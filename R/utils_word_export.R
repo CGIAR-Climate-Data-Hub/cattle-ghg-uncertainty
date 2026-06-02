@@ -785,6 +785,12 @@ build_trend_summary_docx <- function(path,
   # table so the Word report leads with 95% MoE — the IPCC Vol.1 Ch.3 Table
   # 3.3 convention. `cv_pct` is still in the underlying uncertainty frame for
   # any downstream consumer that wants it.
+  # Andreas 2026-06-02 review: include the asymmetric half-widths
+  # (+upper% / -lower%) alongside the symmetric MoE — many emission
+  # distributions are skewed (lognormal EFs, PERT-bounded fractions,
+  # manure-N2O sums) and reporting the two sides separately is what users
+  # may need to populate the asymmetric-bounds version of IPCC Table 3.3.
+  has_asym <- all(c("upper_pct", "lower_pct") %in% names(keep))
   df <- data.frame(
     `Emission category` = .pretty_var(keep$variable),
     Unit                = .unit_for_var(keep$variable),
@@ -795,6 +801,10 @@ build_trend_summary_docx <- function(path,
     check.names = FALSE,
     stringsAsFactors = FALSE
   )
+  if (has_asym) {
+    df[["+ upper (%)"]] <- formatC(keep$upper_pct, digits = 3, format = "g")
+    df[["- lower (%)"]] <- formatC(keep$lower_pct, digits = 3, format = "g")
+  }
   flextable::flextable(df)
 }
 

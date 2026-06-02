@@ -570,13 +570,25 @@ app_server <- function(input, output, session) {
     )
   })
 
-  # Uncertainty table
+  # Uncertainty table.
+  # Andreas 2026-06-02 review: when a user searched the table for a parameter
+  # (e.g. "MW") and edited a cell, the whole DT re-rendered from scratch and
+  # the search filter was cleared — forcing a fresh search for every edit on
+  # large inventories. stateSave = TRUE + stateDuration = -1 tells the
+  # underlying DataTables JS to persist search, ordering, and paging in the
+  # browser's sessionStorage and re-apply on every re-init. Cleared on tab
+  # close so it doesn't bleed across sessions.
   output$uncertainty_table <- DT::renderDT({
     req(rv$param_specs)
     DT::datatable(
       rv$param_specs[, c("parameter", "mean", "uncertainty_pct", "distribution",
                           "lower", "upper", "param_type")],
-      options = list(pageLength = 20), editable = TRUE, rownames = FALSE
+      options = list(
+        pageLength    = 20,
+        stateSave     = TRUE,
+        stateDuration = -1   # sessionStorage; cleared when tab closes
+      ),
+      editable = TRUE, rownames = FALSE
     )
   })
 
@@ -806,8 +818,12 @@ app_server <- function(input, output, session) {
     # Snap the selection back to "none" if the currently-active mode just
     # became unavailable (e.g. user uploaded a new template whose TS sheet
     # is empty while previously on timeseries). Deferred via session.
+    # NOTE on manual: this mode is now ALWAYS selectable (the file picker
+    # lives inside the manual conditionalPanel, so users need to enter the
+    # mode to reach the upload). The simulation observer blocks the run if
+    # the user selected manual without actually uploading a matrix — that's
+    # where the safety check lives now, not here.
     if ((current_mode == "timeseries" && !ts_ok) ||
-        (current_mode == "manual"     && !manual_ok) ||
         (current_mode == "preset"     && !has_template)) {
       isolate({
         updateRadioButtons(session, "corr_mode", selected = "none")
@@ -851,9 +867,14 @@ app_server <- function(input, output, session) {
           help_enabled  = tagList("Known biological linkages (BW↔MW, DE↔Ym, Milk↔BW, Milk↔DE, etc.) applied automatically. ", tags$em("Recommended for single-year inventories.")),
           help_disabled = "no parameter data loaded yet. Load Country X / Country Y or upload your own template to enable."),
         label_for("manual", "Advanced — manual entry",
-          enabled       = manual_ok,
-          help_enabled  = "Use the uploaded CSV matrix below. Only pick this if you have a matrix from expert elicitation or a published study.",
-          help_disabled = "no manual CSV matrix uploaded yet. Use the file picker further down this card to upload a square symmetric matrix.")
+          # Always enabled: the file picker is inside this option's conditional
+          # panel, so the user has to be able to select it to reach the upload.
+          # Help text adapts to whether a CSV is already loaded.
+          enabled       = TRUE,
+          help_enabled  = if (manual_ok)
+            "A manual CSV matrix is loaded — using it for the run. Re-upload below to replace."
+          else
+            "Pick this and use the file picker that appears below to upload a square symmetric CSV matrix (parameter names as row/col headers, diagonal = 1, off-diagonals in [-1, 1]).")
       ),
       selected = current_mode)
 
@@ -864,7 +885,9 @@ app_server <- function(input, output, session) {
     disabled_values <- c()
     if (!ts_ok)        disabled_values <- c(disabled_values, "timeseries")
     if (!has_template) disabled_values <- c(disabled_values, "preset")
-    if (!manual_ok)    disabled_values <- c(disabled_values, "manual")
+    # "manual" intentionally NOT in disabled_values — see comment above the
+    # radioButtons() call. The simulation observer blocks the run if manual
+    # is selected without an uploaded matrix.
     js_disable <- if (length(disabled_values) > 0) {
       tags$script(HTML(sprintf(
         "setTimeout(function(){var vals=%s; vals.forEach(function(v){var el=document.querySelector('input[name=\"corr_mode\"][value=\"'+v+'\"]'); if(el){el.disabled=true;}});}, 0);",

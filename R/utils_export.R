@@ -39,6 +39,16 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
     if (nrow(row) == 0L) return(NA_real_)
     round(row$moe_pct, 1)
   }
+  # Andreas 2026-06-02 review: also expose the asymmetric half-widths so users
+  # can read +upper% / -lower% for the combined run alongside the symmetric MoE.
+  get_asym <- function(df, var, side) {
+    row <- df[df$variable == var, , drop = FALSE]
+    if (nrow(row) == 0L) row <- df[df$variable == alt_name(var), , drop = FALSE]
+    if (nrow(row) == 0L) return(NA_real_)
+    col <- if (side == "upper") "upper_pct" else "lower_pct"
+    if (!col %in% names(row)) return(NA_real_)
+    round(row[[col]], 1)
+  }
 
   # Andreas 2026-05 #36, C10: pasture direct + indirect must appear as
   # separate IPCC reporting lines, not collapsed into "total N2O".
@@ -64,6 +74,11 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
     `AD uncertainty (95% MoE %)`       = sapply(vars, function(v) get_moe(ad_only, v)),
     `EF uncertainty (95% MoE %)`       = sapply(vars, function(v) get_moe(ef_only, v)),
     `Combined uncertainty (95% MoE %)` = sapply(vars, function(v) get_moe(combined, v)),
+    # Asymmetric breakdown on the combined run — for skewed pathways the
+    # +upper% and -lower% differ, which IPCC Vol.1 Ch.3 §3.7 explicitly
+    # endorses reporting alongside the symmetric MoE.
+    `Combined +upper (%)`              = sapply(vars, function(v) get_asym(combined, v, "upper")),
+    `Combined -lower (%)`              = sapply(vars, function(v) get_asym(combined, v, "lower")),
     check.names = FALSE,
     stringsAsFactors = FALSE,
     row.names = NULL

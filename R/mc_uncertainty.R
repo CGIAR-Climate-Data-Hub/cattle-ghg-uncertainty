@@ -9,6 +9,12 @@ calc_uncertainty_metrics <- function(x) {
   # downstream formatters can handle it gracefully.
   cv_pct  <- if (isTRUE(m != 0)) sd(x) / m * 100 else NA_real_
   moe_pct <- if (isTRUE(m != 0)) ((q975 - q025) / 2) / m * 100 else NA_real_
+  # Andreas 2026-06-02 review: asymmetric half-widths reported alongside the
+  # symmetric MoE so users can see the +upper% / -lower% breakdown when the
+  # emission distribution is skewed (lognormal EFs, PERT-bounded fractions,
+  # manure-N2O sums). For a perfectly symmetric distribution these equal MoE.
+  upper_pct <- if (isTRUE(m != 0)) (q975 - m) / m * 100 else NA_real_
+  lower_pct <- if (isTRUE(m != 0)) (m - q025) / m * 100 else NA_real_
   data.frame(
     mean = m, median = median(x), sd = sd(x),
     cv_pct  = cv_pct,
@@ -19,6 +25,8 @@ calc_uncertainty_metrics <- function(x) {
     # (Previous formula was 1.96*sd/sqrt(n)/mean — that is the standard error
     # of the *estimator*, not the uncertainty of the emission value.)
     moe_pct = moe_pct,
+    upper_pct = upper_pct,
+    lower_pct = lower_pct,
     iqr = IQR(x), min = min(x), max = max(x)
   )
 }
