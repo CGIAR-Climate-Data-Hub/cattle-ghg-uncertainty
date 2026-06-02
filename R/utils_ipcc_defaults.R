@@ -500,6 +500,68 @@ generate_country_y_timeseries <- function() {
   )
 }
 
+# Country X manure-management allocation (4 MMS types).
+# Typical for a smallholder dairy in tropical Africa: half the manure
+# deposited on pasture during grazing, the rest split between solid kraal
+# storage (most), liquid slurry (washing into pits), and a small share to
+# anaerobic-digester biogas (an increasingly common practice). Per-MMS MCF
+# / EF3 / Frac_GasMS / Frac_LeachMS follow IPCC 2019 Refinement Vol.4 Ch.10
+# Tables 10.17, 10.21, 10.22, 10.23 (warm/tropical climate). Uncertainty
+# bounds added on fraction_pct, MCF, and EF3 so the per-MMS sampling code
+# path is exercised and MMS allocation surfaces in the sensitivity tornado.
+generate_country_x_manure <- function() {
+  data.frame(
+    cattle_type           = rep("dairy", 4),
+    aggregation_level     = rep("Country X – smallholder dairy", 4),
+    sub_category          = rep("cows", 4),
+    mms_type              = c("pasture", "solid_storage", "liquid_slurry",
+                               "anaerobic_digester"),
+    fraction_pct          = c(50, 30, 15, 5),
+    lower_fraction        = c(40, 25, 10, 2),
+    upper_fraction        = c(60, 35, 20, 8),
+    distribution_fraction = rep("pert", 4),
+    MCF_pct               = c(1.5, 4.0, 71.0, 10.0),
+    lower_mcf             = c(1.0, 2.0, 50.0, 5.0),
+    upper_mcf             = c(2.0, 8.0, 80.0, 20.0),
+    distribution_mcf      = rep("pert", 4),
+    EF3                   = c(0.020, 0.005, 0.005, 0.0006),
+    lower_ef3             = c(0.007, 0.0025, 0.0025, 0.0003),
+    upper_ef3             = c(0.060, 0.0250, 0.0250, 0.0015),
+    distribution_ef3      = rep("pert", 4),
+    Frac_GasMS_pct        = c(21, 45, 32, 5),
+    Frac_LeachMS_pct      = c(30,  2,  0, 0),
+    stringsAsFactors      = FALSE
+  )
+}
+
+# Country Y manure-management allocation (2 MMS types).
+# Pastoral non-dairy beef cattle: almost all manure stays on the rangeland
+# (pasture), with a small fraction in solid storage during occasional
+# overnight confinement in kraals.
+generate_country_y_manure <- function() {
+  data.frame(
+    cattle_type           = rep("non_dairy", 2),
+    aggregation_level     = rep("Country Y – pastoral rangeland", 2),
+    sub_category          = rep("breeding_cows", 2),
+    mms_type              = c("pasture", "solid_storage"),
+    fraction_pct          = c(90, 10),
+    lower_fraction        = c(80,  5),
+    upper_fraction        = c(95, 20),
+    distribution_fraction = rep("pert", 2),
+    MCF_pct               = c(1.5, 4.0),
+    lower_mcf             = c(1.0, 2.0),
+    upper_mcf             = c(2.0, 8.0),
+    distribution_mcf      = rep("pert", 2),
+    EF3                   = c(0.020, 0.005),
+    lower_ef3             = c(0.007, 0.0025),
+    upper_ef3             = c(0.060, 0.0250),
+    distribution_ef3      = rep("pert", 2),
+    Frac_GasMS_pct        = c(21, 45),
+    Frac_LeachMS_pct      = c(30,  2),
+    stringsAsFactors      = FALSE
+  )
+}
+
 # Fill in lower/upper bounds from explicit overrides or uncertainty_pct
 # Priority: lower_bound/upper_bound columns (if present and non-NA) > ±pct formula
 fill_bounds <- function(param_specs) {

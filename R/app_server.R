@@ -100,12 +100,18 @@ app_server <- function(input, output, session) {
       # requiring a separate Excel upload.
       rv$population  <- generate_country_x_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
-      rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded — 12 parameters, dairy / cows; 5-year synthetic time-series populated for correlation auto-mode.\n"
+      # Manure-management allocation with 4 MMS types + per-MMS uncertainty so
+      # the IPCC Table 3.3 EF column varies across N2O pathways (otherwise
+      # every N2O row collapses to the same Nex-dominated MoE — looks like a
+      # bug but is actually structural for single-MMS inventories).
+      rv$manure_data <- generate_country_x_manure()
+      rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded — 12 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
-      rv$sim_log <- "Country Y (hypothetical pastoral non-dairy) example data loaded — 11 parameters, non_dairy / breeding_cows; 5-year synthetic time-series populated for correlation auto-mode.\n"
+      rv$manure_data <- generate_country_y_manure()
+      rv$sim_log <- "Country Y (hypothetical pastoral non-dairy) example data loaded — 11 parameters, non_dairy / breeding_cows; 2 MMS types (pasture / solid_storage); 5-year synthetic time-series populated for correlation auto-mode.\n"
     }
     # Flag any missing core parameters immediately so the Tab 1 notice appears
     # without needing to run the simulation first.

@@ -21,6 +21,8 @@ _verify_dist.R
 _zim_verify.R
 _example_verify.R
 _repro_app_path.R
+_repro_country_y.R
+_verify_x_with_manure.R
 deploy_shinyapps.R
 install.R
 
