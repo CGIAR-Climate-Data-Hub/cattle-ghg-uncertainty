@@ -1395,11 +1395,18 @@ app_server <- function(input, output, session) {
 
             corr_mtx_active <- effective_corr_matrix()
 
-            unified_corr <- if (input$corr_mode != "none" && !is.null(corr_mtx_active)) {
+            # isTRUE() wrap protects against input$corr_mode being NA mid-render
+            # (the radioButtons("corr_mode", ...) is built inside a renderUI, so
+            # input$corr_mode can transiently be NA right after Country X / Y
+            # load when corr_mtx_active is already populated from the example's
+            # synthetic time-series). Without isTRUE, `NA != "none"` returns NA,
+            # `NA && TRUE` returns NA, and `if (NA)` throws "missing value where
+            # TRUE/FALSE needed" — the exact error users reported on Country X.
+            unified_corr <- if (isTRUE(input$corr_mode != "none") && !is.null(corr_mtx_active)) {
               expand_corr_matrix(corr_mtx_active, all_names)
             } else NULL
 
-            ts_coef_corr <- if (input$corr_mode != "none" && !is.null(corr_mtx_active)) {
+            ts_coef_corr <- if (isTRUE(input$corr_mode != "none") && !is.null(corr_mtx_active)) {
               expand_corr_matrix(corr_mtx_active, coef_names)
             } else NULL
 
