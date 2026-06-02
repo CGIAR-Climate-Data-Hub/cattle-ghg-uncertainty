@@ -1738,6 +1738,33 @@ section_F <- function() {
                                ent_per_head, mm_per_head, n2o_per_head))
   }
 
+  # F22 — Downloadable correlation-matrix template (Lolita 2026-06-02 review).
+  # Confirms generate_corr_matrix_template() produces a CSV that round-trips
+  # correctly through the upload parser (read.csv with row.names = 1) and
+  # that the example variant matches build_ipcc_preset_corr() element-for-
+  # element. Catches drift between the downloadable template and the in-app
+  # structural-defaults preset.
+  tmp_csv <- tempfile(fileext = ".csv")
+  generate_corr_matrix_template(tmp_csv, include_example = TRUE)
+  m_back <- as.matrix(read.csv(tmp_csv, row.names = 1, check.names = FALSE))
+  m_ref  <- build_ipcc_preset_corr(PARAM_CATALOGUE$parameter)
+  shape_ok  <- nrow(m_back) == ncol(m_back) &&
+                nrow(m_back) == nrow(PARAM_CATALOGUE)
+  diag_ok   <- all(diag(m_back) == 1)
+  names_ok  <- identical(rownames(m_back), PARAM_CATALOGUE$parameter) &&
+                identical(colnames(m_back), PARAM_CATALOGUE$parameter)
+  values_ok <- isTRUE(all.equal(unname(m_back), unname(m_ref),
+                                  tolerance = 1e-10))
+  # At least seven off-diagonal symmetric pairs of the preset → ≥14 non-zero
+  # off-diagonal cells. Check ≥7 to be robust against any reordering.
+  n_nonzero_off <- sum(m_back != 0) - nrow(m_back)  # subtract diagonal ones
+  pairs_ok <- n_nonzero_off >= 7
+  check_bool("F22", "F",
+             "generate_corr_matrix_template(example) round-trips through CSV and matches build_ipcc_preset_corr()",
+             shape_ok && diag_ok && names_ok && values_ok && pairs_ok,
+             notes = sprintf("shape=%s diag=%s names=%s values=%s pairs=%s",
+                             shape_ok, diag_ok, names_ok, values_ok, pairs_ok))
+
   # F19b — Tornado user_reducible lookup handles labelled sub-category
   # parameters. Strip " (sub_category)" suffix before catalogue lookup.
   labelled <- c("Ym (DINT_cow)", "BW (DINT_heif)", "Bo (DINT_GrM)",

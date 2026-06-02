@@ -485,6 +485,15 @@ If you prefer to specify correlations manually:
   \item The tool verifies positive-definiteness and projects onto the nearest positive-definite correlation matrix if needed; you are warned if any entry shifts by more than 0.01.
 \end{enumerate}
 
+\textit{Downloadable starting templates.} Two CSV templates appear inside the \textbf{Advanced --- manual entry} panel and remove the need to construct the matrix from scratch:
+
+\begin{itemize}
+  \item \textbf{Download blank matrix template} --- a square matrix with all parameter names already in place as row and column headers, the diagonal set to 1, and every off-diagonal cell set to 0. Open it in Excel, fill the cells you want correlated, save as CSV, and upload via the \textbf{Upload correlation matrix (.csv)} button.
+  \item \textbf{Download matrix with example values} --- the same matrix but pre-filled with the seven structural-defaults pairs (BW $\leftrightarrow$ MW, BW $\leftrightarrow$ WG, Milk $\leftrightarrow$ Fat, Milk $\leftrightarrow$ BW, Milk $\leftrightarrow$ DE, DE $\leftrightarrow$ CP, DE $\leftrightarrow$ Ym). This matrix is \textbf{identical} to what the in-app \textit{Structural defaults} preset applies internally --- it is a useful starting point if you want to tweak just one or two pairs.
+\end{itemize}
+
+\textit{Parameter-name rules.} The templates ship with the canonical parameter names already in the first column and the header row (\texttt{N}, \texttt{BW}, \texttt{MW}, \texttt{WG}, \texttt{Milk}, \texttt{Fat}, \texttt{pct\_pregnant}, \texttt{DE}, \texttt{Cfi}, \texttt{Ca}, \texttt{C}, \texttt{Cp}, \texttt{hours}, \texttt{CP}, \texttt{Ym}, \texttt{Bo}, \texttt{ASH}, \texttt{UE}, \texttt{EF3\_PRP}, \texttt{EF4}, \texttt{EF5}, \texttt{Frac\_GASM\_PRP}, \texttt{Frac\_LEACH\_PRP}, \texttt{MilkPR}, \texttt{Tw}). \textbf{Do not rename rows or columns} --- names that don't match a catalogue parameter are silently ignored when the matrix is applied to the simulation (no error message; the correlation just doesn't take effect). Legacy aliases such as \texttt{pct\_calving} are resolved on the \emph{Parameters-sheet} upload only; on the correlation matrix they need to be the canonical names listed above.
+
 ## Structural defaults (expert-elicited)
 
 A built-in preset of structural defaults is available. It applies the following well-documented pairs, drawn from the IPCC equations and the livestock literature. \textit{These values are expert-elicited; the IPCC publishes no numerical correlation coefficients for these pairs.} Hover any non-zero cell in the heatmap for the per-pair source citation.

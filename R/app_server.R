@@ -689,6 +689,21 @@ app_server <- function(input, output, session) {
     }
   )
 
+  # Lolita 2026-06-02 review: downloadable correlation-matrix templates for
+  # the "Advanced — manual entry" mode. Two flavours — blank (identity) and
+  # pre-filled with the structural-defaults pairs — so users have a concrete
+  # starting CSV with the canonical PARAM_CATALOGUE names already in place.
+  # Prevents typos in row/column headers that would otherwise be silently
+  # dropped by expand_corr_matrix().
+  output$download_corr_template <- downloadHandler(
+    filename = function() "correlation_matrix_template_blank.csv",
+    content  = function(file) generate_corr_matrix_template(file, include_example = FALSE)
+  )
+  output$download_corr_template_example <- downloadHandler(
+    filename = function() "correlation_matrix_template_example.csv",
+    content  = function(file) generate_corr_matrix_template(file, include_example = TRUE)
+  )
+
   # --- CORRELATIONS ---
 
   # T4.1 / Round 7 R1.15: structural-defaults preset — sparse matrix with documented
@@ -874,7 +889,7 @@ app_server <- function(input, output, session) {
           help_enabled  = if (manual_ok)
             "A manual CSV matrix is loaded — using it for the run. Re-upload below to replace."
           else
-            "Pick this and use the file picker that appears below to upload a square symmetric CSV matrix (parameter names as row/col headers, diagonal = 1, off-diagonals in [-1, 1]).")
+            "Pick this to use a CSV correlation matrix. Two starting templates appear below — a blank matrix with all parameter names pre-labelled, and an example pre-filled with the structural-defaults pairs. Edit cells and re-upload.")
       ),
       selected = current_mode)
 

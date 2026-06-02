@@ -1,11 +1,11 @@
 # AUDIT_REPORT.md — Statistician's end-to-end audit
 
-Generated 2026-06-02 18:50 CEST by `_audit.R`.
+Generated 2026-06-02 19:05 CEST by `_audit.R`.
 
 ## Summary
 
-- Tests run: **89**
-- Pass: **89**
+- Tests run: **90**
+- Pass: **90**
 - Fail: **0**
 - Skip: **0**
 - Verdict: **AUDIT CLEAN**
@@ -110,10 +110,11 @@ Synthetic single-sub-category dairy inventory with all 27 IPCC-aligned parameter
 | F20c | F | Zim end-to-end: 5 sub-categories produced, each with non-zero direct N2O | ✅ PASS | n_sys = 5; all non-zero = TRUE |
 | F21_country_x | F | Built-in example country_x per-head emissions in IPCC Tier-2 plausible band | ✅ PASS | enteric=75.5 kg/hd, manure_CH4=2.71 kg/hd, direct_N2O_mm=0.1144 kg/hd |
 | F21_country_y | F | Built-in example country_y per-head emissions in IPCC Tier-2 plausible band | ✅ PASS | enteric=74.4 kg/hd, manure_CH4=2.75 kg/hd, direct_N2O_mm=0.1130 kg/hd |
+| F22 | F | generate_corr_matrix_template(example) round-trips through CSV and matches build_ipcc_preset_corr() | ✅ PASS | shape=TRUE diag=TRUE names=TRUE values=TRUE pairs=TRUE |
 | F19b | F | Tornado user_reducible lookup correctly classifies labelled params | ✅ PASS | results: FALSE, TRUE, FALSE, FALSE, TRUE; expected: FALSE, TRUE, FALSE, FALSE, TRUE |
-| G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9785 bytes |
+| G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9784 bytes |
 | G2 | G | CSV write of uncertainty frame produces non-empty file | ✅ PASS | 2215 bytes |
-| G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316633 bytes |
+| G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316634 bytes |
 | G4 | G | methodology.Rmd Reporting section contains CRT category map (3.A / 3.B / 3.D) | ✅ PASS | 3.A=TRUE 3.B=TRUE 3.D=TRUE |
 | G5 | G | methodology.Rmd Reporting section contains Level 1/2/3 disaggregation guide | ✅ PASS | L1=TRUE L2=TRUE L3=TRUE |
 
@@ -204,6 +205,7 @@ Synthetic single-sub-category dairy inventory with all 27 IPCC-aligned parameter
 | F20c | TRUE | TRUE | PASS |
 | F21_country_x | TRUE | TRUE | PASS |
 | F21_country_y | TRUE | TRUE | PASS |
+| F22 | TRUE | TRUE | PASS |
 | F19b | TRUE | TRUE | PASS |
 | G1 | TRUE | TRUE | PASS |
 | G2 | TRUE | TRUE | PASS |

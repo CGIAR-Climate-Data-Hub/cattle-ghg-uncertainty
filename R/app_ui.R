@@ -767,7 +767,18 @@ app_ui <- function() {
                   tags$strong("Advanced — manual matrix entry. "),
                   "Upload a CSV with parameter names as both column headers and the first column. ",
                   "Values must be in [-1, 1] with the diagonal = 1. ",
-                  "Recommended only for experienced users — most cases are covered by the time-series or preset options."),
+                  "Don't write the matrix from scratch — download one of the templates below, ",
+                  "edit cells in Excel, save as CSV, and re-upload."),
+              # Lolita 2026-06-02 review: provide a concrete starting CSV so
+              # users don't have to hand-type parameter names (typos would be
+              # silently dropped downstream).
+              div(style = "margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;",
+                  downloadButton("download_corr_template",
+                                 "Download blank matrix template",
+                                 class = "btn-outline-success btn-sm"),
+                  downloadButton("download_corr_template_example",
+                                 "Download matrix with example values",
+                                 class = "btn-outline-primary btn-sm")),
               fileInput("corr_matrix_upload", "Upload correlation matrix (.csv)",
                         accept = ".csv")
             ),

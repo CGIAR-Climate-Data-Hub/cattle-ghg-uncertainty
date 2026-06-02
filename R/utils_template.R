@@ -395,6 +395,37 @@ PARAM_CATALOGUE <- data.frame(
 
 
 # ---------------------------------------------------------------------------
+# Correlation matrix template (Lolita 2026-06-02 review).
+# Produces a square CSV the user can drop into the "Advanced — manual entry"
+# correlation-mode upload. The row and column names are the canonical
+# PARAM_CATALOGUE$parameter values so the upload parser + expand_corr_matrix()
+# in the simulation observer can pick up every pair correctly. Without this
+# template, users hand-writing a matrix risk typos in headers that get
+# silently dropped (expand_corr_matrix uses intersect() — names that don't
+# match the simulation's parameter list contribute no correlation).
+#
+# include_example = TRUE pre-fills the seven structural-defaults pairs
+# (BW <-> MW, BW <-> WG, Milk <-> Fat, Milk <-> BW, Milk <-> DE, DE <-> CP,
+# DE <-> Ym) via build_ipcc_preset_corr() so the example matrix is IDENTICAL
+# to what the in-app "Structural defaults" preset applies — single source of
+# truth in PRESET_PAIRS (R/mc_sampling.R).
+generate_corr_matrix_template <- function(filepath, include_example = FALSE) {
+  params <- PARAM_CATALOGUE$parameter
+  m <- if (include_example) {
+    build_ipcc_preset_corr(params)
+  } else {
+    out <- diag(length(params))
+    rownames(out) <- colnames(out) <- params
+    out
+  }
+  # write.csv with row.names = TRUE so the first column carries the parameter
+  # names — exactly the shape read.csv(..., row.names = 1, check.names = FALSE)
+  # expects in the upload parser (R/app_server.R observeEvent(corr_matrix_upload)).
+  utils::write.csv(m, file = filepath, row.names = TRUE)
+  invisible(filepath)
+}
+
+# ---------------------------------------------------------------------------
 # MAIN ENTRY POINT
 # ---------------------------------------------------------------------------
 generate_template <- function(filepath, include_example = FALSE,
