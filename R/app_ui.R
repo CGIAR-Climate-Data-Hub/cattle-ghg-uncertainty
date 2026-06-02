@@ -768,7 +768,9 @@ app_ui <- function() {
                   "Upload a CSV with parameter names as both column headers and the first column. ",
                   "Values must be in [-1, 1] with the diagonal = 1. ",
                   "Don't write the matrix from scratch — download one of the templates below, ",
-                  "edit cells in Excel, save as CSV, and re-upload."),
+                  "edit cells in Excel, save as CSV, and re-upload. ",
+                  tags$strong("Missing parameters are assumed to have zero correlation: "),
+                  "any parameter whose row/column is absent from the uploaded matrix (or whose name doesn't match the canonical list) is treated as independent of every other parameter — the simulation runs but no correlation is applied for that parameter."),
               # Lolita 2026-06-02 review: provide a concrete starting CSV so
               # users don't have to hand-type parameter names (typos would be
               # silently dropped downstream).
