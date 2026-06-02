@@ -81,7 +81,8 @@ for (sg in sys_groups) {
 
   frac_gas_vals   <- NULL
   frac_leach_vals <- NULL
-  mcf_samples <- ef3_samples <- fg_samples <- fl_samples <- NULL
+  mcf_samples <- ef3_samples <- fg_samples <- fl_samples <-
+    fraction_samples <- NULL
 
   if (!is.null(manure) && nrow(manure) > 0 &&
       all(c("mms_type", "fraction_pct", "MCF_pct", "EF3") %in% names(manure))) {
@@ -142,11 +143,30 @@ for (sg in sys_groups) {
         mr_fl_scaled, "Frac_LeachMS_pct", "lower_frac_leach",
         "upper_frac_leach", "distribution_frac_leach",
         n_iter_val, default_dist = "pert")
+      # Andreas 28/5/26 #4: sample fraction_pct per-MMS so MMS allocation
+      # shows up in the tornado / rank-correlation. Mirrors app_server.R.
+      if (any(c("lower_fraction", "upper_fraction", "distribution_fraction")
+              %in% names(mms_rows))) {
+        fraction_samples <- sample_per_mms_param(
+          mms_rows, "fraction_pct", "lower_fraction",
+          "upper_fraction", "distribution_fraction",
+          n_iter_val, default_dist = "pert")
+        if (!is.null(fraction_samples)) {
+          fraction_samples[fraction_samples < 0] <- 0
+          fraction_samples <- fraction_samples / 100
+          rs <- rowSums(fraction_samples)
+          rs[rs <= 0] <- 1
+          fraction_samples <- fraction_samples / rs
+        }
+      }
+
       ord_names <- names(mms_fracs)
       if (!is.null(mcf_samples)) mcf_samples <- mcf_samples[, ord_names, drop = FALSE]
       if (!is.null(ef3_samples)) ef3_samples <- ef3_samples[, ord_names, drop = FALSE]
       if (!is.null(fg_samples))  fg_samples  <- fg_samples[, ord_names, drop = FALSE]
       if (!is.null(fl_samples))  fl_samples  <- fl_samples[, ord_names, drop = FALSE]
+      if (!is.null(fraction_samples))
+        fraction_samples <- fraction_samples[, ord_names, drop = FALSE]
 
       if (length(mms_fracs) == 0) {
         mms_fracs <- default_mms_fracs
@@ -170,7 +190,8 @@ for (sg in sys_groups) {
     mms_fractions = mms_fracs, mcf_values = mcf_vals, ef3_values = ef3_vals,
     frac_gas_values = frac_gas_vals, frac_leach_values = frac_leach_vals,
     mcf_samples = mcf_samples, ef3_samples = ef3_samples,
-    frac_gas_samples = fg_samples, frac_leach_samples = fl_samples)
+    frac_gas_samples = fg_samples, frac_leach_samples = fl_samples,
+    mms_fraction_samples = fraction_samples)
 }
 
 # Run the simulation -------------------------------------------------------

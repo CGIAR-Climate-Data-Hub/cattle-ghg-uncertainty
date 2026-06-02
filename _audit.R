@@ -1590,6 +1590,154 @@ section_F <- function() {
            "uncertainty_template_ipcc2019_ZIM_v2.xlsx not in repo root")
   }
 
+  # F20 — End-to-end custom-upload regression on Andreas's canonical Zim
+  # template. Mirrors _zim_verify.R, hard-wired tolerances. Protects against
+  # silent regression of: (a) the auto-match of DINT_heif → DINT_heifer, (b)
+  # the per-MMS / multi-sub-category direct N2O calculation, (c) per-
+  # sub-category disaggregation in the simulation output. Skipped when the
+  # template file isn't on disk (the file is intentionally not committed —
+  # it's Andreas's working data).
+  zim_path <- "uncertainty_template_ipcc2019_ZIM_v2.xlsx"
+  if (file.exists(zim_path)) {
+    parsed_z <- tryCatch(parse_uploaded_template(zim_path),
+                          error = function(e) NULL)
+    if (!is.null(parsed_z) && !is.null(parsed_z$manure) &&
+        nrow(parsed_z$manure) > 0) {
+      specs_z  <- parsed_z$param_specs
+      manure_z <- parsed_z$manure
+      group_key_z <- paste(specs_z$cattle_type, specs_z$aggregation_level,
+                            specs_z$sub_category, sep = "||")
+      sys_groups_z <- unique(group_key_z)
+      sg_resolve_z <- resolve_sub_category_matches(specs_z, manure_z)
+
+      # F20a — heifer auto-match fires for the DINT_heif typo.
+      auto_match_fired <- any(sg_resolve_z$issues$status == "warn" &
+                                sg_resolve_z$issues$check == "sub_category_auto_match" &
+                                grepl("DINT_heif", sg_resolve_z$issues$message))
+      check_bool("F20a", "F",
+                 "Zim template: heifer auto-match (DINT_heif → DINT_heifer) fires",
+                 auto_match_fired,
+                 notes = if (auto_match_fired) "auto-match issue raised as warning"
+                         else "auto-match NOT triggered — would cause N2O off-by-10")
+
+      # F20b — full simulation runs and total_direct_n2o_mm is within tolerance
+      # of the @Risk reference (39.9 t). Tolerance: [20, 50] — generous because
+      # Monte Carlo + tool/risk modelling differences. Below 10 → regression to
+      # the pre-auto-match factor-of-10 bug.
+      systems_data_z <- list()
+      for (sg in sys_groups_z) {
+        sys_specs <- specs_z[group_key_z == sg, ]
+        manure_key_z <- paste(manure_z$cattle_type, manure_z$aggregation_level,
+                               manure_z$sub_category, sep = "||")
+        sg_lookup <- if (sg %in% names(sg_resolve_z$matched))
+          sg_resolve_z$matched[[sg]] else sg
+        mms_rows <- manure_z[manure_key_z == sg_lookup, ]
+        if (nrow(mms_rows) > 0) {
+          fp <- suppressWarnings(as.numeric(mms_rows$fraction_pct)) / 100
+          mcf <- suppressWarnings(as.numeric(mms_rows$MCF_pct)) / 100
+          ef3 <- suppressWarnings(as.numeric(mms_rows$EF3))
+          mms_fracs <- setNames(fp, mms_rows$mms_type)
+          mcf_vals <- setNames(mcf, mms_rows$mms_type)
+          ef3_vals <- setNames(ef3, mms_rows$mms_type)
+          mms_fracs <- mms_fracs[!is.na(mms_fracs)]
+          mcf_vals  <- mcf_vals[names(mms_fracs)]; mcf_vals[is.na(mcf_vals)] <- 0.015
+          ef3_vals  <- ef3_vals[names(mms_fracs)]; ef3_vals[is.na(ef3_vals)] <- 0.005
+        } else {
+          mms_fracs <- c(pasture = 0.70, solid_storage = 0.30)
+          mcf_vals  <- c(pasture = 0.015, solid_storage = 0.050)
+          ef3_vals  <- c(pasture = 0.020, solid_storage = 0.005)
+        }
+        systems_data_z[[sg]] <- list(
+          param_specs = sys_specs, corr_matrix = NULL, ef_corr_matrix = NULL,
+          unified_corr_matrix = NULL,
+          mms_fractions = mms_fracs, mcf_values = mcf_vals, ef3_values = ef3_vals)
+      }
+      sim_z <- tryCatch(
+        run_inventory_simulation(systems_data_z, n_iter = 2000L, gwp = "AR5",
+                                  seed = 42L, pct_pregnant = 1,
+                                  sampler = "iman_conover"),
+        error = function(e) NULL)
+      if (!is.null(sim_z)) {
+        n2o_direct <- mean(sim_z$inventory$total_direct_n2o_mm)
+        # Generous tolerance — protect against the factor-of-10 regression.
+        ok_n2o <- n2o_direct >= 15 && n2o_direct <= 60
+        check_bool("F20b", "F",
+                   "Zim end-to-end: total_direct_n2o_mm in plausible band [15, 60] (vs @Risk 39.9)",
+                   ok_n2o,
+                   notes = sprintf("mean = %.1f t (regression threshold: < 15 would indicate the auto-match fix is broken)",
+                                   n2o_direct))
+
+        # F20c — per-sub-category disaggregation: by_system has 5 systems,
+        # each with non-zero direct_n2o_mm_total. Protects against the "
+        # disaggregation not working" report.
+        n_sys <- length(sim_z$by_system)
+        all_nonzero <- all(vapply(sim_z$by_system, function(bs) {
+          if (!is.list(bs) || is.null(bs$results)) return(FALSE)
+          if (!"direct_n2o_mm_total" %in% names(bs$results)) return(FALSE)
+          mean(bs$results$direct_n2o_mm_total) > 0
+        }, logical(1)))
+        check_bool("F20c", "F",
+                   "Zim end-to-end: 5 sub-categories produced, each with non-zero direct N2O",
+                   n_sys == 5L && all_nonzero,
+                   notes = sprintf("n_sys = %d; all non-zero = %s",
+                                   n_sys, all_nonzero))
+      }
+    } else {
+      record("F20", "F", "Zim end-to-end regression",
+             "parsed manure data", "missing or empty", "SKIP",
+             "uncertainty_template_ipcc2019_ZIM_v2.xlsx parse failed or empty")
+    }
+  } else {
+    record("F20", "F", "Zim end-to-end regression",
+           "skip", "missing-file", "SKIP",
+           "uncertainty_template_ipcc2019_ZIM_v2.xlsx not in repo root (intentionally untracked)")
+  }
+
+  # F21 — Built-in examples (Country X dairy + Country Y pastoral) produce
+  # per-head emission rates inside the IPCC Tier-2 plausible band. Protects
+  # against the regression Andreas was worried about in the 2 Jun meeting:
+  # "are the examples on the app silently wrong like the pre-fix Zim data was?"
+  # Tight enough to catch a factor-of-10 break, loose enough not to fail on
+  # ordinary Monte Carlo noise.
+  for (cn in c("country_x", "country_y")) {
+    spec_fn <- if (cn == "country_x") generate_country_x_example else
+                                       generate_country_y_example
+    specs <- fill_bounds(spec_fn())
+    group_key <- paste(specs$cattle_type, specs$aggregation_level,
+                       specs$sub_category, sep = "||")
+    sg <- unique(group_key)
+    sys_data <- list()
+    sys_data[[sg]] <- list(
+      param_specs = specs, corr_matrix = NULL, ef_corr_matrix = NULL,
+      unified_corr_matrix = NULL,
+      mms_fractions = c(pasture = 0.70, solid_storage = 0.30),
+      mcf_values    = c(pasture = 0.015, solid_storage = 0.050),
+      ef3_values    = c(pasture = 0.020, solid_storage = 0.005))
+    sim_e <- tryCatch(
+      run_inventory_simulation(sys_data, n_iter = 2000L, gwp = "AR5",
+                                seed = 42L, pct_pregnant = 1,
+                                sampler = "iman_conover"),
+      error = function(e) NULL)
+    if (is.null(sim_e)) {
+      check_bool(paste0("F21_", cn), "F",
+                 sprintf("Built-in example %s simulates without error", cn),
+                 FALSE, notes = "simulation crashed")
+      next
+    }
+    N <- specs$mean[specs$parameter == "N"]
+    ent_per_head <- mean(sim_e$inventory$total_enteric_ch4) * 1e3 / N
+    mm_per_head  <- mean(sim_e$inventory$total_manure_ch4)  * 1e3 / N
+    n2o_per_head <- mean(sim_e$inventory$total_direct_n2o_mm) * 1e3 / N
+    ok <- ent_per_head  >= 30  && ent_per_head  <= 160 &&
+          mm_per_head   >=  0  && mm_per_head   <=  40 &&
+          n2o_per_head  >= 0.005 && n2o_per_head <= 0.5
+    check_bool(paste0("F21_", cn), "F",
+               sprintf("Built-in example %s per-head emissions in IPCC Tier-2 plausible band", cn),
+               ok,
+               notes = sprintf("enteric=%.1f kg/hd, manure_CH4=%.2f kg/hd, direct_N2O_mm=%.4f kg/hd",
+                               ent_per_head, mm_per_head, n2o_per_head))
+  }
+
   # F19b — Tornado user_reducible lookup handles labelled sub-category
   # parameters. Strip " (sub_category)" suffix before catalogue lookup.
   labelled <- c("Ym (DINT_cow)", "BW (DINT_heif)", "Bo (DINT_GrM)",

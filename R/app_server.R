@@ -1147,7 +1147,13 @@ app_server <- function(input, output, session) {
       message = sprintf("Monte Carlo simulation (%s iterations)", n_iter_fmt),
       value   = 0,
       {
-        tryCatch({
+        # Capture-by-reference holder for the stack at point-of-error. The
+        # tryCatch error handler runs AFTER the stack has unwound, so
+        # sys.calls() there only shows Shiny scaffolding (useless for
+        # debugging if(NA) errors). withCallingHandlers runs BEFORE unwinding
+        # — we snap sys.calls() there and stash it for the tryCatch logger.
+        captured_stack <- character(0)
+        tryCatch(withCallingHandlers({
 
           # ---- Stage 1: build system data ----
           setProgress(0.03, detail = "Preparing system data...")
@@ -1544,7 +1550,7 @@ app_server <- function(input, output, session) {
           #   EF-only  — all activity-data params fixed at their means
           # Works for any number of cattle groups because it uses the same
           # run_inventory_simulation() pipeline as the main run.
-          if (input$run_decomposition) {
+          if (isTRUE(input$run_decomposition)) {
             setProgress(0.48, detail = sprintf("Running AD-only simulation (%d group(s))...",
                                                length(systems_data)))
 
@@ -1681,28 +1687,32 @@ app_server <- function(input, output, session) {
           showNotification("Simulation complete — results displayed.",
                            type = "message", duration = 4)
 
-        }, error = function(e) {
-          # Andreas 2026-05-26 follow-up: capture the R call stack alongside
-          # the error message so cryptic errors (especially "missing value
-          # where TRUE/FALSE needed", which gives no location otherwise)
-          # come with a traceback we can read off the simulation log on
-          # Tab 5. sys.calls() is captured INSIDE the handler frame so we
-          # see the chain from the simulation observer down to the failing
-          # call. Capped at the last 40 frames to keep the log readable.
-          stack <- tryCatch({
-            sc <- sys.calls()
-            tail(vapply(sc, function(call)
+        },
+        error = function(e) {
+          # withCallingHandlers: this runs BEFORE the stack unwinds. Snap the
+          # call chain here so the outer tryCatch (which sees an already-
+          # unwound stack) can log the real culprit. Capped at 40 frames.
+          sc <- tryCatch(sys.calls(), error = function(.e) NULL)
+          if (!is.null(sc))
+            captured_stack <<- tail(vapply(sc, function(call)
               substr(paste(deparse(call), collapse = " "), 1, 240),
               character(1)), 40)
-          }, error = function(.e) character(0))
+        }),
+        error = function(e) {
           rv$sim_log <- paste0(rv$sim_log,
             "ERROR: ", e$message, "\n",
-            if (length(stack) > 0)
+            if (length(captured_stack) > 0)
               paste0("call stack (innermost last):\n  ",
-                     paste(stack, collapse = "\n  "), "\n")
+                     paste(captured_stack, collapse = "\n  "), "\n")
             else "")
           rv$sim_error <- e$message
           rv$sim_running <- FALSE
+          # Make the failure visible — previously the error only landed in the
+          # Tab 5 sim log, so users could click Simulate and see nothing happen.
+          showNotification(
+            paste0("Simulation failed: ", e$message,
+                   " — see the Run log on Tab 5 for the full call trace."),
+            type = "error", duration = NULL)
         })
       }
     )

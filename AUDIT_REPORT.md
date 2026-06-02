@@ -1,11 +1,11 @@
 # AUDIT_REPORT.md — Statistician's end-to-end audit
 
-Generated 2026-06-01 19:35 CEST by `_audit.R`.
+Generated 2026-06-02 17:53 CEST by `_audit.R`.
 
 ## Summary
 
-- Tests run: **84**
-- Pass: **84**
+- Tests run: **89**
+- Pass: **89**
 - Fail: **0**
 - Skip: **0**
 - Verdict: **AUDIT CLEAN**
@@ -105,10 +105,15 @@ Synthetic single-sub-category dairy inventory with all 27 IPCC-aligned parameter
 | F18 | F | Inventory_Metadata region: explicit slug kept; country auto-mapped; unknown -> global | ✅ PASS | explicit africa -> africa; Zimbabwe (legacy) -> africa; Atlantis -> global; India (blank region) -> asia |
 | F18b | F | Continental region cell (new-template parser key) is honoured over country fallback | ✅ PASS | Zimbabwe + global -> global; Zimbabwe + africa -> africa |
 | F19a | F | Legacy 'Country / region' label parses to metadata$country (no trailing underscore) + region resolves to africa for Zimbabwe | ✅ PASS | country='Zimbabwe' region='africa' country_ key present=FALSE |
+| F20a | F | Zim template: heifer auto-match (DINT_heif → DINT_heifer) fires | ✅ PASS | auto-match issue raised as warning |
+| F20b | F | Zim end-to-end: total_direct_n2o_mm in plausible band [15, 60] (vs @Risk 39.9) | ✅ PASS | mean = 30.1 t (regression threshold: < 15 would indicate the auto-match fix is broken) |
+| F20c | F | Zim end-to-end: 5 sub-categories produced, each with non-zero direct N2O | ✅ PASS | n_sys = 5; all non-zero = TRUE |
+| F21_country_x | F | Built-in example country_x per-head emissions in IPCC Tier-2 plausible band | ✅ PASS | enteric=75.5 kg/hd, manure_CH4=2.71 kg/hd, direct_N2O_mm=0.1144 kg/hd |
+| F21_country_y | F | Built-in example country_y per-head emissions in IPCC Tier-2 plausible band | ✅ PASS | enteric=74.4 kg/hd, manure_CH4=2.75 kg/hd, direct_N2O_mm=0.1130 kg/hd |
 | F19b | F | Tornado user_reducible lookup correctly classifies labelled params | ✅ PASS | results: FALSE, TRUE, FALSE, FALSE, TRUE; expected: FALSE, TRUE, FALSE, FALSE, TRUE |
-| G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9481 bytes |
+| G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9482 bytes |
 | G2 | G | CSV write of uncertainty frame produces non-empty file | ✅ PASS | 1874 bytes |
-| G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316258 bytes |
+| G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316257 bytes |
 | G4 | G | methodology.Rmd Reporting section contains CRT category map (3.A / 3.B / 3.D) | ✅ PASS | 3.A=TRUE 3.B=TRUE 3.D=TRUE |
 | G5 | G | methodology.Rmd Reporting section contains Level 1/2/3 disaggregation guide | ✅ PASS | L1=TRUE L2=TRUE L3=TRUE |
 
@@ -194,6 +199,11 @@ Synthetic single-sub-category dairy inventory with all 27 IPCC-aligned parameter
 | F18 | TRUE | TRUE | PASS |
 | F18b | TRUE | TRUE | PASS |
 | F19a | TRUE | TRUE | PASS |
+| F20a | TRUE | TRUE | PASS |
+| F20b | TRUE | TRUE | PASS |
+| F20c | TRUE | TRUE | PASS |
+| F21_country_x | TRUE | TRUE | PASS |
+| F21_country_y | TRUE | TRUE | PASS |
 | F19b | TRUE | TRUE | PASS |
 | G1 | TRUE | TRUE | PASS |
 | G2 | TRUE | TRUE | PASS |

@@ -18,6 +18,9 @@ _smoketest_word.R
 _verify_catalogue.R
 _verify_changes.R
 _verify_dist.R
+_zim_verify.R
+_example_verify.R
+_repro_app_path.R
 deploy_shinyapps.R
 install.R
 
@@ -37,6 +40,9 @@ AW_final_comments_tracker.docx
 AW_review_response*.docx
 AW_review_response*.md
 AW_review_response*.pdf
+
+# Internal meeting notes — not part of the deployed app
+docs/meeting_*.md
 docs/AW_review_response*.md
 
 # Source-form drafts (the rendered .pdf is what the app serves)
