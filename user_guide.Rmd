@@ -437,6 +437,8 @@ These are useful for a first exploratory run. Refine individual parameters befor
 
 # Correlations (Tab 4 — Correlations)
 
+\textit{Deeper dive.} For a side-by-side worked comparison of all four correlation modes applied to the Country X / Country Y built-in examples --- including how each mode changes the 95\% confidence interval on total CO$_2$eq, the structural-defaults heatmap with per-pair sources, and the common mistakes to avoid --- click the green \emph{Find out more} link at the top of the Activity Data Correlations card on Tab 4. It opens a focused topic page in a new browser tab.
+
 ## Why correlations matter
 
 If multiple parameters tend to move together (e.g. larger animals also tend to produce more milk), ignoring this relationship underestimates the uncertainty in the total emission estimate. For most Tier 2 analyses, ignoring correlations (the default "No correlations" setting) is a reasonable simplifying assumption. IPCC Approach 2 guidance recommends including known correlations where they exist.

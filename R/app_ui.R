@@ -729,7 +729,24 @@ app_ui <- function() {
 
         # --- Activity data correlations ---
         bslib::card(
-          bslib::card_header("Activity Data Correlations"),
+          bslib::card_header(
+            tags$div(
+              style = "display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;",
+              tags$span("Activity Data Correlations"),
+              # Lolita 2026-06-03 / Pete request: "Find out more" deep-link
+              # to the topic page with worked examples. Opens in a new tab
+              # so the user keeps their app session.
+              tags$a(
+                href = "docs/correlations.html", target = "_blank",
+                icon("circle-info"),
+                tags$span("Find out more", style = "margin-left:4px;"),
+                style = paste("color:#2D6A4F; font-size:0.82rem; font-weight:500;",
+                              "text-decoration:none; padding:4px 10px;",
+                              "border:1px solid #2D6A4F; border-radius:14px;",
+                              "background:#FFFFFF;")
+              )
+            )
+          ),
           bslib::card_body(
             div(class = "info-panel",
                 "Activity-data correlations describe how your input parameters move together. ",

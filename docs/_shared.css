@@ -1,0 +1,103 @@
+/* Shared styling for in-app "Find out more" topic pages.
+   Mirrors the green CGIAR Alliance / ClimateActionNetZero palette used in
+   the methodology PDF and the app's bslib::bs_theme. */
+
+:root {
+  --green-dark:  #1B4332;
+  --green-mid:   #2D6A4F;
+  --green-light: #40916C;
+  --green-bg:    #D8F3DC;
+  --beige:       #F7F5F0;
+  --grey-text:   #3C3C3C;
+  --grey-soft:   #6B6B6B;
+  --warn-amber:  #F59E0B;
+}
+
+body {
+  font-family: "DM Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--beige);
+  color: var(--grey-text);
+  line-height: 1.6;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 32px 28px 80px;
+}
+
+h1, h2, h3 {
+  color: var(--green-dark);
+  font-weight: 700;
+}
+h1 { font-size: 2rem;   border-bottom: 2px solid var(--green-mid); padding-bottom: 8px; margin-top: 0; }
+h2 { font-size: 1.4rem; margin-top: 32px; }
+h3 { font-size: 1.1rem; color: var(--green-mid); margin-top: 24px; }
+
+a       { color: var(--green-mid); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, pre {
+  background: #F0EBE0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  font-size: 0.92em;
+}
+pre { padding: 12px 14px; overflow-x: auto; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0 22px;
+  background: #FFF;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td { padding: 8px 12px; border-bottom: 1px solid #E0DDD5; text-align: left; vertical-align: top; }
+th     { background: var(--green-bg); color: var(--green-dark); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+
+.tldr {
+  background: #FFF;
+  border-left: 4px solid var(--green-mid);
+  padding: 14px 18px;
+  margin: 16px 0 28px;
+  border-radius: 0 6px 6px 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.tldr strong { color: var(--green-dark); }
+
+.callout-warn {
+  background: #FEF3C7;
+  border-left: 4px solid var(--warn-amber);
+  padding: 12px 16px;
+  margin: 18px 0;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.95em;
+  color: #7A4F00;
+}
+.callout-warn strong { color: #7A4F00; }
+
+.callout-note {
+  background: #FFF;
+  border-left: 4px solid var(--green-light);
+  padding: 12px 16px;
+  margin: 18px 0;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.95em;
+}
+
+.related {
+  background: var(--green-bg);
+  padding: 14px 18px;
+  margin: 32px 0 0;
+  border-radius: 8px;
+  font-size: 0.92em;
+}
+.related h3 { margin-top: 0; }
+.related a { font-weight: 500; }
+
+footer {
+  margin-top: 60px;
+  padding-top: 18px;
+  border-top: 1px solid #E0DDD5;
+  font-size: 0.85em;
+  color: var(--grey-soft);
+}
