@@ -390,25 +390,52 @@ translator_chat_server <- function(input, output, session) {
   })
 
   # ---- Download translated template ----------------------------------------
-  # The AI emits a `template-ready` fenced block containing JSON. We expect
-  # one of two shapes (see assemble_translator_system_prompt — Output
-  # convention):
-  #   { "parameters": [ {parameter, sub_category, value, ...}, ... ],
-  #     "manure_management": [ {sub_category, mms_type, fraction_pct, ...}, ... ],
-  #     "inventory_metadata": {country, year, species, ipcc_version} }
-  # We write this to a multi-sheet .xlsx that mirrors the official template
-  # structure (Inventory_Metadata / Parameters / Manure_Management). If
-  # parsing fails (malformed JSON), we fall back to a raw .json download so
-  # the user doesn't lose the AI's work.
+  # The AI emits a `template-ready` JSON block. We try to write a multi-
+  # sheet .xlsx mirroring the official input template (Inventory_Metadata /
+  # Parameters / Manure_Management). If the JSON is malformed (commonly
+  # because the model hit max_tokens and the response was truncated mid-
+  # object), we fall back to writing the raw text as a .json file so the
+  # user doesn't lose the AI's work. The filename + extension follow the
+  # actual content type produced.
+  #
+  # Reactive: detect whether the saved JSON is parseable. The download
+  # filename / extension is computed against this fresh, so the user sees
+  # accurate context.
+  .last_template_is_valid <- reactive({
+    j <- state$last_template_json
+    if (is.null(j) || !nzchar(j)) return(FALSE)
+    parsed <- tryCatch(jsonlite::fromJSON(j, simplifyVector = TRUE),
+                        error = function(e) NULL)
+    !is.null(parsed)
+  })
+
   output$translator_download_template <- downloadHandler(
     filename = function() {
+      ext <- if (isTRUE(.last_template_is_valid())) "xlsx" else "json"
       paste0("translated_template_",
-              format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
+             format(Sys.time(), "%Y%m%d_%H%M%S"), ".", ext)
     },
     content = function(file) {
-      .translator_write_template_xlsx(state$last_template_json, file)
+      j <- state$last_template_json
+      if (is.null(j) || !nzchar(j)) {
+        writeLines("{}", file)
+        return(invisible(NULL))
+      }
+      if (isTRUE(.last_template_is_valid())) {
+        .translator_write_template_xlsx(j, file)
+      } else {
+        # Truncated / malformed — write the raw text and surface a toast.
+        writeLines(j, file)
+        tryCatch(showNotification(
+          paste0("The AI's template output appears truncated or malformed ",
+                  "(saved as .json with the raw text). Try clicking ",
+                  "'Produce template now' again — the increased token ",
+                  "budget usually fixes this."),
+          type = "warning", duration = 10),
+          error = function(e) NULL)
+      }
     },
-    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    contentType = NULL  # let the browser sniff from the extension
   )
 
   # Expose the state to the caller in case the rest of app_server wants to
@@ -448,6 +475,30 @@ translator_chat_server <- function(input, output, session) {
               ),
               accept = c(".xlsx", ".xls", ".csv"),
               width = "100%"),
+
+    # 2026-06: pre-stream loading spinner. Hidden by default; shown by JS
+    # when the user clicks Send / Force-template / triggers an upload;
+    # hidden again as soon as translatorStreamStart fires (or the
+    # force-template call returns via translatorStreamEnd).
+    tags$div(id = "translator_spinner",
+             style = "display:none; align-items:center; gap:10px;
+                      padding:10px 14px; margin:8px 0;
+                      background:#FFF8E1; border:1px solid #FFE082;
+                      border-radius:8px; color:#5D4037; font-size:0.88rem;",
+             tags$div(style = "width:18px; height:18px;
+                                border:3px solid #FFE082;
+                                border-top-color:#FF6F00;
+                                border-radius:50%;
+                                animation: translatorSpin 0.8s linear infinite;"),
+             "Translator is working — reading your message, calling the AI, waiting for the first reply…"),
+    # Inline keyframes for the spinner's rotation (avoids needing a
+    # custom CSS file just for this).
+    tags$head(tags$style(HTML(
+      "@keyframes translatorSpin {
+         from { transform: rotate(0deg); }
+         to   { transform: rotate(360deg); }
+       }"
+    ))),
 
     uiOutput("translator_messages"),
 
@@ -675,7 +726,15 @@ translator_chat_server <- function(input, output, session) {
 .translator_force_template <- function(state, session) {
   state$pending <- TRUE
   state$last_error <- NULL
-  on.exit(state$pending <- FALSE)
+  on.exit({
+    state$pending <- FALSE
+    # Hide the JS spinner — force-template is non-streaming so
+    # translatorStreamStart never fires; we have to clear the spinner
+    # explicitly. translatorStreamEnd is a safe no-op when there's no
+    # active bubble.
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+              error = function(e) NULL)
+  })
 
   if (budget_would_exceed()) {
     state$last_error <- paste0(

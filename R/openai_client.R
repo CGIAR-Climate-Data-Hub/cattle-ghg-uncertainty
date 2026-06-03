@@ -242,7 +242,7 @@ openai_cost_usd <- function(prompt_tokens, completion_tokens,
 # observer) is responsible for surfacing the error to the user.
 openai_chat <- function(messages,
                          model = .OPENAI_DEFAULT_MODEL,
-                         max_tokens = 4000,
+                         max_tokens = 16000,
                          temperature = 0.2,
                          timeout_sec = 90) {
   api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
@@ -344,7 +344,7 @@ openai_chat <- function(messages,
 openai_chat_stream <- function(messages,
                                 on_chunk = function(text) {},
                                 model = .OPENAI_DEFAULT_MODEL,
-                                max_tokens = 4000,
+                                max_tokens = 16000,
                                 temperature = 0.2,
                                 timeout_sec = 180,
                                 max_retries = 2) {
@@ -516,7 +516,7 @@ openai_chat_stream <- function(messages,
 # schema, OpenAI returns an error and the user sees a clear message.
 openai_chat_template_force <- function(messages,
                                         model = .OPENAI_DEFAULT_MODEL,
-                                        max_tokens = 4000,
+                                        max_tokens = 16000,
                                         timeout_sec = 120) {
   api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
   if (!nzchar(api_key))

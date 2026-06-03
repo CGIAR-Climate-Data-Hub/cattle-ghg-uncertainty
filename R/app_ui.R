@@ -55,6 +55,9 @@ app_ui <- function() {
          //                            bubble (next round starts fresh).
          var _translatorActiveBubble = null;
          Shiny.addCustomMessageHandler('translatorStreamStart', function(_unused) {
+           // First streamed token has arrived (or is about to) — hide
+           // the pre-stream spinner now that the bubble is taking over.
+           if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
            var container = document.getElementById('translator_stream_target');
            if (!container) return;
            var bubble = document.createElement('div');
@@ -81,6 +84,9 @@ app_ui <- function() {
            // properly-rendered one in the message history. Just drop the
            // reference so future chunks don't accidentally append.
            _translatorActiveBubble = null;
+           // Also hide the pre-stream spinner — covers the non-streaming
+           // force-template path where StreamStart never fires.
+           if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
          });
          // 2026-06: persistent sign-in. After magic-link consume, server
          // sends a signed cookie value here; we drop it into document.cookie
@@ -97,20 +103,64 @@ app_ui <- function() {
          // - Email field (#translator_email): Enter clicks Send sign-in link.
          // - Chat input (#translator_input, a <textarea>): Enter clicks Send,
          //   Shift+Enter inserts a newline (default textarea behaviour).
+         // We use CAPTURE phase (third arg = true) so we beat any
+         // bubble-phase keydown handlers Shiny/Bootstrap may attach to the
+         // input fields. Otherwise the textarea swallows Enter and our
+         // bubble-phase listener never fires.
          document.addEventListener('keydown', function(e) {
-           if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey) return;
+           if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
            var t = e.target;
            if (!t || !t.id) return;
            if (t.id === 'translator_email') {
              e.preventDefault();
+             e.stopPropagation();
              var btn = document.getElementById('translator_submit');
              if (btn) btn.click();
            } else if (t.id === 'translator_input') {
              e.preventDefault();
+             e.stopPropagation();
              var btn = document.getElementById('translator_send');
              if (btn) btn.click();
            }
-         });"
+         }, true);  // capture phase
+
+         // 2026-06: visible loading spinner during the time between
+         // clicking Send (or uploading a file) and the AI's first
+         // streamed token landing. Without this the user clicks Send
+         // and sees nothing for 1-3 seconds.
+         function _translatorShowSpinner() {
+           var el = document.getElementById('translator_spinner');
+           if (el) el.style.display = 'flex';
+         }
+         function _translatorHideSpinner() {
+           var el = document.getElementById('translator_spinner');
+           if (el) el.style.display = 'none';
+         }
+         // Whenever the user clicks Send / Force-template / Upload, show
+         // the spinner immediately. The translatorStreamStart handler
+         // (further up) hides it as soon as the first token arrives —
+         // and translatorStreamEnd hides it for non-streaming paths
+         // (force-template, error short-circuits).
+         document.addEventListener('click', function(e) {
+           var t = e.target;
+           if (!t) return;
+           // Walk up the DOM tree a couple of levels in case the click
+           // lands on a child of the button (e.g. the <i> icon).
+           for (var i = 0; i < 3 && t; i++) {
+             if (t.id === 'translator_send' ||
+                 t.id === 'translator_force_template') {
+               _translatorShowSpinner();
+               return;
+             }
+             t = t.parentElement;
+           }
+         }, false);
+         // File upload: listen for change on the file input itself.
+         document.addEventListener('change', function(e) {
+           if (e.target && e.target.id === 'translator_file') {
+             _translatorShowSpinner();
+           }
+         }, false);"
       )))
     ),
     fillable = FALSE,
