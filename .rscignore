@@ -80,6 +80,7 @@ __pycache__/
 # auth tokens are created at runtime in the deployed container's working
 # dir; never bundle a local dev copy into the deploy.
 translator_usage_log.csv
+translator_history_*.json
 auth_tokens.csv
 .env
 

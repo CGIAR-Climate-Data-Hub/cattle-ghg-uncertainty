@@ -39,6 +39,7 @@
 .usage_log_columns <- c(
   "timestamp", "user_email", "model",
   "prompt_tokens", "completion_tokens", "total_tokens",
+  "cached_tokens",  # 2026-06: GPT-4.1 implicit-cache hit count (~50% off)
   "cost_usd"
 )
 
@@ -57,6 +58,7 @@
 # openai_chat() ($usage, $model, $cost_usd) plus the user_email.
 usage_log_append <- function(user_email, model,
                               prompt_tokens, completion_tokens, cost_usd,
+                              cached_tokens = 0L,
                               ts = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ",
                                            tz = "UTC")) {
   path <- .usage_log_ensure()
@@ -68,6 +70,7 @@ usage_log_append <- function(user_email, model,
     completion_tokens = as.integer(completion_tokens %||% 0L),
     total_tokens      = as.integer((prompt_tokens %||% 0L) +
                                     (completion_tokens %||% 0L)),
+    cached_tokens     = as.integer(cached_tokens %||% 0L),
     cost_usd          = as.numeric(cost_usd %||% 0),
     stringsAsFactors  = FALSE
   )

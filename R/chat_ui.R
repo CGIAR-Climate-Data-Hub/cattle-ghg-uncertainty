@@ -56,6 +56,10 @@ translator_chat_server <- function(input, output, session) {
     restored <- auth_session_cookie_verify(cookie_value)
     if (!is.null(restored) && auth_is_approved(restored)) {
       state$user_email <- restored
+      # 2026-06: also restore the saved conversation history so the user
+      # picks up where they left off.
+      hist <- tryCatch(conversation_load(restored), error = function(e) list())
+      if (length(hist) > 0) state$messages <- hist
     }
   }, once = TRUE, ignoreInit = FALSE)
 
@@ -157,6 +161,8 @@ translator_chat_server <- function(input, output, session) {
             content = user_msg,
             display = sprintf("Uploaded %s (%d rows × %d columns shown).",
                               fi$name, nrow(parsed$preview), ncol(parsed$preview)))
+    tryCatch(conversation_save(state$user_email, state$messages),
+              error = function(e) NULL)
     .translator_send(state, session)
   })
 
@@ -169,6 +175,26 @@ translator_chat_server <- function(input, output, session) {
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
     .translator_send(state, session)
+  })
+
+  # ---- Reset conversation: wipe history + saved file -----------------------
+  observeEvent(input$translator_reset, {
+    req(state$user_email)
+    state$messages           <- list()
+    state$last_template_json <- NULL
+    state$last_error         <- NULL
+    conversation_delete(state$user_email)
+    showNotification("Conversation reset.", type = "message", duration = 3)
+  })
+
+  # ---- Force-template button: ask the AI to produce the final JSON now ----
+  observeEvent(input$translator_force_template, {
+    req(state$user_email)
+    state$messages[[length(state$messages) + 1]] <-
+      list(role = "user",
+           content = "Please produce the final filled template JSON now using IPCC defaults for any parameters where I haven't given country-specific data. Do not ask any more questions — just output the template-ready JSON matching the schema in your instructions.",
+           display = "(Asked the AI to produce the final template now.)")
+    .translator_force_template(state, session)
   })
 
   # ---- Render the message history ------------------------------------------
@@ -259,11 +285,19 @@ translator_chat_server <- function(input, output, session) {
     total_calls <- nrow(df)
     total_cost  <- sum(as.numeric(df$cost_usd), na.rm = TRUE)
     unique_users <- length(unique(df$user_email))
+    # Cache-hit ratio: cached_tokens / prompt_tokens across all calls.
+    prompt_sum  <- sum(as.numeric(df$prompt_tokens %||% 0L), na.rm = TRUE)
+    cached_sum  <- if ("cached_tokens" %in% names(df))
+      sum(as.numeric(df$cached_tokens), na.rm = TRUE) else 0L
+    cache_pct   <- if (prompt_sum > 0)
+      sprintf("%.0f%%", 100 * cached_sum / prompt_sum) else "—"
     tail_n <- min(5, nrow(df))
-    recent <- tail(df[, c("timestamp", "user_email",
-                           "prompt_tokens", "completion_tokens",
-                           "cost_usd")], tail_n)
-    recent$cost_usd <- sprintf("$%.4f", as.numeric(recent$cost_usd))
+    show_cols <- intersect(c("timestamp", "user_email", "prompt_tokens",
+                              "completion_tokens", "cached_tokens",
+                              "cost_usd"), names(df))
+    recent <- tail(df[, show_cols], tail_n)
+    if ("cost_usd" %in% names(recent))
+      recent$cost_usd <- sprintf("$%.4f", as.numeric(recent$cost_usd))
     tags$div(
       style = "margin-top:14px; padding:10px 14px; background:#F1F5F9;
                border:1px solid #CBD5E1; border-radius:6px;
@@ -274,7 +308,9 @@ translator_chat_server <- function(input, output, session) {
         style = "display:flex; gap:18px; flex-wrap:wrap; margin-bottom:8px;",
         tags$span(tags$strong("Calls: "), total_calls),
         tags$span(tags$strong("Spend: "), sprintf("$%.4f", total_cost)),
-        tags$span(tags$strong("Unique users: "), unique_users)
+        tags$span(tags$strong("Unique users: "), unique_users),
+        tags$span(title = "Share of prompt tokens served from OpenAI's implicit prompt cache (50% cheaper).",
+                  tags$strong("Cache-hit: "), cache_pct)
       ),
       tags$div(style = "font-size:0.78rem; color:#475569; margin-bottom:4px;",
                sprintf("Last %d calls:", tail_n)),
@@ -379,6 +415,24 @@ translator_chat_server <- function(input, output, session) {
                         rows = 2, width = "100%")),
       actionButton("translator_send", "Send", class = "btn-success",
                    style = "min-width:80px; height:42px;")
+    ),
+    # Secondary action row — reset + force-template. Kept compact and
+    # styled as outline buttons so they don't compete with the primary
+    # Send action above.
+    tags$div(
+      style = "display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;",
+      actionButton("translator_force_template",
+                   tagList(icon("file-arrow-down"),
+                            " Produce template now"),
+                   class = "btn-outline-success",
+                   style = "font-size:0.82rem;",
+                   title = "Ask the AI to output the final filled template right now, using IPCC defaults for any remaining unknowns."),
+      actionButton("translator_reset",
+                   tagList(icon("rotate-left"),
+                            " Reset conversation"),
+                   class = "btn-outline-secondary",
+                   style = "font-size:0.82rem;",
+                   title = "Clear the chat and start over from scratch.")
     ),
 
     uiOutput("translator_last_error"),
@@ -524,12 +578,14 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  # Log the spend.
+  # Log the spend (now including cached_tokens — 50% discount on the
+  # cache-hit portion; see openai_client.R::openai_cost_usd).
   usage_log_append(
     user_email        = state$user_email,
     model             = resp$model,
     prompt_tokens     = resp$usage$prompt_tokens,
     completion_tokens = resp$usage$completion_tokens,
+    cached_tokens     = resp$usage$cached_tokens %||% 0L,
     cost_usd          = resp$cost_usd
   )
 
@@ -544,6 +600,64 @@ translator_chat_server <- function(input, output, session) {
     list(role = "assistant",
           content = resp$reply,
           display = resp$reply)
+
+  # Persist so a refresh / reload resumes where we left off.
+  tryCatch(conversation_save(state$user_email, state$messages),
+           error = function(e) NULL)
+}
+
+# Force the AI to emit the final filled-template JSON now, regardless of
+# whether it thinks it has enough info. Uses OpenAI's response_format
+# json_schema mode so the output is GUARANTEED to be valid JSON matching
+# .translator_write_template_xlsx()'s expected schema. Called only by
+# the "Produce template now" button.
+.translator_force_template <- function(state, session) {
+  state$pending <- TRUE
+  state$last_error <- NULL
+  on.exit(state$pending <- FALSE)
+
+  if (budget_would_exceed()) {
+    state$last_error <- paste0(
+      "The monthly budget cap for the AI translator has been reached ",
+      "($", sprintf("%.2f", monthly_budget_cap_usd()), "). ",
+      "Please contact the administrator to raise it or wait until the ",
+      "1st of next month.")
+    return()
+  }
+
+  system_prompt <- tryCatch(assemble_translator_system_prompt(),
+                             error = function(e) NULL)
+  if (is.null(system_prompt)) {
+    state$last_error <- "Couldn't load the translator instructions."
+    return()
+  }
+
+  msgs <- openai_build_messages(system_prompt, history = state$messages)
+  resp <- openai_chat_template_force(msgs)
+
+  if (!is.null(resp$error)) {
+    state$last_error <- resp$error
+    return()
+  }
+
+  usage_log_append(
+    user_email        = state$user_email,
+    model             = resp$model,
+    prompt_tokens     = resp$usage$prompt_tokens,
+    completion_tokens = resp$usage$completion_tokens,
+    cached_tokens     = resp$usage$cached_tokens %||% 0L,
+    cost_usd          = resp$cost_usd
+  )
+
+  # The response IS the JSON — json_schema mode guarantees pure JSON,
+  # no fenced block needed.
+  state$last_template_json <- resp$reply
+  state$messages[[length(state$messages) + 1]] <-
+    list(role    = "assistant",
+         content = resp$reply,
+         display = "Template ready — click the green download button below to get the .xlsx.")
+  tryCatch(conversation_save(state$user_email, state$messages),
+           error = function(e) NULL)
 }
 
 # Write the AI's template-ready JSON to a multi-sheet .xlsx mirroring the

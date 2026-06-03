@@ -203,16 +203,25 @@ assemble_translator_system_prompt <- function(asset_dir = "claude_project_assets
   as.integer(ceiling(nchar(text) / 4))
 }
 
-# Cost in USD for a (prompt_tokens, completion_tokens, model) triple.
+# Cost in USD for a usage tuple, with GPT-4.1's implicit prompt-cache
+# discount applied. Cached tokens cost 50% of the normal input price
+# (OpenAI's "Automatic Prompt Caching" feature, applied when a system
+# prompt of ≥1024 tokens has been seen within the past ~5-10 minutes).
+# Verify the discount factor against
+# <https://platform.openai.com/docs/pricing> if pricing changes.
 openai_cost_usd <- function(prompt_tokens, completion_tokens,
-                             model = .OPENAI_DEFAULT_MODEL) {
+                             model = .OPENAI_DEFAULT_MODEL,
+                             cached_tokens = 0L) {
   p <- .OPENAI_PRICING[[model]]
   if (is.null(p)) {
     warning(sprintf("Unknown model '%s'; cost reported as NA.", model),
             call. = FALSE)
     return(NA_real_)
   }
-  (prompt_tokens     / 1e6) * p$input  +
+  cached_tokens <- min(cached_tokens %||% 0L, prompt_tokens %||% 0L)
+  non_cached    <- max((prompt_tokens %||% 0L) - cached_tokens, 0L)
+  (non_cached      / 1e6) * p$input        +
+  (cached_tokens   / 1e6) * p$input * 0.5  +
   (completion_tokens / 1e6) * p$output
 }
 
@@ -279,13 +288,20 @@ openai_chat <- function(messages,
     usage <- parsed$usage %||% list(prompt_tokens = 0L,
                                      completion_tokens = 0L,
                                      total_tokens = 0L)
+    cached_tokens <- usage$prompt_tokens_details$cached_tokens %||% 0L
     list(
       reply    = reply,
-      usage    = usage,
+      usage    = list(prompt_tokens     = usage$prompt_tokens     %||% 0L,
+                       completion_tokens = usage$completion_tokens %||% 0L,
+                       cached_tokens     = cached_tokens,
+                       total_tokens      = usage$total_tokens     %||%
+                                            ((usage$prompt_tokens %||% 0L) +
+                                             (usage$completion_tokens %||% 0L))),
       model    = parsed$model %||% model,
-      cost_usd = openai_cost_usd(usage$prompt_tokens %||% 0L,
+      cost_usd = openai_cost_usd(usage$prompt_tokens     %||% 0L,
                                   usage$completion_tokens %||% 0L,
-                                  parsed$model %||% model),
+                                  parsed$model %||% model,
+                                  cached_tokens = cached_tokens),
       error    = NULL
     )
   } else {
@@ -330,7 +346,8 @@ openai_chat_stream <- function(messages,
                                 model = .OPENAI_DEFAULT_MODEL,
                                 max_tokens = 4000,
                                 temperature = 0.2,
-                                timeout_sec = 180) {
+                                timeout_sec = 180,
+                                max_retries = 2) {
   api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
   if (!nzchar(api_key)) {
     return(list(reply = NULL,
@@ -346,73 +363,118 @@ openai_chat_stream <- function(messages,
     stream_options = list(include_usage = TRUE)
   )
 
-  # Mutable state shared between the SSE callback and the outer scope.
-  accumulated <- ""
-  final_usage <- NULL
-  sse_buffer  <- ""
+  # Retry loop. Only retries while NO chunks have been emitted to the
+  # browser yet — once the user has seen partial output we can't safely
+  # restart without duplicating tokens.
+  attempt   <- 0
+  last_err  <- NULL
+  last_msg  <- NULL
+  final_resp <- NULL
 
-  # Called by httr2 for each chunk of bytes that arrives off the wire.
-  # Returns TRUE to continue streaming, FALSE to stop.
-  on_data <- function(data) {
-    chunk_text <- rawToChar(data)
-    sse_buffer <<- paste0(sse_buffer, chunk_text)
-    # SSE events are separated by a blank line ("\n\n").
-    while (grepl("\n\n", sse_buffer, fixed = TRUE)) {
-      split <- regmatches(sse_buffer,
-                          regexpr("\n\n", sse_buffer, fixed = TRUE),
-                          invert = TRUE)[[1]]
-      event       <- split[1]
-      sse_buffer <<- if (length(split) >= 2) split[2] else ""
+  repeat {
+    attempt <- attempt + 1
 
-      for (line in strsplit(event, "\n", fixed = TRUE)[[1]]) {
-        if (!startsWith(line, "data: ")) next
-        payload <- substring(line, 7)
-        if (payload == "[DONE]") next
-        parsed <- tryCatch(jsonlite::fromJSON(payload, simplifyVector = FALSE),
-                            error = function(e) NULL)
-        if (is.null(parsed)) next
-        # Usage (only present when stream_options.include_usage = TRUE,
-        # and arrives in a chunk whose `choices` array is empty).
-        if (!is.null(parsed$usage)) final_usage <<- parsed$usage
-        # Token delta.
-        if (length(parsed$choices) >= 1) {
-          delta <- parsed$choices[[1]]$delta$content
-          if (!is.null(delta) && nzchar(delta)) {
-            accumulated <<- paste0(accumulated, delta)
-            tryCatch(on_chunk(delta), error = function(e) {
-              message("translator stream on_chunk error: ", conditionMessage(e))
-            })
+    # Reset per-attempt state.
+    accumulated <- ""
+    final_usage <- NULL
+    sse_buffer  <- ""
+
+    on_data <- function(data) {
+      chunk_text <- rawToChar(data)
+      sse_buffer <<- paste0(sse_buffer, chunk_text)
+      while (grepl("\n\n", sse_buffer, fixed = TRUE)) {
+        split <- regmatches(sse_buffer,
+                            regexpr("\n\n", sse_buffer, fixed = TRUE),
+                            invert = TRUE)[[1]]
+        event       <- split[1]
+        sse_buffer <<- if (length(split) >= 2) split[2] else ""
+        for (line in strsplit(event, "\n", fixed = TRUE)[[1]]) {
+          if (!startsWith(line, "data: ")) next
+          payload <- substring(line, 7)
+          if (payload == "[DONE]") next
+          parsed <- tryCatch(jsonlite::fromJSON(payload, simplifyVector = FALSE),
+                              error = function(e) NULL)
+          if (is.null(parsed)) next
+          if (!is.null(parsed$usage)) final_usage <<- parsed$usage
+          if (length(parsed$choices) >= 1) {
+            delta <- parsed$choices[[1]]$delta$content
+            if (!is.null(delta) && nzchar(delta)) {
+              accumulated <<- paste0(accumulated, delta)
+              tryCatch(on_chunk(delta), error = function(e) {
+                message("translator stream on_chunk error: ", conditionMessage(e))
+              })
+            }
           }
         }
       }
+      TRUE
     }
-    TRUE  # keep going
+
+    req <- httr2::request(.OPENAI_ENDPOINT) |>
+      httr2::req_headers(
+        `Authorization` = paste("Bearer", api_key),
+        `Content-Type`  = "application/json",
+        `Accept`        = "text/event-stream"
+      ) |>
+      httr2::req_body_json(body) |>
+      httr2::req_timeout(timeout_sec) |>
+      httr2::req_error(is_error = function(resp) FALSE)
+
+    resp <- tryCatch(httr2::req_perform_stream(req, on_data, buffer_kb = 16),
+                      error = function(e) e)
+
+    # Decide outcome of this attempt.
+    if (inherits(resp, "error")) {
+      last_err <- conditionMessage(resp)
+      status   <- NA_integer_
+    } else {
+      last_err <- NULL
+      status   <- httr2::resp_status(resp)
+    }
+
+    success_status <- !is.na(status) && status >= 200 && status < 300
+    transient_status <- !is.na(status) && (status == 429 || status >= 500)
+    network_error    <- inherits(resp, "error")
+
+    if (success_status) {
+      final_resp <- resp
+      break
+    }
+
+    # Don't retry if user already saw some text — would duplicate output.
+    if (nzchar(accumulated)) {
+      final_resp <- resp
+      break
+    }
+
+    # Don't retry on non-transient client errors (401, 403, 404, ...).
+    if (!network_error && !transient_status) {
+      final_resp <- resp
+      break
+    }
+
+    if (attempt > max_retries) {
+      final_resp <- resp
+      break
+    }
+
+    delay <- c(1, 3)[min(attempt, 2)]
+    message(sprintf("openai_chat_stream: retrying after %ds (attempt %d/%d, status=%s)",
+                     delay, attempt, max_retries + 1L,
+                     if (is.na(status)) last_err else as.character(status)))
+    Sys.sleep(delay)
   }
 
-  req <- httr2::request(.OPENAI_ENDPOINT) |>
-    httr2::req_headers(
-      `Authorization` = paste("Bearer", api_key),
-      `Content-Type`  = "application/json",
-      `Accept`        = "text/event-stream"
-    ) |>
-    httr2::req_body_json(body) |>
-    httr2::req_timeout(timeout_sec) |>
-    httr2::req_error(is_error = function(resp) FALSE)
-
-  resp <- tryCatch(httr2::req_perform_stream(req, on_data, buffer_kb = 16),
-                    error = function(e) e)
-
+  # Handle final outcome.
+  resp <- final_resp
   if (inherits(resp, "error")) {
     return(list(reply = if (nzchar(accumulated)) accumulated else NULL,
-                error = paste0("Streaming failed (",
-                               conditionMessage(resp),
+                error = paste0("Streaming failed (", last_err,
                                "). Try again in a minute.")))
   }
 
   status <- httr2::resp_status(resp)
   if (status >= 300) {
-    # The error body may have arrived as JSON in the buffer rather than
-    # as SSE — try to surface a useful message.
     tryCatch({
       body <- httr2::resp_body_json(resp)
       msg  <- body$error$message %||% ""
@@ -429,13 +491,150 @@ openai_chat_stream <- function(messages,
 
   prompt_tokens     <- final_usage$prompt_tokens     %||% 0L
   completion_tokens <- final_usage$completion_tokens %||% 0L
+  # GPT-4.1 implicit prompt caching surfaces in usage.prompt_tokens_details.
+  cached_tokens     <- final_usage$prompt_tokens_details$cached_tokens %||% 0L
   list(
     reply    = accumulated,
     usage    = list(prompt_tokens     = prompt_tokens,
                      completion_tokens = completion_tokens,
+                     cached_tokens     = cached_tokens,
                      total_tokens      = prompt_tokens + completion_tokens),
     model    = model,
-    cost_usd = openai_cost_usd(prompt_tokens, completion_tokens, model),
+    cost_usd = openai_cost_usd(prompt_tokens, completion_tokens, model,
+                                cached_tokens = cached_tokens),
+    error    = NULL
+  )
+}
+
+# Non-streaming variant that uses OpenAI's `response_format: json_schema`
+# strict mode to force a guaranteed-valid filled-template JSON. Called
+# only by the "Produce template now" button — the regular chat path
+# stays text/streaming.
+#
+# The strict-mode schema mirrors `.translator_write_template_xlsx()`'s
+# expectations. If the model produces anything that doesn't match the
+# schema, OpenAI returns an error and the user sees a clear message.
+openai_chat_template_force <- function(messages,
+                                        model = .OPENAI_DEFAULT_MODEL,
+                                        max_tokens = 4000,
+                                        timeout_sec = 120) {
+  api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
+  if (!nzchar(api_key))
+    return(list(reply = NULL,
+                error = "AI translator is not configured. Please contact the administrator."))
+
+  body <- list(
+    model       = model,
+    messages    = messages,
+    max_tokens  = max_tokens,
+    temperature = 0,
+    response_format = list(
+      type = "json_schema",
+      json_schema = list(
+        name   = "filled_inventory_template",
+        strict = FALSE,
+        schema = list(
+          type = "object",
+          properties = list(
+            inventory_metadata = list(
+              type = "object",
+              properties = list(
+                country      = list(type = "string"),
+                year         = list(type = c("integer", "string")),
+                species      = list(type = "string"),
+                ipcc_version = list(type = "string"),
+                prepared_by  = list(type = "string"),
+                notes        = list(type = "string")
+              )
+            ),
+            parameters = list(
+              type  = "array",
+              items = list(
+                type = "object",
+                properties = list(
+                  cattle_type       = list(type = "string"),
+                  aggregation_level = list(type = "string"),
+                  sub_category      = list(type = "string"),
+                  parameter         = list(type = "string"),
+                  mean              = list(type = "number"),
+                  uncertainty_pct   = list(type = c("number", "null")),
+                  lower             = list(type = c("number", "null")),
+                  upper             = list(type = c("number", "null")),
+                  distribution      = list(type = "string"),
+                  param_type        = list(type = "string")
+                ),
+                required = c("sub_category", "parameter", "mean",
+                              "distribution", "param_type")
+              )
+            ),
+            manure_management = list(
+              type  = "array",
+              items = list(
+                type = "object",
+                properties = list(
+                  cattle_type       = list(type = "string"),
+                  aggregation_level = list(type = "string"),
+                  sub_category      = list(type = "string"),
+                  mms_type          = list(type = "string"),
+                  fraction_pct      = list(type = "number"),
+                  mcf               = list(type = c("number", "null")),
+                  ef3               = list(type = c("number", "null"))
+                ),
+                required = c("sub_category", "mms_type", "fraction_pct")
+              )
+            )
+          ),
+          required = c("parameters")
+        )
+      )
+    )
+  )
+
+  req <- httr2::request(.OPENAI_ENDPOINT) |>
+    httr2::req_headers(
+      `Authorization` = paste("Bearer", api_key),
+      `Content-Type`  = "application/json"
+    ) |>
+    httr2::req_body_json(body) |>
+    httr2::req_timeout(timeout_sec) |>
+    httr2::req_error(is_error = function(resp) FALSE)
+
+  resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
+  if (inherits(resp, "error"))
+    return(list(reply = NULL,
+                error = paste0("Couldn't reach OpenAI (",
+                               conditionMessage(resp), ").")))
+  status <- httr2::resp_status(resp)
+  if (status < 200 || status >= 300) {
+    tryCatch({
+      body <- httr2::resp_body_json(resp)
+      msg  <- body$error$message %||% ""
+      if (nzchar(msg)) message("OpenAI template-force error: ", msg)
+    }, error = function(e) NULL)
+    return(list(reply = NULL,
+                error = sprintf("Template force failed (HTTP %d). Try again later.",
+                                 status)))
+  }
+  parsed <- httr2::resp_body_json(resp)
+  json_text <- tryCatch(parsed$choices[[1]]$message$content,
+                         error = function(e) NULL)
+  if (is.null(json_text) || !nzchar(json_text))
+    return(list(reply = NULL,
+                error = "OpenAI returned an empty template payload. Try again."))
+  usage <- parsed$usage %||% list(prompt_tokens = 0L, completion_tokens = 0L)
+  cached_tokens <- usage$prompt_tokens_details$cached_tokens %||% 0L
+  list(
+    reply    = json_text,
+    usage    = list(prompt_tokens     = usage$prompt_tokens     %||% 0L,
+                     completion_tokens = usage$completion_tokens %||% 0L,
+                     cached_tokens     = cached_tokens,
+                     total_tokens      = (usage$prompt_tokens %||% 0L) +
+                                         (usage$completion_tokens %||% 0L)),
+    model    = parsed$model %||% model,
+    cost_usd = openai_cost_usd(usage$prompt_tokens     %||% 0L,
+                                usage$completion_tokens %||% 0L,
+                                parsed$model %||% model,
+                                cached_tokens = cached_tokens),
     error    = NULL
   )
 }

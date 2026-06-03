@@ -33,4 +33,5 @@ __pycache__/
 .env
 *.env
 translator_usage_log.csv
+translator_history_*.json
 auth_tokens.csv
