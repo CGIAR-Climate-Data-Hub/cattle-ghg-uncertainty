@@ -132,7 +132,7 @@ translator_chat_server <- function(input, output, session) {
             content = user_msg,
             display = sprintf("Uploaded %s (%d rows × %d columns shown).",
                               fi$name, nrow(parsed$preview), ncol(parsed$preview)))
-    .translator_send(state)
+    .translator_send(state, session)
   })
 
   # ---- Send button: user types something, click Send -----------------------
@@ -143,12 +143,20 @@ translator_chat_server <- function(input, output, session) {
     updateTextAreaInput(session, "translator_input", value = "")
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
-    .translator_send(state)
+    .translator_send(state, session)
   })
 
   # ---- Render the message history ------------------------------------------
+  # The history scroller has TWO regions:
+  #   - .messages-static  : reactive uiOutput, redrawn whenever state$messages
+  #                          changes. Holds completed messages.
+  #   - #translator_stream_target : non-reactive DOM slot that the streaming
+  #                                  JS handlers append to during a live
+  #                                  response. Cleared / replaced when the
+  #                                  stream finishes and the assistant
+  #                                  message lands in state$messages.
   output$translator_messages <- renderUI({
-    if (length(state$messages) == 0)
+    if (length(state$messages) == 0 && !isTRUE(state$pending))
       return(tags$p(style = "color:#888; font-style:italic;",
                     "Upload your raw cattle data above or type a question to get started."))
     msgs <- lapply(state$messages, function(m) {
@@ -163,18 +171,28 @@ translator_chat_server <- function(input, output, session) {
         m$display %||% m$content
       )
     })
-    tagList(
-      tags$div(
-        style = "display:flex; flex-direction:column; max-height:480px;
-                 overflow-y:auto; padding:8px;",
-        msgs
-      ),
+    tags$div(
+      `data-translator-scroller` = "true",
+      style = "display:flex; flex-direction:column; max-height:480px;
+               overflow-y:auto; padding:8px;",
+      msgs,
+      # Streaming target — JS appends live response bubbles inside this slot.
+      tags$div(id = "translator_stream_target",
+               style = "display:flex; flex-direction:column;"),
       if (isTRUE(state$pending))
         tags$div(style = "padding:8px; color:#2D6A4F; font-size:0.85rem;",
                  icon("spinner", class = "fa-spin"),
                  " Translator is thinking…")
     )
   })
+
+  # Reactive flag the conditionalPanel watches to decide whether to show
+  # the "Download translated template" button. Becomes TRUE only when the
+  # AI's latest response contained a successful template-ready JSON block.
+  output$translator_template_ready <- reactive({
+    !is.null(state$last_template_json) && nzchar(state$last_template_json)
+  })
+  outputOptions(output, "translator_template_ready", suspendWhenHidden = FALSE)
 
   # ---- Render the budget status line + last error --------------------------
   output$translator_budget_line <- renderText(budget_status_line())
@@ -185,15 +203,26 @@ translator_chat_server <- function(input, output, session) {
                state$last_error)
   })
 
-  # ---- Download translated template -----------------------------------------
+  # ---- Download translated template ----------------------------------------
+  # The AI emits a `template-ready` fenced block containing JSON. We expect
+  # one of two shapes (see assemble_translator_system_prompt — Output
+  # convention):
+  #   { "parameters": [ {parameter, sub_category, value, ...}, ... ],
+  #     "manure_management": [ {sub_category, mms_type, fraction_pct, ...}, ... ],
+  #     "inventory_metadata": {country, year, species, ipcc_version} }
+  # We write this to a multi-sheet .xlsx that mirrors the official template
+  # structure (Inventory_Metadata / Parameters / Manure_Management). If
+  # parsing fails (malformed JSON), we fall back to a raw .json download so
+  # the user doesn't lose the AI's work.
   output$translator_download_template <- downloadHandler(
     filename = function() {
-      paste0("translated_template_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".json")
+      paste0("translated_template_",
+              format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
     },
     content = function(file) {
-      writeLines(state$last_template_json %||% "{}", file)
+      .translator_write_template_xlsx(state$last_template_json, file)
     },
-    contentType = "application/json"
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
   # Expose the state to the caller in case the rest of app_server wants to
@@ -259,7 +288,7 @@ translator_chat_server <- function(input, output, session) {
                          "The AI has finished mapping your data. Download the result below."),
                tags$br(),
                downloadButton("translator_download_template",
-                              "Download translated template (.json)",
+                              "Download translated template (.xlsx)",
                               class = "btn-primary", style = "margin-top:8px;"))
     ),
 
@@ -328,20 +357,29 @@ translator_chat_server <- function(input, output, session) {
   paste(c(hdr, sep, rows), collapse = "\n")
 }
 
-# Make the API call from the current message stack, append the reply
-# (or surface the error). All this state lives on `state`.
-.translator_send <- function(state) {
+# Make the API call from the current message stack, stream the reply
+# into the browser, then append it to the chat history. All this state
+# lives on `state`. Requires `session` so the streaming chunks can be
+# pushed to the active browser tab via sendCustomMessage.
+.translator_send <- function(state, session) {
   state$pending <- TRUE
   state$last_error <- NULL
-  on.exit(state$pending <- FALSE)
+  on.exit({
+    state$pending <- FALSE
+    # Always tell the browser to drop the active streaming bubble — the
+    # server-side renderUI will replace it (or leave a blank when there's
+    # an error). Safe to call even if the bubble was never created.
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+              error = function(e) NULL)
+  })
 
   # Cap check.
   if (budget_would_exceed()) {
     state$last_error <- paste0(
       "The monthly budget cap for the AI translator has been reached ",
       "($", sprintf("%.2f", monthly_budget_cap_usd()), "). ",
-      "Please contact Lolita (lolita.muller26@gmail.com) to raise it ",
-      "or wait until the 1st of next month.")
+      "Please contact the administrator to raise it or wait until the ",
+      "1st of next month.")
     return()
   }
 
@@ -355,10 +393,26 @@ translator_chat_server <- function(input, output, session) {
   if (is.null(system_prompt)) return()
 
   msgs <- openai_build_messages(system_prompt, history = state$messages)
-  resp <- openai_chat(msgs)
+
+  # Create an empty bubble client-side, then stream tokens into it. The
+  # final assistant message gets written into state$messages at the end so
+  # the renderUI for the message history catches up.
+  session$sendCustomMessage("translatorStreamStart", "")
+
+  resp <- openai_chat_stream(
+    msgs,
+    on_chunk = function(text) {
+      session$sendCustomMessage("translatorStreamChunk", text)
+    }
+  )
 
   if (!is.null(resp$error)) {
     state$last_error <- resp$error
+    # If we got at least some text before the error, still save it.
+    if (!is.null(resp$reply) && nzchar(resp$reply)) {
+      state$messages[[length(state$messages) + 1]] <-
+        list(role = "assistant", content = resp$reply, display = resp$reply)
+    }
     return()
   }
 
@@ -375,11 +429,70 @@ translator_chat_server <- function(input, output, session) {
   json_block <- .translator_extract_template_ready(resp$reply)
   if (!is.null(json_block)) state$last_template_json <- json_block
 
-  # Append assistant message to history.
+  # Append assistant message to history. The renderUI for translator_messages
+  # will redraw and the streaming bubble (still in the DOM from the JS
+  # handler) gets replaced by the freshly-rendered history.
   state$messages[[length(state$messages) + 1]] <-
     list(role = "assistant",
           content = resp$reply,
           display = resp$reply)
+}
+
+# Write the AI's template-ready JSON to a multi-sheet .xlsx mirroring the
+# app's input template structure. Falls back to a JSON dump if the JSON
+# is malformed (so the user never loses their work).
+.translator_write_template_xlsx <- function(json_text, file_path) {
+  if (is.null(json_text) || !nzchar(json_text)) {
+    writeLines("{}", file_path)
+    return(invisible(NULL))
+  }
+  parsed <- tryCatch(jsonlite::fromJSON(json_text, simplifyVector = TRUE),
+                      error = function(e) NULL)
+  if (is.null(parsed)) {
+    # Malformed JSON — write the raw text with a .json sibling so the
+    # user can still hand-fix it.
+    writeLines(json_text, file_path)
+    return(invisible(NULL))
+  }
+
+  # Build the sheets. Every sheet is optional — the AI may not have
+  # gathered Manure_Management info, for instance.
+  sheets <- list()
+
+  if (!is.null(parsed$inventory_metadata)) {
+    md <- parsed$inventory_metadata
+    sheets[["Inventory_Metadata"]] <- data.frame(
+      Field = c("Country / region", "Inventory year", "Livestock species",
+                 "IPCC Guidelines version", "Prepared by", "Notes"),
+      Value = c(md$country %||% "",
+                 md$year %||% "",
+                 md$species %||% "cattle_dairy",
+                 md$ipcc_version %||% "2019_refinement",
+                 md$prepared_by %||% "",
+                 md$notes %||% ""),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  if (!is.null(parsed$parameters) && length(parsed$parameters) > 0) {
+    df <- as.data.frame(parsed$parameters, stringsAsFactors = FALSE)
+    sheets[["Parameters"]] <- df
+  }
+
+  if (!is.null(parsed$manure_management) && length(parsed$manure_management) > 0) {
+    df <- as.data.frame(parsed$manure_management, stringsAsFactors = FALSE)
+    sheets[["Manure_Management"]] <- df
+  }
+
+  if (length(sheets) == 0) {
+    # JSON parsed but no recognised top-level keys — dump raw so the user
+    # can still inspect.
+    sheets[["RawOutput"]] <- data.frame(content = json_text,
+                                          stringsAsFactors = FALSE)
+  }
+
+  writexl::write_xlsx(sheets, path = file_path)
+  invisible(NULL)
 }
 
 # Look for ```template-ready ... ``` and return the inner JSON; NULL if

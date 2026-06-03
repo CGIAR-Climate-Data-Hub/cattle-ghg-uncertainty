@@ -54,13 +54,78 @@ assemble_translator_system_prompt <- function(asset_dir = "claude_project_assets
     "",
     "## Output convention",
     "",
-    "When you have enough information to produce a complete filled",
-    "IPCC template, emit the JSON inside a fenced block tagged",
-    "```template-ready ... ``` (rather than the usual ```json ... ```).",
-    "The in-app UI watches for the `template-ready` tag and uses it to",
-    "show a 'Download translated template' button. Do NOT emit the tag",
-    "until every required parameter is filled and every clarifying",
-    "question has been answered.",
+    "When (and only when) you have enough information to produce a",
+    "complete filled IPCC template, emit the data inside a fenced block",
+    "tagged ```template-ready ... ``` (rather than the usual ```json```).",
+    "The in-app UI watches for the `template-ready` tag, parses the JSON,",
+    "and writes it to a multi-sheet .xlsx that the user downloads via a",
+    "'Download translated template (.xlsx)' button.",
+    "",
+    "### Required JSON schema",
+    "",
+    "```",
+    "{",
+    "  \"inventory_metadata\": {",
+    "    \"country\": \"Zimbabwe\",",
+    "    \"year\": 2024,",
+    "    \"species\": \"cattle_dairy\",",
+    "    \"ipcc_version\": \"2019_refinement\",",
+    "    \"prepared_by\": \"<optional>\",",
+    "    \"notes\": \"<optional>\"",
+    "  },",
+    "  \"parameters\": [",
+    "    {",
+    "      \"cattle_type\": \"dairy\",",
+    "      \"aggregation_level\": \"all\",",
+    "      \"sub_category\": \"dairy_cows\",",
+    "      \"parameter\": \"N\",",
+    "      \"mean\": 250000,",
+    "      \"lower\": 237500,",
+    "      \"upper\": 262500,",
+    "      \"uncertainty_pct\": 5,",
+    "      \"distribution\": \"normal\",",
+    "      \"param_type\": \"activity_data\"",
+    "    }",
+    "    /* one row per (sub_category, parameter) pair */",
+    "  ],",
+    "  \"manure_management\": [",
+    "    {",
+    "      \"cattle_type\": \"dairy\",",
+    "      \"aggregation_level\": \"all\",",
+    "      \"sub_category\": \"dairy_cows\",",
+    "      \"mms_type\": \"pasture\",",
+    "      \"fraction_pct\": 100,",
+    "      \"mcf\": 0.015,",
+    "      \"ef3\": 0.020",
+    "    }",
+    "    /* one row per (sub_category, MMS) combination; per-sub-category",
+    "       fraction_pct values must sum to 100 */",
+    "  ]",
+    "}",
+    "```",
+    "",
+    "Rules:",
+    "",
+    "* `parameters[].parameter` MUST be one of the canonical names from the",
+    "  parameter catalogue (N, BW, MW, WG, Milk, Fat, DE, CP, Ym, Bo,",
+    "  MCF, EF3_PRP, Frac_GASM_PRP, EF4, EF5, Frac_LEACH_PRP, Cfi, Ca,",
+    "  C_growth, Cp, UE, MilkPR, pct_pregnant, hours, etc.).",
+    "* `parameters[].param_type` is either `activity_data` (N, BW, MW, WG,",
+    "  Milk, Fat, DE, CP, hours, pct_pregnant) or `coefficient` (everything",
+    "  else).",
+    "* `parameters[].distribution` is one of: normal, lognormal, pert,",
+    "  beta, uniform, constant.",
+    "* `parameters[].mean` is required; either `lower`+`upper` OR",
+    "  `uncertainty_pct` is required (not both — pick the one that matches",
+    "  how you derived the uncertainty).",
+    "* `manure_management` rows are required if N2O emission sources are",
+    "  in play; omit the array entirely if the inventory is CH4-only.",
+    "* Inside the fenced block, emit STRICT JSON (no /* comments */ except",
+    "  the schema example above), parseable by jsonlite::fromJSON().",
+    "",
+    "Do NOT emit the `template-ready` block until every required parameter",
+    "is filled and every clarifying question has been answered. While you",
+    "are still gathering information, just respond in plain text.",
     sep = "\n")
 
   # 2026-06: in-app UI presentation rules. These OVERRIDE any earlier
@@ -234,6 +299,134 @@ openai_chat <- function(messages,
     }, error = function(e) NULL)
     list(reply = NULL, error = user_msg)
   }
+}
+
+# Streaming variant of openai_chat().
+#
+# Uses OpenAI's `stream: true` mode (Server-Sent Events) so the response
+# tokens arrive incrementally as the model generates them. The supplied
+# `on_chunk(text)` callback is fired once per token delta — typically
+# the Shiny chat UI uses this to push the new text to the browser via
+# `session$sendCustomMessage()` so the bubble appears to type out live.
+#
+# Returns the same shape as openai_chat() when the stream finishes:
+#   $reply / $usage / $model / $cost_usd / $error
+# but the assembled $reply is the concatenation of every delta, which
+# matches what a non-streaming call would have returned. Usage info is
+# in the FINAL chunk when `stream_options.include_usage = TRUE`.
+openai_chat_stream <- function(messages,
+                                on_chunk = function(text) {},
+                                model = .OPENAI_DEFAULT_MODEL,
+                                max_tokens = 4000,
+                                temperature = 0.2,
+                                timeout_sec = 180) {
+  api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
+  if (!nzchar(api_key)) {
+    return(list(reply = NULL,
+                error = "AI translator is not configured (server is missing the OPENAI_API_KEY). Please contact the administrator."))
+  }
+
+  body <- list(
+    model          = model,
+    messages       = messages,
+    max_tokens     = max_tokens,
+    temperature    = temperature,
+    stream         = TRUE,
+    stream_options = list(include_usage = TRUE)
+  )
+
+  # Mutable state shared between the SSE callback and the outer scope.
+  accumulated <- ""
+  final_usage <- NULL
+  sse_buffer  <- ""
+
+  # Called by httr2 for each chunk of bytes that arrives off the wire.
+  # Returns TRUE to continue streaming, FALSE to stop.
+  on_data <- function(data) {
+    chunk_text <- rawToChar(data)
+    sse_buffer <<- paste0(sse_buffer, chunk_text)
+    # SSE events are separated by a blank line ("\n\n").
+    while (grepl("\n\n", sse_buffer, fixed = TRUE)) {
+      split <- regmatches(sse_buffer,
+                          regexpr("\n\n", sse_buffer, fixed = TRUE),
+                          invert = TRUE)[[1]]
+      event       <- split[1]
+      sse_buffer <<- if (length(split) >= 2) split[2] else ""
+
+      for (line in strsplit(event, "\n", fixed = TRUE)[[1]]) {
+        if (!startsWith(line, "data: ")) next
+        payload <- substring(line, 7)
+        if (payload == "[DONE]") next
+        parsed <- tryCatch(jsonlite::fromJSON(payload, simplifyVector = FALSE),
+                            error = function(e) NULL)
+        if (is.null(parsed)) next
+        # Usage (only present when stream_options.include_usage = TRUE,
+        # and arrives in a chunk whose `choices` array is empty).
+        if (!is.null(parsed$usage)) final_usage <<- parsed$usage
+        # Token delta.
+        if (length(parsed$choices) >= 1) {
+          delta <- parsed$choices[[1]]$delta$content
+          if (!is.null(delta) && nzchar(delta)) {
+            accumulated <<- paste0(accumulated, delta)
+            tryCatch(on_chunk(delta), error = function(e) {
+              message("translator stream on_chunk error: ", conditionMessage(e))
+            })
+          }
+        }
+      }
+    }
+    TRUE  # keep going
+  }
+
+  req <- httr2::request(.OPENAI_ENDPOINT) |>
+    httr2::req_headers(
+      `Authorization` = paste("Bearer", api_key),
+      `Content-Type`  = "application/json",
+      `Accept`        = "text/event-stream"
+    ) |>
+    httr2::req_body_json(body) |>
+    httr2::req_timeout(timeout_sec) |>
+    httr2::req_error(is_error = function(resp) FALSE)
+
+  resp <- tryCatch(httr2::req_perform_stream(req, on_data, buffer_kb = 16),
+                    error = function(e) e)
+
+  if (inherits(resp, "error")) {
+    return(list(reply = if (nzchar(accumulated)) accumulated else NULL,
+                error = paste0("Streaming failed (",
+                               conditionMessage(resp),
+                               "). Try again in a minute.")))
+  }
+
+  status <- httr2::resp_status(resp)
+  if (status >= 300) {
+    # The error body may have arrived as JSON in the buffer rather than
+    # as SSE — try to surface a useful message.
+    tryCatch({
+      body <- httr2::resp_body_json(resp)
+      msg  <- body$error$message %||% ""
+      if (nzchar(msg)) message("OpenAI stream error: ", msg)
+    }, error = function(e) NULL)
+    user_msg <- switch(as.character(status),
+      "401" = "AI translator authentication failed. Please contact the administrator.",
+      "403" = "AI translator is blocked by OpenAI. The administrator may need to add billing.",
+      "429" = "OpenAI is rate-limiting requests. Try again in a minute.",
+      sprintf("OpenAI returned HTTP %d. Try again later.", status))
+    return(list(reply = if (nzchar(accumulated)) accumulated else NULL,
+                error = user_msg))
+  }
+
+  prompt_tokens     <- final_usage$prompt_tokens     %||% 0L
+  completion_tokens <- final_usage$completion_tokens %||% 0L
+  list(
+    reply    = accumulated,
+    usage    = list(prompt_tokens     = prompt_tokens,
+                     completion_tokens = completion_tokens,
+                     total_tokens      = prompt_tokens + completion_tokens),
+    model    = model,
+    cost_usd = openai_cost_usd(prompt_tokens, completion_tokens, model),
+    error    = NULL
+  )
 }
 
 # Convenience: build the message list for the chat UI from

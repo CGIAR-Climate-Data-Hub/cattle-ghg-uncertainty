@@ -44,6 +44,38 @@ app_ui <- function() {
              history.replaceState({}, document.title,
                                    window.location.pathname);
            }
+         });
+         // 2026-06: in-app AI translator — Server-Sent-Events streaming.
+         // server -> client message protocol:
+         //   translatorStreamStart : create a fresh assistant bubble,
+         //                            remember it as the active target.
+         //   translatorStreamChunk : append text to the active bubble,
+         //                            auto-scroll the message container.
+         //   translatorStreamEnd   : drop the reference to the active
+         //                            bubble (next round starts fresh).
+         var _translatorActiveBubble = null;
+         Shiny.addCustomMessageHandler('translatorStreamStart', function(_unused) {
+           var container = document.getElementById('translator_stream_target');
+           if (!container) return;
+           var bubble = document.createElement('div');
+           bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+             'padding:10px 14px; border-radius:10px; white-space:pre-wrap;' +
+             'font-size:0.92rem; background:#F0F4EE; align-self:flex-start;';
+           container.appendChild(bubble);
+           _translatorActiveBubble = bubble;
+         });
+         Shiny.addCustomMessageHandler('translatorStreamChunk', function(text) {
+           if (!_translatorActiveBubble) return;
+           _translatorActiveBubble.textContent += text;
+           // auto-scroll the surrounding message-history div
+           var scroller = _translatorActiveBubble.closest('[data-translator-scroller]');
+           if (scroller) scroller.scrollTop = scroller.scrollHeight;
+         });
+         Shiny.addCustomMessageHandler('translatorStreamEnd', function(_unused) {
+           // Don't remove the bubble — the server about to swap it for a
+           // properly-rendered one in the message history. Just drop the
+           // reference so future chunks don't accidentally append.
+           _translatorActiveBubble = null;
          });"
       )))
     ),
