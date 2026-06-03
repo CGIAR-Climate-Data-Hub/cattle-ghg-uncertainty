@@ -160,13 +160,19 @@ translator_chat_server <- function(input, output, session) {
       return(tags$p(style = "color:#888; font-style:italic;",
                     "Upload your raw cattle data above or type a question to get started."))
     msgs <- lapply(state$messages, function(m) {
+      # User vs AI bubble distinction — standard chat convention:
+      #   user  : light blue, right-aligned
+      #   AI    : light green (CGIAR brand), left-aligned
       bubble_style <- if (m$role == "user")
-        "background:#D8E4D6; align-self:flex-end;"
+        "background:#DCEFFB; color:#1A3A5C; align-self:flex-end;
+         border:1px solid #BFDCEE;"
       else
-        "background:#F0F4EE; align-self:flex-start;"
+        "background:#E8F5E9; color:#1B4332; align-self:flex-start;
+         border:1px solid #C8E6C9;"
       tags$div(
         style = paste("max-width:80%; margin:6px 0; padding:10px 14px;",
-                      "border-radius:10px; white-space:pre-wrap; font-size:0.92rem;",
+                      "border-radius:12px; white-space:pre-wrap; font-size:0.92rem;",
+                      "line-height:1.45;",
                       bubble_style),
         m$display %||% m$content
       )

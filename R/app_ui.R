@@ -58,9 +58,14 @@ app_ui <- function() {
            var container = document.getElementById('translator_stream_target');
            if (!container) return;
            var bubble = document.createElement('div');
+           // Style MUST match the AI bubble style in R/chat_ui.R's renderUI
+           // so the streamed-live bubble looks identical to the rendered-
+           // history bubble that replaces it once streaming ends.
            bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
-             'padding:10px 14px; border-radius:10px; white-space:pre-wrap;' +
-             'font-size:0.92rem; background:#F0F4EE; align-self:flex-start;';
+             'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
+             'font-size:0.92rem; line-height:1.45;' +
+             'background:#E8F5E9; color:#1B4332; align-self:flex-start;' +
+             'border:1px solid #C8E6C9;';
            container.appendChild(bubble);
            _translatorActiveBubble = bubble;
          });
