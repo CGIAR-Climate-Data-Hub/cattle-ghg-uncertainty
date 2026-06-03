@@ -42,6 +42,23 @@ translator_chat_ui <- function() {
 translator_chat_server <- function(input, output, session) {
   state <- .translator_init_state()
 
+  # ---- Session-restore from cookie (runs once on Shiny session start) ------
+  # If the browser already has a valid translator_session cookie, the user
+  # is signed back in immediately — no magic link required. The Cookie:
+  # header is on session$request$HTTP_COOKIE; we parse + HMAC-verify it
+  # in pure R (no JS round-trip needed for restore).
+  observeEvent(session$clientData$url_protocol, {
+    if (!is.null(state$user_email)) return()  # already signed in this session
+    cookie_value <- auth_cookie_lookup(
+      cookie_header = session$request$HTTP_COOKIE,
+      name          = "translator_session")
+    if (is.null(cookie_value)) return()
+    restored <- auth_session_cookie_verify(cookie_value)
+    if (!is.null(restored) && auth_is_approved(restored)) {
+      state$user_email <- restored
+    }
+  }, once = TRUE, ignoreInit = FALSE)
+
   # ---- One-shot URL-token consumption on app start --------------------------
   observeEvent(session$clientData$url_search, {
     qs <- shiny::parseQueryString(session$clientData$url_search %||% "")
@@ -53,6 +70,14 @@ translator_chat_server <- function(input, output, session) {
     } else if (auth_is_approved(email)) {
       state$user_email <- email
       state$login_status <- NULL
+      # Drop a 30-day signed cookie so the next refresh keeps the user
+      # signed in without another magic-link round-trip.
+      tryCatch({
+        sess_cookie <- auth_session_cookie_issue(email)
+        session$sendCustomMessage("setTranslatorSession", sess_cookie)
+      }, error = function(e) {
+        message("auth: couldn't issue session cookie: ", conditionMessage(e))
+      })
     } else {
       state$user_email <- NULL
       state$login_status <- paste0(
@@ -200,8 +225,80 @@ translator_chat_server <- function(input, output, session) {
   })
   outputOptions(output, "translator_template_ready", suspendWhenHidden = FALSE)
 
-  # ---- Render the budget status line + last error --------------------------
-  output$translator_budget_line <- renderText(budget_status_line())
+  # ---- Admin-only budget + usage stats -------------------------------------
+  # The budget status line ("Pilot budget: $0.04 / $10.00 used") and a
+  # small stats card are visible ONLY to the admin (defined by the
+  # ADMIN_EMAIL env var). Regular signed-in users see nothing — they don't
+  # need to think about the pilot budget.
+  is_admin <- reactive({
+    admin <- tolower(trimws(Sys.getenv("ADMIN_EMAIL", unset = "")))
+    !is.null(state$user_email) && nzchar(admin) &&
+      identical(tolower(state$user_email), admin)
+  })
+
+  output$translator_budget_line <- renderText({
+    if (!isTRUE(is_admin())) return("")
+    budget_status_line()
+  })
+
+  # Compact usage card surfaced to the admin: total spend this month,
+  # total calls, unique users, latest 5 calls (timestamp + user + tokens
+  # + cost). Cheap to render — reads the small CSV ledger.
+  output$translator_admin_stats <- renderUI({
+    if (!isTRUE(is_admin())) return(NULL)
+    df <- tryCatch(usage_log_read(), error = function(e) NULL)
+    if (is.null(df) || nrow(df) == 0) {
+      return(tags$div(
+        style = "margin-top:14px; padding:10px 14px; background:#F1F5F9;
+                 border:1px solid #CBD5E1; border-radius:6px;
+                 font-size:0.85rem; color:#475569;",
+        tags$strong("Admin: usage log"),
+        tags$br(),
+        "No translator calls logged yet this container session."))
+    }
+    total_calls <- nrow(df)
+    total_cost  <- sum(as.numeric(df$cost_usd), na.rm = TRUE)
+    unique_users <- length(unique(df$user_email))
+    tail_n <- min(5, nrow(df))
+    recent <- tail(df[, c("timestamp", "user_email",
+                           "prompt_tokens", "completion_tokens",
+                           "cost_usd")], tail_n)
+    recent$cost_usd <- sprintf("$%.4f", as.numeric(recent$cost_usd))
+    tags$div(
+      style = "margin-top:14px; padding:10px 14px; background:#F1F5F9;
+               border:1px solid #CBD5E1; border-radius:6px;
+               font-size:0.82rem; color:#1E293B;",
+      tags$div(style = "font-weight:600; margin-bottom:6px; color:#0F172A;",
+               "Admin: translator usage (this container session)"),
+      tags$div(
+        style = "display:flex; gap:18px; flex-wrap:wrap; margin-bottom:8px;",
+        tags$span(tags$strong("Calls: "), total_calls),
+        tags$span(tags$strong("Spend: "), sprintf("$%.4f", total_cost)),
+        tags$span(tags$strong("Unique users: "), unique_users)
+      ),
+      tags$div(style = "font-size:0.78rem; color:#475569; margin-bottom:4px;",
+               sprintf("Last %d calls:", tail_n)),
+      tags$pre(
+        style = "background:#FFFFFF; padding:6px 10px; border-radius:4px;
+                 font-size:0.78rem; max-height:160px; overflow-y:auto;
+                 margin:0;",
+        paste(apply(recent, 1, function(r) {
+          paste(r["timestamp"], r["user_email"],
+                sprintf("p=%s c=%s %s",
+                        r["prompt_tokens"], r["completion_tokens"],
+                        r["cost_usd"]))
+        }), collapse = "\n")
+      ),
+      tags$div(style = "font-size:0.78rem; color:#64748B; margin-top:6px;",
+               "Note: the usage log is held in the container's working dir ",
+               "and resets when shinyapps.io recycles the container. ",
+               "For permanent per-month tracking, OpenAI's dashboard at ",
+               tags$a(href = "https://platform.openai.com/usage",
+                      target = "_blank", "platform.openai.com/usage"),
+               " is the source of truth.")
+    )
+  })
+
   output$translator_last_error <- renderUI({
     if (!is.null(state$last_error))
       tags$div(style = "padding:8px 12px; margin-top:8px; background:#FED7D7;
@@ -250,9 +347,14 @@ translator_chat_server <- function(input, output, session) {
         tags$strong("Signed in: "),
         tags$code(state$user_email)
       ),
+      # 2026-06: only the admin sees the budget line. Regular users see
+      # nothing in this slot — the spend is not their concern.
       tags$div(style = "font-size:0.82rem; color:#52525B;",
                textOutput("translator_budget_line", inline = TRUE))
     ),
+    # Admin-only stats card (visible only when state$user_email matches
+    # ADMIN_EMAIL). For non-admin users this renders to NULL.
+    uiOutput("translator_admin_stats"),
     tags$hr(style = "margin:10px 0;"),
 
     fileInput("translator_file",

@@ -181,6 +181,80 @@ auth_notify_admin_of_request <- function(requesting_email,
   httr2::resp_status(resp) %in% 200:299
 }
 
+# ----- Long-lived session cookie -------------------------------------------
+#
+# After a successful magic-link consume we drop a 30-day cookie in the
+# browser so the user doesn't have to re-verify every time they reload
+# the page. The cookie is a signed token:
+#
+#   <email>|<expires_at_epoch>|<hmac_hex>
+#
+# - email + expires_at_epoch are in the clear (they're shown to the
+#   user themselves anyway, no secret).
+# - hmac = HMAC-SHA256(email|expires_at, SESSION_SIGNING_KEY) — the
+#   server verifies this on every page load. If the attacker doesn't
+#   have SESSION_SIGNING_KEY they can't forge a valid token.
+#
+# The cookie is set via JS (document.cookie) so it can't be HttpOnly,
+# but the value is also not a usable secret on its own — it identifies
+# the user but doesn't authorise any privileged action beyond the
+# translator chat. For the pilot this trade-off is acceptable.
+
+.auth_hmac <- function(message) {
+  key <- Sys.getenv("SESSION_SIGNING_KEY", unset = "")
+  if (!nzchar(key))
+    stop("SESSION_SIGNING_KEY is not set — refusing to issue session tokens.",
+         call. = FALSE)
+  # Use openssl::sha256 with HMAC-SHA256. openssl is a transitive
+  # dependency of httr2 so already loaded.
+  hmac_raw <- openssl::sha256(charToRaw(message),
+                                key = charToRaw(key))
+  paste(as.character(hmac_raw), collapse = "")
+}
+
+# Issue a 30-day cookie value for the given email. Returns the full
+# cookie string ready to push to the browser.
+auth_session_cookie_issue <- function(email,
+                                      ttl_days = 30) {
+  email <- tolower(trimws(email))
+  expires_at <- as.integer(Sys.time()) + ttl_days * 86400L
+  payload    <- paste(email, expires_at, sep = "|")
+  paste(payload, .auth_hmac(payload), sep = "|")
+}
+
+# Verify a cookie value. Returns the email if (a) the HMAC is valid and
+# (b) expires_at is still in the future. Returns NULL on any failure
+# (tampered, expired, malformed, or signing key not set).
+auth_session_cookie_verify <- function(cookie_value) {
+  if (is.null(cookie_value) || !nzchar(cookie_value)) return(NULL)
+  parts <- strsplit(cookie_value, "|", fixed = TRUE)[[1]]
+  if (length(parts) != 3) return(NULL)
+  email      <- parts[1]
+  expires_at <- suppressWarnings(as.integer(parts[2]))
+  hmac_seen  <- parts[3]
+  if (is.na(expires_at) || expires_at < as.integer(Sys.time())) return(NULL)
+  payload <- paste(email, expires_at, sep = "|")
+  hmac_expected <- tryCatch(.auth_hmac(payload), error = function(e) NULL)
+  if (is.null(hmac_expected)) return(NULL)
+  if (!identical(hmac_expected, hmac_seen)) return(NULL)
+  email
+}
+
+# Parse the Cookie: header from session$request$HTTP_COOKIE and return
+# the value of the named cookie, or NULL.
+auth_cookie_lookup <- function(cookie_header, name) {
+  if (is.null(cookie_header) || !nzchar(cookie_header)) return(NULL)
+  pairs <- strsplit(cookie_header, ";\\s*")[[1]]
+  for (p in pairs) {
+    eq <- regexpr("=", p, fixed = TRUE)
+    if (eq < 1) next
+    k <- substr(p, 1, eq - 1)
+    if (identical(trimws(k), name))
+      return(utils::URLdecode(substr(p, eq + 1, nchar(p))))
+  }
+  NULL
+}
+
 # ----- Shiny UI helpers -----------------------------------------------------
 
 # Email-entry form shown when no user is logged in.
