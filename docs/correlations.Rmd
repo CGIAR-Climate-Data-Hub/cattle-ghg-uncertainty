@@ -43,7 +43,14 @@ runs <- readRDS(file.path(params$cache_dir, "correlations_runs.rds"))
 # Correlations — Find out more {.unlisted .unnumbered}
 
 <div class="tldr">
-<strong>Quick answer.</strong> If you're unsure, pick <strong>No correlations</strong> — most national inventories do. If your input parameters are clearly linked physically (e.g. high-fibre diets push Y<sub>m</sub> up <em>and</em> DE down), pick <strong>Structural defaults</strong> for a more honest representation. If you have ≥5 years of historical inventory data, pick <strong>From template (auto)</strong> — most accurate. Pick <strong>Manual entry</strong> only if you have a correlation matrix from a published study or expert elicitation.
+<strong>Quick answer.</strong> For a typical national inventory you have two sensible picks:
+
+- <strong>No multi-year historical data?</strong> Pick <strong>Structural defaults (expert-elicited)</strong>. This applies seven well-documented biological pairs (BW↔MW, DE↔Y<sub>m</sub>, Milk↔BW, …) drawn from the IPCC equations and the livestock literature. It is the recommended choice for single-year inventories.
+- <strong>You have ≥5 years of populated <code>Parameter_TimeSeries</code> data?</strong> Pick <strong>From template (auto, time-series)</strong>. The tool learns correlations directly from your country's history.
+
+<strong>No correlations</strong> is the conservative IPCC-Approach-2 default and is always defensible. <strong>Manual entry</strong> is only for users with a published correlation matrix or an expert-elicitation result.
+
+<strong>Either way the central emission estimate barely moves</strong> — correlations affect only the <em>spread</em> (95% MoE). Expect a 3–10% widening of the MoE on a single-year inventory when you turn the preset on; mean change is essentially zero.
 </div>
 
 ## Why correlations matter at all
@@ -52,36 +59,70 @@ Monte Carlo without correlations draws each input parameter independently each i
 
 Adding a correlation between DE and Y<sub>m</sub> tells the sampler "when one is high, the other tends to be low". Iterations now cluster around the physically-plausible combinations and the tails of the emission distribution shift.
 
-**Key effect on the headline:** correlations <em>widen</em> the 95% confidence interval, not narrow it. The strongly-linked extremes (high-DE / low-Y<sub>m</sub> at one end, low-DE / high-Y<sub>m</sub> at the other) become more likely than independent sampling makes them, and these extremes produce more extreme emission totals. **Correlations do not bias the central estimate** — the mean is preserved because correlations operate on the joint distribution, not the marginals.
+**Key effect on the headline:** correlations <em>widen</em> the 95% confidence interval, not narrow it. The strongly-linked extremes (high-DE / low-Y<sub>m</sub> at one end, low-DE / high-Y<sub>m</sub> at the other) become more likely than independent sampling makes them, and these extremes produce more extreme emission totals. **Correlations do not bias the central estimate** — the mean is preserved because correlations operate on the joint distribution of the inputs, not on each parameter's marginal mean.
+
+<div class="callout-info">
+<strong>"My inventory is for one year. Why does the tool talk about time series?"</strong>
+
+Correlation in this tool means correlation <strong>between parameters within one Monte Carlo iteration</strong> — not correlation across years. The Monte Carlo only ever simulates the single year of your inventory. The 10,000 iterations are alternative "what could 2024 actually be" tuples (BW, DE, Y<sub>m</sub>, …), and correlation decides which combinations of those values are jointly plausible.
+
+The historical <code>Parameter_TimeSeries</code> data — when you have it — is used purely as a <em>training set</em> to estimate the correlation pattern. The tool asks: "in this country's past, when body weight went up did digestibility usually go up too?" Whatever pattern the historical years show, that pattern is then imposed on the within-year Monte Carlo draws.
+
+If you have no historical data, the "Structural defaults" preset imposes correlations from external evidence (biology, the IPCC equations) — exactly the same single-year MC, just with a different source for the correlation values.
+</div>
 
 ## Decision flow
 
 ```
-Do you have a Parameter_TimeSeries sheet with ≥5 years of data?
+Do you have a Parameter_TimeSeries sheet with ≥5 years of populated data?
         │
-        ├── YES → "From template (auto, time-series)" — RECOMMENDED
+        ├── YES → "From template (auto, time-series)"
+        │        (the tool learns correlations from your own history)
         │
-        └── NO  → Do you believe your input parameters move together
-                  (e.g. heavier cattle eat more — BW & MW correlated)?
-                       │
-                       ├── YES → "Structural defaults (expert-elicited)"
-                       │
-                       └── NO  → "No correlations"
-                                  (always a safe, IPCC-standard default)
+        └── NO  → "Structural defaults (expert-elicited)"   ← recommended
+                  (the tool applies seven biological pairs from the literature)
+        │
+        └── Want the strictly-conservative IPCC Approach-2 default?
+                → "No correlations"   (always defensible)
 
 Do you have a correlation matrix from a published study or expert elicitation?
         │
-        └── If YES → "Advanced — manual entry" with a CSV upload
+        └── YES → "Advanced — manual entry" with a CSV upload
 ```
+
+<div class="callout-info">
+<strong>You can't pick a mode that won't work.</strong> The Tab 4 radio greys out automatically when its prerequisites are missing — "From template (auto)" is disabled when your upload has no populated <code>Parameter_TimeSeries</code> sheet, "Advanced — manual entry" is disabled until a CSV matrix is uploaded, and "Structural defaults" is disabled until at least one template has been loaded. Each greyed option carries a short note explaining why. The Run button also blocks the simulation with a clear error if a no-data mode somehow slips through.
+</div>
 
 ## The four options compared
 
 | Option | What it does | When to pick | Data needed |
 |---|---|---|---|
-| **No correlations** | All parameters sampled independently each iteration | Default. You have no information about co-movement. | None |
-| **Structural defaults** | Applies 7 expert-elicited pairs from the livestock literature: BW↔MW, BW↔WG, Milk↔Fat, Milk↔BW, Milk↔DE, DE↔CP, DE↔Y<sub>m</sub> | Single-year inventory with no historical data; you want the most well-documented links applied automatically. | None — built into the tool. |
-| **From template (auto, time-series)** | Computes a Spearman rank-correlation matrix from your `Parameter_TimeSeries` sheet (after first-difference detrending). | You have ≥5 years of historical inventory data with non-constant parameters. | A populated `Parameter_TimeSeries` sheet (≥5 rows, ≥2 numeric columns). |
+| **No correlations** | All parameters sampled independently each iteration | Default. You have no information about co-movement, or want the strictly-conservative IPCC Approach 2 starting point. | None |
+| **Structural defaults** | Applies 7 expert-elicited pairs from the livestock literature: BW↔MW, BW↔WG, Milk↔Fat, Milk↔BW, Milk↔DE, DE↔CP, DE↔Y<sub>m</sub> | Single-year inventory with no historical data; you want the most well-documented links applied automatically. **Recommended** for typical national inventories. | None — built into the tool. |
+| **From template (auto, time-series)** | Computes a Spearman rank-correlation matrix from your `Parameter_TimeSeries` sheet (first-difference detrending applied internally to strip shared long-run growth). | You have ≥5 years of historical inventory data with non-constant parameters. | A populated `Parameter_TimeSeries` sheet (≥5 rows, ≥2 numeric columns). |
 | **Manual entry** | Use a square CSV correlation matrix you supply. | You have a published correlation matrix from a similar inventory, or expert-elicitation results. | A CSV — downloadable templates are inside the panel. |
+
+## How much will the result actually change?
+
+The honest answer is **a few percent on the 95% MoE**, with the central estimate essentially unchanged. The detail:
+
+**Correlations move the result a lot when** (i) the linked parameters have wide uncertainty ranges, (ii) the correlation is strong (|ρ| ≥ 0.5), and (iii) **several pairs are correlated at once**. They move it **a little** when only one or two pairs are linked inside a long multiplication of many independent inputs — which is the situation in the IPCC equation chain (~13 multiplicative parameters, 7 correlated pairs in the preset).
+
+Concrete dummy-data examples from our regression test suite (each line is the SD-ratio of the output **with** vs **without** the correlation):
+
+| Setup | Correlation | Output spread |
+|---|---|---|
+| 2-parameter product, wide uncertainty (±60% each) | ρ = +0.8 | **32% wider** |
+| 2-parameter product, wide uncertainty | ρ = −0.5 | **28% narrower** |
+| 2-parameter product, realistic livestock CVs (DE & Y<sub>m</sub>) | ρ = −0.5 | **17% narrower** |
+| 10-parameter product, only ONE pair correlated | ρ = −0.5 | **5% narrower** (the rest of the product dilutes the effect) |
+
+The 10-parameter row is closest to the real situation in the IPCC equation chain: even the dominant DE↔Y<sub>m</sub> = −0.5 cross-block pair, sitting inside a product with ~12 other independent inputs, only nudges the headline by a few percent.
+
+<div class="callout-info">
+<strong>See it on your own data.</strong> On Tab 5, tick <strong>"Compare with/without correlations"</strong> before pressing Run. The Results tab will then show a small bar chart labelled <em>"Effect of Correlations on Uncertainty"</em> — green bars are the 95% MoE with your selected correlations on, grey bars are the same simulation with all correlations cleared. The gap between green and grey is the actual effect of correlations on <em>your</em> inventory.
+</div>
 
 ## Worked example: Country X (smallholder dairy, 500 000 head)
 
@@ -162,27 +203,40 @@ Each non-zero cell is documented in the methodology. The values:
 | DE ↔ CP | +0.50 | Forage-quality co-variation across feed types (NRC; INRA). |
 | DE ↔ Y<sub>m</sub> | **−0.50** | IPCC 2019 Refinement Eq 10.21 + meta-analysis (Niu 2018, Hristov 2013). Cross-block — the dominant headline mover. |
 
+## EF correlations (right-hand card on Tab 4)
+
+The right-hand "Coefficient Correlations" card is a separate, opt-in switch for correlations <em>between emission-factor coefficients</em> that share a measurement literature (e.g.\ all rumen-fermentation coefficients from one regional database). It has two modes:
+
+- **No EF correlations** (default) — emission factors are sampled independently. Standard IPCC Approach 2 assumption.
+- **Block-structured EF correlation** — three within-block ρ sliders (energy / manure-CH<sub>4</sub> / manure-N), each in the range 0–0.5. Cross-block correlation is always zero because the three literatures are independent.
+
+All three sliders default to 0, so the right-hand card does nothing until the user actively moves a slider. Setting one slider to ρ = 0.3 typically widens the 95% MoE by a few more percentage points on top of any activity-data correlation effect; ρ = 0.5 roughly doubles that. Most users will not engage this — it is for inventory compilers who believe their EFs come from a single biased source.
+
 ## Common mistakes
 
 <div class="callout-warn">
 
 - **Expecting the mean to change.** It doesn't. Correlations widen the CI; they don't bias the central estimate.
 
-- **Renaming row/column headers in the manual matrix.** Names that don't match the canonical `PARAM_CATALOGUE` are silently dropped — the simulation runs but the correlation doesn't apply. Always start from the **downloadable example template**, which ships with the canonical names already in place.
+- **Picking "From template (auto)" on an empty Parameter_TimeSeries sheet.** Before June 2026 this silently fell back to "no correlations" — the simulation ran, the result was identical to the no-correlations case, and nothing in the UI warned the user. The radio now greys out automatically when the prerequisite is missing, but if you ever see the comparison bars (green vs grey on the Results tab) sitting at identical heights, double-check that the mode you selected actually had data to work with.
 
-- **Picking "From template (auto)" without 5 years of time-series data.** The radio greys out automatically when the prerequisite is missing, but if you switch upload files mid-session the state may persist briefly — re-check that the selected mode matches your data.
+- **Picking "Block-structured EF correlation" with all three sliders at 0.** Same silent-no-op trap on the EF side. An inline amber warning now surfaces underneath the sliders when all three are zero — heed it.
+
+- **Renaming row/column headers in the manual matrix.** Names that don't match the canonical `PARAM_CATALOGUE` are silently dropped — the simulation runs but the correlation doesn't apply. Always start from the **downloadable example template**, which ships with the canonical names already in place.
 
 - **Worrying about positive-definiteness.** If your uploaded matrix is not positive-definite, the tool projects it onto the nearest positive-definite correlation matrix via `Matrix::nearPD()` and warns you if any entry shifts by more than 0.01. You don't need to construct a perfectly valid matrix by hand.
 
 - **Missing parameters.** If your uploaded matrix only covers, say, 10 parameters, the simulation treats all pairs involving the missing 15 as independent (zero correlation). That's intentional graceful degradation, not an error.
+
+- **Reading a small effect as "broken".** A single correlated pair inside the 13-input IPCC equation chain only moves the headline 95% MoE by a few percent. That is the correct mathematical behaviour — it is not a bug. If you want a larger effect, you need either richer multi-year time-series data (which the "From template" mode will harvest into multiple correlated pairs) or genuinely wide per-parameter uncertainty bounds.
 
 </div>
 
 <div class="related">
 ### Related material
 
-- [Methodology document](../methodology.pdf), §Correlation Structure — the equations and rationale behind each preset pair, including the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) and why they were dropped.
-- [User Guide](../user_guide.pdf), §Correlations (Tab 4) — step-by-step app workflow including how to download the manual-entry CSV template.
+- [Methodology document](../methodology.pdf), §Correlation Structure — the equations and rationale behind each preset pair, including the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) and why they were dropped in the June 2026 review.
+- [User Guide](../user_guide.pdf), §Correlations (Tab 4) — step-by-step app workflow including how to download the manual-entry CSV template and how to read the "Effect of Correlations on Uncertainty" comparison chart.
 - IPCC 2006 Vol.1 Ch.3 §3.2.3.2 — restricted-pairing rank-correlation procedure (Iman & Conover 1982) that the tool implements.
 
 </div>
