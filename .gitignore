@@ -24,3 +24,13 @@ desktop.ini
 # Python cache (build_docs script)
 __pycache__/
 *.pyc
+
+# 2026-06: in-app AI translator runtime artefacts
+# Never commit secrets or per-call usage logs — secrets only live in the
+# shinyapps.io env-var dashboard; the usage log lives ephemerally in the
+# container's working dir.
+.Renviron
+.env
+*.env
+translator_usage_log.csv
+auth_tokens.csv

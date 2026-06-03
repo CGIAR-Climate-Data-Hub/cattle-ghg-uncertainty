@@ -1,0 +1,142 @@
+# Token + spend ledger for the in-app AI translator.
+#
+# Each successful OpenAI call appends one row to a local CSV. A
+# month-to-date spend check is run BEFORE every API call; if the cap is
+# exceeded, the caller refuses the request and surfaces a "monthly cap
+# reached" message to the user.
+#
+# IMPORTANT — shinyapps.io ephemerality:
+#
+# The shinyapps.io free/starter tiers do not have persistent storage.
+# The container is recycled on idle and the local CSV resets to empty.
+# This means the in-app cap is BEST-EFFORT only — a container restart
+# resets the month-to-date counter.
+#
+# The REAL hard ceiling is set on OpenAI's side, by the account holder
+# (Lolita), at <https://platform.openai.com/account/limits>. The plan
+# recommends $20/month — a 2× buffer above this app's $10/month soft cap.
+# OpenAI itself stops billing the account at the hard limit regardless
+# of what the in-app log reports.
+#
+# If we later need a true persistent ledger, a Google Sheet via
+# `googlesheets4` is the lightweight upgrade path. Out of scope for the
+# pilot.
+
+# Resolve a directory we can write to in any deployment context.
+.usage_log_dir <- function() {
+  # Honour an explicit override (used by tests / dev).
+  override <- Sys.getenv("TRANSLATOR_LOG_DIR", unset = "")
+  if (nzchar(override)) return(override)
+  # On shinyapps.io the working dir IS writable (just ephemeral).
+  # Locally we use the working dir too — keeps dev and prod identical.
+  getwd()
+}
+
+.usage_log_path <- function() {
+  file.path(.usage_log_dir(), "translator_usage_log.csv")
+}
+
+.usage_log_columns <- c(
+  "timestamp", "user_email", "model",
+  "prompt_tokens", "completion_tokens", "total_tokens",
+  "cost_usd"
+)
+
+# Create the file with a header row if it doesn't already exist.
+.usage_log_ensure <- function() {
+  path <- .usage_log_path()
+  if (!file.exists(path)) {
+    df <- as.data.frame(matrix(character(0), ncol = length(.usage_log_columns),
+                                dimnames = list(NULL, .usage_log_columns)))
+    utils::write.csv(df, path, row.names = FALSE)
+  }
+  path
+}
+
+# Append one row.  Caller passes the OPenAI response shape from
+# openai_chat() ($usage, $model, $cost_usd) plus the user_email.
+usage_log_append <- function(user_email, model,
+                              prompt_tokens, completion_tokens, cost_usd,
+                              ts = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ",
+                                           tz = "UTC")) {
+  path <- .usage_log_ensure()
+  row  <- data.frame(
+    timestamp         = ts,
+    user_email        = user_email %||% "unknown",
+    model             = model %||% NA_character_,
+    prompt_tokens     = as.integer(prompt_tokens %||% 0L),
+    completion_tokens = as.integer(completion_tokens %||% 0L),
+    total_tokens      = as.integer((prompt_tokens %||% 0L) +
+                                    (completion_tokens %||% 0L)),
+    cost_usd          = as.numeric(cost_usd %||% 0),
+    stringsAsFactors  = FALSE
+  )
+  # Append without re-writing the header.
+  utils::write.table(row, path, sep = ",",
+                     append    = TRUE,
+                     row.names = FALSE,
+                     col.names = FALSE,
+                     quote     = c(2, 3))    # quote user_email + model
+  invisible(row)
+}
+
+# Read the log back as a data.frame; empty data.frame with the right
+# schema when the file doesn't exist yet.
+usage_log_read <- function() {
+  path <- .usage_log_path()
+  if (!file.exists(path) || file.info(path)$size == 0)
+    return(data.frame(matrix(character(0), ncol = length(.usage_log_columns),
+                              dimnames = list(NULL, .usage_log_columns)),
+                       stringsAsFactors = FALSE))
+  df <- tryCatch(utils::read.csv(path, stringsAsFactors = FALSE),
+                  error = function(e) NULL)
+  if (is.null(df)) return(data.frame())
+  df
+}
+
+# Sum of cost_usd since the start of the current month (UTC).
+# Returns 0 if the log is empty or unreadable. Used to gate against the
+# monthly cap.
+month_to_date_spend <- function() {
+  df <- usage_log_read()
+  if (nrow(df) == 0 || !"cost_usd" %in% names(df)) return(0)
+  ts <- suppressWarnings(as.POSIXct(df$timestamp, tz = "UTC",
+                                      format = "%Y-%m-%dT%H:%M:%SZ"))
+  month_start <- as.POSIXct(format(Sys.time(), "%Y-%m-01 00:00:00", tz = "UTC"),
+                             tz = "UTC")
+  current <- !is.na(ts) & ts >= month_start
+  sum(as.numeric(df$cost_usd[current]), na.rm = TRUE)
+}
+
+# Read the monthly cap from the env var (set on shinyapps.io). Default
+# $10 if missing or malformed. The env-var path means Lolita can change
+# the cap without redeploying.
+monthly_budget_cap_usd <- function() {
+  raw <- Sys.getenv("MONTHLY_BUDGET_CAP_USD", unset = "10")
+  cap <- suppressWarnings(as.numeric(raw))
+  if (!is.finite(cap) || cap <= 0) cap <- 10
+  cap
+}
+
+# Returns TRUE if the next API call would push us over the cap.
+# Conservative: assumes the next call costs as much as the LARGEST call
+# we've seen this month (so the very first call of the month always goes
+# through). The actual per-call estimate from the chat UI takes
+# precedence if it's supplied.
+budget_would_exceed <- function(estimated_next_cost = NULL) {
+  cap <- monthly_budget_cap_usd()
+  spent <- month_to_date_spend()
+  if (is.null(estimated_next_cost)) {
+    df <- usage_log_read()
+    estimated_next_cost <- if (nrow(df) > 0) max(as.numeric(df$cost_usd),
+                                                  na.rm = TRUE) else 0
+  }
+  (spent + estimated_next_cost) > cap
+}
+
+# Human-friendly status string for display under the chat panel
+# ("Pilot budget: $1.42 / $10.00 used this month").
+budget_status_line <- function() {
+  sprintf("Pilot budget: $%.2f / $%.2f used this month",
+          month_to_date_spend(), monthly_budget_cap_usd())
+}

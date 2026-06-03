@@ -1,0 +1,207 @@
+# Magic-link email authentication for the in-app AI translator.
+#
+# Flow:
+#   1. User enters email -> server generates a 32-char token, stores
+#      (token, email, expires_at) in an in-memory table, sends a link
+#      via SendGrid.
+#   2. User clicks the link in their inbox -> Shiny app loads with
+#      `?token=...` in the URL -> the server validates the token,
+#      consumes it, and sets `rv$user_email`.
+#   3. The user_email is checked against the approved-users whitelist
+#      (approved_users.csv). If approved, the chat UI unlocks. If not,
+#      a "pending Lolita's approval" page is shown and a notification
+#      email is sent to the admin.
+#
+# Tokens are kept ONLY in memory (a session-scoped reactiveValues map).
+# Container restart wipes them; the user just enters their email again.
+# No persistent secret in code or in git.
+#
+# Persistent storage caveat (same as usage_log.R): shinyapps.io's
+# free/starter tiers don't persist files across container restarts.
+# For tokens that's fine — they're short-lived (15 min). For the
+# 30-day "stay-logged-in" cookie, the cookie is stored client-side
+# (browser localStorage); on the server we just validate that a
+# cookie-supplied email matches the approved list.
+
+# ----- Approved-users whitelist --------------------------------------------
+
+# Read the whitelist CSV (single column: email). Returns character(0)
+# if the file is missing — fail-closed (no one gets in).
+auth_read_approved_users <- function(path = "approved_users.csv") {
+  if (!file.exists(path)) {
+    warning("approved_users.csv not found — no users will be approved.",
+            call. = FALSE)
+    return(character(0))
+  }
+  df <- tryCatch(utils::read.csv(path, stringsAsFactors = FALSE),
+                  error = function(e) NULL)
+  if (is.null(df) || !"email" %in% names(df)) return(character(0))
+  emails <- tolower(trimws(as.character(df$email)))
+  emails[nzchar(emails)]
+}
+
+# Decide whether a given email is approved.
+#  - listed explicitly in approved_users.csv -> TRUE
+#  - matches the @cgiar.org domain pattern    -> TRUE  (per the plan)
+#  - otherwise                                 -> FALSE
+auth_is_approved <- function(email,
+                              whitelist = auth_read_approved_users()) {
+  if (is.null(email) || !nzchar(email)) return(FALSE)
+  e <- tolower(trimws(email))
+  if (e %in% whitelist) return(TRUE)
+  grepl("@cgiar\\.org$", e, ignore.case = TRUE)
+}
+
+# ----- Magic-link token store (in-memory) ----------------------------------
+
+# A simple environment used as a hashmap. Cleared on container restart.
+.auth_token_store <- new.env(parent = emptyenv())
+
+.auth_token_make <- function() {
+  # 32 hex chars, ~128 bits of entropy. Avoids depending on extra packages.
+  paste(as.hexmode(sample.int(2^31 - 1, size = 4)), collapse = "")
+}
+
+# Store a new token; returns the token string.
+auth_token_issue <- function(email, ttl_seconds = 15 * 60) {
+  tok <- .auth_token_make()
+  .auth_token_store[[tok]] <- list(
+    email      = tolower(trimws(email)),
+    expires_at = Sys.time() + ttl_seconds
+  )
+  tok
+}
+
+# Consume a token (one-shot). Returns the email if valid, NULL otherwise.
+# Always removes the token from the store, even on failure, so a leaked
+# URL is single-use.
+auth_token_consume <- function(token) {
+  if (is.null(token) || !nzchar(token)) return(NULL)
+  rec <- .auth_token_store[[token]]
+  rm(list = token, envir = .auth_token_store, inherits = FALSE)
+  if (is.null(rec)) return(NULL)
+  if (Sys.time() > rec$expires_at) return(NULL)
+  rec$email
+}
+
+# ----- SendGrid e-mail dispatch --------------------------------------------
+
+# Send a magic-link email. Returns TRUE on success, FALSE on any error.
+# SendGrid API: POST https://api.sendgrid.com/v3/mail/send
+# Auth: Bearer <SENDGRID_API_KEY> from env.
+#
+# `app_base_url` should be the public URL of the app (e.g.
+# "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/"). We read it
+# from the env var APP_BASE_URL set on shinyapps.io; sensible default is
+# left as a placeholder so a misconfiguration is loud rather than silent.
+auth_send_magic_link <- function(email, token,
+                                  app_base_url = Sys.getenv("APP_BASE_URL",
+                                                             unset = ""),
+                                  from_email = Sys.getenv("MAGIC_LINK_FROM",
+                                                           unset = "noreply@cattle-uncertainty.app"),
+                                  from_name  = "IPCC Cattle GHG Tool") {
+  sg_key <- Sys.getenv("SENDGRID_API_KEY", unset = "")
+  if (!nzchar(sg_key)) {
+    message("auth: SENDGRID_API_KEY not set — magic link not sent")
+    return(FALSE)
+  }
+  if (!nzchar(app_base_url)) {
+    message("auth: APP_BASE_URL not set — using a relative link (won't open in email)")
+  }
+  link <- paste0(sub("/?$", "/", app_base_url), "?token=", token)
+  body <- list(
+    personalizations = list(list(
+      to      = list(list(email = email)),
+      subject = "Sign in to the IPCC Cattle GHG Uncertainty tool"
+    )),
+    from    = list(email = from_email, name = from_name),
+    content = list(
+      list(type = "text/plain",
+            value = paste0(
+              "Welcome to the AI translator for the IPCC Cattle GHG Tool.\n\n",
+              "Click the link below to sign in (the link is valid for 15 minutes):\n\n",
+              link, "\n\n",
+              "If you didn't request this, you can safely ignore this email.\n")),
+      list(type = "text/html",
+            value = paste0(
+              "<p>Welcome to the AI translator for the IPCC Cattle GHG Tool.</p>",
+              "<p><a href=\"", link, "\">Click here to sign in</a> ",
+              "(the link is valid for 15 minutes).</p>",
+              "<p>If you didn't request this, you can safely ignore this email.</p>"))
+    )
+  )
+  req <- httr2::request("https://api.sendgrid.com/v3/mail/send") |>
+    httr2::req_headers(
+      `Authorization` = paste("Bearer", sg_key),
+      `Content-Type`  = "application/json"
+    ) |>
+    httr2::req_body_json(body) |>
+    httr2::req_timeout(20) |>
+    httr2::req_error(is_error = function(resp) FALSE)
+  resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
+  if (inherits(resp, "error")) {
+    message("auth: SendGrid request failed: ", conditionMessage(resp))
+    return(FALSE)
+  }
+  status <- httr2::resp_status(resp)
+  if (status >= 200 && status < 300) return(TRUE)
+  message(sprintf("auth: SendGrid returned HTTP %d", status))
+  FALSE
+}
+
+# Notify the admin when a non-approved user requests access. Best-effort.
+auth_notify_admin_of_request <- function(requesting_email,
+                                          admin_email = Sys.getenv("ADMIN_EMAIL",
+                                                                    unset = "")) {
+  if (!nzchar(admin_email)) return(FALSE)
+  sg_key <- Sys.getenv("SENDGRID_API_KEY", unset = "")
+  if (!nzchar(sg_key)) return(FALSE)
+  body <- list(
+    personalizations = list(list(
+      to      = list(list(email = admin_email)),
+      subject = paste("Cattle GHG Tool — access request from", requesting_email)
+    )),
+    from    = list(email = Sys.getenv("MAGIC_LINK_FROM",
+                                       unset = "noreply@cattle-uncertainty.app"),
+                    name  = "IPCC Cattle GHG Tool"),
+    content = list(list(type = "text/plain",
+                         value = paste0(
+                           "A new user requested access to the in-app AI translator:\n\n",
+                           "    ", requesting_email, "\n\n",
+                           "To approve, add this email to approved_users.csv and redeploy.\n")))
+  )
+  req <- httr2::request("https://api.sendgrid.com/v3/mail/send") |>
+    httr2::req_headers(`Authorization` = paste("Bearer", sg_key),
+                        `Content-Type`  = "application/json") |>
+    httr2::req_body_json(body) |>
+    httr2::req_timeout(20) |>
+    httr2::req_error(is_error = function(resp) FALSE)
+  resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
+  if (inherits(resp, "error")) return(FALSE)
+  httr2::resp_status(resp) %in% 200:299
+}
+
+# ----- Shiny UI helpers -----------------------------------------------------
+
+# Email-entry form shown when no user is logged in.
+auth_login_panel <- function(id_prefix = "translator") {
+  ns <- function(x) paste0(id_prefix, "_", x)
+  tagList(
+    tags$div(
+      style = "max-width: 480px; margin: 24px auto; padding: 24px;
+               background:#F8FAF7; border:1px solid #D8E4D6; border-radius:8px;",
+      tags$h4(style = "margin-top:0; color:#2D6A4F;",
+              "Sign in to the AI translator"),
+      tags$p(style = "font-size:0.9rem; color:#52525B;",
+             "Enter your email address. We will send you a one-time sign-in link. ",
+             "No password required. CGIAR email addresses are approved automatically; ",
+             "other addresses are reviewed manually by the administrator."),
+      textInput(ns("email"), label = NULL,
+                placeholder = "your.name@example.org",
+                width = "100%"),
+      actionButton(ns("submit"), "Send sign-in link",
+                   class = "btn-success", width = "100%"),
+      uiOutput(ns("status"))
+    )
+  )
+}

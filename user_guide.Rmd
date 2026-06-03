@@ -129,26 +129,27 @@ If you do not yet have uncertainty estimates, see Section 2.4 for guidance on ob
 
 \textbf{You only need the parameters used by the emission sources you tick.} The tool's pre-run check is source-aware: if you select only the methane sources (enteric, manure CH\textsubscript{4}), it will not ask you to fill the N\textsubscript{2}O parameters, and vice versa. So a methane-only run never blocks on blank manure-N\textsubscript{2}O cells. The managed-storage N\textsubscript{2}O quantities (EF3 per system, Frac\_GasMS, Frac\_LeachMS) live in the Manure\_Management tab — fill them there, not in the Parameters tab.
 
-## AI-assisted data preparation (optional, free)
+## AI-assisted data preparation (optional)
 
-If your raw inventory data lives in your own Excel or CSV files with column names that do not match the template, you can use the free **GMH Uncertainty Translator** on \texttt{claude.ai} to do the column-mapping and unit-conversion work for you. The Translator is a small AI assistant — loaded with the parameter catalogue, the template schema, and ten worked mapping examples — that you set up once inside your own free Claude.ai account and then reuse for every inventory. It is free, requires no installation, and your data stays inside your own account.
+If your raw inventory data lives in your own Excel or CSV files with column names that do not match the template, the tool offers an \textbf{in-app AI translator} that does the column-mapping and unit-conversion work for you. It is a small chat panel embedded in the Resources tab; you upload your data and the AI proposes a mapping, asks any clarifying questions, and produces a filled template you can download.
 
-\textbf{One-time setup (about 2 minutes).} The Resources tab offers a downloadable \texttt{translator\_kit.zip} containing a system-instructions file plus four small knowledge files. After signing up for a free Claude.ai account, you create a Project in claude.ai (Projects $\to$ Create project), paste the contents of \texttt{system\_instructions.md} into the Project's \emph{Instructions} field, then drag the four knowledge files (\texttt{param\_catalogue.md}, \texttt{template\_schema.md}, \texttt{mapping\_examples.md}, \texttt{questionnaire.md}) into the Project's \emph{Files} panel. That is the whole setup --- you only do it once. Step-by-step screenshots are in the Getting Started guide available from the Resources tab.
-
-\textbf{Workflow (each inventory).} The chat with the Translator has two distinct inputs you provide: a \textbf{pre-flight questionnaire} that you \textit{paste as text} into the chat, and your \textbf{raw data file(s)} that you \textit{attach} when Claude prompts you. The questionnaire is not a separate upload --- it is a one-page form whose contents you copy-paste into the chat box, so Claude knows about your inventory up front and can skip its warm-up questions.
+\textbf{Workflow (each inventory).}
 
 \begin{enumerate}
-\item Download the \textbf{pre-flight questionnaire} (\texttt{.docx}) from the Resources tab and fill it out --- country, year, IPCC version, your sub-categories, manure systems, data fields, uncertainty source (about 2 minutes).
-\item Open your Translator Project on claude.ai and click \emph{Start a new chat}.
-\item In the chat box, \textbf{paste the filled questionnaire as your first message}. This is text you copy-paste, not a file you attach. Claude will summarise back what it understood and then ask you to upload your data.
-\item \textbf{Attach your raw data file(s)} using the paperclip icon in the chat input box (\texttt{.xlsx}, \texttt{.csv}, or even a PDF / screenshot of a table).
-\item Claude proposes a column mapping with confidence flags; confirm ambiguities (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}).
-\item Download the produced \texttt{filled\_template\_for\_app.xlsx} and upload it in Tab 1 (Data Input).
+\item Open the Resources tab. The "AI Translator" card is at the top.
+\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day).
+\item Once signed in, \textbf{upload your raw data file} (\texttt{.xlsx} or \texttt{.csv}) using the file picker at the top of the chat panel. The AI reads it immediately and starts the conversation.
+\item Answer the AI's clarifying questions in plain English in the chat box at the bottom of the panel (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}).
+\item When the AI has enough information to produce a complete filled template, a green \textbf{"Download translated template"} button appears. Click it to download the result, then upload it in Tab 1 (Data Input).
 \end{enumerate}
 
-\textbf{When to use.} The Translator is most useful when (a) your data is in a non-standard shape, (b) your column names differ from the template (e.g. \texttt{cattle\_pop}, \texttt{live\_wt\_lb}), (c) you have data in inconsistent units (lbs vs kg, fractions vs percentages), or (d) you want IPCC defaults filled in for the parameters you do not measure.
+\textbf{When to use.} The translator is most useful when (a) your data is in a non-standard shape, (b) your column names differ from the template (e.g. \texttt{cattle\_pop}, \texttt{live\_wt\_lb}), (c) you have data in inconsistent units (lbs vs kg, fractions vs percentages), or (d) you want IPCC defaults filled in for the parameters you do not measure.
 
-\textbf{Quality control.} The Translator does column-mapping, not analysis. Always (a) spot-check the key numbers (population, body weight, milk yield) by comparing with your original file, and (b) review the QA/QC tab after upload --- any value the Translator filled from an IPCC default is flagged in amber there.
+\textbf{Quality control.} The translator does column-mapping, not analysis. Always (a) spot-check the key numbers (population, body weight, milk yield) by comparing with your original file, and (b) review the QA/QC tab after upload --- any value the translator filled from an IPCC default is flagged in amber there.
+
+\textbf{Privacy + cost.} The translator is hosted by the GMH project on a small AI account (no payment from you). The chat does not store your input data --- only your email and a per-call token count are logged so the administrator can monitor monthly usage. A \$10/month global spending cap prevents runaway use; if the cap is hit you will see a clear "monthly cap reached, contact administrator" message.
+
+\textbf{Free fallback (optional, more setup).} If you would rather not sign in to the in-app translator, the Resources tab also offers a downloadable \texttt{translator\_kit.zip} you can use with your own free \texttt{claude.ai} account. One-time setup (about 5 minutes); the workflow then mirrors the in-app version.
 
 ## Complete parameter reference
 

@@ -12,5 +12,7 @@ install.packages(c(
   "mc2d",
   "Matrix",
   "future",
-  "promises"
+  "promises",
+  "httr2",
+  "jsonlite"
 ), repos = "https://cloud.r-project.org")

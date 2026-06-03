@@ -3462,4 +3462,10 @@ app_server <- function(input, output, session) {
   # Round 8 — Contact / Feedback. The form is rendered as raw HTML+JS in
   # R/utils_contact.R via contact_form_html(); submission happens browser-side
   # (Web3Forms free tier blocks server-side POSTs). No Shiny observer needed.
+
+  # 2026-06: in-app AI translator. Login + chat are encapsulated in
+  # R/chat_ui.R; this single call registers all of its observers and
+  # outputs. The translator UI is inserted into the Resources tab via
+  # translator_chat_ui() in R/app_ui.R.
+  translator_chat_server(input, output, session)
 }

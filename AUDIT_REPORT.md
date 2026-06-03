@@ -1,6 +1,6 @@
 # AUDIT_REPORT.md — Statistician's end-to-end audit
 
-Generated 2026-06-03 14:43 CEST by `_audit.R`.
+Generated 2026-06-03 16:29 CEST by `_audit.R`.
 
 ## Summary
 

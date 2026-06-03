@@ -23,6 +23,9 @@ library(promises)
 library(officer)
 library(flextable)
 # Round 8 contact form posts client-side to Web3Forms (no server-side libs needed)
+# 2026-06: in-app AI translator — OpenAI API client + magic-link auth
+library(httr2)
+library(jsonlite)
 
 # Launch app
 shinyApp(ui = app_ui(), server = app_server)

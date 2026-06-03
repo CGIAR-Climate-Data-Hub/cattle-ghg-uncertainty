@@ -75,3 +75,12 @@ __pycache__/
 
 # Backup file from the May 2026 audit
 *.pre_audit_2026_05_bak
+
+# 2026-06: in-app AI translator runtime artefacts. The usage log and any
+# auth tokens are created at runtime in the deployed container's working
+# dir; never bundle a local dev copy into the deploy. Secrets only live
+# in the shinyapps.io env-var dashboard.
+translator_usage_log.csv
+auth_tokens.csv
+.Renviron
+.env

@@ -35,6 +35,15 @@ app_ui <- function() {
              var el = document.getElementById(id);
              if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
            }, 150);
+         });
+         // 2026-06: after the magic-link auth flow consumes a ?token=...
+         // query parameter, server sends this to clean it out of the
+         // browser URL so the token doesn't sit in browser history.
+         Shiny.addCustomMessageHandler('scrubUrl', function(_unused) {
+           if (history && history.replaceState) {
+             history.replaceState({}, document.title,
+                                   window.location.pathname);
+           }
          });"
       )))
     ),
@@ -260,81 +269,29 @@ app_ui <- function() {
         # Excel/CSV files into the strict app template via a pre-built Claude.ai
         # Project. Placed below Tool-specific resources so the canonical docs
         # are the first thing users see. See claude_project_assets/README.md.
+        # 2026-06: in-app AI translator. Replaces the previous "Sign up for
+        # claude.ai, paste these files, set up a Project" guide with a
+        # direct in-app chat behind a magic-link login. Backed by Lolita's
+        # OpenAI account with a $10/month spending cap. The downloadable
+        # kit and the free-tier flow remain available below as a fallback.
+        translator_chat_ui(),
+
+        # Fallback: downloadable kit for users who don't want to sign in.
         bslib::card(
-          style = "border-left: 4px solid #2D6A4F;",
-          bslib::card_header(h4("AI-assisted data preparation (free)", style = "margin: 0;")),
+          style = "border-left: 4px solid #94A3B8;",
+          bslib::card_header(h4("Or — use the free downloadable kit on claude.ai",
+                                 style = "margin: 0;")),
           bslib::card_body(
             tags$p(style = "margin-bottom: 12px;",
-              "Filling the template by hand can take hours if your raw data isn't already in the right shape. ",
-              "The ", tags$strong("GMH Uncertainty Translator"),
-              " is a free, AI-powered helper — built on top of Claude.ai — that turns your own Excel/CSV files into a ready-to-upload template in roughly 10 minutes. ",
-              "No installation, no payment, and you keep full control of your own data inside your own Claude account."),
-            tags$h6("How to set it up (one time, about 2 minutes)"),
-            tags$ol(
-              tags$li(
-                tags$strong("Download the Translator kit (.zip)"),
-                " using the button below. Unzip it anywhere on your computer."
-              ),
-              tags$li(
-                tags$strong("Sign up for a free Claude.ai account"),
-                " at ",
-                tags$a(href = "https://claude.ai", target = "_blank",
-                       rel = "noopener noreferrer", "claude.ai"),
-                " if you don't already have one. No payment details required."
-              ),
-              tags$li(
-                tags$strong("In claude.ai, click Projects → Create project."),
-                " Name it whatever you like (e.g. ", tags$em("GMH Uncertainty Translator"), ")."
-              ),
-              tags$li(
-                tags$strong("Paste ", tags$code("system_instructions.md"), " into the Project's Instructions field."),
-                " Open the file in any text editor, select all, copy, paste."
-              ),
-              tags$li(
-                tags$strong("Drag the four knowledge files into the Project's Files panel:"),
-                " ",
-                tags$code("param_catalogue.md"), ", ",
-                tags$code("template_schema.md"), ", ",
-                tags$code("mapping_examples.md"), ", and ",
-                tags$code("questionnaire.md"), "."
-              )
-            ),
-            tags$h6("How to use it (each inventory)"),
-            tags$ol(
-              tags$li(
-                tags$strong("Fill the pre-flight questionnaire."),
-                " It's a one-page form — country, year, IPCC version, your sub-categories, manure systems, data fields. About 2 minutes."
-              ),
-              tags$li(
-                tags$strong("Start a new chat in your Translator Project"),
-                " on claude.ai."
-              ),
-              tags$li(
-                tags$strong("Paste the filled questionnaire as your first message."),
-                " ",
-                tags$em("Text you copy-paste, not a file you upload."),
-                " Claude confirms what it understood."
-              ),
-              tags$li(
-                tags$strong("Attach your raw data file(s)"),
-                " using the paperclip icon — Excel, CSV, even a PDF or screenshot of a table."
-              ),
-              tags$li(
-                tags$strong("Answer 2–5 short clarification questions"),
-                " about anything ambiguous (e.g. ",
-                tags$em("\"Is your weight column body weight or mature weight?\""), ")."
-              ),
-              tags$li(
-                tags$strong("Download the filled template"),
-                " (Claude produces ", tags$code("filled_template_for_app.xlsx"),
-                ") and upload it in the Data Input tab."
-              )
-            ),
-            div(style = "margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;",
+              "Prefer to keep everything inside your own free Claude.ai account ",
+              "(no sign-in here, but you handle the setup yourself)? Download ",
+              "the kit and follow the short setup guide. Two minutes the first time, ",
+              "then reusable for every inventory."),
+            div(style = "margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap;",
               tags$a(
                 href = "translator_kit.zip",
                 download = "translator_kit.zip",
-                class = "btn btn-success",
+                class = "btn btn-outline-success",
                 icon("box-archive"), " Download Translator kit (.zip)"
               ),
               tags$a(
@@ -351,13 +308,7 @@ app_ui <- function() {
                 class = "btn btn-outline-success",
                 icon("clipboard-list"), " Pre-flight questionnaire (.docx)"
               )
-            ),
-            div(style = "margin-top: 10px; font-size: 0.82rem; color: #666;",
-              "Already set up? ",
-              tags$a(href = "https://claude.ai/projects", target = "_blank",
-                     rel = "noopener noreferrer",
-                     "Open claude.ai → Projects"),
-              " to start a new chat in your Translator.")
+            )
           )
         ),
 
