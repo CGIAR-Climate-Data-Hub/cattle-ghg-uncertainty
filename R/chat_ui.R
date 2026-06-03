@@ -220,12 +220,37 @@ translator_chat_server <- function(input, output, session) {
       else
         "background:#E8F5E9; color:#1B4332; align-self:flex-start;
          border:1px solid #C8E6C9;"
+      # For assistant messages, split the response into a clean visible
+      # part and an optional "structure / thinking" part containing any
+      # template-ready JSON or pure-JSON force-template output. The
+      # visible part is what the user actually wants to read; the
+      # technical detail goes behind a collapsible <details> element.
+      visible <- m$display %||% m$content
+      hidden  <- NULL
+      if (identical(m$role, "assistant")) {
+        split <- .translator_split_visible_hidden(m$content, m$display)
+        visible <- split$visible
+        hidden  <- split$hidden
+      }
       tags$div(
         style = paste("max-width:80%; margin:6px 0; padding:10px 14px;",
                       "border-radius:12px; white-space:pre-wrap; font-size:0.92rem;",
                       "line-height:1.45;",
                       bubble_style),
-        m$display %||% m$content
+        visible,
+        if (!is.null(hidden) && nzchar(hidden))
+          tags$details(
+            style = "margin-top:10px; font-size:0.82rem; color:#2D6A4F;",
+            tags$summary(
+              style = "cursor:pointer; user-select:none; font-weight:500;",
+              "Show structure / details"),
+            tags$pre(
+              style = "background:#FFFFFF; border:1px solid #C8E6C9;
+                       padding:8px 10px; border-radius:6px; margin-top:6px;
+                       font-size:0.78rem; max-height:280px; overflow:auto;
+                       white-space:pre-wrap; color:#1B4332;",
+              hidden)
+          )
       )
     })
     tags$div(
@@ -715,6 +740,59 @@ translator_chat_server <- function(input, output, session) {
 
   writexl::write_xlsx(sheets, path = file_path)
   invisible(NULL)
+}
+
+# Split an assistant message into a clean "visible" part and a hidden
+# "details/structure" part.
+#
+# Three cases the message bubble UI cares about:
+#
+#   1. Force-template path  : m$content is pure JSON (json_schema mode),
+#                              m$display is "Template ready..." text.
+#                              -> visible = m$display, hidden = m$content.
+#
+#   2. Normal reply with ```template-ready ... ``` fence inline:
+#                              -> visible = the prose with the fence
+#                                 stripped out, hidden = the JSON.
+#
+#   3. Normal reply, no fence:
+#                              -> visible = m$content (or m$display),
+#                                 hidden = NULL (no expander shown).
+#
+# Returns a list with $visible (character) and $hidden (character or NULL).
+.translator_split_visible_hidden <- function(content, display = NULL) {
+  fallback <- list(visible = display %||% content %||% "",
+                   hidden  = NULL)
+  if (is.null(content) || !nzchar(content)) return(fallback)
+
+  # Case 1: pure-JSON body + a separate display message. Detected when
+  # display differs from content AND content looks like a JSON object.
+  if (!is.null(display) && nzchar(display) && !identical(display, content)) {
+    trimmed <- trimws(content)
+    if (startsWith(trimmed, "{") && endsWith(trimmed, "}")) {
+      return(list(visible = display, hidden = trimmed))
+    }
+  }
+
+  # Case 2: inline ```template-ready ... ``` fenced block. Strip the
+  # whole block from the visible text and surface its inner JSON in the
+  # expander. Leading/trailing whitespace from the strip is cleaned up.
+  m <- regexpr("```template-ready\\s*\\n([\\s\\S]*?)\\n```",
+               content, perl = TRUE)
+  if (m > 0) {
+    fence <- regmatches(content, m)
+    inner <- sub("^```template-ready\\s*\\n", "", fence, perl = TRUE)
+    inner <- sub("\\n```$", "", inner)
+    visible <- sub("```template-ready\\s*\\n[\\s\\S]*?\\n```",
+                   "", content, perl = TRUE)
+    # Collapse the >2 blank lines the strip might leave behind.
+    visible <- gsub("\\n{3,}", "\n\n", trimws(visible))
+    return(list(visible = if (nzchar(visible)) visible
+                            else "Template ready — click the green download button below to get the .xlsx.",
+                hidden = trimws(inner)))
+  }
+
+  fallback
 }
 
 # Look for ```template-ready ... ``` and return the inner JSON; NULL if

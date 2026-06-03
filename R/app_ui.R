@@ -92,6 +92,24 @@ app_ui <- function() {
            var maxAge = 30 * 24 * 60 * 60;  // 30 days in seconds
            document.cookie = 'translator_session=' + encodeURIComponent(value) +
              '; max-age=' + maxAge + '; path=/; SameSite=Lax; Secure';
+         });
+         // 2026-06: Enter-to-submit for the translator email + chat inputs.
+         // - Email field (#translator_email): Enter clicks Send sign-in link.
+         // - Chat input (#translator_input, a <textarea>): Enter clicks Send,
+         //   Shift+Enter inserts a newline (default textarea behaviour).
+         document.addEventListener('keydown', function(e) {
+           if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey) return;
+           var t = e.target;
+           if (!t || !t.id) return;
+           if (t.id === 'translator_email') {
+             e.preventDefault();
+             var btn = document.getElementById('translator_submit');
+             if (btn) btn.click();
+           } else if (t.id === 'translator_input') {
+             e.preventDefault();
+             var btn = document.getElementById('translator_send');
+             if (btn) btn.click();
+           }
          });"
       )))
     ),
