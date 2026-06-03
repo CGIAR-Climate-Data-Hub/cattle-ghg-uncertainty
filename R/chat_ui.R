@@ -152,15 +152,37 @@ translator_chat_server <- function(input, output, session) {
       }
     )
     if (is.null(parsed)) return()
-    preview_md <- .translator_table_to_md(parsed$preview)
+    # Build a single user-message that includes a preview of EVERY
+    # non-empty sheet. For multi-sheet files this is the only way the
+    # AI gets to see all the data on the first round.
+    sheet_blocks <- lapply(parsed$sheets, function(s) {
+      sheet_label <- if (is.na(s$name) || !nzchar(s$name %||% ""))
+        "(file contents)" else sprintf("Sheet \"%s\"", s$name)
+      sprintf("### %s (%d rows × %d columns, first %d shown)\n\n%s",
+              sheet_label, s$n_rows, s$n_cols, nrow(s$preview),
+              .translator_table_to_md(s$preview))
+    })
     user_msg <- sprintf(
-      "I have uploaded a file (%s). Here is the head of the data:\n\n%s\n\nPlease identify which columns map to which IPCC parameters and ask any clarifying questions you need.",
-      fi$name, preview_md)
+      "I have uploaded a file (%s) with %d sheet%s. Below is the head of each sheet. Please identify which columns map to which IPCC parameters across all the sheets, and ask any clarifying questions you need.\n\n%s",
+      fi$name,
+      parsed$n_total_sheets,
+      if (parsed$n_total_sheets == 1L) "" else "s",
+      paste(sheet_blocks, collapse = "\n\n---\n\n"))
+    # The on-screen "display" stays terse — the user doesn't want a wall
+    # of markdown tables in their own bubble; only the AI needs that.
+    display_summary <- if (parsed$n_total_sheets == 1L)
+      sprintf("Uploaded %s (%d rows × %d columns shown).",
+              fi$name, nrow(parsed$sheets[[1]]$preview),
+              ncol(parsed$sheets[[1]]$preview))
+    else
+      sprintf("Uploaded %s (%d sheets: %s).",
+              fi$name, parsed$n_total_sheets,
+              paste(sapply(parsed$sheets, `[[`, "name"),
+                    collapse = ", "))
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user",
             content = user_msg,
-            display = sprintf("Uploaded %s (%d rows × %d columns shown).",
-                              fi$name, nrow(parsed$preview), ncol(parsed$preview)))
+            display = display_summary)
     tryCatch(conversation_save(state$user_email, state$messages),
               error = function(e) NULL)
     .translator_send(state, session)
@@ -496,38 +518,52 @@ translator_chat_server <- function(input, output, session) {
                                  value = isTRUE(ready)))
 }
 
-# Read an uploaded file and return:
-#   $sheet_name    chosen sheet (NA for csv)
-#   $n_rows_total  total data rows
-#   $n_cols_total  total columns
-#   $preview       a data.frame of the first 100 rows of the chosen sheet
+# Read an uploaded file and return a SUMMARY OF ALL SHEETS so the AI
+# can see everything in one shot.
+#
+# Returns:
+#   $kind          "csv" or "xlsx"
+#   $sheets        list of list(name, n_rows, n_cols, preview) — one
+#                  entry per non-empty sheet (or one entry for csv)
+#   $n_total_sheets  count of non-empty sheets found
+#
+# The 2026-06 stress-test upload (Burkina-style file with 6 sheets)
+# surfaced a real problem with the previous "send only the densest
+# sheet" heuristic: it picked the compact metadata sheet and dropped
+# the actual cattle data on the floor. The AI then had nothing to map.
+# Now every non-trivial sheet is summarised and forwarded to the AI.
 .translator_read_upload <- function(path, name) {
   ext <- tolower(tools::file_ext(name))
   if (ext == "csv") {
     df <- utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE)
-    return(list(sheet_name = NA, n_rows_total = nrow(df), n_cols_total = ncol(df),
-                preview = utils::head(df, 100)))
+    return(list(
+      kind   = "csv",
+      sheets = list(list(name = NA_character_,
+                         n_rows = nrow(df), n_cols = ncol(df),
+                         preview = utils::head(df, 100))),
+      n_total_sheets = 1L
+    ))
   }
-  # Excel — pick the sheet with the most non-empty cells.
-  sheets <- readxl::excel_sheets(path)
-  best <- NULL
-  best_density <- -1
-  for (s in sheets) {
+  sheet_names <- readxl::excel_sheets(path)
+  out <- list()
+  for (s in sheet_names) {
     df <- tryCatch(readxl::read_excel(path, sheet = s, n_max = 200),
                     error = function(e) NULL)
-    if (is.null(df) || nrow(df) == 0) next
-    density <- sum(!is.na(df)) / max(1, prod(dim(df)))
-    if (density > best_density) {
-      best <- list(sheet = s, df = df)
-      best_density <- density
-    }
+    if (is.null(df) || nrow(df) == 0 || ncol(df) == 0) next
+    # Drop sheets that have zero non-NA cells — pure empty placeholders.
+    if (sum(!is.na(df)) == 0) next
+    out[[length(out) + 1]] <- list(
+      name    = s,
+      n_rows  = nrow(df),
+      n_cols  = ncol(df),
+      preview = utils::head(df, 40)   # cap per-sheet preview at 40 rows
+                                       # to keep the prompt size reasonable
+                                       # for multi-sheet uploads
+    )
   }
-  if (is.null(best))
+  if (length(out) == 0)
     stop("No readable sheet found in ", name)
-  list(sheet_name   = best$sheet,
-       n_rows_total = nrow(best$df),
-       n_cols_total = ncol(best$df),
-       preview      = utils::head(best$df, 100))
+  list(kind = "xlsx", sheets = out, n_total_sheets = length(out))
 }
 
 # Render a small data.frame as a markdown table the LLM can read.
