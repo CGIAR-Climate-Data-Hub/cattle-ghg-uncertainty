@@ -63,7 +63,59 @@ assemble_translator_system_prompt <- function(asset_dir = "claude_project_assets
     "question has been answered.",
     sep = "\n")
 
-  paste(c(parts, marker_instruction), collapse = "\n\n---\n\n")
+  # 2026-06: in-app UI presentation rules. These OVERRIDE any earlier
+  # formatting guidance from the kit's system_instructions.md. The kit
+  # was written for the claude.ai web workspace (wide screen, no rate
+  # limits, users expecting a long-form analysis). The in-app chat panel
+  # is narrow and users want focused answers fast. The rules below trim
+  # the response style accordingly. Last-wins on conflicts, by OpenAI
+  # convention (later instructions take precedence).
+  ui_presentation_rules <- paste(
+    "",
+    "",
+    "## In-app UI presentation rules (HIGHEST PRIORITY — override earlier rules)",
+    "",
+    "You are now deployed inside a small chat panel embedded in a Shiny",
+    "web app, not in the claude.ai workspace. The UI is narrow and users",
+    "want focused, fast answers. Apply these rules to every reply:",
+    "",
+    "1. **No preamble.** Do not introduce yourself, do not summarise what",
+    "   you do, do not say 'Here is a brief summary' or 'Welcome!'. Start",
+    "   directly with the most important substantive content.",
+    "2. **Maximum 3-5 clarifying questions per response.** If you have",
+    "   more potential ambiguities, save them for follow-up rounds AFTER",
+    "   the user answers the first batch. Pick the questions that block",
+    "   you from making the most progress.",
+    "3. **Minimal markdown.** No `##` or `###` headings. No tables unless",
+    "   the user explicitly asks for one (the final `template-ready`",
+    "   block is allowed, but is a JSON code fence, not a markdown table).",
+    "   Use short bullet lists at most.",
+    "4. **One step at a time.** Do not pre-announce 'Step 1 / Step 2 /",
+    "   Step 3' — just do the most important step and wait for the user.",
+    "5. **Short paragraphs.** 2-4 sentences max. The chat panel is narrow.",
+    "6. **Confirmations are terse.** 'OK — Cows in milk maps to dairy_cows'",
+    "   is better than restating the reasoning.",
+    "7. **No 'Next steps' / 'Summary' / 'Please answer above' meta-text.**",
+    "   The user will reply when they're ready; trust them to drive the",
+    "   conversation.",
+    "",
+    "Concrete first-response template, for reference:",
+    "",
+    "  I've read your data. Two things look ambiguous before I can map",
+    "  everything:",
+    "",
+    "  - 'working bulls': castrated (oxen) or breeding bulls?",
+    "  - 'heifers in calf' and 'other heifers': are both 1-3 years old, or",
+    "    is one group older?",
+    "",
+    "  Also: is this all dairy, or is there a separate non-dairy herd",
+    "  somewhere in the file?",
+    "",
+    "Stop after the questions. Wait for the user.",
+    sep = "\n")
+
+  paste(c(parts, marker_instruction, ui_presentation_rules),
+        collapse = "\n\n---\n\n")
 }
 
 # Internal helper: estimate token count (approximate). OpenAI uses BPE
