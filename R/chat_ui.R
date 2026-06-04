@@ -298,102 +298,15 @@ translator_chat_server <- function(input, output, session) {
   })
   outputOptions(output, "translator_template_ready", suspendWhenHidden = FALSE)
 
-  # ---- Admin-only budget + usage stats -------------------------------------
-  # The budget status line ("Pilot budget: $0.04 / $10.00 used") and a
-  # small stats card are visible ONLY to the admin (defined by the
-  # ADMIN_EMAIL env var). Regular signed-in users see nothing — they don't
-  # need to think about the pilot budget.
-  is_admin <- reactive({
-    admin <- tolower(trimws(Sys.getenv("ADMIN_EMAIL", unset = "")))
-    !is.null(state$user_email) && nzchar(admin) &&
-      identical(tolower(state$user_email), admin)
-  })
-
-  output$translator_budget_line <- renderText({
-    if (!isTRUE(is_admin())) return("")
-    budget_status_line()
-  })
-
-  # 2026-06: per-user spend (visible to all signed-in users — they see
-  # only their own usage, not the all-users pool). Updates whenever
-  # state$messages changes (each new assistant message means a new
-  # log row, so re-render the line). Numbers are best-effort —
-  # shinyapps.io recycles the container, which resets the local CSV.
-  output$translator_user_usage <- renderText({
-    if (is.null(state$user_email)) return("")
-    # Take a dependency on state$messages so the line refreshes after
-    # each AI reply (the new usage_log row was just appended).
-    invisible(length(state$messages))
-    user_spend_status_line(state$user_email)
-  })
-
-  # Compact usage card surfaced to the admin: total spend this month,
-  # total calls, unique users, latest 5 calls (timestamp + user + tokens
-  # + cost). Cheap to render — reads the small CSV ledger.
-  output$translator_admin_stats <- renderUI({
-    if (!isTRUE(is_admin())) return(NULL)
-    df <- tryCatch(usage_log_read(), error = function(e) NULL)
-    if (is.null(df) || nrow(df) == 0) {
-      return(tags$div(
-        style = "margin-top:14px; padding:10px 14px; background:#F1F5F9;
-                 border:1px solid #CBD5E1; border-radius:6px;
-                 font-size:0.85rem; color:#475569;",
-        tags$strong("Admin: usage log"),
-        tags$br(),
-        "No translator calls logged yet this container session."))
-    }
-    total_calls <- nrow(df)
-    total_cost  <- sum(as.numeric(df$cost_usd), na.rm = TRUE)
-    unique_users <- length(unique(df$user_email))
-    # Cache-hit ratio: cached_tokens / prompt_tokens across all calls.
-    prompt_sum  <- sum(as.numeric(df$prompt_tokens %||% 0L), na.rm = TRUE)
-    cached_sum  <- if ("cached_tokens" %in% names(df))
-      sum(as.numeric(df$cached_tokens), na.rm = TRUE) else 0L
-    cache_pct   <- if (prompt_sum > 0)
-      sprintf("%.0f%%", 100 * cached_sum / prompt_sum) else "—"
-    tail_n <- min(5, nrow(df))
-    show_cols <- intersect(c("timestamp", "user_email", "prompt_tokens",
-                              "completion_tokens", "cached_tokens",
-                              "cost_usd"), names(df))
-    recent <- tail(df[, show_cols], tail_n)
-    if ("cost_usd" %in% names(recent))
-      recent$cost_usd <- sprintf("$%.4f", as.numeric(recent$cost_usd))
-    tags$div(
-      style = "margin-top:14px; padding:10px 14px; background:#F1F5F9;
-               border:1px solid #CBD5E1; border-radius:6px;
-               font-size:0.82rem; color:#1E293B;",
-      tags$div(style = "font-weight:600; margin-bottom:6px; color:#0F172A;",
-               "Admin: translator usage (this container session)"),
-      tags$div(
-        style = "display:flex; gap:18px; flex-wrap:wrap; margin-bottom:8px;",
-        tags$span(tags$strong("Calls: "), total_calls),
-        tags$span(tags$strong("Spend: "), sprintf("$%.4f", total_cost)),
-        tags$span(tags$strong("Unique users: "), unique_users),
-        tags$span(title = "Share of prompt tokens served from OpenAI's implicit prompt cache (50% cheaper).",
-                  tags$strong("Cache-hit: "), cache_pct)
-      ),
-      tags$div(style = "font-size:0.78rem; color:#475569; margin-bottom:4px;",
-               sprintf("Last %d calls:", tail_n)),
-      tags$pre(
-        style = "background:#FFFFFF; padding:6px 10px; border-radius:4px;
-                 font-size:0.78rem; max-height:160px; overflow-y:auto;
-                 margin:0;",
-        paste(apply(recent, 1, function(r) {
-          paste(r["timestamp"], r["user_email"],
-                sprintf("p=%s c=%s %s",
-                        r["prompt_tokens"], r["completion_tokens"],
-                        r["cost_usd"]))
-        }), collapse = "\n")
-      ),
-      tags$div(style = "font-size:0.78rem; color:#64748B; margin-top:6px;",
-               "Note: the usage log is held in the container's working dir ",
-               "and resets when shinyapps.io recycles the container. ",
-               "For permanent per-month tracking, OpenAI's dashboard at ",
-               tags$a(href = "https://platform.openai.com/usage",
-                      target = "_blank", "platform.openai.com/usage"),
-               " is the source of truth.")
-    )
-  })
+  # ---- Spend display REMOVED 2026-06 ---------------------------------------
+  # The user-facing 'Your usage' line, the admin 'Pilot budget' line, and
+  # the admin stats card have all been removed at user request — the local
+  # CSV resets on every shinyapps.io container recycle, so the numbers
+  # were misleading. Ground-truth spend lives in OpenAI's billing
+  # dashboard at https://platform.openai.com/usage. The internal
+  # budget_would_exceed() cap-check still runs in .translator_send() —
+  # see usage_log.R. It's a best-effort soft cap; the real hard ceiling
+  # is set on the OpenAI account.
 
   output$translator_last_error <- renderUI({
     if (!is.null(state$last_error))
@@ -468,19 +381,9 @@ translator_chat_server <- function(input, output, session) {
       style = "display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;",
       tags$div(
         tags$strong("Signed in: "),
-        tags$code(state$user_email),
-        # Per-user usage line (this month + lifetime, filtered to the
-        # signed-in user's own email). Visible to every signed-in user.
-        tags$div(style = "font-size:0.78rem; color:#52525B; margin-top:2px;",
-                 textOutput("translator_user_usage", inline = TRUE))
-      ),
-      # Global pool spend (all users combined) — admin only.
-      tags$div(style = "font-size:0.82rem; color:#52525B;",
-               textOutput("translator_budget_line", inline = TRUE))
+        tags$code(state$user_email)
+      )
     ),
-    # Admin-only stats card (visible only when state$user_email matches
-    # ADMIN_EMAIL). For non-admin users this renders to NULL.
-    uiOutput("translator_admin_stats"),
     tags$hr(style = "margin:10px 0;"),
 
     fileInput("translator_file",
