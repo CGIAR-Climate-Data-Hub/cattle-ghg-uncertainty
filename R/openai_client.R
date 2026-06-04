@@ -642,7 +642,7 @@ openai_chat_template_force <- function(messages,
               )
             )
           ),
-          required = c("parameters")
+          required = I(c("parameters"))  # I() preserves single-element vector as a JSON array; without it jsonlite auto-unboxes to "required":"parameters" which OpenAI rejects ("parameters is not of type 'array'")
         )
       )
     )
