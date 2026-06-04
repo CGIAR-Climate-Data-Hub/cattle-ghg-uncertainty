@@ -30,7 +30,8 @@
 # prompt is roughly 12-15K tokens.
 assemble_translator_system_prompt <- function(asset_dir = "claude_project_assets") {
   files <- c("system_instructions.md", "param_catalogue.md",
-             "template_schema.md", "mapping_examples.md", "questionnaire.md")
+             "template_schema.md", "mapping_examples.md",
+             "worked_example.md", "questionnaire.md")
   parts <- lapply(files, function(f) {
     p <- file.path(asset_dir, f)
     if (!file.exists(p)) {
