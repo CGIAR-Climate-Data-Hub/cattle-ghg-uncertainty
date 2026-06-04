@@ -1,6 +1,6 @@
 # AUDIT_REPORT.md — Statistician's end-to-end audit
 
-Generated 2026-06-04 10:43 CEST by `_audit.R`.
+Generated 2026-06-04 10:46 CEST by `_audit.R`.
 
 ## Summary
 
@@ -113,7 +113,7 @@ Synthetic single-sub-category dairy inventory with all 27 IPCC-aligned parameter
 | F22 | F | generate_corr_matrix_template(example) round-trips through CSV and matches build_ipcc_preset_corr() | ✅ PASS | shape=TRUE diag=TRUE names=TRUE values=TRUE pairs=TRUE |
 | F23 | F | Correlations help page rendered with TL;DR + both worked examples + mistakes section | ✅ PASS | size_ok=TRUE tldr=TRUE X=TRUE Y=TRUE mistakes=TRUE |
 | F19b | F | Tornado user_reducible lookup correctly classifies labelled params | ✅ PASS | results: FALSE, TRUE, FALSE, FALSE, TRUE; expected: FALSE, TRUE, FALSE, FALSE, TRUE |
-| G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9785 bytes |
+| G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9784 bytes |
 | G2 | G | CSV write of uncertainty frame produces non-empty file | ✅ PASS | 2215 bytes |
 | G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316634 bytes |
 | G4 | G | methodology.Rmd Reporting section contains CRT category map (3.A / 3.B / 3.D) | ✅ PASS | 3.A=TRUE 3.B=TRUE 3.D=TRUE |

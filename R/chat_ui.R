@@ -158,7 +158,13 @@ translator_chat_server <- function(input, output, session) {
         NULL
       }
     )
-    if (is.null(parsed)) return()
+    if (is.null(parsed)) {
+      # Parse failed — hide the spinner we just showed, otherwise it
+      # spins forever with no AI reply coming.
+      tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+               error = function(e) NULL)
+      return()
+    }
     # Build a single user-message that includes a preview of EVERY
     # non-empty sheet. For multi-sheet files this is the only way the
     # AI gets to see all the data on the first round.
@@ -215,6 +221,12 @@ translator_chat_server <- function(input, output, session) {
     state$last_template_json <- NULL
     state$last_error         <- NULL
     conversation_delete(state$user_email)
+    # If the user clicked Reset while a request was mid-flight (or the
+    # spinner got stuck for any other reason), drop it. translatorStreamEnd
+    # also wipes the active streaming bubble reference — safe to call when
+    # there's no active stream.
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+             error = function(e) NULL)
     showNotification("Conversation reset.", type = "message", duration = 3)
   })
 

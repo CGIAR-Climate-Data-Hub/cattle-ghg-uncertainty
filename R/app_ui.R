@@ -196,6 +196,10 @@ app_ui <- function() {
              if (t.id === 'translator_send') {
                var input = document.getElementById('translator_input');
                var txt = (input && input.value) ? input.value : '';
+               // Empty submit: server-side req() would no-op, but the
+               // spinner would spin forever with nothing to clear it.
+               // Bail without touching anything.
+               if (!txt.replace(/\\s+/g, '').length) return;
                if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
                  Shiny.setInputValue('translator_input', txt,
                                       {priority: 'event'});
