@@ -55,9 +55,12 @@ app_ui <- function() {
          //                            bubble (next round starts fresh).
          var _translatorActiveBubble = null;
          Shiny.addCustomMessageHandler('translatorStreamStart', function(_unused) {
-           // First streamed token has arrived (or is about to) — hide
-           // the pre-stream spinner now that the bubble is taking over.
-           if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
+           // NOTE: do NOT hide the spinner here. translatorStreamStart fires
+           // BEFORE the API call returns the first token, so hiding now
+           // leaves the user staring at an empty bubble for 3-5 seconds.
+           // The spinner is hidden by translatorStreamChunk on the very
+           // first chunk (see handler below) — that's the moment the user
+           // actually has something to look at.
            var container = document.getElementById('translator_stream_target');
            if (!container) return;
            var bubble = document.createElement('div');
@@ -73,6 +76,9 @@ app_ui <- function() {
            _translatorActiveBubble = bubble;
          });
          Shiny.addCustomMessageHandler('translatorStreamChunk', function(text) {
+           // First real token arrived — hide the pre-stream spinner now
+           // (cheap no-op if it was already hidden).
+           if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
            if (!_translatorActiveBubble) return;
            _translatorActiveBubble.textContent += text;
            // auto-scroll the surrounding message-history div
@@ -183,11 +189,19 @@ app_ui <- function() {
            }
          }, false);
          // File upload — different label so the user knows what's happening.
+         // Capture phase + defensive id-contains match (in case Shiny ever
+         // wraps the input or namespaces the id). Without capture, Shiny's
+         // own change binding can stop propagation before we see the event.
          document.addEventListener('change', function(e) {
-           if (e.target && e.target.id === 'translator_file') {
+           var t = e.target;
+           if (!t) return;
+           var isTranslatorFile =
+             t.id === 'translator_file' ||
+             (t.type === 'file' && /translator_file/.test(t.id || ''));
+           if (isTranslatorFile) {
              _translatorShowSpinner('Analyzing your file — reading sheets, building a preview to send to the AI…');
            }
-         }, false);"
+         }, true);"
       )))
     ),
     fillable = FALSE,
