@@ -222,29 +222,38 @@ app_ui <- function() {
                if (!slot) return;
                slot.innerHTML = '';
                var bubble = document.createElement('div');
-               bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
-                 'padding:10px 14px; border-radius:12px;' +
+               bubble.style.cssText = 'max-width:90%; margin:6px 0;' +
+                 'padding:12px 16px; border-radius:12px;' +
                  'font-size:0.92rem; line-height:1.45;' +
                  'background:#FFF8E1; color:#5D4037;' +
                  'border:1px solid #FFE082; align-self:flex-start;' +
-                 'display:flex; align-items:center; gap:10px;';
+                 'display:flex; align-items:flex-start; gap:10px;';
                var s = document.createElement('div');
                s.style.cssText = 'width:14px; height:14px; flex-shrink:0;' +
+                 'margin-top:4px;' +
                  'border:2px solid #FFE082; border-top-color:#FF6F00;' +
                  'border-radius:50%;' +
                  'animation: translatorSpin 0.8s linear infinite;';
                bubble.appendChild(s);
-               var label = document.createElement('span');
-               label.textContent = 'Building your .xlsx — this can take 5-15 seconds. Your browser will pop a save dialog when it is ready.';
+               var label = document.createElement('div');
+               label.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+               var line1 = document.createElement('div');
+               line1.innerHTML = '<strong>Building your .xlsx file</strong> — about 5 to 15 seconds. A save dialog will pop up in your browser when it is ready.';
+               label.appendChild(line1);
+               var line2 = document.createElement('div');
+               line2.style.cssText = 'font-size:0.85rem; line-height:1.4;';
+               line2.innerHTML = '<strong>Important:</strong> please open the file and check the AI\\'s work before uploading it on the 1. Data Input tab. Spot-check the populations, body weights, milk yields, sub-category labels, and any unit conversions against your original data. Any IPCC default values the AI applied will be flagged amber on the 2. QA/QC tab — review those carefully too. The AI is a draft assistant, not a verified source.';
+               label.appendChild(line2);
                bubble.appendChild(label);
                slot.appendChild(bubble);
                var scroller = bubble.closest('[data-translator-scroller]');
                if (scroller) scroller.scrollTop = scroller.scrollHeight;
-               // Auto-clear after 20 seconds in case the browser
-               // download wasn't detected.
+               // Auto-clear after 45 seconds — leaves enough time for
+               // the user to actually read the 'spot-check before
+               // uploading' guidance, but doesn't linger forever.
                setTimeout(function() {
                  if (slot.contains(bubble)) slot.removeChild(bubble);
-               }, 20000);
+               }, 45000);
                return;
              }
              t = t.parentElement;

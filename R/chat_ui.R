@@ -693,9 +693,20 @@ translator_chat_server <- function(input, output, session) {
   state$messages[[length(state$messages) + 1]] <- list(
     role    = "assistant",
     content = "(download hint)",
-    display = paste0("Your translated template is ready. Click the green ",
-                      "'Download template (.xlsx)' button below to get ",
-                      "the file, then upload it on the 1. Data Input tab."))
+    display = paste0(
+      "Your translated template is ready — click the green ",
+      "'Download template (.xlsx)' button below to get the file.\n\n",
+      "Important: before uploading it on the 1. Data Input tab, ",
+      "please open the .xlsx and spot-check the AI's work against ",
+      "your original data:\n",
+      "- populations, body weights, milk yields, and any unit ",
+      "conversions are sensible\n",
+      "- sub-category labels were mapped correctly\n",
+      "- the manure-management percentages match what you intended\n\n",
+      "Any IPCC default values the AI applied (when your raw data ",
+      "didn't include them) will be flagged in amber on the 2. QA/QC ",
+      "tab — review those carefully too. The AI is a draft assistant, ",
+      "not a verified source."))
 }
 
 # Force the AI to emit the final filled-template JSON now, regardless of
