@@ -213,16 +213,27 @@ translator_chat_server <- function(input, output, session) {
   })
 
   # ---- Send button: user types something, click Send -----------------------
+  # If the user's message looks like a trigger ('produce the template',
+  # 'generate it', 'go ahead', etc.), AND the AI has been gathering
+  # info for at least one round, we shortcut to the json_schema force-
+  # template path — no separate button needed. Otherwise it's a normal
+  # chat round (clarifying questions, mapping discussion).
   observeEvent(input$translator_send, {
     req(state$user_email)
     txt <- trimws(input$translator_input %||% "")
     if (!nzchar(txt)) return()
-    session$sendCustomMessage("translatorShowSpinner",
-      "Translator is working — calling the AI, waiting for the first reply…")
     updateTextAreaInput(session, "translator_input", value = "")
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
-    .translator_send(state, session)
+    if (.translator_is_generate_trigger(txt) && length(state$messages) >= 2) {
+      session$sendCustomMessage("translatorShowSpinner",
+        "Producing the final template — this can take 20–40 seconds for a large inventory…")
+      .translator_force_template(state, session)
+    } else {
+      session$sendCustomMessage("translatorShowSpinner",
+        "Translator is working — calling the AI, waiting for the first reply…")
+      .translator_send(state, session)
+    }
   })
 
   # ---- Reset conversation: wipe history + saved file -----------------------
@@ -241,62 +252,13 @@ translator_chat_server <- function(input, output, session) {
     showNotification("Conversation reset.", type = "message", duration = 3)
   })
 
-  # ---- Force-template button: ask the AI to produce the final JSON now ----
-  observeEvent(input$translator_force_template, {
-    req(state$user_email)
-    session$sendCustomMessage("translatorShowSpinner",
-      "Producing the final template — this can take 20–40 seconds for a large inventory…")
-    # The user message below is deliberately long and hammered with explicit
-    # row-count requirements. Without it, the model tends to reuse the
-    # 'for brevity' framing from its prior chat reply and emit a truncated
-    # subset of sub-categories. This message overrides that tendency.
-    state$messages[[length(state$messages) + 1]] <-
-      list(role = "user",
-           content = paste(
-             "Produce the final filled template JSON now.",
-             "",
-             "HARD REQUIREMENTS — your output is rejected if any of these fail:",
-             "",
-             "1. EVERY sub-category you identified in this conversation must",
-             "   appear in `parameters`. Re-read the conversation, count the",
-             "   sub-categories you named, and emit ALL of them — not just a",
-             "   subset. If you previously said something like 'repeat for all",
-             "   other sub-categories', IGNORE that shortcut now and emit every",
-             "   row explicitly.",
-             "",
-             "2. For each sub-category, fill ALL 25 parameters from the IPCC",
-             "   catalogue (N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi,",
-             "   Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5,",
-             "   Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw). Use the user's",
-             "   data where supplied, IPCC defaults from param_catalogue.md",
-             "   otherwise.",
-             "",
-             "3. Manure_Management must contain rows for EVERY sub-category,",
-             "   not just one. If the user's raw data has a single herd-wide",
-             "   MMS allocation, copy that same allocation to every",
-             "   sub-category. Each MMS row must have `fraction_pct`,",
-             "   `MCF_pct`, `EF3`, `Frac_GasMS_pct`, AND `Frac_LeachMS_pct`",
-             "   filled (the last two are commonly forgotten — do not skip",
-             "   them). Use IPCC 2019R defaults for the (mms_type,",
-             "   tropical-climate) pairing.",
-             "",
-             "4. Row-count check: if you identified N sub-categories and",
-             "   M manure-management systems per sub-category, your JSON",
-             "   MUST contain exactly N × 25 = (number) parameter rows and",
-             "   N × M = (number) manure_management rows. Count yourself",
-             "   before emitting. If the count is short, you missed",
-             "   sub-categories — go back and add them.",
-             "",
-             "5. STRICT JSON: no comments, no expressions like `4.5*1.032`,",
-             "   no `// for brevity not shown` placeholders, no trailing",
-             "   commas. Literal numbers and quoted strings only.",
-             "",
-             "Do not ask any more questions. Just emit the complete",
-             "template-ready JSON matching the schema.",
-             sep = "\n"),
-           display = "(Asked the AI to produce the final template now.)")
-    .translator_force_template(state, session)
-  })
+  # The old translator_force_template button has been removed. Users
+  # now trigger generation by typing a natural-language phrase like
+  # 'produce the template' or 'go ahead' (detected by
+  # .translator_is_generate_trigger, which is called inline from
+  # observeEvent(input$translator_send) above). The hard-requirements
+  # user message that the old observer prepended is now built inside
+  # .translator_force_template itself so both paths use it.
 
   # ---- Render the message history ------------------------------------------
   # IMPORTANT: this output renders ONLY the completed-message bubbles.
@@ -505,20 +467,13 @@ translator_chat_server <- function(input, output, session) {
       actionButton("translator_send", "Send", class = "btn-success",
                    style = "min-width:80px; height:42px;")
     ),
-    # Secondary action row — force-template + reset + download. The
-    # download lives inline with the other two so it's the obvious next
-    # click when ready, instead of being buried in a separate green
-    # panel below. It's wrapped in conditionalPanel so it only appears
-    # once the AI has produced a well-formed template (validated by
-    # output$translator_template_ready).
+    # Secondary action row — reset + download. The 'Produce template
+    # now' button was removed; users now trigger generation by saying
+    # 'produce the template' / 'go ahead' / etc. in chat, and the
+    # server auto-calls the same code path. See observeEvent for
+    # translator_send and the .translator_is_generate_trigger helper.
     tags$div(
       style = "display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; align-items:center;",
-      actionButton("translator_force_template",
-                   tagList(icon("file-arrow-down"),
-                            " Produce template now"),
-                   class = "btn-outline-success",
-                   style = "font-size:0.82rem;",
-                   title = "Ask the AI to output the final filled template right now, using IPCC defaults for any remaining unknowns."),
       actionButton("translator_reset",
                    tagList(icon("rotate-left"),
                             " Reset conversation"),
@@ -731,9 +686,8 @@ translator_chat_server <- function(input, output, session) {
     role    = "assistant",
     content = "(download hint)",
     display = paste0("Your translated template is ready. Click the green ",
-                      "'Download template (.xlsx)' button on the right ",
-                      "(next to Reset conversation) to get the file, ",
-                      "then upload it on the 1. Data Input tab."))
+                      "'Download template (.xlsx)' button below to get ",
+                      "the file, then upload it on the 1. Data Input tab."))
 }
 
 # Force the AI to emit the final filled-template JSON now, regardless of
@@ -770,7 +724,45 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  msgs <- openai_build_messages(system_prompt, history = state$messages)
+  # Build the message list and inject the hard-requirements prompt as
+  # the FINAL user turn (not stored in state$messages — keeps the chat
+  # visible to the user clean, just nudges the API call). Includes the
+  # explicit row-count + completeness + strict-JSON checklist that
+  # previously lived in the (now-removed) force-template button's
+  # observeEvent.
+  hard_requirements <- paste(
+    "Produce the final filled template JSON now.",
+    "",
+    "HARD REQUIREMENTS — your output is rejected if any of these fail:",
+    "",
+    "1. EVERY sub-category you identified in this conversation must",
+    "   appear in `parameters`. Re-read the conversation, count the",
+    "   sub-categories you named, and emit ALL of them — not just a",
+    "   subset. If you previously said something like 'repeat for all",
+    "   other sub-categories', IGNORE that shortcut now and emit every",
+    "   row explicitly.",
+    "",
+    "2. For each sub-category, fill ALL 25 parameters from the IPCC",
+    "   catalogue (N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi,",
+    "   Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5,",
+    "   Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw). Use the user's",
+    "   data where supplied, IPCC defaults from param_catalogue.md",
+    "   otherwise.",
+    "",
+    "3. Manure_Management must contain rows for EVERY sub-category,",
+    "   not just one. If the user's raw data has a single herd-wide",
+    "   MMS allocation, copy that same allocation to every",
+    "   sub-category. Each MMS row must have fraction_pct, MCF_pct,",
+    "   EF3, Frac_GasMS_pct, AND Frac_LeachMS_pct filled.",
+    "",
+    "4. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
+    "   'for brevity not shown' placeholders, no trailing commas.",
+    "",
+    "Do not ask any more questions. Just emit the complete",
+    "template-ready JSON matching the schema.",
+    sep = "\n")
+  msgs <- openai_build_messages(system_prompt, history = state$messages,
+                                  new_user_message = hard_requirements)
 
   # Try once; if the JSON parses, use it. If not (truncation, schema
   # mismatch, etc.), retry ONCE before giving up. Two attempts is a
@@ -1190,6 +1182,36 @@ translator_chat_server <- function(input, output, session) {
   }
 
   fallback
+}
+
+# Detect when a user's typed message is asking the AI to generate the
+# final template (instead of continuing the clarifying-questions
+# conversation). Triggers the json_schema force-template path. Matches
+# common phrasings in English + a couple of French / Spanish variants
+# the typical user might type. Whole-word matching so 'go' doesn't
+# match 'cargo' etc.
+.translator_is_generate_trigger <- function(txt) {
+  if (is.null(txt) || !nzchar(txt)) return(FALSE)
+  t <- tolower(trimws(txt))
+  patterns <- c(
+    "produce (the |a )?template",
+    "generate (the |a )?(template|file|output|xlsx)",
+    "create (the |a )?(template|file|output|xlsx)",
+    "make (the |a )?(template|file|output|xlsx)",
+    "build (the |a )?(template|file|output|xlsx)",
+    "give me (the |a )?(template|file|output|xlsx)",
+    "translate (the |my )?data",
+    "go ahead",
+    "do (it|as you think)",
+    "you decide",
+    "i'?m ready",
+    "ready to (generate|produce|go|download)",
+    "let'?s? go",
+    "ok go",
+    "yes( please)?,? (do|generate|produce|go)",
+    "(produire|générer|créer) (le |la |un |une )?(template|fichier)"
+  )
+  any(vapply(patterns, function(p) grepl(p, t, perl = TRUE), logical(1)))
 }
 
 # Scan the conversation history for canonical sub-category names and

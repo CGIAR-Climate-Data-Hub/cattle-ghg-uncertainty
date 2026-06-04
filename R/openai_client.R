@@ -219,17 +219,19 @@ assemble_translator_system_prompt <- function(asset_dir = "claude_project_assets
     "   truncated mid-array, which the parser rejects and the user gets",
     "   no download. Instead, when you have enough information to",
     "   produce the template, end your reply with ONE short sentence",
-    "   along the lines of: 'I have everything I need — click the green",
-    "   Produce template now button below the chat box to generate the",
-    "   .xlsx.' That button triggers a separate, non-streaming",
+    "   asking the user to say so: e.g. 'I have everything I need — say",
+    "   \"produce the template\" or \"go ahead\" to generate it.' When",
+    "   the user types any phrase that means 'go' (produce / generate /",
+    "   create / go ahead / yes do it / translate the data / etc.) the",
+    "   server intercepts the message and runs a separate, non-streaming",
     "   json_schema-strict API call (16k token budget, server-side",
-    "   coverage-check + auto-retry) which is the only reliable path",
-    "   for a complete multi-sub-category template. The plain-text",
-    "   conversation is for clarifying questions and mapping",
-    "   discussion only — never for the final JSON. The ONE exception:",
-    "   if the inventory is genuinely tiny (single sub-category, no",
+    "   coverage-check + auto-retry) which is the only reliable path for",
+    "   a complete multi-sub-category template. The plain-text",
+    "   conversation is for clarifying questions and mapping discussion",
+    "   only — never for the final JSON. The ONE exception: if the",
+    "   inventory is genuinely tiny (single sub-category, no",
     "   manure-management table), you may inline the block — but err",
-    "   strongly toward directing the user to the button.",
+    "   strongly toward asking the user to confirm with 'go ahead'.",
     "",
     "Concrete first-response template, for reference:",
     "",
@@ -662,14 +664,21 @@ openai_chat_template_force <- function(messages,
                                conditionMessage(resp), ").")))
   status <- httr2::resp_status(resp)
   if (status < 200 || status >= 300) {
-    tryCatch({
+    api_msg <- tryCatch({
       body <- httr2::resp_body_json(resp)
-      msg  <- body$error$message %||% ""
-      if (nzchar(msg)) message("OpenAI template-force error: ", msg)
-    }, error = function(e) NULL)
+      body$error$message %||% ""
+    }, error = function(e) "")
+    if (nzchar(api_msg))
+      message("OpenAI template-force error (HTTP ", status, "): ", api_msg)
+    # Surface the actual OpenAI reason to the user — generic 'try again later'
+    # was hiding real schema / model / token issues.
     return(list(reply = NULL,
-                error = sprintf("Template force failed (HTTP %d). Try again later.",
-                                 status)))
+                error = paste0(
+                  sprintf("Template generation failed (HTTP %d). ", status),
+                  if (nzchar(api_msg))
+                    paste0("OpenAI said: ", api_msg, ".")
+                  else
+                    "Try again in a moment.")))
   }
   parsed <- httr2::resp_body_json(resp)
   json_text <- tryCatch(parsed$choices[[1]]$message$content,
