@@ -638,11 +638,24 @@ translator_chat_server <- function(input, output, session) {
 
   # Extract any `template-ready` fenced block from the reply, and only
   # promote it if it actually parses + has the expected shape. If the AI
-  # streamed a truncated block, we silently drop it — the user can click
-  # 'Produce template now' to get a guaranteed-valid one via json_schema.
+  # emitted a block but it's malformed (JS-style comments, JS expressions
+  # like `4.5*1.032`, `// for brevity not shown` placeholders, or
+  # truncated mid-stream), don't promote — but DO tell the user, otherwise
+  # they see the AI's confident "template-ready" reply and no download
+  # button with no explanation.
   json_block <- .translator_extract_template_ready(resp$reply)
-  if (!is.null(json_block) && .translator_template_is_well_formed(json_block))
-    state$last_template_json <- json_block
+  if (!is.null(json_block)) {
+    if (.translator_template_is_well_formed(json_block)) {
+      state$last_template_json <- json_block
+    } else {
+      state$last_error <- paste0(
+        "The AI tried to emit a template but the format wasn't valid JSON ",
+        "(usually because of JS-style comments, math expressions, or ",
+        "'for brevity' placeholders inside the block). Click 'Produce ",
+        "template now' below — that uses OpenAI's strict-schema mode and ",
+        "is guaranteed to produce a downloadable .xlsx.")
+    }
+  }
 
   # Append assistant message to history. The renderUI for translator_messages
   # will redraw and the streaming bubble (still in the DOM from the JS
