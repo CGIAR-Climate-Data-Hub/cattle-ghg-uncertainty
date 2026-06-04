@@ -439,6 +439,12 @@ app_ui <- function() {
                    onerror = "this.style.display='none'; this.nextSibling.style.display='inline-block';"),
           tags$span("Alliance Bioversity & CIAT",
                     style = "display:none; font-size:0.9rem; color:#444; font-weight:600;"),
+          tags$img(src = "climate_action_logo.png",
+                   alt = "CGIAR Climate Action",
+                   style = "height:96px; max-width:320px; object-fit:contain;",
+                   onerror = "this.style.display='none'; this.nextSibling.style.display='inline-block';"),
+          tags$span("CGIAR Climate Action",
+                    style = "display:none; font-size:0.9rem; color:#444; font-weight:600;"),
           tags$img(src = "gmh_logo.png",
                    alt = "Global Methane Hub",
                    style = "height:96px; max-width:320px; object-fit:contain;",
@@ -832,11 +838,22 @@ app_ui <- function() {
               "Use the AI Translator on the ",
               tags$a(href = "#",
                      onclick = paste0(
-                       "Shiny.setInputValue('nav', 'Resources'); ",
+                       # Click the actual Resources nav-tab. Shiny.setInputValue
+                       # alone only updates the input value, it does not trigger
+                       # the tab switch. bslib renders nav-links and the Resources
+                       # one is identified by text content. Find it and click.
+                       "var tab = null; ",
+                       "var anchors = document.querySelectorAll('a.nav-link, button.nav-link'); ",
+                       "for (var i = 0; i < anchors.length; i++) { ",
+                       "  if (anchors[i].textContent.trim() === 'Resources') { ",
+                       "    tab = anchors[i]; break; ",
+                       "  } ",
+                       "} ",
+                       "if (tab) tab.click(); ",
                        "setTimeout(function() { ",
                        "  var el = document.getElementById('ai-translator-card'); ",
                        "  if (el) el.scrollIntoView({behavior:'smooth', block:'start'}); ",
-                       "}, 150); ",
+                       "}, 300); ",
                        "return false;"),
                      "AI Translator card on the Resources tab"),
               " — upload your raw data file and the AI produces a ",
