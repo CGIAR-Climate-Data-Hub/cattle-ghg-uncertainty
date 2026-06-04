@@ -1,6 +1,6 @@
 # AUDIT_REPORT.md — Statistician's end-to-end audit
 
-Generated 2026-06-04 14:48 CEST by `_audit.R`.
+Generated 2026-06-04 15:03 CEST by `_audit.R`.
 
 ## Summary
 
@@ -115,7 +115,7 @@ Synthetic single-sub-category dairy inventory with all 27 IPCC-aligned parameter
 | F19b | F | Tornado user_reducible lookup correctly classifies labelled params | ✅ PASS | results: FALSE, TRUE, FALSE, FALSE, TRUE; expected: FALSE, TRUE, FALSE, FALSE, TRUE |
 | G1 | G | export_results_xlsx produces non-empty file | ✅ PASS | 9784 bytes |
 | G2 | G | CSV write of uncertainty frame produces non-empty file | ✅ PASS | 2215 bytes |
-| G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316635 bytes |
+| G3 | G | build_run_summary_docx produces Word file > 50 KB | ✅ PASS | 316634 bytes |
 | G4 | G | methodology.Rmd Reporting section contains CRT category map (3.A / 3.B / 3.D) | ✅ PASS | 3.A=TRUE 3.B=TRUE 3.D=TRUE |
 | G5 | G | methodology.Rmd Reporting section contains Level 1/2/3 disaggregation guide | ✅ PASS | L1=TRUE L2=TRUE L3=TRUE |
 

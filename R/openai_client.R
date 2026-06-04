@@ -405,7 +405,8 @@ openai_chat_stream <- function(messages,
                                 max_tokens = 16000,
                                 temperature = 0.2,
                                 timeout_sec = 180,
-                                max_retries = 2) {
+                                max_retries = 2,
+                                response_format = NULL) {
   api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
   if (!nzchar(api_key)) {
     return(list(reply = NULL,
@@ -420,6 +421,12 @@ openai_chat_stream <- function(messages,
     stream         = TRUE,
     stream_options = list(include_usage = TRUE)
   )
+  # Optional response_format (e.g. json_schema strict mode). Streaming
+  # supports it — chunks arrive with delta.content fragments of the
+  # JSON, accumulated they form the complete validated payload. Lets
+  # the force-template path share this streaming machinery and avoid
+  # the 180s timeout that hit the old non-streaming call.
+  if (!is.null(response_format)) body$response_format <- response_format
 
   # Retry loop. Only retries while NO chunks have been emitted to the
   # browser yet — once the user has seen partial output we can't safely
@@ -573,20 +580,16 @@ openai_chat_stream <- function(messages,
 # expectations. If the model produces anything that doesn't match the
 # schema, OpenAI returns an error and the user sees a clear message.
 openai_chat_template_force <- function(messages,
+                                        on_chunk = function(text) {},
                                         model = .OPENAI_DEFAULT_MODEL,
-                                        max_tokens = 32000,  # GPT-4.1 max output is 32768; 32000 leaves headroom and fits even an 8-subcat × 25-param × 250-char-per-row inventory (~20k tokens) with room for MMS rows and metadata
+                                        max_tokens = 32000,  # GPT-4.1 max output is 32768
                                         timeout_sec = 180) {
-  api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
-  if (!nzchar(api_key))
-    return(list(reply = NULL,
-                error = "AI translator is not configured. Please contact the administrator."))
-
-  body <- list(
-    model       = model,
-    messages    = messages,
-    max_tokens  = max_tokens,
-    temperature = 0,
-    response_format = list(
+  # Build the json_schema response_format, then delegate to
+  # openai_chat_stream so we get streaming (no 180s timeout) + the
+  # built-in retry logic for free. The on_chunk callback lets the
+  # caller observe progress as JSON streams in — useful for updating
+  # the progress bubble on the client.
+  schema_body <- list(
       type = "json_schema",
       json_schema = list(
         name   = "filled_inventory_template",
@@ -647,64 +650,19 @@ openai_chat_template_force <- function(messages,
             )
           ),
           required = I(c("parameters"))  # I() preserves single-element vector as a JSON array; without it jsonlite auto-unboxes to "required":"parameters" which OpenAI rejects ("parameters is not of type 'array'")
-        )
-      )
-    )
-  )
+        )  # closes schema
+      )    # closes json_schema
+    )      # closes schema_body
+  # (one trailing close bracket removed — was a leftover from the old non-streaming wrapper)
 
-  req <- httr2::request(.OPENAI_ENDPOINT) |>
-    httr2::req_headers(
-      `Authorization` = paste("Bearer", api_key),
-      `Content-Type`  = "application/json"
-    ) |>
-    httr2::req_body_json(body) |>
-    httr2::req_timeout(timeout_sec) |>
-    httr2::req_error(is_error = function(resp) FALSE)
-
-  resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
-  if (inherits(resp, "error"))
-    return(list(reply = NULL,
-                error = paste0("Couldn't reach OpenAI (",
-                               conditionMessage(resp), ").")))
-  status <- httr2::resp_status(resp)
-  if (status < 200 || status >= 300) {
-    api_msg <- tryCatch({
-      body <- httr2::resp_body_json(resp)
-      body$error$message %||% ""
-    }, error = function(e) "")
-    if (nzchar(api_msg))
-      message("OpenAI template-force error (HTTP ", status, "): ", api_msg)
-    # Surface the actual OpenAI reason to the user — generic 'try again later'
-    # was hiding real schema / model / token issues.
-    return(list(reply = NULL,
-                error = paste0(
-                  sprintf("Template generation failed (HTTP %d). ", status),
-                  if (nzchar(api_msg))
-                    paste0("OpenAI said: ", api_msg, ".")
-                  else
-                    "Try again in a moment.")))
-  }
-  parsed <- httr2::resp_body_json(resp)
-  json_text <- tryCatch(parsed$choices[[1]]$message$content,
-                         error = function(e) NULL)
-  if (is.null(json_text) || !nzchar(json_text))
-    return(list(reply = NULL,
-                error = "OpenAI returned an empty template payload. Try again."))
-  usage <- parsed$usage %||% list(prompt_tokens = 0L, completion_tokens = 0L)
-  cached_tokens <- usage$prompt_tokens_details$cached_tokens %||% 0L
-  list(
-    reply    = json_text,
-    usage    = list(prompt_tokens     = usage$prompt_tokens     %||% 0L,
-                     completion_tokens = usage$completion_tokens %||% 0L,
-                     cached_tokens     = cached_tokens,
-                     total_tokens      = (usage$prompt_tokens %||% 0L) +
-                                         (usage$completion_tokens %||% 0L)),
-    model    = parsed$model %||% model,
-    cost_usd = openai_cost_usd(usage$prompt_tokens     %||% 0L,
-                                usage$completion_tokens %||% 0L,
-                                parsed$model %||% model,
-                                cached_tokens = cached_tokens),
-    error    = NULL
+  openai_chat_stream(
+    messages        = messages,
+    on_chunk        = on_chunk,
+    model           = model,
+    max_tokens      = max_tokens,
+    temperature     = 0,
+    timeout_sec     = timeout_sec,
+    response_format = schema_body
   )
 }
 

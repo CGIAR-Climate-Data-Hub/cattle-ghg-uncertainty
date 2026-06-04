@@ -250,6 +250,23 @@ app_ui <- function() {
              t = t.parentElement;
            }
          }, false);
+         // Progress tick from the server-side force-template stream.
+         // Updates the inline info bubble's elapsed-label with a
+         // 'chars received' counter so the user has TWO live signals:
+         // wall-clock seconds + actual JSON characters arriving. Means
+         // 'stuck on slow inference' vs 'actively streaming' is visible.
+         Shiny.addCustomMessageHandler('translatorProgressTick', function(data) {
+           var slot = document.getElementById('translator_stream_target');
+           if (!slot) return;
+           // Find the elapsed-label inside the active info bubble.
+           var labels = slot.querySelectorAll('div');
+           labels.forEach(function(l) {
+             if (l.dataset && l.dataset.elapsedLabel === 'true' && data && data.chars) {
+               var sec = Math.floor((Date.now() - (l._translatorStart || Date.now())) / 1000);
+               l.textContent = sec + 's elapsed · ' + data.chars.toLocaleString() + ' chars received';
+             }
+           });
+         });
          // Inline info bubble inside the conversation — used during the
          // force-template path (non-streaming, can take 60-120s). The
          // bubble lives in translator_stream_target so it's visible
@@ -297,6 +314,8 @@ app_ui <- function() {
            var elapsedLabel = document.createElement('div');
            elapsedLabel.style.cssText = 'font-size:0.78rem; color:#8D6E63;';
            elapsedLabel.textContent = '0s elapsed';
+           elapsedLabel.dataset.elapsedLabel = 'true';
+           elapsedLabel._translatorStart = Date.now();
            bubble.appendChild(elapsedLabel);
            slot.appendChild(bubble);
            // Drive the progress bar from a JS timer.

@@ -778,9 +778,20 @@ translator_chat_server <- function(input, output, session) {
   # mode almost always returns valid JSON; failures are usually max_tokens
   # truncation on very large inventories, which a retry won't fix but a
   # retry is cheap and catches transient OpenAI hiccups.
+  # Stream-aware progress callback: forward each JSON chunk's size to
+  # the client so the progress bubble's elapsed counter can also show
+  # 'X chars received' — gives the user concrete feedback that the AI
+  # is producing output (not stuck waiting on OpenAI).
+  total_chars <- 0L
+  on_chunk_cb <- function(text) {
+    total_chars <<- total_chars + nchar(text)
+    tryCatch(session$sendCustomMessage("translatorProgressTick",
+                                         list(chars = total_chars)),
+              error = function(e) NULL)
+  }
   resp <- NULL
   for (attempt in seq_len(2)) {
-    resp <- openai_chat_template_force(msgs)
+    resp <- openai_chat_template_force(msgs, on_chunk = on_chunk_cb)
     if (!is.null(resp$error)) break  # hard error — don't retry
     if (.translator_template_is_well_formed(resp$reply)) break
     if (attempt == 1L)
