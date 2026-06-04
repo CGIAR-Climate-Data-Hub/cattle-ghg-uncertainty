@@ -823,48 +823,87 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  # Valid JSON. Run a coverage check before promoting: if the parameters
-  # array has many sub-categories but manure_management covers only one
-  # (or two), the AI almost certainly forgot the broadcast rule. Same if
-  # the sub-categories-in-manure_management is a strict subset of
-  # sub-categories-in-parameters. We still surface the download (the user
-  # may want it anyway) but warn alongside, so they can hit the button
-  # again with a clearer mental model.
+  # Valid JSON. Coverage check + auto-retry: the AI very often emits a
+  # single representative sub-category (usually dairy_cows) and treats
+  # the rest as "implied", even when the conversation listed all 8. We
+  # scan the conversation history for canonical sub-category names, and
+  # if the output is missing any that were discussed, do ONE extra
+  # force-template call with an explicit list of the missing ones.
   parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE),
                             error = function(e) NULL)
+  history_subcats <- .translator_detect_subcategories_in_history(state$messages)
+  output_subcats <- if (!is.null(parsed_check) &&
+                          is.data.frame(parsed_check$parameters))
+    unique(parsed_check$parameters$sub_category) else character(0)
+  missing_subcats <- setdiff(history_subcats, output_subcats)
+
+  if (length(missing_subcats) > 0 && length(output_subcats) > 0) {
+    message("translator: force-template missing sub-categories: ",
+            paste(missing_subcats, collapse = ", "),
+            " — retrying with explicit list.")
+    # Push an extra user message that NAMES every missing sub-category.
+    msgs_retry <- c(msgs, list(list(
+      role    = "user",
+      content = paste0(
+        "You just emitted parameters for: ",
+        paste(output_subcats, collapse = ", "),
+        ". But this inventory has ", length(history_subcats),
+        " sub-categories total: ",
+        paste(history_subcats, collapse = ", "),
+        ". You missed: ", paste(missing_subcats, collapse = ", "),
+        ". Emit the COMPLETE template now with all ",
+        length(history_subcats),
+        " sub-categories × 25 parameters = ",
+        25 * length(history_subcats),
+        " parameter rows, plus manure_management for ALL ",
+        length(history_subcats),
+        " sub-categories. Use IPCC defaults for every cell. ",
+        "Strict JSON, no comments, no shortcuts. List every row."))))
+    resp2 <- openai_chat_template_force(msgs_retry)
+    if (is.null(resp2$error) && .translator_template_is_well_formed(resp2$reply)) {
+      # Re-log the spend for the retry call.
+      usage_log_append(
+        user_email        = state$user_email,
+        model             = resp2$model,
+        prompt_tokens     = resp2$usage$prompt_tokens,
+        completion_tokens = resp2$usage$completion_tokens,
+        cached_tokens     = resp2$usage$cached_tokens %||% 0L,
+        cost_usd          = resp2$cost_usd)
+      resp <- resp2  # promote the better attempt
+      parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply,
+                                                    simplifyVector = TRUE),
+                                error = function(e) NULL)
+      output_subcats <- if (!is.null(parsed_check) &&
+                              is.data.frame(parsed_check$parameters))
+        unique(parsed_check$parameters$sub_category) else character(0)
+      missing_subcats <- setdiff(history_subcats, output_subcats)
+    }
+  }
+
+  # Final coverage messages (after auto-retry). Only surface a warning
+  # if something is STILL wrong — the retry may have fixed everything.
   coverage_msgs <- character(0)
   if (!is.null(parsed_check)) {
-    sc_param <- unique(parsed_check$parameters$sub_category)
+    if (length(missing_subcats) > 0)
+      coverage_msgs <- c(coverage_msgs, paste0(
+        "Heads up: the AI emitted parameters for ",
+        paste(output_subcats, collapse = ", "),
+        " but skipped ", paste(missing_subcats, collapse = ", "),
+        " (mentioned earlier in the chat). The download is still valid ",
+        "for what's present, but emissions for the missing sub-categories ",
+        "will be zero. Hit 'Produce template now' again to retry, or ",
+        "open the .xlsx and add the missing rows by hand."))
+
+    sc_param <- output_subcats
     sc_mm <- if (is.data.frame(parsed_check$manure_management))
       unique(parsed_check$manure_management$sub_category) else character(0)
     missing_in_mm <- setdiff(sc_param, sc_mm)
-    if (length(missing_in_mm) > 0 && length(sc_mm) > 0) {
+    if (length(missing_in_mm) > 0 && length(sc_mm) > 0)
       coverage_msgs <- c(coverage_msgs, paste0(
-        "Manure_Management only covers ",
-        paste(sc_mm, collapse = ", "),
-        " — but the parameters sheet lists ",
-        length(sc_param), " sub-categories (",
-        paste(sc_param, collapse = ", "), "). ",
-        "Manure-CH4 and -N2O emissions will be zero for ",
-        paste(missing_in_mm, collapse = ", "),
-        ". Hit 'Produce template now' again to retry, or download this ",
-        "file and add MMS rows for the missing sub-categories yourself."))
-    }
-    # Same-pattern check: did the AI emit only ~25-50 rows when many
-    # sub-categories are in play? Below the threshold of (n_subcats * 5),
-    # the param array is almost certainly truncated.
-    n_subcats <- length(sc_param)
-    n_param_rows <- nrow(parsed_check$parameters) %||% 0L
-    if (n_subcats >= 3 && n_param_rows < n_subcats * 5) {
-      coverage_msgs <- c(coverage_msgs, paste0(
-        "Only ", n_param_rows, " parameter rows for ", n_subcats,
-        " sub-categories — that averages ",
-        sprintf("%.1f", n_param_rows / n_subcats),
-        " rows per sub-category, which is below the 5-row minimum for ",
-        "even the activity-data set. The AI likely truncated. Hit ",
-        "'Produce template now' again — usually a second attempt with ",
-        "the same conversation context expands the coverage."))
-    }
+        "Manure_Management only covers ", paste(sc_mm, collapse = ", "),
+        " — manure CH4/N2O for ", paste(missing_in_mm, collapse = ", "),
+        " will be zero. Retry 'Produce template now' or add the MMS ",
+        "rows yourself."))
   }
   if (length(coverage_msgs) > 0)
     state$last_error <- paste(coverage_msgs, collapse = " ")
@@ -1151,6 +1190,30 @@ translator_chat_server <- function(input, output, session) {
   }
 
   fallback
+}
+
+# Scan the conversation history for canonical sub-category names and
+# return the de-duplicated set. Used by .translator_force_template to
+# detect when the AI silently dropped sub-categories from its output
+# (a common failure mode — the AI emits one "representative" sub-cat
+# and ignores the rest, even when the chat clearly listed all 8). The
+# controlled vocabulary comes from claude_project_assets/template_schema.md.
+.TRANSLATOR_SUBCATEGORY_VOCAB <- c(
+  "dairy_cows", "other_cows", "bulls", "oxen",
+  "heifers", "growing_males", "growing_females",
+  "calves_male", "calves_female"
+)
+.translator_detect_subcategories_in_history <- function(messages) {
+  if (length(messages) == 0) return(character(0))
+  text <- paste(vapply(messages, function(m) {
+    paste(as.character(m$content %||% ""),
+          as.character(m$display %||% ""), sep = " ")
+  }, character(1)), collapse = "\n")
+  if (!nzchar(text)) return(character(0))
+  found <- vapply(.TRANSLATOR_SUBCATEGORY_VOCAB, function(s) {
+    grepl(paste0("\\b", s, "\\b"), text, fixed = FALSE)
+  }, logical(1))
+  unname(.TRANSLATOR_SUBCATEGORY_VOCAB[found])
 }
 
 # Validate that a template JSON string parses AND has the expected shape
