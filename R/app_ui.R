@@ -99,14 +99,34 @@ app_ui <- function() {
            document.cookie = 'translator_session=' + encodeURIComponent(value) +
              '; max-age=' + maxAge + '; path=/; SameSite=Lax; Secure';
          });
+         // 2026-06: visible loading spinner with a context-aware label.
+         // Without this the user clicks Send / uploads a file and sees
+         // nothing for 1-5 seconds.
+         var _translatorSpinnerDefault = 'Translator is working — calling the AI, waiting for the first reply…';
+         function _translatorShowSpinner(label) {
+           var el = document.getElementById('translator_spinner');
+           if (!el) return;
+           var lab = el.querySelector('[data-translator-spinner-label]');
+           if (lab) lab.textContent = label || _translatorSpinnerDefault;
+           el.style.display = 'flex';
+         }
+         function _translatorHideSpinner() {
+           var el = document.getElementById('translator_spinner');
+           if (el) el.style.display = 'none';
+         }
+         // Clear the chat textarea immediately on submit so the user
+         // gets instant visual feedback that the message was accepted.
+         // Shiny's cached input value for translator_input still holds
+         // the original text (set during typing), so the server-side
+         // observer reads it correctly even after we clear the DOM.
+         function _translatorClearInputDOM() {
+           var input = document.getElementById('translator_input');
+           if (input) input.value = '';
+         }
+
          // 2026-06: Enter-to-submit for the translator email + chat inputs.
-         // - Email field (#translator_email): Enter clicks Send sign-in link.
-         // - Chat input (#translator_input, a <textarea>): Enter clicks Send,
-         //   Shift+Enter inserts a newline (default textarea behaviour).
-         // We use CAPTURE phase (third arg = true) so we beat any
-         // bubble-phase keydown handlers Shiny/Bootstrap may attach to the
-         // input fields. Otherwise the textarea swallows Enter and our
-         // bubble-phase listener never fires.
+         // Capture phase (third arg = true) so we beat any bubble-phase
+         // keydown handler Shiny/Bootstrap may attach to the input.
          document.addEventListener('keydown', function(e) {
            if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
            var t = e.target;
@@ -114,51 +134,58 @@ app_ui <- function() {
            if (t.id === 'translator_email') {
              e.preventDefault();
              e.stopPropagation();
+             _translatorShowSpinner('Sending sign-in link…');
              var btn = document.getElementById('translator_submit');
              if (btn) btn.click();
            } else if (t.id === 'translator_input') {
              e.preventDefault();
              e.stopPropagation();
+             // Push the current textarea value into Shiny's cache BEFORE
+             // we clear the DOM, so the observer reads the right text
+             // even if Shiny was still debouncing the input event.
+             if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+               Shiny.setInputValue('translator_input', t.value,
+                                    {priority: 'event'});
+             }
+             _translatorClearInputDOM();
+             _translatorShowSpinner();
              var btn = document.getElementById('translator_send');
              if (btn) btn.click();
            }
-         }, true);  // capture phase
+         }, true);
 
-         // 2026-06: visible loading spinner during the time between
-         // clicking Send (or uploading a file) and the AI's first
-         // streamed token landing. Without this the user clicks Send
-         // and sees nothing for 1-3 seconds.
-         function _translatorShowSpinner() {
-           var el = document.getElementById('translator_spinner');
-           if (el) el.style.display = 'flex';
-         }
-         function _translatorHideSpinner() {
-           var el = document.getElementById('translator_spinner');
-           if (el) el.style.display = 'none';
-         }
-         // Whenever the user clicks Send / Force-template / Upload, show
-         // the spinner immediately. The translatorStreamStart handler
-         // (further up) hides it as soon as the first token arrives —
-         // and translatorStreamEnd hides it for non-streaming paths
-         // (force-template, error short-circuits).
+         // Click handler: show the spinner with the right label and
+         // clear the input on Send. Walks up a couple of levels because
+         // the click target may be a child <i> icon of the button.
          document.addEventListener('click', function(e) {
            var t = e.target;
            if (!t) return;
-           // Walk up the DOM tree a couple of levels in case the click
-           // lands on a child of the button (e.g. the <i> icon).
            for (var i = 0; i < 3 && t; i++) {
-             if (t.id === 'translator_send' ||
-                 t.id === 'translator_force_template') {
+             if (t.id === 'translator_send') {
+               var input = document.getElementById('translator_input');
+               if (input && typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+                 Shiny.setInputValue('translator_input', input.value,
+                                      {priority: 'event'});
+               }
+               _translatorClearInputDOM();
                _translatorShowSpinner();
+               return;
+             }
+             if (t.id === 'translator_force_template') {
+               _translatorShowSpinner('Producing the final template — this can take 20–40 seconds for a large inventory…');
+               return;
+             }
+             if (t.id === 'translator_submit') {
+               _translatorShowSpinner('Sending sign-in link…');
                return;
              }
              t = t.parentElement;
            }
          }, false);
-         // File upload: listen for change on the file input itself.
+         // File upload — different label so the user knows what's happening.
          document.addEventListener('change', function(e) {
            if (e.target && e.target.id === 'translator_file') {
-             _translatorShowSpinner();
+             _translatorShowSpinner('Analyzing your file — reading sheets, building a preview to send to the AI…');
            }
          }, false);"
       )))

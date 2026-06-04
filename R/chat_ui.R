@@ -490,7 +490,11 @@ translator_chat_server <- function(input, output, session) {
                                 border-top-color:#FF6F00;
                                 border-radius:50%;
                                 animation: translatorSpin 0.8s linear infinite;"),
-             "Translator is working — reading your message, calling the AI, waiting for the first reply…"),
+             # The text inside is overwritten by JS to give context-aware
+             # labels (Analyzing your file… / Producing the final template… /
+             # Sending sign-in link… / default working message).
+             tags$span(`data-translator-spinner-label` = "true",
+                       "Translator is working — calling the AI, waiting for the first reply…")),
     # Inline keyframes for the spinner's rotation (avoids needing a
     # custom CSS file just for this).
     tags$head(tags$style(HTML(
@@ -780,61 +784,221 @@ translator_chat_server <- function(input, output, session) {
            error = function(e) NULL)
 }
 
-# Write the AI's template-ready JSON to a multi-sheet .xlsx mirroring the
-# app's input template structure. Falls back to a JSON dump if the JSON
-# is malformed (so the user never loses their work).
+# Write the AI's template-ready JSON to an .xlsx that LOOKS LIKE THE
+# OFFICIAL INPUT TEMPLATE — same column ordering, header colours,
+# tab colours, sheet names, README / Vocab / _Lists sheets.
+#
+# Strategy: call the existing generate_template_openxlsx() helper to
+# produce a blank-but-styled official template, then load the workbook
+# and OVERWRITE the data cells with the AI's values. This preserves
+# every bit of styling, dropdowns, formulas, and supporting sheets
+# without us having to re-implement them.
+#
+# Multi-sub-category handling: the blank template ships with ONE
+# pre-formatted sub-category block in the Parameters sheet (one row
+# per IPCC parameter, ordered by PARAM_CATALOGUE). For each
+# sub-category in the AI's JSON we either overwrite that block (first
+# sub-category) or append a new block below (subsequent sub-categories).
+# Appended blocks share the column structure but only get basic styling
+# — acceptable tradeoff for now.
+#
+# Falls back to a raw .json dump if the JSON is malformed (so the user
+# never loses the AI's work). The download handler checks JSON validity
+# beforehand and uses the .json extension in that case.
 .translator_write_template_xlsx <- function(json_text, file_path) {
   if (is.null(json_text) || !nzchar(json_text)) {
-    writeLines("{}", file_path)
-    return(invisible(NULL))
+    writeLines("{}", file_path); return(invisible(NULL))
   }
   parsed <- tryCatch(jsonlite::fromJSON(json_text, simplifyVector = TRUE),
                       error = function(e) NULL)
   if (is.null(parsed)) {
-    # Malformed JSON — write the raw text with a .json sibling so the
-    # user can still hand-fix it.
-    writeLines(json_text, file_path)
-    return(invisible(NULL))
+    writeLines(json_text, file_path); return(invisible(NULL))
   }
 
-  # Build the sheets. Every sheet is optional — the AI may not have
-  # gathered Manure_Management info, for instance.
-  sheets <- list()
+  ok <- tryCatch({
+    .translator_write_official_template(parsed, file_path); TRUE
+  }, error = function(e) {
+    message("translator: official-template write failed: ",
+            conditionMessage(e), " — falling back to simple xlsx.")
+    FALSE
+  })
+  if (!ok) .translator_write_simple_xlsx(parsed, file_path)
+  invisible(NULL)
+}
 
+# Primary writer — overlays AI values onto the official blank template.
+.translator_write_official_template <- function(parsed, file_path) {
+  if (!exists("generate_template_openxlsx") || !exists("PARAM_CATALOGUE"))
+    stop("template-generation helpers not available")
+
+  ipcc_version <- parsed$inventory_metadata$ipcc_version %||% "2019_refinement"
+  ipcc_short <- if (grepl("2019|refinement", ipcc_version, ignore.case = TRUE))
+    "2019_refinement" else "2006"
+
+  tmp_blank <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp_blank), add = TRUE)
+  generate_template_openxlsx(tmp_blank, include_example = FALSE,
+                              ipcc_version = ipcc_short)
+
+  wb <- openxlsx::loadWorkbook(tmp_blank)
+
+  # ---------- Inventory_Metadata --------------------------------------------
+  md <- parsed$inventory_metadata %||% list()
+  # Row order matches meta_fields in generate_template_openxlsx:
+  #   row 2 Country / row 3 Region / row 4 Year / row 5 Species /
+  #   row 6 IPCC version / row 7 Prepared by / row 8 Notes
+  .put_meta <- function(row, val) {
+    if (is.null(val) || (is.character(val) && !nzchar(val))) return()
+    openxlsx::writeData(wb, "Inventory_Metadata", val,
+                        startRow = row, startCol = 3, colNames = FALSE)
+  }
+  .put_meta(2, md$country %||% md$country_region)
+  .put_meta(3, md$region %||% md$continental_region %||% "africa")
+  .put_meta(4, md$inventory_year %||% md$year)
+  .put_meta(5, md$species %||% "cattle_dairy")
+  .put_meta(6, md$ipcc_version %||% ipcc_short)
+  .put_meta(7, md$prepared_by)
+  .put_meta(8, md$notes)
+
+  # ---------- Parameters ----------------------------------------------------
+  params <- parsed$parameters
+  if (is.data.frame(params) && nrow(params) > 0) {
+    n_params  <- nrow(PARAM_CATALOGUE)
+    DATA_START <- 4L
+    # Build the per-sub-category key in the AI's data.
+    if (!"sub_category" %in% names(params))
+      stop("AI template missing 'sub_category' column in parameters[]")
+    sub_keys <- unique(paste(
+      params$cattle_type       %||% rep("dairy", nrow(params)),
+      params$aggregation_level %||% rep("all",   nrow(params)),
+      params$sub_category,
+      sep = "||"))
+
+    for (k in seq_along(sub_keys)) {
+      parts <- strsplit(sub_keys[k], "||", fixed = TRUE)[[1]]
+      cattle_type <- parts[1]
+      agg_level   <- parts[2]
+      sub_cat     <- parts[3]
+
+      # Block of rows for this sub-category, in PARAM_CATALOGUE order.
+      block_start <- DATA_START + (k - 1L) * n_params
+
+      for (i in seq_len(n_params)) {
+        r      <- block_start + i - 1L
+        p_name <- PARAM_CATALOGUE$parameter[i]
+        # Find AI's row matching this sub_cat + parameter (may be missing).
+        mask <- params$sub_category == sub_cat & params$parameter == p_name
+        mask[is.na(mask)] <- FALSE
+        ai   <- if (any(mask)) params[which(mask)[1], , drop = FALSE] else NULL
+
+        # Column 1-3: cattle_type / aggregation_level / sub_category
+        openxlsx::writeData(wb, "Parameters", cattle_type, startRow = r,
+                            startCol = 1, colNames = FALSE)
+        openxlsx::writeData(wb, "Parameters", agg_level,   startRow = r,
+                            startCol = 2, colNames = FALSE)
+        openxlsx::writeData(wb, "Parameters", sub_cat,     startRow = r,
+                            startCol = 3, colNames = FALSE)
+
+        # For sub-category blocks AFTER the first, the row is blank — we
+        # need to write the static info cells (parameter / definition /
+        # unit / param_type / ipcc_ref) too.
+        if (k > 1L) {
+          openxlsx::writeData(wb, "Parameters", p_name,
+                              startRow = r, startCol = 4, colNames = FALSE)
+          openxlsx::writeData(wb, "Parameters",
+                              PARAM_CATALOGUE$definition[i],
+                              startRow = r, startCol = 5, colNames = FALSE)
+          openxlsx::writeData(wb, "Parameters",
+                              PARAM_CATALOGUE$unit[i],
+                              startRow = r, startCol = 6, colNames = FALSE)
+          openxlsx::writeData(wb, "Parameters",
+                              PARAM_CATALOGUE$param_type[i],
+                              startRow = r, startCol = 14, colNames = FALSE)
+          openxlsx::writeData(wb, "Parameters",
+                              PARAM_CATALOGUE$ipcc_ref[i],
+                              startRow = r, startCol = 15, colNames = FALSE)
+        }
+
+        # If the AI provided this parameter for this sub-cat, write its
+        # value / uncertainty / bounds / distribution.
+        if (!is.null(ai)) {
+          .put_param <- function(col_idx, v) {
+            if (is.null(v) || length(v) == 0) return()
+            if (is.na(v[1]) || (is.character(v[1]) && !nzchar(v[1]))) return()
+            openxlsx::writeData(wb, "Parameters", v[1],
+                                startRow = r, startCol = col_idx,
+                                colNames = FALSE)
+          }
+          .put_param(7,  ai$mean %||% ai$value)
+          .put_param(8,  ai$uncertainty_pct)
+          .put_param(9,  ai$lower_bound %||% ai$lower)
+          .put_param(10, ai$upper_bound %||% ai$upper)
+          .put_param(11, ai$distribution)
+          .put_param(16, ai$data_source %||% "AI translator")
+        }
+      }
+    }
+  }
+
+  # ---------- Manure_Management ---------------------------------------------
+  mm <- parsed$manure_management
+  if (is.data.frame(mm) && nrow(mm) > 0) {
+    MM_DATA_START <- 4L   # template puts banner @ row 1, headers @ 2, hints @ 3
+    for (i in seq_len(nrow(mm))) {
+      r <- MM_DATA_START + i - 1L
+      .put_mm <- function(col_idx, v) {
+        if (is.null(v) || length(v) == 0) return()
+        if (is.na(v[1]) || (is.character(v[1]) && !nzchar(v[1]))) return()
+        openxlsx::writeData(wb, "Manure_Management", v[1],
+                            startRow = r, startCol = col_idx,
+                            colNames = FALSE)
+      }
+      .put_mm(1, mm$cattle_type[i]       %||% "dairy")
+      .put_mm(2, mm$aggregation_level[i] %||% "all")
+      .put_mm(3, mm$sub_category[i])
+      .put_mm(4, mm$mms_type[i])
+      .put_mm(5, mm$fraction_pct[i])
+      # mcf / ef3 — match the official MM_COLS ordering
+      .put_mm(9,  mm$mcf[i] %||% mm$MCF_pct[i])
+      .put_mm(13, mm$ef3[i] %||% mm$EF3[i])
+    }
+  }
+
+  openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
+}
+
+# Fallback writer — used only when the official template builder errors
+# (missing helper, dependency problem, etc.). Produces a 3-sheet xlsx
+# with the AI's data but no styling. Better than nothing.
+.translator_write_simple_xlsx <- function(parsed, file_path) {
+  sheets <- list()
   if (!is.null(parsed$inventory_metadata)) {
     md <- parsed$inventory_metadata
     sheets[["Inventory_Metadata"]] <- data.frame(
-      Field = c("Country / region", "Inventory year", "Livestock species",
-                 "IPCC Guidelines version", "Prepared by", "Notes"),
+      Field = c("Country", "Continental region", "Inventory year",
+                "Livestock species", "IPCC Guidelines version",
+                "Prepared by", "Notes"),
       Value = c(md$country %||% "",
-                 md$year %||% "",
-                 md$species %||% "cattle_dairy",
-                 md$ipcc_version %||% "2019_refinement",
-                 md$prepared_by %||% "",
-                 md$notes %||% ""),
-      stringsAsFactors = FALSE
-    )
+                md$region  %||% "africa",
+                md$inventory_year %||% md$year %||% "",
+                md$species %||% "cattle_dairy",
+                md$ipcc_version %||% "2019_refinement",
+                md$prepared_by %||% "",
+                md$notes %||% ""),
+      stringsAsFactors = FALSE)
   }
-
-  if (!is.null(parsed$parameters) && length(parsed$parameters) > 0) {
-    df <- as.data.frame(parsed$parameters, stringsAsFactors = FALSE)
-    sheets[["Parameters"]] <- df
-  }
-
-  if (!is.null(parsed$manure_management) && length(parsed$manure_management) > 0) {
-    df <- as.data.frame(parsed$manure_management, stringsAsFactors = FALSE)
-    sheets[["Manure_Management"]] <- df
-  }
-
-  if (length(sheets) == 0) {
-    # JSON parsed but no recognised top-level keys — dump raw so the user
-    # can still inspect.
-    sheets[["RawOutput"]] <- data.frame(content = json_text,
-                                          stringsAsFactors = FALSE)
-  }
-
+  if (is.data.frame(parsed$parameters) && nrow(parsed$parameters) > 0)
+    sheets[["Parameters"]] <- as.data.frame(parsed$parameters,
+                                              stringsAsFactors = FALSE)
+  if (is.data.frame(parsed$manure_management) &&
+      nrow(parsed$manure_management) > 0)
+    sheets[["Manure_Management"]] <- as.data.frame(parsed$manure_management,
+                                                    stringsAsFactors = FALSE)
+  if (length(sheets) == 0)
+    sheets[["RawOutput"]] <- data.frame(
+      content = jsonlite::toJSON(parsed, auto_unbox = TRUE, pretty = TRUE),
+      stringsAsFactors = FALSE)
   writexl::write_xlsx(sheets, path = file_path)
-  invisible(NULL)
 }
 
 # Split an assistant message into a clean "visible" part and a hidden
