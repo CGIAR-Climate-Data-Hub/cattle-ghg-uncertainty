@@ -98,7 +98,15 @@ app_ui <- function() {
            // renderUI, so its contents persist across re-renders unless we
            // explicitly wipe them.)
            var container = document.getElementById('translator_stream_target');
-           if (container) container.innerHTML = '';
+           if (container) {
+             // Cancel any progress-bar timers attached to bubbles we're
+             // about to remove (force-template path uses these).
+             Array.prototype.forEach.call(container.children, function(c) {
+               if (c && c._translatorProgressInterval)
+                 clearInterval(c._translatorProgressInterval);
+             });
+             container.innerHTML = '';
+           }
            _translatorActiveBubble = null;
            // Also hide the pre-stream spinner — covers the non-streaming
            // force-template path where StreamStart never fires.
@@ -179,23 +187,56 @@ app_ui <- function() {
            var slot = document.getElementById('translator_stream_target');
            if (!slot) return;
            slot.innerHTML = '';
+           // Outer bubble — column flex so we can stack text + progress bar.
            var bubble = document.createElement('div');
            bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
-             'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
+             'padding:12px 16px; border-radius:12px; white-space:pre-wrap;' +
              'font-size:0.92rem; line-height:1.45;' +
              'background:#FFF8E1; color:#5D4037;' +
              'border:1px solid #FFE082; align-self:flex-start;' +
-             'display:flex; align-items:center; gap:10px;';
+             'display:flex; flex-direction:column; gap:8px;';
+           // Top row: small spinner icon + the message text.
+           var topRow = document.createElement('div');
+           topRow.style.cssText = 'display:flex; align-items:center; gap:10px;';
            var spinner = document.createElement('div');
            spinner.style.cssText = 'width:14px; height:14px; flex-shrink:0;' +
              'border:2px solid #FFE082; border-top-color:#FF6F00;' +
              'border-radius:50%;' +
              'animation: translatorSpin 0.8s linear infinite;';
-           bubble.appendChild(spinner);
+           topRow.appendChild(spinner);
            var txt = document.createElement('span');
            txt.textContent = text || 'Translator is working…';
-           bubble.appendChild(txt);
+           topRow.appendChild(txt);
+           bubble.appendChild(topRow);
+           // Progress bar — fake-determinate, animates 0 -> 90% over 60s.
+           // Gives a tangible 'something is happening' feel during the
+           // long non-streaming force-template call. Stays at 90% until
+           // the work actually completes (translatorStreamEnd clears
+           // the bubble). The label below the bar shows elapsed seconds.
+           var barOuter = document.createElement('div');
+           barOuter.style.cssText = 'height:6px; background:#FFE082;' +
+             'border-radius:3px; overflow:hidden; width:100%;';
+           var barFill = document.createElement('div');
+           barFill.style.cssText = 'height:100%; width:0%;' +
+             'background:#FF6F00; transition:width 0.5s linear;';
+           barOuter.appendChild(barFill);
+           bubble.appendChild(barOuter);
+           var elapsedLabel = document.createElement('div');
+           elapsedLabel.style.cssText = 'font-size:0.78rem; color:#8D6E63;';
+           elapsedLabel.textContent = '0s elapsed';
+           bubble.appendChild(elapsedLabel);
            slot.appendChild(bubble);
+           // Drive the progress bar from a JS timer.
+           var startTime = Date.now();
+           var targetSec = 60;
+           var iv = setInterval(function() {
+             var sec = Math.floor((Date.now() - startTime) / 1000);
+             var pct = Math.min(90, (sec / targetSec) * 90);
+             barFill.style.width = pct + '%';
+             elapsedLabel.textContent = sec + 's elapsed' +
+               (sec >= targetSec ? ' — still working, large inventories take longer' : '');
+           }, 500);
+           bubble._translatorProgressInterval = iv;
            var scroller = bubble.closest('[data-translator-scroller]');
            if (scroller) scroller.scrollTop = scroller.scrollHeight;
          });

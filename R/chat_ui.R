@@ -226,12 +226,13 @@ translator_chat_server <- function(input, output, session) {
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
     if (.translator_is_generate_trigger(txt) && length(state$messages) >= 2) {
-      session$sendCustomMessage("translatorShowSpinner",
-        "Producing the final template — this can take 20–40 seconds for a large inventory…")
-      # Paint an inline 'working…' bubble inside the conversation so the
-      # user sees progress regardless of where the page is scrolled. The
-      # bubble is cleared by translatorStreamEnd at the end of
-      # .translator_force_template.
+      # Paint an inline 'working…' bubble inside the conversation. The
+      # bubble includes a faked-progress bar that animates 0 -> 90%
+      # over ~60s so the user has constant visual feedback during the
+      # 30-120s non-streaming force-template call. Cleared by
+      # translatorStreamEnd when the work completes. The top-of-card
+      # yellow pill is skipped here — the inline bubble is enough and
+      # scrolls with the conversation.
       session$sendCustomMessage("translatorAppendInfoBubble",
         "Generating the full template now — please wait, this can take 30 to 120 seconds for an inventory with many sub-categories. The Download button will appear right after.")
       .translator_force_template(state, session)
@@ -808,14 +809,17 @@ translator_chat_server <- function(input, output, session) {
     # never gets the malformed .json file with the warning toast.
     # Diagnostic hint: if completion_tokens is at the 16k ceiling, the
     # response was almost certainly truncated.
-    near_cap <- (resp$usage$completion_tokens %||% 0L) >= 15500L
+    near_cap <- (resp$usage$completion_tokens %||% 0L) >= 31000L
     hint <- if (near_cap)
       paste0(" The response hit the output-size ceiling (~", resp$usage$completion_tokens,
-             " tokens), which usually means the inventory is too large to fit in one shot. ",
-             "Try splitting it: ask the AI to produce ONLY the dairy sub-categories ",
-             "first, then start a new conversation for the beef ones (or vice versa).")
+             " tokens). This is the GPT-4.1 hard maximum — the inventory ",
+             "is too large to fit in a single response. Reset the ",
+             "conversation and ask the AI to translate ONLY the dairy ",
+             "sub-categories first, then start a new conversation for the ",
+             "beef ones (or vice versa). The two .xlsx files can be merged ",
+             "by hand afterwards.")
     else
-      " Try clicking 'Produce template now' again — this is sometimes a transient OpenAI hiccup."
+      " Type 'go ahead' again — this is sometimes a transient OpenAI hiccup."
     state$last_error <- paste0(
       "Couldn't produce a complete template from the AI's response.",
       hint)

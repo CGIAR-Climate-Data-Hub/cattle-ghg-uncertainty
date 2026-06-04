@@ -574,8 +574,8 @@ openai_chat_stream <- function(messages,
 # schema, OpenAI returns an error and the user sees a clear message.
 openai_chat_template_force <- function(messages,
                                         model = .OPENAI_DEFAULT_MODEL,
-                                        max_tokens = 16000,
-                                        timeout_sec = 120) {
+                                        max_tokens = 32000,  # GPT-4.1 max output is 32768; 32000 leaves headroom and fits even an 8-subcat × 25-param × 250-char-per-row inventory (~20k tokens) with room for MMS rows and metadata
+                                        timeout_sec = 180) {
   api_key <- Sys.getenv("OPENAI_API_KEY", unset = "")
   if (!nzchar(api_key))
     return(list(reply = NULL,
