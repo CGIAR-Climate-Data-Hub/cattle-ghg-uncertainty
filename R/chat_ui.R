@@ -314,6 +314,19 @@ translator_chat_server <- function(input, output, session) {
     budget_status_line()
   })
 
+  # 2026-06: per-user spend (visible to all signed-in users — they see
+  # only their own usage, not the all-users pool). Updates whenever
+  # state$messages changes (each new assistant message means a new
+  # log row, so re-render the line). Numbers are best-effort —
+  # shinyapps.io recycles the container, which resets the local CSV.
+  output$translator_user_usage <- renderText({
+    if (is.null(state$user_email)) return("")
+    # Take a dependency on state$messages so the line refreshes after
+    # each AI reply (the new usage_log row was just appended).
+    invisible(length(state$messages))
+    user_spend_status_line(state$user_email)
+  })
+
   # Compact usage card surfaced to the admin: total spend this month,
   # total calls, unique users, latest 5 calls (timestamp + user + tokens
   # + cost). Cheap to render — reads the small CSV ledger.
@@ -455,10 +468,13 @@ translator_chat_server <- function(input, output, session) {
       style = "display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;",
       tags$div(
         tags$strong("Signed in: "),
-        tags$code(state$user_email)
+        tags$code(state$user_email),
+        # Per-user usage line (this month + lifetime, filtered to the
+        # signed-in user's own email). Visible to every signed-in user.
+        tags$div(style = "font-size:0.78rem; color:#52525B; margin-top:2px;",
+                 textOutput("translator_user_usage", inline = TRUE))
       ),
-      # 2026-06: only the admin sees the budget line. Regular users see
-      # nothing in this slot — the spend is not their concern.
+      # Global pool spend (all users combined) — admin only.
       tags$div(style = "font-size:0.82rem; color:#52525B;",
                textOutput("translator_budget_line", inline = TRUE))
     ),

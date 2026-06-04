@@ -138,8 +138,49 @@ budget_would_exceed <- function(estimated_next_cost = NULL) {
 }
 
 # Human-friendly status string for display under the chat panel
-# ("Pilot budget: $1.42 / $10.00 used this month").
+# ("Pilot budget: $1.42 / $10.00 used this month"). This is the GLOBAL
+# spend across all users — shown to the admin only.
 budget_status_line <- function() {
-  sprintf("Pilot budget: $%.2f / $%.2f used this month",
+  sprintf("Pilot budget (all users): $%.2f / $%.2f used this month",
           month_to_date_spend(), monthly_budget_cap_usd())
+}
+
+# Per-user spend — month-to-date and lifetime. Case-insensitive email
+# match. Returns 0 if log is empty / unreadable / email NULL.
+#
+# IMPORTANT: shinyapps.io recycles the container on idle, which resets
+# the local CSV. So "lifetime" really means "since this container last
+# booted." The container has been up for `<unknown>` time — the user
+# should treat these numbers as best-effort. The authoritative number
+# lives in OpenAI's billing dashboard.
+.user_spend_filter <- function(df, email) {
+  if (nrow(df) == 0 || is.null(email) || !nzchar(email)) return(df[0, , drop = FALSE])
+  match <- !is.na(df$user_email) &
+            tolower(trimws(df$user_email)) == tolower(trimws(email))
+  df[match, , drop = FALSE]
+}
+
+user_spend_month <- function(email) {
+  df <- .user_spend_filter(usage_log_read(), email)
+  if (nrow(df) == 0) return(0)
+  ts <- suppressWarnings(as.POSIXct(df$timestamp, tz = "UTC",
+                                      format = "%Y-%m-%dT%H:%M:%SZ"))
+  month_start <- as.POSIXct(format(Sys.time(), "%Y-%m-01 00:00:00", tz = "UTC"),
+                             tz = "UTC")
+  current <- !is.na(ts) & ts >= month_start
+  sum(as.numeric(df$cost_usd[current]), na.rm = TRUE)
+}
+
+user_spend_lifetime <- function(email) {
+  df <- .user_spend_filter(usage_log_read(), email)
+  if (nrow(df) == 0) return(0)
+  sum(as.numeric(df$cost_usd), na.rm = TRUE)
+}
+
+# "Your usage — $0.34 this month / $1.78 lifetime"
+# Returns "" when email is missing (e.g. user not signed in yet).
+user_spend_status_line <- function(email) {
+  if (is.null(email) || !nzchar(email)) return("")
+  sprintf("Your usage — $%.2f this month / $%.2f lifetime",
+          user_spend_month(email), user_spend_lifetime(email))
 }
