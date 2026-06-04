@@ -483,6 +483,13 @@ openai_chat_stream <- function(messages,
       ) |>
       httr2::req_body_json(body) |>
       httr2::req_timeout(timeout_sec) |>
+      # Stall detector: if the stream sends < 1 byte/sec for 45 seconds,
+      # treat the call as dead and abort. This is the right knob for a
+      # streaming API — wall-clock timeouts kill calls that are still
+      # legitimately progressing (e.g. a 6MB response that legitimately
+      # takes 4 minutes to fully stream). curl options are exposed via
+      # req_options() and map directly to CURLOPT_LOW_SPEED_*.
+      httr2::req_options(low_speed_time = 45L, low_speed_limit = 1L) |>
       httr2::req_error(is_error = function(resp) FALSE)
 
     resp <- tryCatch(httr2::req_perform_stream(req, on_data, buffer_kb = 16),
@@ -583,7 +590,7 @@ openai_chat_template_force <- function(messages,
                                         on_chunk = function(text) {},
                                         model = .OPENAI_DEFAULT_MODEL,
                                         max_tokens = 32000,  # GPT-4.1 max output is 32768
-                                        timeout_sec = 180) {
+                                        timeout_sec = 600) {  # 10-min wall-clock — actual progress check is the stall detector in openai_chat_stream
   # Build the json_schema response_format, then delegate to
   # openai_chat_stream so we get streaming (no 180s timeout) + the
   # built-in retry logic for free. The on_chunk callback lets the
