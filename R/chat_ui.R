@@ -314,10 +314,12 @@ translator_chat_server <- function(input, output, session) {
   })
 
   # Reactive flag the conditionalPanel watches to decide whether to show
-  # the "Download translated template" button. Becomes TRUE only when the
-  # AI's latest response contained a successful template-ready JSON block.
+  # the "Download translated template" button. TRUE only when the saved
+  # template JSON parses AND has a non-empty parameters array — so the
+  # button never appears with a payload that would download as a
+  # malformed .json.
   output$translator_template_ready <- reactive({
-    !is.null(state$last_template_json) && nzchar(state$last_template_json)
+    .translator_template_is_well_formed(state$last_template_json)
   })
   outputOptions(output, "translator_template_ready", suspendWhenHidden = FALSE)
 
@@ -339,52 +341,28 @@ translator_chat_server <- function(input, output, session) {
   })
 
   # ---- Download translated template ----------------------------------------
-  # The AI emits a `template-ready` JSON block. We try to write a multi-
-  # sheet .xlsx mirroring the official input template (Inventory_Metadata /
-  # Parameters / Manure_Management). If the JSON is malformed (commonly
-  # because the model hit max_tokens and the response was truncated mid-
-  # object), we fall back to writing the raw text as a .json file so the
-  # user doesn't lose the AI's work. The filename + extension follow the
-  # actual content type produced.
-  #
-  # Reactive: detect whether the saved JSON is parseable. The download
-  # filename / extension is computed against this fresh, so the user sees
-  # accurate context.
-  .last_template_is_valid <- reactive({
-    j <- state$last_template_json
-    if (is.null(j) || !nzchar(j)) return(FALSE)
-    parsed <- tryCatch(jsonlite::fromJSON(j, simplifyVector = TRUE),
-                        error = function(e) NULL)
-    !is.null(parsed)
-  })
-
+  # The download button only appears when state$last_template_json holds a
+  # well-formed payload (gated by output$translator_template_ready above,
+  # which uses .translator_template_is_well_formed()). So by the time we
+  # reach this handler, the JSON parses and we can always produce an .xlsx.
+  # The defensive write-raw-text branch is kept as belt-and-suspenders in
+  # case the JSON somehow becomes invalid between gate and click (e.g.
+  # Reset fired mid-click), but it should never fire in practice.
   output$translator_download_template <- downloadHandler(
     filename = function() {
-      ext <- if (isTRUE(.last_template_is_valid())) "xlsx" else "json"
       paste0("translated_template_",
-             format(Sys.time(), "%Y%m%d_%H%M%S"), ".", ext)
+             format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
     },
     content = function(file) {
       j <- state$last_template_json
-      if (is.null(j) || !nzchar(j)) {
-        writeLines("{}", file)
-        return(invisible(NULL))
-      }
-      if (isTRUE(.last_template_is_valid())) {
+      if (.translator_template_is_well_formed(j)) {
         .translator_write_template_xlsx(j, file)
       } else {
-        # Truncated / malformed — write the raw text and surface a toast.
-        writeLines(j, file)
-        tryCatch(showNotification(
-          paste0("The AI's template output appears truncated or malformed ",
-                  "(saved as .json with the raw text). Try clicking ",
-                  "'Produce template now' again — the increased token ",
-                  "budget usually fixes this."),
-          type = "warning", duration = 10),
-          error = function(e) NULL)
+        # Should be unreachable — the button gate already validated.
+        writeLines("{}", file)
       }
     },
-    contentType = NULL  # let the browser sniff from the extension
+    contentType = NULL
   )
 
   # Expose the state to the caller in case the rest of app_server wants to
@@ -647,9 +625,13 @@ translator_chat_server <- function(input, output, session) {
     cost_usd          = resp$cost_usd
   )
 
-  # Extract any `template-ready` fenced block from the reply.
+  # Extract any `template-ready` fenced block from the reply, and only
+  # promote it if it actually parses + has the expected shape. If the AI
+  # streamed a truncated block, we silently drop it — the user can click
+  # 'Produce template now' to get a guaranteed-valid one via json_schema.
   json_block <- .translator_extract_template_ready(resp$reply)
-  if (!is.null(json_block)) state$last_template_json <- json_block
+  if (!is.null(json_block) && .translator_template_is_well_formed(json_block))
+    state$last_template_json <- json_block
 
   # Append assistant message to history. The renderUI for translator_messages
   # will redraw and the streaming bubble (still in the DOM from the JS
@@ -699,13 +681,29 @@ translator_chat_server <- function(input, output, session) {
   }
 
   msgs <- openai_build_messages(system_prompt, history = state$messages)
-  resp <- openai_chat_template_force(msgs)
+
+  # Try once; if the JSON parses, use it. If not (truncation, schema
+  # mismatch, etc.), retry ONCE before giving up. Two attempts is a
+  # reasonable trade-off between robustness and budget — strict json_schema
+  # mode almost always returns valid JSON; failures are usually max_tokens
+  # truncation on very large inventories, which a retry won't fix but a
+  # retry is cheap and catches transient OpenAI hiccups.
+  resp <- NULL
+  for (attempt in seq_len(2)) {
+    resp <- openai_chat_template_force(msgs)
+    if (!is.null(resp$error)) break  # hard error — don't retry
+    if (.translator_template_is_well_formed(resp$reply)) break
+    if (attempt == 1L)
+      message("translator: force-template attempt 1 produced unparseable JSON, retrying once.")
+  }
 
   if (!is.null(resp$error)) {
     state$last_error <- resp$error
     return()
   }
 
+  # Log the spend regardless of whether the JSON parsed — we still paid
+  # for the tokens.
   usage_log_append(
     user_email        = state$user_email,
     model             = resp$model,
@@ -715,8 +713,28 @@ translator_chat_server <- function(input, output, session) {
     cost_usd          = resp$cost_usd
   )
 
-  # The response IS the JSON — json_schema mode guarantees pure JSON,
-  # no fenced block needed.
+  if (!.translator_template_is_well_formed(resp$reply)) {
+    # Both attempts produced unparseable / incomplete JSON. Don't set
+    # last_template_json — the download button stays hidden, so the user
+    # never gets the malformed .json file with the warning toast.
+    # Diagnostic hint: if completion_tokens is at the 16k ceiling, the
+    # response was almost certainly truncated.
+    near_cap <- (resp$usage$completion_tokens %||% 0L) >= 15500L
+    hint <- if (near_cap)
+      paste0(" The response hit the output-size ceiling (~", resp$usage$completion_tokens,
+             " tokens), which usually means the inventory is too large to fit in one shot. ",
+             "Try splitting it: ask the AI to produce ONLY the dairy sub-categories ",
+             "first, then start a new conversation for the beef ones (or vice versa).")
+    else
+      " Try clicking 'Produce template now' again — this is sometimes a transient OpenAI hiccup."
+    state$last_error <- paste0(
+      "Couldn't produce a complete template from the AI's response.",
+      hint)
+    return()
+  }
+
+  # Valid JSON. The response IS the JSON — json_schema mode guarantees
+  # pure JSON, no fenced block needed.
   state$last_template_json <- resp$reply
   state$messages[[length(state$messages) + 1]] <-
     list(role    = "assistant",
@@ -994,6 +1012,24 @@ translator_chat_server <- function(input, output, session) {
   }
 
   fallback
+}
+
+# Validate that a template JSON string parses AND has the expected shape
+# (a non-empty `parameters` array). Used to gate whether the download
+# button appears and whether the force-template path retries.
+# Returns TRUE / FALSE.
+.translator_template_is_well_formed <- function(json_text) {
+  if (is.null(json_text) || !nzchar(json_text)) return(FALSE)
+  parsed <- tryCatch(jsonlite::fromJSON(json_text, simplifyVector = TRUE),
+                      error = function(e) NULL)
+  if (is.null(parsed)) return(FALSE)
+  if (is.null(parsed$parameters)) return(FALSE)
+  if (is.data.frame(parsed$parameters) && nrow(parsed$parameters) == 0)
+    return(FALSE)
+  if (is.list(parsed$parameters) && !is.data.frame(parsed$parameters) &&
+      length(parsed$parameters) == 0)
+    return(FALSE)
+  TRUE
 }
 
 # Look for ```template-ready ... ``` and return the inner JSON; NULL if
