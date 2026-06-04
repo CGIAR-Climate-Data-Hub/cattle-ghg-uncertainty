@@ -13,8 +13,19 @@
 
 translator_chat_ui <- function() {
   bslib::card(
-    bslib::card_header("AI Translator — turn your raw cattle data into the tool's template"),
+    style = "border-left: 4px solid #2D6A4F;",
+    bslib::card_header(
+      h4("AI Translator — turn your raw cattle data into the tool's template",
+         style = "margin: 0;")
+    ),
     bslib::card_body(
+      tags$p(style = "margin: 0 0 14px 0; color: #475569; font-size: 0.92rem;
+                       line-height: 1.5;",
+        "Drop in your raw cattle data file (.xlsx or .csv — multi-sheet OK, ",
+        "mixed French/English OK, messy units OK). The AI reads every sheet, ",
+        "asks any clarifying questions in plain English, then produces a ",
+        "downloadable .xlsx in the exact format the Data Input tab expects. ",
+        "No setup — sign in once with your email and you're ready."),
       uiOutput("translator_panel")
     )
   )
@@ -235,9 +246,54 @@ translator_chat_server <- function(input, output, session) {
     req(state$user_email)
     session$sendCustomMessage("translatorShowSpinner",
       "Producing the final template — this can take 20–40 seconds for a large inventory…")
+    # The user message below is deliberately long and hammered with explicit
+    # row-count requirements. Without it, the model tends to reuse the
+    # 'for brevity' framing from its prior chat reply and emit a truncated
+    # subset of sub-categories. This message overrides that tendency.
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user",
-           content = "Please produce the final filled template JSON now using IPCC defaults for any parameters where I haven't given country-specific data. Do not ask any more questions — just output the template-ready JSON matching the schema in your instructions.",
+           content = paste(
+             "Produce the final filled template JSON now.",
+             "",
+             "HARD REQUIREMENTS — your output is rejected if any of these fail:",
+             "",
+             "1. EVERY sub-category you identified in this conversation must",
+             "   appear in `parameters`. Re-read the conversation, count the",
+             "   sub-categories you named, and emit ALL of them — not just a",
+             "   subset. If you previously said something like 'repeat for all",
+             "   other sub-categories', IGNORE that shortcut now and emit every",
+             "   row explicitly.",
+             "",
+             "2. For each sub-category, fill ALL 25 parameters from the IPCC",
+             "   catalogue (N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi,",
+             "   Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5,",
+             "   Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw). Use the user's",
+             "   data where supplied, IPCC defaults from param_catalogue.md",
+             "   otherwise.",
+             "",
+             "3. Manure_Management must contain rows for EVERY sub-category,",
+             "   not just one. If the user's raw data has a single herd-wide",
+             "   MMS allocation, copy that same allocation to every",
+             "   sub-category. Each MMS row must have `fraction_pct`,",
+             "   `MCF_pct`, `EF3`, `Frac_GasMS_pct`, AND `Frac_LeachMS_pct`",
+             "   filled (the last two are commonly forgotten — do not skip",
+             "   them). Use IPCC 2019R defaults for the (mms_type,",
+             "   tropical-climate) pairing.",
+             "",
+             "4. Row-count check: if you identified N sub-categories and",
+             "   M manure-management systems per sub-category, your JSON",
+             "   MUST contain exactly N × 25 = (number) parameter rows and",
+             "   N × M = (number) manure_management rows. Count yourself",
+             "   before emitting. If the count is short, you missed",
+             "   sub-categories — go back and add them.",
+             "",
+             "5. STRICT JSON: no comments, no expressions like `4.5*1.032`,",
+             "   no `// for brevity not shown` placeholders, no trailing",
+             "   commas. Literal numbers and quoted strings only.",
+             "",
+             "Do not ask any more questions. Just emit the complete",
+             "template-ready JSON matching the schema.",
+             sep = "\n"),
            display = "(Asked the AI to produce the final template now.)")
     .translator_force_template(state, session)
   })
@@ -449,11 +505,14 @@ translator_chat_server <- function(input, output, session) {
       actionButton("translator_send", "Send", class = "btn-success",
                    style = "min-width:80px; height:42px;")
     ),
-    # Secondary action row — reset + force-template. Kept compact and
-    # styled as outline buttons so they don't compete with the primary
-    # Send action above.
+    # Secondary action row — force-template + reset + download. The
+    # download lives inline with the other two so it's the obvious next
+    # click when ready, instead of being buried in a separate green
+    # panel below. It's wrapped in conditionalPanel so it only appears
+    # once the AI has produced a well-formed template (validated by
+    # output$translator_template_ready).
     tags$div(
-      style = "display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;",
+      style = "display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; align-items:center;",
       actionButton("translator_force_template",
                    tagList(icon("file-arrow-down"),
                             " Produce template now"),
@@ -465,35 +524,18 @@ translator_chat_server <- function(input, output, session) {
                             " Reset conversation"),
                    class = "btn-outline-secondary",
                    style = "font-size:0.82rem;",
-                   title = "Clear the chat and start over from scratch.")
+                   title = "Clear the chat and start over from scratch."),
+      conditionalPanel(
+        condition = "output.translator_template_ready",
+        downloadButton("translator_download_template",
+                        "Download template (.xlsx)",
+                        class = "btn-success",
+                        icon = icon("file-arrow-down"),
+                        style = "font-size:0.82rem;")
+      )
     ),
 
-    uiOutput("translator_last_error"),
-
-    # Download button appears only when the AI has produced a complete
-    # template (i.e. a `template-ready` fenced block was detected in its
-    # last response and parsed into state$last_template_json).
-    conditionalPanel(
-      condition = "output.translator_template_ready",
-      tags$div(style = "margin-top:14px; padding:12px; background:#E8F5E9;
-                        border:1px solid #2D6A4F; border-radius:6px;",
-               tags$strong("Your translated template is ready."),
-               tags$br(),
-               tags$span(style = "font-size:0.85rem; color:#52525B;",
-                         "The AI has finished mapping your data. Download the result below."),
-               tags$br(),
-               downloadButton("translator_download_template",
-                              "Download translated template (.xlsx)",
-                              class = "btn-primary", style = "margin-top:8px;"))
-    ),
-
-    tags$hr(style = "margin:14px 0;"),
-
-    tags$div(style = "font-size:0.82rem; color:#52525B;",
-             "Prefer to use a free Claude.ai account instead? ",
-             tags$a(href = "#downloads-card",
-                    "Download the translator kit"),
-             " and follow the setup guide in the Resources tab."))
+    uiOutput("translator_last_error"))
 }
 
 # Set a flag the conditionalPanel above can react to. Called from
@@ -644,9 +686,11 @@ translator_chat_server <- function(input, output, session) {
   # they see the AI's confident "template-ready" reply and no download
   # button with no explanation.
   json_block <- .translator_extract_template_ready(resp$reply)
+  template_just_ready <- FALSE
   if (!is.null(json_block)) {
     if (.translator_template_is_well_formed(json_block)) {
       state$last_template_json <- json_block
+      template_just_ready <- TRUE
     } else {
       state$last_error <- paste0(
         "The AI tried to emit a template but the format wasn't valid JSON ",
@@ -665,9 +709,31 @@ translator_chat_server <- function(input, output, session) {
           content = resp$reply,
           display = resp$reply)
 
+  # If a valid template-ready block came through in this reply, post a
+  # separate small AI message pointing the user at the green Download
+  # button. The previous reply mixed natural-language with the JSON, so
+  # the user can miss the "click to download" cue — this dedicated
+  # message is the clear next step.
+  if (template_just_ready) .translator_append_download_hint(state)
+
   # Persist so a refresh / reload resumes where we left off.
   tryCatch(conversation_save(state$user_email, state$messages),
            error = function(e) NULL)
+}
+
+# Shared helper: append a friendly 'click the green Download button'
+# message to the conversation. Called from both .translator_send (chat
+# path, when a valid template-ready block lands) and
+# .translator_force_template (forced-output path). Centralised so the
+# wording stays identical in both places.
+.translator_append_download_hint <- function(state) {
+  state$messages[[length(state$messages) + 1]] <- list(
+    role    = "assistant",
+    content = "(download hint)",
+    display = paste0("Your translated template is ready. Click the green ",
+                      "'Download template (.xlsx)' button on the right ",
+                      "(next to Reset conversation) to get the file, ",
+                      "then upload it on the 1. Data Input tab."))
 }
 
 # Force the AI to emit the final filled-template JSON now, regardless of
@@ -757,13 +823,62 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  # Valid JSON. The response IS the JSON — json_schema mode guarantees
-  # pure JSON, no fenced block needed.
+  # Valid JSON. Run a coverage check before promoting: if the parameters
+  # array has many sub-categories but manure_management covers only one
+  # (or two), the AI almost certainly forgot the broadcast rule. Same if
+  # the sub-categories-in-manure_management is a strict subset of
+  # sub-categories-in-parameters. We still surface the download (the user
+  # may want it anyway) but warn alongside, so they can hit the button
+  # again with a clearer mental model.
+  parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE),
+                            error = function(e) NULL)
+  coverage_msgs <- character(0)
+  if (!is.null(parsed_check)) {
+    sc_param <- unique(parsed_check$parameters$sub_category)
+    sc_mm <- if (is.data.frame(parsed_check$manure_management))
+      unique(parsed_check$manure_management$sub_category) else character(0)
+    missing_in_mm <- setdiff(sc_param, sc_mm)
+    if (length(missing_in_mm) > 0 && length(sc_mm) > 0) {
+      coverage_msgs <- c(coverage_msgs, paste0(
+        "Manure_Management only covers ",
+        paste(sc_mm, collapse = ", "),
+        " — but the parameters sheet lists ",
+        length(sc_param), " sub-categories (",
+        paste(sc_param, collapse = ", "), "). ",
+        "Manure-CH4 and -N2O emissions will be zero for ",
+        paste(missing_in_mm, collapse = ", "),
+        ". Hit 'Produce template now' again to retry, or download this ",
+        "file and add MMS rows for the missing sub-categories yourself."))
+    }
+    # Same-pattern check: did the AI emit only ~25-50 rows when many
+    # sub-categories are in play? Below the threshold of (n_subcats * 5),
+    # the param array is almost certainly truncated.
+    n_subcats <- length(sc_param)
+    n_param_rows <- nrow(parsed_check$parameters) %||% 0L
+    if (n_subcats >= 3 && n_param_rows < n_subcats * 5) {
+      coverage_msgs <- c(coverage_msgs, paste0(
+        "Only ", n_param_rows, " parameter rows for ", n_subcats,
+        " sub-categories — that averages ",
+        sprintf("%.1f", n_param_rows / n_subcats),
+        " rows per sub-category, which is below the 5-row minimum for ",
+        "even the activity-data set. The AI likely truncated. Hit ",
+        "'Produce template now' again — usually a second attempt with ",
+        "the same conversation context expands the coverage."))
+    }
+  }
+  if (length(coverage_msgs) > 0)
+    state$last_error <- paste(coverage_msgs, collapse = " ")
+
   state$last_template_json <- resp$reply
+  # Two messages: the raw JSON (kept on state for replay / download) and
+  # a separate, prominent guidance bubble pointing at the green
+  # Download button. Same wording as the chat-path hint so the user's
+  # mental model stays consistent.
   state$messages[[length(state$messages) + 1]] <-
     list(role    = "assistant",
          content = resp$reply,
-         display = "Template ready — click the green download button below to get the .xlsx.")
+         display = "Template generated.")
+  .translator_append_download_hint(state)
   tryCatch(conversation_save(state$user_email, state$messages),
            error = function(e) NULL)
 }

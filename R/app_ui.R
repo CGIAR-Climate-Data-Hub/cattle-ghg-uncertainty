@@ -469,51 +469,12 @@ app_ui <- function() {
           )
         ),
         # AI Translator kit — free, self-serve helper to turn the user's own
-        # Excel/CSV files into the strict app template via a pre-built Claude.ai
-        # Project. Placed below Tool-specific resources so the canonical docs
-        # are the first thing users see. See claude_project_assets/README.md.
-        # 2026-06: in-app AI translator. Replaces the previous "Sign up for
-        # claude.ai, paste these files, set up a Project" guide with a
-        # direct in-app chat behind a magic-link login. Backed by Lolita's
-        # OpenAI account with a $10/month spending cap. The downloadable
-        # kit and the free-tier flow remain available below as a fallback.
+        # 2026-06: in-app AI translator. Backed by Lolita's OpenAI account
+        # with a $10/month spending cap and gated by a magic-link login.
+        # Replaces the earlier "Download translator kit, set up on
+        # claude.ai" flow, which was confusing for first-time users and
+        # ran into free-tier rate limits.
         translator_chat_ui(),
-
-        # Fallback: downloadable kit for users who don't want to sign in.
-        bslib::card(
-          style = "border-left: 4px solid #94A3B8;",
-          bslib::card_header(h4("Or — use the free downloadable kit on claude.ai",
-                                 style = "margin: 0;")),
-          bslib::card_body(
-            tags$p(style = "margin-bottom: 12px;",
-              "Prefer to keep everything inside your own free Claude.ai account ",
-              "(no sign-in here, but you handle the setup yourself)? Download ",
-              "the kit and follow the short setup guide. Two minutes the first time, ",
-              "then reusable for every inventory."),
-            div(style = "margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap;",
-              tags$a(
-                href = "translator_kit.zip",
-                download = "translator_kit.zip",
-                class = "btn btn-outline-success",
-                icon("box-archive"), " Download Translator kit (.zip)"
-              ),
-              tags$a(
-                href = "getting_started.pdf",
-                target = "_blank",
-                rel = "noopener noreferrer",
-                class = "btn btn-outline-success",
-                icon("file-pdf"), " Getting started (full guide)"
-              ),
-              tags$a(
-                href = "questionnaire.docx",
-                target = "_blank",
-                download = "questionnaire.docx",
-                class = "btn btn-outline-success",
-                icon("clipboard-list"), " Pre-flight questionnaire (.docx)"
-              )
-            )
-          )
-        ),
 
         bslib::card(
           bslib::card_header(h4("Useful resources", style = "margin: 0;")),
@@ -696,16 +657,12 @@ app_ui <- function() {
               icon("robot"),
               tags$strong(" Don't have the template filled yet?"),
               tags$br(),
-              "Download the free ",
-              tags$a(href = "translator_kit.zip", download = "translator_kit.zip",
-                     "AI Translator kit"),
-              " and set up your own Claude.ai assistant in ~2 minutes. ",
-              tags$a(href = "getting_started.pdf", target = "_blank",
-                     rel = "noopener noreferrer", "Getting started (PDF)"),
-              " · ",
-              tags$a(href = "questionnaire.docx", target = "_blank",
-                     download = "questionnaire.docx", "Questionnaire (.docx)"),
-              " · see the Resources tab for the full walkthrough."),
+              "Use the AI Translator on the ",
+              tags$a(href = "#",
+                     onclick = "Shiny.setInputValue('nav', 'Resources'); return false;",
+                     "Resources tab"),
+              " — upload your raw data file and the AI produces a ",
+              "ready-to-upload .xlsx."),
             hr(),
             h5("3. Upload your filled template"),
             fileInput("data_upload", "Upload Excel Template (.xlsx)",

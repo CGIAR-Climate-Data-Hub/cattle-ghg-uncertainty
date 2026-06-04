@@ -129,18 +129,19 @@ If you do not yet have uncertainty estimates, see Section 2.4 for guidance on ob
 
 \textbf{You only need the parameters used by the emission sources you tick.} The tool's pre-run check is source-aware: if you select only the methane sources (enteric, manure CH\textsubscript{4}), it will not ask you to fill the N\textsubscript{2}O parameters, and vice versa. So a methane-only run never blocks on blank manure-N\textsubscript{2}O cells. The managed-storage N\textsubscript{2}O quantities (EF3 per system, Frac\_GasMS, Frac\_LeachMS) live in the Manure\_Management tab — fill them there, not in the Parameters tab.
 
-## AI-assisted data preparation (optional)
+## AI-assisted data preparation
 
-If your raw inventory data lives in your own Excel or CSV files with column names that do not match the template, the tool offers an \textbf{in-app AI translator} that does the column-mapping and unit-conversion work for you. It is a small chat panel embedded in the Resources tab; you upload your data and the AI proposes a mapping, asks any clarifying questions, and produces a filled template you can download.
+If your raw inventory data lives in your own Excel or CSV files with column names that do not match the template, the tool offers an \textbf{in-app AI translator} that does the column-mapping and unit-conversion work for you. It is a small chat panel on the Resources tab; you upload your data and the AI proposes a mapping, asks any clarifying questions, and produces a filled template you can download.
 
 \textbf{Workflow (each inventory).}
 
 \begin{enumerate}
-\item Open the Resources tab. The "AI Translator" card is at the top.
-\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day).
-\item Once signed in, \textbf{upload your raw data file} (\texttt{.xlsx} or \texttt{.csv}) using the file picker at the top of the chat panel. The AI reads it immediately and starts the conversation.
-\item Answer the AI's clarifying questions in plain English in the chat box at the bottom of the panel (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}).
-\item When the AI has enough information to produce a complete filled template, a green \textbf{"Download translated template"} button appears. Click it to download the result, then upload it in Tab 1 (Data Input).
+\item Open the \textbf{Resources tab}. The "AI Translator" card is the first item, with a green left-edge accent and a short intro paragraph explaining what it does.
+\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day). The sign-in is remembered for 30 days, so you only do this once per browser.
+\item Once signed in, \textbf{upload your raw data file} (\texttt{.xlsx} or \texttt{.csv}) using the file picker at the top of the chat panel. The AI reads every sheet immediately and starts the conversation.
+\item \textbf{Answer the AI's clarifying questions} in plain English in the chat box at the bottom of the panel (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}). If you'd rather defer, you can simply reply "do as you think is best" and the AI will fill every parameter with IPCC defaults.
+\item When the AI has enough information, click \textbf{"Produce template now"} (left-most button below the chat box). A green \textbf{"Download template (.xlsx)"} button appears alongside the Reset conversation button, and the AI posts a short follow-up message pointing at it.
+\item \textbf{Click the green Download button} to save the file, then upload it on Tab 1 (Data Input).
 \end{enumerate}
 
 \textbf{When to use.} The translator is most useful when (a) your data is in a non-standard shape, (b) your column names differ from the template (e.g. \texttt{cattle\_pop}, \texttt{live\_wt\_lb}), (c) you have data in inconsistent units (lbs vs kg, fractions vs percentages), or (d) you want IPCC defaults filled in for the parameters you do not measure.
@@ -148,8 +149,6 @@ If your raw inventory data lives in your own Excel or CSV files with column name
 \textbf{Quality control.} The translator does column-mapping, not analysis. Always (a) spot-check the key numbers (population, body weight, milk yield) by comparing with your original file, and (b) review the QA/QC tab after upload --- any value the translator filled from an IPCC default is flagged in amber there.
 
 \textbf{Privacy + cost.} The translator is hosted by the GMH project on a small AI account (no payment from you). The chat does not store your input data --- only your email and a per-call token count are logged so the administrator can monitor monthly usage. A \$10/month global spending cap prevents runaway use; if the cap is hit you will see a clear "monthly cap reached, contact administrator" message.
-
-\textbf{Free fallback (optional, more setup).} If you would rather not sign in to the in-app translator, the Resources tab also offers a downloadable \texttt{translator\_kit.zip} you can use with your own free \texttt{claude.ai} account. One-time setup (about 5 minutes); the workflow then mirrors the in-app version.
 
 ## Complete parameter reference
 
