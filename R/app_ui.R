@@ -129,6 +129,36 @@ app_ui <- function() {
            var input = document.getElementById('translator_input');
            if (input) input.value = '';
          }
+         // Optimistic-render: when the user submits a message, paint a
+         // user-bubble in the conversation INSTANTLY (before the server
+         // round-trip) so the user knows their message was accepted.
+         // The server-side renderUI for translator_messages will swap it
+         // for the canonical version once state$messages updates.
+         function _translatorOptimisticUserBubble(text) {
+           if (!text) return;
+           var slot = document.getElementById('translator_stream_target');
+           if (!slot) return;
+           var bubble = document.createElement('div');
+           // Matches the user-bubble styling in chat_ui.R::output$translator_messages
+           bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+             'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
+             'font-size:0.92rem; line-height:1.45;' +
+             'background:#DCEFFB; color:#1A3A5C; align-self:flex-end;' +
+             'border:1px solid #BFDCEE;';
+           bubble.textContent = text;
+           slot.appendChild(bubble);
+           // Scroll the surrounding history into view so the bubble's visible.
+           var scroller = bubble.closest('[data-translator-scroller]');
+           if (scroller) scroller.scrollTop = scroller.scrollHeight;
+         }
+         // Server-driven: force the spinner visible. Belt-and-suspenders
+         // for the case where client-side show fires but something
+         // (re-render, focus change, browser quirk) hides it before the
+         // first AI chunk arrives. The server sends this on every entry
+         // into work that will keep the user waiting.
+         Shiny.addCustomMessageHandler('translatorShowSpinner', function(label) {
+           _translatorShowSpinner(label || _translatorSpinnerDefault);
+         });
 
          // 2026-06: Enter-to-submit for the translator email + chat inputs.
          // Capture phase (third arg = true) so we beat any bubble-phase
@@ -146,15 +176,11 @@ app_ui <- function() {
            } else if (t.id === 'translator_input') {
              e.preventDefault();
              e.stopPropagation();
-             // Push the current textarea value into Shiny's cache BEFORE
-             // we clear the DOM, so the observer reads the right text
-             // even if Shiny was still debouncing the input event.
-             if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-               Shiny.setInputValue('translator_input', t.value,
-                                    {priority: 'event'});
-             }
-             _translatorClearInputDOM();
-             _translatorShowSpinner();
+             // Just trigger the Send button. The click handler (below)
+             // reads the textarea value, pushes it to Shiny, paints the
+             // optimistic bubble, clears the DOM, and shows the spinner —
+             // all in one pass. Don't pre-clear here or the click handler
+             // would re-read an empty value and clobber the typed text.
              var btn = document.getElementById('translator_send');
              if (btn) btn.click();
            }
@@ -169,10 +195,16 @@ app_ui <- function() {
            for (var i = 0; i < 3 && t; i++) {
              if (t.id === 'translator_send') {
                var input = document.getElementById('translator_input');
-               if (input && typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-                 Shiny.setInputValue('translator_input', input.value,
+               var txt = (input && input.value) ? input.value : '';
+               if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+                 Shiny.setInputValue('translator_input', txt,
                                       {priority: 'event'});
                }
+               // Optimistic UI: paint the user's bubble in the conversation
+               // BEFORE clearing the textarea — instant feedback that the
+               // message was accepted. Server-side renderUI will replace
+               // it with the canonical version when state$messages updates.
+               _translatorOptimisticUserBubble(txt);
                _translatorClearInputDOM();
                _translatorShowSpinner();
                return;

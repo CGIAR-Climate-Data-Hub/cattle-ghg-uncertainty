@@ -143,6 +143,13 @@ translator_chat_server <- function(input, output, session) {
     req(state$user_email)
     fi <- input$translator_file
     if (is.null(fi)) return()
+    # Force the spinner visible the moment the server picks up the upload.
+    # Client-side JS also shows it when the user picks the file, but the
+    # client signal can race with renders; the server message is the
+    # authoritative "we're working" trigger. Stays visible until the
+    # first AI chunk arrives (see translatorStreamChunk in app_ui.R).
+    session$sendCustomMessage("translatorShowSpinner",
+      "Analyzing your file — reading sheets, sending a preview to the AI…")
     parsed <- tryCatch(
       .translator_read_upload(fi$datapath, fi$name),
       error = function(e) {
@@ -193,6 +200,8 @@ translator_chat_server <- function(input, output, session) {
     req(state$user_email)
     txt <- trimws(input$translator_input %||% "")
     if (!nzchar(txt)) return()
+    session$sendCustomMessage("translatorShowSpinner",
+      "Translator is working — calling the AI, waiting for the first reply…")
     updateTextAreaInput(session, "translator_input", value = "")
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
@@ -212,6 +221,8 @@ translator_chat_server <- function(input, output, session) {
   # ---- Force-template button: ask the AI to produce the final JSON now ----
   observeEvent(input$translator_force_template, {
     req(state$user_email)
+    session$sendCustomMessage("translatorShowSpinner",
+      "Producing the final template — this can take 20–40 seconds for a large inventory…")
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user",
            content = "Please produce the final filled template JSON now using IPCC defaults for any parameters where I haven't given country-specific data. Do not ask any more questions — just output the template-ready JSON matching the schema in your instructions.",
