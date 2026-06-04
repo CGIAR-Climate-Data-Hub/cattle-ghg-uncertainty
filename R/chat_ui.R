@@ -13,6 +13,7 @@
 
 translator_chat_ui <- function() {
   bslib::card(
+    id = "ai-translator-card",
     style = "border-left: 4px solid #2D6A4F;",
     bslib::card_header(
       h4("AI Translator — turn your raw cattle data into the tool's template",

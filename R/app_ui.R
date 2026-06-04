@@ -802,26 +802,68 @@ app_ui <- function() {
             div(style = "font-size:0.78rem; color:#666; margin-top:-6px; margin-bottom:8px;",
                 tags$em("The MMS dropdown in the downloaded template will be filtered to manure systems valid for the version you pick here.")),
             h5("2. Download a template"),
-            downloadButton("download_template", "Download Blank Template",
-                           class = "btn-outline-success btn-sm"),
-            downloadButton("download_template_example", "Download Template with Example",
-                           class = "btn-outline-primary btn-sm mt-2"),
-            div(style = "font-size:0.78rem; color:#666; margin-top:6px;",
-                tags$em("If no IPCC version is picked, the download is blocked and the app will prompt you to select one.")),
+            # Active controls — visible only when an IPCC version is picked.
+            conditionalPanel(
+              condition = "input.template_version === '2006' || input.template_version === '2019_refinement'",
+              downloadButton("download_template", "Download Blank Template",
+                             class = "btn-outline-success btn-sm"),
+              downloadButton("download_template_example", "Download Template with Example",
+                             class = "btn-outline-primary btn-sm mt-2")
+            ),
+            # Greyed-out placeholder shown when no version is picked yet —
+            # explains the gating instead of just hiding the buttons.
+            conditionalPanel(
+              condition = "input.template_version !== '2006' && input.template_version !== '2019_refinement'",
+              div(style = "opacity:0.45; pointer-events:none;",
+                tags$button(class = "btn btn-outline-success btn-sm",
+                            type = "button", disabled = NA,
+                            icon("download"), " Download Blank Template"),
+                tags$button(class = "btn btn-outline-primary btn-sm mt-2",
+                            type = "button", disabled = NA,
+                            icon("download"), " Download Template with Example")),
+              div(style = "font-size:0.82rem; color:#92400E; margin-top:6px;",
+                  icon("circle-info"),
+                  tags$em(" Pick an IPCC version above first — then these buttons unlock."))
+            ),
             div(style = "margin-top: 10px; padding: 8px 10px; background:#E8F5E9; border-left:3px solid #2D6A4F; border-radius:4px; font-size:0.82rem;",
               icon("robot"),
               tags$strong(" Don't have the template filled yet?"),
               tags$br(),
               "Use the AI Translator on the ",
               tags$a(href = "#",
-                     onclick = "Shiny.setInputValue('nav', 'Resources'); return false;",
-                     "Resources tab"),
+                     onclick = paste0(
+                       "Shiny.setInputValue('nav', 'Resources'); ",
+                       "setTimeout(function() { ",
+                       "  var el = document.getElementById('ai-translator-card'); ",
+                       "  if (el) el.scrollIntoView({behavior:'smooth', block:'start'}); ",
+                       "}, 150); ",
+                       "return false;"),
+                     "AI Translator card on the Resources tab"),
               " — upload your raw data file and the AI produces a ",
               "ready-to-upload .xlsx."),
             hr(),
             h5("3. Upload your filled template"),
-            fileInput("data_upload", "Upload Excel Template (.xlsx)",
-                      accept = ".xlsx")
+            # Active upload — only after an IPCC version is picked.
+            conditionalPanel(
+              condition = "input.template_version === '2006' || input.template_version === '2019_refinement'",
+              fileInput("data_upload", "Upload Excel Template (.xlsx)",
+                        accept = ".xlsx")
+            ),
+            # Greyed-out upload placeholder when no version is picked.
+            conditionalPanel(
+              condition = "input.template_version !== '2006' && input.template_version !== '2019_refinement'",
+              div(style = "opacity:0.45; pointer-events:none;",
+                tags$label(class = "control-label", "Upload Excel Template (.xlsx)"),
+                div(class = "input-group",
+                    tags$label(class = "input-group-btn input-group-prepend",
+                               tags$span(class = "btn btn-default btn-file",
+                                          "Browse...", disabled = NA)),
+                    tags$input(type = "text", class = "form-control",
+                               placeholder = "No file selected", readonly = "readonly"))),
+              div(style = "font-size:0.82rem; color:#92400E; margin-top:4px;",
+                  icon("circle-info"),
+                  tags$em(" Pick an IPCC version above first to enable upload."))
+            )
           ),
           hr(),
           h5("Validation"),
