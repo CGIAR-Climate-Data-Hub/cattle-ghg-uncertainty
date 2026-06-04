@@ -169,6 +169,36 @@ app_ui <- function() {
          Shiny.addCustomMessageHandler('translatorShowSpinner', function(label) {
            _translatorShowSpinner(label || _translatorSpinnerDefault);
          });
+         // Inline info bubble inside the conversation — used during the
+         // force-template path (non-streaming, can take 60-120s). The
+         // bubble lives in translator_stream_target so it's visible
+         // alongside the conversation regardless of page scroll, and
+         // gets cleared automatically by translatorStreamEnd when the
+         // work completes.
+         Shiny.addCustomMessageHandler('translatorAppendInfoBubble', function(text) {
+           var slot = document.getElementById('translator_stream_target');
+           if (!slot) return;
+           slot.innerHTML = '';
+           var bubble = document.createElement('div');
+           bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+             'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
+             'font-size:0.92rem; line-height:1.45;' +
+             'background:#FFF8E1; color:#5D4037;' +
+             'border:1px solid #FFE082; align-self:flex-start;' +
+             'display:flex; align-items:center; gap:10px;';
+           var spinner = document.createElement('div');
+           spinner.style.cssText = 'width:14px; height:14px; flex-shrink:0;' +
+             'border:2px solid #FFE082; border-top-color:#FF6F00;' +
+             'border-radius:50%;' +
+             'animation: translatorSpin 0.8s linear infinite;';
+           bubble.appendChild(spinner);
+           var txt = document.createElement('span');
+           txt.textContent = text || 'Translator is working…';
+           bubble.appendChild(txt);
+           slot.appendChild(bubble);
+           var scroller = bubble.closest('[data-translator-scroller]');
+           if (scroller) scroller.scrollTop = scroller.scrollHeight;
+         });
 
          // 2026-06: Enter-to-submit for the translator email + chat inputs.
          // Capture phase (third arg = true) so we beat any bubble-phase

@@ -228,6 +228,12 @@ translator_chat_server <- function(input, output, session) {
     if (.translator_is_generate_trigger(txt) && length(state$messages) >= 2) {
       session$sendCustomMessage("translatorShowSpinner",
         "Producing the final template — this can take 20–40 seconds for a large inventory…")
+      # Paint an inline 'working…' bubble inside the conversation so the
+      # user sees progress regardless of where the page is scrolled. The
+      # bubble is cleared by translatorStreamEnd at the end of
+      # .translator_force_template.
+      session$sendCustomMessage("translatorAppendInfoBubble",
+        "Generating the full template now — please wait, this can take 30 to 120 seconds for an inventory with many sub-categories. The Download button will appear right after.")
       .translator_force_template(state, session)
     } else {
       session$sendCustomMessage("translatorShowSpinner",
@@ -420,7 +426,8 @@ translator_chat_server <- function(input, output, session) {
              style = "display:none; align-items:center; gap:10px;
                       padding:10px 14px; margin:8px 0;
                       background:#FFF8E1; border:1px solid #FFE082;
-                      border-radius:8px; color:#5D4037; font-size:0.88rem;",
+                      border-radius:8px; color:#5D4037; font-size:0.88rem;
+                      position:sticky; top:8px; z-index:50;",
              tags$div(style = "width:18px; height:18px;
                                 border:3px solid #FFE082;
                                 border-top-color:#FF6F00;
