@@ -63,6 +63,10 @@ app_ui <- function() {
            // actually has something to look at.
            var container = document.getElementById('translator_stream_target');
            if (!container) return;
+           // Wipe any leftover bubble from the previous round before we
+           // start streaming the new one (defense in depth — translatorStreamEnd
+           // also clears on completion).
+           container.innerHTML = '';
            var bubble = document.createElement('div');
            // Style MUST match the AI bubble style in R/chat_ui.R's renderUI
            // so the streamed-live bubble looks identical to the rendered-
@@ -86,9 +90,15 @@ app_ui <- function() {
            if (scroller) scroller.scrollTop = scroller.scrollHeight;
          });
          Shiny.addCustomMessageHandler('translatorStreamEnd', function(_unused) {
-           // Don't remove the bubble — the server about to swap it for a
-           // properly-rendered one in the message history. Just drop the
-           // reference so future chunks don't accidentally append.
+           // Streaming is done. The canonical AI message is in state$messages
+           // now and translator_messages has already re-rendered with it,
+           // so the bubble we built up in #translator_stream_target is a
+           // DUPLICATE. Clear the slot to avoid showing the same content
+           // twice. (translator_stream_target is OUTSIDE the reactive
+           // renderUI, so its contents persist across re-renders unless we
+           // explicitly wipe them.)
+           var container = document.getElementById('translator_stream_target');
+           if (container) container.innerHTML = '';
            _translatorActiveBubble = null;
            // Also hide the pre-stream spinner — covers the non-streaming
            // force-template path where StreamStart never fires.

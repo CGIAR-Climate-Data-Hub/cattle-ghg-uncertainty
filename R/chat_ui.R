@@ -243,14 +243,17 @@ translator_chat_server <- function(input, output, session) {
   })
 
   # ---- Render the message history ------------------------------------------
-  # The history scroller has TWO regions:
-  #   - .messages-static  : reactive uiOutput, redrawn whenever state$messages
-  #                          changes. Holds completed messages.
-  #   - #translator_stream_target : non-reactive DOM slot that the streaming
-  #                                  JS handlers append to during a live
-  #                                  response. Cleared / replaced when the
-  #                                  stream finishes and the assistant
-  #                                  message lands in state$messages.
+  # IMPORTANT: this output renders ONLY the completed-message bubbles.
+  # The streaming bubble lives in #translator_stream_target which is a
+  # STATIC sibling in .translator_chat_panel (NOT inside this renderUI).
+  # That separation is critical: when state$messages changes (e.g. on
+  # upload, the user msg gets appended), this output re-renders. If the
+  # stream_target lived in here, the re-render would replace its DOM
+  # while chunks were streaming into it — the bubble would be detached
+  # mid-stream and the user would see 10 seconds of silence until the
+  # final state$messages update brought everything back at once. By
+  # keeping stream_target outside, the live bubble persists across
+  # renders and the user sees the AI typing in real time.
   output$translator_messages <- renderUI({
     if (length(state$messages) == 0 && !isTRUE(state$pending))
       return(tags$p(style = "color:#888; font-style:italic;",
@@ -299,13 +302,8 @@ translator_chat_server <- function(input, output, session) {
       )
     })
     tags$div(
-      `data-translator-scroller` = "true",
-      style = "display:flex; flex-direction:column; max-height:480px;
-               overflow-y:auto; padding:8px;",
+      style = "display:flex; flex-direction:column;",
       msgs,
-      # Streaming target — JS appends live response bubbles inside this slot.
-      tags$div(id = "translator_stream_target",
-               style = "display:flex; flex-direction:column;"),
       if (isTRUE(state$pending))
         tags$div(style = "padding:8px; color:#2D6A4F; font-size:0.85rem;",
                  icon("spinner", class = "fa-spin"),
@@ -424,7 +422,20 @@ translator_chat_server <- function(input, output, session) {
        }"
     ))),
 
-    uiOutput("translator_messages"),
+    # Static scroller wraps both the reactive message list AND the
+    # streaming target. translator_stream_target lives OUTSIDE
+    # output$translator_messages so it survives re-renders triggered by
+    # state$messages changes — chunks stream into it visibly in real time.
+    # See the long comment on output$translator_messages.
+    tags$div(
+      `data-translator-scroller` = "true",
+      style = "display:flex; flex-direction:column; max-height:480px;
+               overflow-y:auto; padding:8px;",
+      uiOutput("translator_messages",
+                style = "display:flex; flex-direction:column;"),
+      tags$div(id = "translator_stream_target",
+                style = "display:flex; flex-direction:column;")
+    ),
 
     tags$hr(style = "margin:14px 0;"),
 
