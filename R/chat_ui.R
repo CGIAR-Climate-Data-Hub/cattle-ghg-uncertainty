@@ -21,11 +21,11 @@ translator_chat_ui <- function() {
     bslib::card_body(
       tags$p(style = "margin: 0 0 14px 0; color: #475569; font-size: 0.92rem;
                        line-height: 1.5;",
-        "Drop in your raw cattle data file (.xlsx or .csv — multi-sheet OK, ",
-        "mixed French/English OK, messy units OK). The AI reads every sheet, ",
-        "asks any clarifying questions in plain English, then produces a ",
-        "downloadable .xlsx in the exact format the Data Input tab expects. ",
-        "No setup — sign in once with your email and you're ready."),
+        "Drop in your raw cattle data file (.xlsx or .csv). The AI reads ",
+        "every sheet, asks any clarifying questions in plain English, ",
+        "then produces a downloadable .xlsx in the exact format the Data ",
+        "Input tab expects. No setup — sign in once with your email and ",
+        "you're ready."),
       uiOutput("translator_panel")
     )
   )
