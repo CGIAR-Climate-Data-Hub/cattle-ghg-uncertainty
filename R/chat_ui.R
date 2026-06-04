@@ -154,13 +154,11 @@ translator_chat_server <- function(input, output, session) {
     req(state$user_email)
     fi <- input$translator_file
     if (is.null(fi)) return()
-    # Force the spinner visible the moment the server picks up the upload.
-    # Client-side JS also shows it when the user picks the file, but the
-    # client signal can race with renders; the server message is the
-    # authoritative "we're working" trigger. Stays visible until the
-    # first AI chunk arrives (see translatorStreamChunk in app_ui.R).
-    session$sendCustomMessage("translatorShowSpinner",
-      "Analyzing your file — reading sheets, sending a preview to the AI…")
+    # Inline typing-indicator in the conversation while we read the
+    # uploaded file + wait for the AI's first reply. Visible alongside
+    # the conversation regardless of scroll position; cleared by
+    # translatorStreamStart when the AI starts streaming.
+    session$sendCustomMessage("translatorAppendTypingBubble", "")
     parsed <- tryCatch(
       .translator_read_upload(fi$datapath, fi$name),
       error = function(e) {
@@ -226,19 +224,17 @@ translator_chat_server <- function(input, output, session) {
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
     if (.translator_is_generate_trigger(txt) && length(state$messages) >= 2) {
-      # Paint an inline 'working…' bubble inside the conversation. The
-      # bubble includes a faked-progress bar that animates 0 -> 90%
-      # over ~60s so the user has constant visual feedback during the
-      # 30-120s non-streaming force-template call. Cleared by
-      # translatorStreamEnd when the work completes. The top-of-card
-      # yellow pill is skipped here — the inline bubble is enough and
-      # scrolls with the conversation.
+      # Paint an inline 'working…' bubble with a fake-determinate
+      # progress bar for the non-streaming force-template call (30-
+      # 120s). Cleared by translatorStreamEnd when work completes.
       session$sendCustomMessage("translatorAppendInfoBubble",
         "Generating the full template now — please wait, this can take 30 to 120 seconds for an inventory with many sub-categories. The Download button will appear right after.")
       .translator_force_template(state, session)
     } else {
-      session$sendCustomMessage("translatorShowSpinner",
-        "Translator is working — calling the AI, waiting for the first reply…")
+      # Three-dot typing indicator inline in the conversation while we
+      # wait for the AI's first chunk. Cleared by translatorStreamStart
+      # which wipes stream_target before painting the live AI bubble.
+      session$sendCustomMessage("translatorAppendTypingBubble", "")
       .translator_send(state, session)
     }
   })
@@ -445,6 +441,10 @@ translator_chat_server <- function(input, output, session) {
       "@keyframes translatorSpin {
          from { transform: rotate(0deg); }
          to   { transform: rotate(360deg); }
+       }
+       @keyframes translatorDot {
+         0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+         40%           { opacity: 1.0; transform: scale(1.2); }
        }"
     ))),
 
@@ -1099,9 +1099,15 @@ translator_chat_server <- function(input, output, session) {
       .put_mm(3, mm$sub_category[i])
       .put_mm(4, mm$mms_type[i])
       .put_mm(5, mm$fraction_pct[i])
-      # mcf / ef3 — match the official MM_COLS ordering
+      # Coefficient columns — read both lowercase and CamelCase keys
+      # because the AI is inconsistent. MM_COLS positions: 9=MCF_pct,
+      # 13=EF3, 17=Frac_GasMS_pct, 21=Frac_LeachMS_pct.
       .put_mm(9,  mm$mcf[i] %||% mm$MCF_pct[i])
       .put_mm(13, mm$ef3[i] %||% mm$EF3[i])
+      .put_mm(17, mm$Frac_GasMS_pct[i] %||% mm$frac_gasms_pct[i] %||%
+                   mm$Frac_GasMS[i])
+      .put_mm(21, mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
+                   mm$Frac_LeachMS[i])
     }
   }
 

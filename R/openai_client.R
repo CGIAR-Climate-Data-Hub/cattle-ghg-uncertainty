@@ -635,10 +635,14 @@ openai_chat_template_force <- function(messages,
                   sub_category      = list(type = "string"),
                   mms_type          = list(type = "string"),
                   fraction_pct      = list(type = "number"),
-                  mcf               = list(type = c("number", "null")),
-                  ef3               = list(type = c("number", "null"))
+                  MCF_pct           = list(type = c("number", "null")),
+                  EF3               = list(type = c("number", "null")),
+                  Frac_GasMS_pct    = list(type = c("number", "null")),
+                  Frac_LeachMS_pct  = list(type = c("number", "null"))
                 ),
-                required = c("sub_category", "mms_type", "fraction_pct")
+                required = c("sub_category", "mms_type", "fraction_pct",
+                              "MCF_pct", "EF3",
+                              "Frac_GasMS_pct", "Frac_LeachMS_pct")
               )
             )
           ),

@@ -177,6 +177,79 @@ app_ui <- function() {
          Shiny.addCustomMessageHandler('translatorShowSpinner', function(label) {
            _translatorShowSpinner(label || _translatorSpinnerDefault);
          });
+         // Simple typing-indicator bubble for the streaming chat wait
+         // (~1-5 seconds between Enter and the first chunk). Replaces
+         // the off-screen yellow pill that the user couldn't see during
+         // long conversations. Cleared by translatorStreamStart (which
+         // also wipes the stream_target before painting the live AI
+         // bubble).
+         Shiny.addCustomMessageHandler('translatorAppendTypingBubble', function(_unused) {
+           var slot = document.getElementById('translator_stream_target');
+           if (!slot) return;
+           slot.innerHTML = '';
+           var bubble = document.createElement('div');
+           bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+             'padding:10px 14px; border-radius:12px;' +
+             'font-size:0.92rem; line-height:1.45;' +
+             'background:#E8F5E9; color:#1B4332;' +
+             'border:1px solid #C8E6C9; align-self:flex-start;' +
+             'display:flex; align-items:center; gap:8px;';
+           var dot1 = document.createElement('span');
+           var dot2 = document.createElement('span');
+           var dot3 = document.createElement('span');
+           [dot1, dot2, dot3].forEach(function(d, i) {
+             d.style.cssText = 'display:inline-block; width:6px; height:6px;' +
+               'background:#2D6A4F; border-radius:50%;' +
+               'animation: translatorDot 1.2s ease-in-out ' + (i * 0.2) + 's infinite;';
+             bubble.appendChild(d);
+           });
+           slot.appendChild(bubble);
+           var scroller = bubble.closest('[data-translator-scroller]');
+           if (scroller) scroller.scrollTop = scroller.scrollHeight;
+         });
+         // Download click feedback — when the user clicks the green
+         // Download button, the server takes 5-15 seconds to build the
+         // multi-sheet .xlsx (style overlay + many cell writes). Without
+         // feedback the user sees a frozen-looking app. Paint an inline
+         // bubble in the conversation that auto-disappears after 20s
+         // (or whenever the file actually downloads).
+         document.addEventListener('click', function(e) {
+           var t = e.target;
+           if (!t) return;
+           for (var i = 0; i < 4 && t; i++) {
+             if (t.id === 'translator_download_template') {
+               var slot = document.getElementById('translator_stream_target');
+               if (!slot) return;
+               slot.innerHTML = '';
+               var bubble = document.createElement('div');
+               bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+                 'padding:10px 14px; border-radius:12px;' +
+                 'font-size:0.92rem; line-height:1.45;' +
+                 'background:#FFF8E1; color:#5D4037;' +
+                 'border:1px solid #FFE082; align-self:flex-start;' +
+                 'display:flex; align-items:center; gap:10px;';
+               var s = document.createElement('div');
+               s.style.cssText = 'width:14px; height:14px; flex-shrink:0;' +
+                 'border:2px solid #FFE082; border-top-color:#FF6F00;' +
+                 'border-radius:50%;' +
+                 'animation: translatorSpin 0.8s linear infinite;';
+               bubble.appendChild(s);
+               var label = document.createElement('span');
+               label.textContent = 'Building your .xlsx — this can take 5-15 seconds. Your browser will pop a save dialog when it is ready.';
+               bubble.appendChild(label);
+               slot.appendChild(bubble);
+               var scroller = bubble.closest('[data-translator-scroller]');
+               if (scroller) scroller.scrollTop = scroller.scrollHeight;
+               // Auto-clear after 20 seconds in case the browser
+               // download wasn't detected.
+               setTimeout(function() {
+                 if (slot.contains(bubble)) slot.removeChild(bubble);
+               }, 20000);
+               return;
+             }
+             t = t.parentElement;
+           }
+         }, false);
          // Inline info bubble inside the conversation — used during the
          // force-template path (non-streaming, can take 60-120s). The
          // bubble lives in translator_stream_target so it's visible
@@ -289,13 +362,10 @@ app_ui <- function() {
                // BEFORE clearing the textarea — instant feedback that the
                // message was accepted. Server-side renderUI will replace
                // it with the canonical version when state$messages updates.
+               // The 'AI is typing…' indicator is now painted inline by
+               // the server-side observer via translatorAppendTypingBubble.
                _translatorOptimisticUserBubble(txt);
                _translatorClearInputDOM();
-               _translatorShowSpinner();
-               return;
-             }
-             if (t.id === 'translator_force_template') {
-               _translatorShowSpinner('Producing the final template — this can take 20–40 seconds for a large inventory…');
                return;
              }
              if (t.id === 'translator_submit') {
@@ -304,21 +374,7 @@ app_ui <- function() {
              }
              t = t.parentElement;
            }
-         }, false);
-         // File upload — different label so the user knows what's happening.
-         // Capture phase + defensive id-contains match (in case Shiny ever
-         // wraps the input or namespaces the id). Without capture, Shiny's
-         // own change binding can stop propagation before we see the event.
-         document.addEventListener('change', function(e) {
-           var t = e.target;
-           if (!t) return;
-           var isTranslatorFile =
-             t.id === 'translator_file' ||
-             (t.type === 'file' && /translator_file/.test(t.id || ''));
-           if (isTranslatorFile) {
-             _translatorShowSpinner('Analyzing your file — reading sheets, building a preview to send to the AI…');
-           }
-         }, true);"
+         }, false);"
       )))
     ),
     fillable = FALSE,
