@@ -7,7 +7,7 @@
 
 A web-based tool for national cattle GHG inventory teams to quantify and report uncertainty in their IPCC Tier 2 emission estimates. Upload your country data, run 10,000 Monte Carlo simulations, and download results formatted directly for IPCC Table 3.3 — no coding required. An in-app **AI Translator** turns raw country data files (in any shape, any language) into the strict input template before you analyse.
 
-**Developed by** the CGIAR Alliance of Bioversity International and CIAT, under the **CGIAR Climate Action** initiative
+**Developed by** the CGIAR Alliance of Bioversity International and CIAT, under the **CGIAR Climate Action Programme**
 **Funded by** Global Methane Hub (Grant R-2026-01051)
 
 ---
@@ -121,7 +121,7 @@ cattle-ghg-uncertainty/
 
 ## Funding and acknowledgements
 
-This tool was developed as part of project **D614 — GMH Emissions Uncertainty** funded by the **Global Methane Hub** (Grant R-2026-01051), implemented by the CGIAR Alliance of Bioversity International and CIAT under the **CGIAR Climate Action** initiative.
+This tool was developed as part of project **D614 — GMH Emissions Uncertainty** funded by the **Global Methane Hub** (Grant R-2026-01051), implemented by the CGIAR Alliance of Bioversity International and CIAT under the **CGIAR Climate Action Programme**.
 
 Thanks to Andreas Wilkes, Pete Steward, and Todd Rosenstock for the extended review and benchmark testing against @Risk and the IPCC Inventory Software, and to the national inventory teams in Zimbabwe and Zambia for use-case piloting.
 
