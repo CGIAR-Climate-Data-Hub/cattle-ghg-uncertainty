@@ -128,3 +128,8 @@ R/_test_*.R
 
 # Claude Code per-machine session state
 .claude/
+
+# Snapshot of the approved-users CSV from the last successful deploy.
+# Lives only on the deployer's machine; scripts/notify_approved.R uses
+# it to know which approved emails are NEW since last deploy.
+.approved_users_snapshot.csv
