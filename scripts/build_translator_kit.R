@@ -10,6 +10,9 @@
 #   source("_build_claude_project_assets.R")
 # =============================================================================
 
+# Run from project root: Rscript scripts/build_translator_kit.R
+if (basename(getwd()) == "scripts") setwd("..")
+
 suppressMessages({
   source("R/utils_template.R", local = FALSE)
   source("R/utils_validation.R", local = FALSE)

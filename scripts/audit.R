@@ -82,6 +82,10 @@
 #     total_co2e_AR6 = 6124.82*27.0 + 66.670*273 = 165370.14 + 18200.91 = 183571.05
 # =============================================================================
 
+# Run from project root: Rscript scripts/audit.R
+# Self-correcting if invoked from inside scripts/.
+if (basename(getwd()) == "scripts") setwd("..")
+
 options(warn = 1)
 suppressMessages({
   # Source library files only; skip entry-point scripts like R/_test_*.R that
@@ -1875,8 +1879,11 @@ section_G <- function() {
 
   # G4 — methodology.Rmd Reporting section present (Andreas review round 2):
   # CRT category map covering 3.A, 3.B, 3.D.
-  meth_txt <- if (file.exists("methodology.Rmd"))
-    paste(readLines("methodology.Rmd", warn = FALSE, encoding = "UTF-8"),
+  meth_path <- if (file.exists("doc/methodology.Rmd")) "doc/methodology.Rmd"
+               else if (file.exists("methodology.Rmd")) "methodology.Rmd"
+               else NULL
+  meth_txt <- if (!is.null(meth_path))
+    paste(readLines(meth_path, warn = FALSE, encoding = "UTF-8"),
           collapse = "\n") else ""
   has_crt_a <- grepl("3\\.A Enteric fermentation", meth_txt)
   has_crt_b <- grepl("3\\.B Manure management", meth_txt)

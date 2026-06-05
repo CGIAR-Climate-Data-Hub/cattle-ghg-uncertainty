@@ -123,37 +123,45 @@ The app opens in your default browser.
 
 ```
 cattle-ghg-uncertainty/
-├── app.R                        # Entry point — sources R/ and launches app
-├── install.R                    # One-line dependency installer
-├── runtime.txt                  # Binder R version specification
-├── deploy_shinyapps.R           # shinyapps.io deployment script
+├── app.R                        # Shiny entry point
+├── install.R                    # Dependency installer (Binder + shinyapps.io)
+├── runtime.txt                  # Binder R-version spec
+├── README.md
 │
-├── R/
-│   ├── app_ui.R                 # Shiny UI (9-tab page_navbar)
-│   ├── app_server.R             # Reactive server logic
-│   │
-│   ├── calc_energy.R            # Net energy equations (NEm, NEa, NEg, NEl, NEw, NEp)
-│   ├── calc_enteric.R           # Enteric CH4 (IPCC Eq 10.21)
-│   ├── calc_manure_ch4.R        # VS and manure CH4 (Eq 10.23–10.24)
-│   ├── calc_manure_n2o.R        # N excretion, direct and indirect N2O
-│   ├── calc_ghg_master.R        # Master emission function (calls all calc_*)
-│   │
-│   ├── mc_sampling.R            # Gaussian copula engine; make_uniform_corr()
-│   ├── mc_simulation.R          # run_mc_simulation(); run_inventory_simulation()
-│   ├── mc_uncertainty.R         # Uncertainty metrics and AD/EF decomposition
-│   ├── mc_sensitivity.R         # SRC and PRCC sensitivity analysis
-│   │
-│   ├── utils_ipcc_defaults.R    # IPCC lookup tables and controlled vocabularies
-│   ├── utils_template.R         # Excel template generation and parsing
-│   ├── utils_timeseries_template.R  # Standalone time series template for Tab 4
-│   ├── utils_distributions.R    # sample_distribution(); transform_marginal()
-│   ├── utils_validation.R       # validate_param_specs()
-│   ├── utils_qaqc.R             # run_qaqc() — 6 automated checks per parameter
-│   └── utils_export.R           # XLSX/CSV report generation
+├── R/                           # All application source
+│   ├── app_ui.R, app_server.R   # Shiny UI + reactive server
+│   ├── calc_*.R                 # IPCC Vol.4 Ch.10/11 emission equations
+│   ├── mc_*.R                   # Monte Carlo sampling, simulation, uncertainty, sensitivity
+│   ├── utils_*.R                # IPCC defaults, templates, distributions, QA/QC, exports
+│   ├── auth_magic_link.R        # AI translator email auth
+│   ├── chat_ui.R, conversation_history.R, openai_client.R, usage_log.R
+│   │                            #   AI translator chat panel + OpenAI client
+│   └── trend_tab.R              # Trend analysis tab
 │
-├── www/                         # Custom CSS
-└── docs/
-    └── correlations.Rmd         # Source for the in-app "Find out more" page (Correlations)
+├── www/                         # Web assets — logos, built docs (PDF/DOCX),
+│                                #   Find-out-more topic HTML, custom CSS
+├── docs/                        # Find-out-more topic page sources (Rmd)
+├── doc/                         # Methodology + user guide source documents
+├── config/                      # Runtime config (approved_users.csv whitelist)
+├── claude_project_assets/       # AI translator knowledge files (md)
+├── scripts/                     # Build, test, deploy tooling
+│   ├── audit.R                  #   Test suite (91/91)
+│   ├── build_methodology.R      #   Render methodology.pdf
+│   ├── build_user_guide.R       #   Render user_guide.pdf/docx
+│   ├── build_help_docs.R        #   Render Find-out-more HTML pages
+│   ├── build_translator_kit.R   #   Refresh AI translator knowledge files
+│   ├── deploy.R                 #   Deploy to shinyapps.io
+│   ├── example_verify.R         #   End-to-end sanity check on built-in examples
+│   └── make_stress_test_data.R  #   Generate stress-test dataset for the translator
+└── rsconnect/                   # shinyapps.io deploy state (auto-generated)
+```
+
+Scripts can be run from the project root, for example:
+
+```bash
+Rscript scripts/audit.R
+Rscript scripts/build_methodology.R
+Rscript scripts/deploy.R
 ```
 
 ---

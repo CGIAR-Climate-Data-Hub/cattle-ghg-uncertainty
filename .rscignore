@@ -2,32 +2,14 @@
 # The app itself only needs R/, www/, app.R, methodology.pdf, user_guide.pdf,
 # the input template, plus runtime config.
 
-# Dev / build scripts (underscore-prefixed conventions in this project)
-_build_aw_response.py
-_build_docs.py
-_build_methodology.R
-_check_sensitivity.R
-_check_sensitivity_after.R
-_debug_mm_parse.R
-_deploy.R
-_extract_ipcc.py
-_make_comments_tracker.R
-_make_feedback_template.R
-_smoketest.R
-_smoketest_word.R
-_verify_catalogue.R
-_verify_changes.R
-_verify_dist.R
-_zim_verify.R
-_example_verify.R
-_repro_app_path.R
-_repro_country_y.R
-_verify_x_with_manure.R
-_build_help_docs.R
+# Dev / build scripts — entire folder excluded from deploy bundle
+scripts/
+
+# Source documents — only the rendered PDFs in www/ ship to the app
+doc/
 
 # Help-page cache — keep the rendered HTML in www/docs/ but skip the RDS cache
 www/docs/_cache/
-deploy_shinyapps.R
 install.R
 
 # Source PDFs we audited against (not needed at runtime)
@@ -52,8 +34,6 @@ docs/meeting_*.md
 docs/AW_review_response*.md
 
 # Source-form drafts (the rendered .pdf is what the app serves)
-methodology.Rmd
-user_guide.Rmd
 user_guide_draft.md
 www/user_guide_draft.md
 methodology.log

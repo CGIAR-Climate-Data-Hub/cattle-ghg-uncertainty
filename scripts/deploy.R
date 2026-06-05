@@ -1,3 +1,6 @@
+# Run from project root: Rscript scripts/deploy.R
+if (basename(getwd()) == "scripts") setwd("..")
+
 rsconnect::deployApp(
   appDir      = ".",
   appName     = "cattle-ghg-uncertainty",

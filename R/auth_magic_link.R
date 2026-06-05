@@ -27,9 +27,9 @@
 
 # Read the whitelist CSV (single column: email). Returns character(0)
 # if the file is missing — fail-closed (no one gets in).
-auth_read_approved_users <- function(path = "approved_users.csv") {
+auth_read_approved_users <- function(path = "config/approved_users.csv") {
   if (!file.exists(path)) {
-    warning("approved_users.csv not found — no users will be approved.",
+    warning("config/approved_users.csv not found — no users will be approved.",
             call. = FALSE)
     return(character(0))
   }

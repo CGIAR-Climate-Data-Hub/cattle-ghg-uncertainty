@@ -6,9 +6,11 @@
 # docs/<topic>.Rmd to www/docs/<topic>.html using those cached results.
 #
 # Run from repo root with:
-#   Rscript _build_help_docs.R
+#   Rscript scripts/build_help_docs.R
 #
 # Re-run whenever the simulation pipeline, example data, or topic Rmds change.
+
+if (basename(getwd()) == "scripts") setwd("..")
 
 options(warn = 1)
 suppressMessages({

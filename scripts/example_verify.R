@@ -6,6 +6,9 @@
 # style). This script runs both through the same simulation pipeline as the
 # live app and prints hand-comparable per-head and total emission numbers.
 
+# Run from project root: Rscript scripts/example_verify.R
+if (basename(getwd()) == "scripts") setwd("..")
+
 options(warn = 1)
 suppressMessages({
   for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(f)

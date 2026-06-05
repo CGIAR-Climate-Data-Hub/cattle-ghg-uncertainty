@@ -8,10 +8,12 @@
 # A good translator should be able to map this into the strict template
 # after 3-5 clarifying questions.
 #
-# Run with:
-#   Rscript _make_stress_test_data.R
+# Run from project root with:
+#   Rscript scripts/make_stress_test_data.R
 # Output:
 #   stress_test_cattle_data_burkina.xlsx  (repo root)
+
+if (basename(getwd()) == "scripts") setwd("..")
 
 suppressMessages(library(writexl))
 
