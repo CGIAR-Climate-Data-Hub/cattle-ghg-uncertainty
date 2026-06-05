@@ -41,7 +41,9 @@ auth_tokens.csv
 # outputs in the repo root all stay LOCAL but never enter the public
 # repo. The canonical built docs live in www/ and are tracked there.
 
-# Reviewer cycle (Andreas, etc.)
+# Reviewer cycle (Andreas, etc.). NOTE: gitignore patterns do NOT use
+# shell-style quotes — spaces in filenames are matched directly, quotes
+# would become literal characters and never match anything.
 AW_review_response*
 AW_final_comments_tracker.docx
 Andreas comments on uncertainty calculator*.docx
@@ -51,10 +53,26 @@ beta_feedback_template*.xlsx
 beta_feedback_template*.csv
 beta_feedback_template_aw.xlsx
 correlation_review_notes.md
-"Suggested outline for final section on reporting.docx"
-"UNC tool methodology text aw_reviewed.pdf"
-"RE_ Emission Calculator*.zip"
+Suggested outline for final section on reporting.docx
+UNC tool methodology text aw_reviewed.pdf
+RE_ Emission Calculator*.zip
 email_to_andreas.md
+docs/AW_review_response*.md
+docs/meeting_*_todo.md
+
+# Auto-regenerated outputs — no need to commit
+AUDIT_REPORT.md
+TECHNICAL_SUMMARY.md
+docs/correlations.md
+claude_project_assets/getting_started.docx
+claude_project_assets/getting_started.pdf
+claude_project_assets/questionnaire.docx
+claude_project_assets/questionnaire.pdf
+claude_project_assets/README.txt
+
+# Working-copy artefacts the user no longer wants tracked
+.ipcc_text/
+figures/
 
 # IPCC source PDFs (copyrighted; users should fetch from ipcc-nggip.iges.or.jp)
 19R_V*.pdf

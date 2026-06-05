@@ -152,10 +152,8 @@ cattle-ghg-uncertainty/
 │   └── utils_export.R           # XLSX/CSV report generation
 │
 ├── www/                         # Custom CSS
-├── docs/
-│   └── correlations.md          # Technical documentation: Gaussian copula design
-├── figures/                     # Static figures used in the UI
-└── TECHNICAL_SUMMARY.md         # Full technical reference (equations, variables, design)
+└── docs/
+    └── correlations.Rmd         # Source for the in-app "Find out more" page (Correlations)
 ```
 
 ---
