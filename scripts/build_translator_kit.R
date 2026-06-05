@@ -1,16 +1,17 @@
 # =============================================================================
-# Build the knowledge files for the "GMH Uncertainty Translator" Claude Project
+# Build the knowledge files for the in-app GMH Uncertainty Translator
 # =============================================================================
 # Reads PARAM_CATALOGUE, PARAM_ALIASES, MMS_DEFAULTS and controlled vocabularies
 # from the live R source and emits Markdown knowledge files into
-# claude_project_assets/. Re-run whenever the catalogue or vocabularies change,
-# then re-upload the .md files to the public Claude Project on claude.ai.
+# translator_prompts/. These .md files are concatenated at runtime by
+# R/openai_client.R::assemble_translator_system_prompt() into the system
+# prompt sent to GPT-4.1. Re-run whenever PARAM_CATALOGUE, PARAM_ALIASES,
+# MMS_DEFAULTS, or the controlled vocabularies change in R/.
 #
 # Usage (from project root):
-#   source("_build_claude_project_assets.R")
+#   Rscript scripts/build_translator_kit.R
 # =============================================================================
 
-# Run from project root: Rscript scripts/build_translator_kit.R
 if (basename(getwd()) == "scripts") setwd("..")
 
 suppressMessages({
@@ -19,7 +20,7 @@ suppressMessages({
   source("R/utils_ipcc_defaults.R", local = FALSE)
 })
 
-out_dir <- "claude_project_assets"
+out_dir <- "translator_prompts"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 stamp <- format(Sys.Date(), "%Y-%m-%d")
@@ -291,7 +292,7 @@ message("✓ wrote template_schema.md")
 # ---------------------------------------------------------------------------
 # 3. Stage user-facing assets into www/ so the Shiny app can serve them.
 # Only the files end-users need to download go to www/ — system_instructions.md
-# and the README stay in claude_project_assets/ for the maintainer.
+# and the README stay in translator_prompts/ for the maintainer.
 # ---------------------------------------------------------------------------
 www_dir <- "www"
 if (!dir.exists(www_dir)) dir.create(www_dir, recursive = TRUE)
@@ -313,7 +314,7 @@ message("✓ staged ", length(user_facing), " files into ", www_dir, "/")
 # 3b. Render the user-facing .Rmd files (getting_started.Rmd, questionnaire.Rmd)
 # to PDF + DOCX via rmarkdown::render(). The .Rmd files carry the same polished
 # CGIAR-green LaTeX styling as user_guide.Rmd and methodology.Rmd. Outputs are
-# staged in claude_project_assets/ (canonical) and copied to www/ (served by
+# staged in translator_prompts/ (canonical) and copied to www/ (served by
 # Shiny). Needs: `rmarkdown` package + a LaTeX install (MiKTeX/TinyTeX) for
 # pdflatex.
 # ---------------------------------------------------------------------------
@@ -440,7 +441,7 @@ zip_path <- normalizePath(file.path(www_dir, "translator_kit.zip"),
                            winslash = "/", mustWork = FALSE)
 if (file.exists(zip_path)) file.remove(zip_path)
 
-# Build the zip with paths flattened (no claude_project_assets/ prefix inside
+# Build the zip with paths flattened (no translator_prompts/ prefix inside
 # the archive). Switch into out_dir so the file names in the archive match the
 # short names the README references.
 old_wd <- getwd()

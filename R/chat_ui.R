@@ -1259,7 +1259,7 @@ translator_chat_server <- function(input, output, session) {
 # detect when the AI silently dropped sub-categories from its output
 # (a common failure mode — the AI emits one "representative" sub-cat
 # and ignores the rest, even when the chat clearly listed all 8). The
-# controlled vocabulary comes from claude_project_assets/template_schema.md.
+# controlled vocabulary comes from translator_prompts/template_schema.md.
 .TRANSLATOR_SUBCATEGORY_VOCAB <- c(
   "dairy_cows", "other_cows", "bulls", "oxen",
   "heifers", "growing_males", "growing_females",

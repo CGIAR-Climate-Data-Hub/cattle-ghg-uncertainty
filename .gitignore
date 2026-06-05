@@ -64,11 +64,11 @@ docs/meeting_*_todo.md
 AUDIT_REPORT.md
 TECHNICAL_SUMMARY.md
 docs/correlations.md
-claude_project_assets/getting_started.docx
-claude_project_assets/getting_started.pdf
-claude_project_assets/questionnaire.docx
-claude_project_assets/questionnaire.pdf
-claude_project_assets/README.txt
+translator_prompts/getting_started.docx
+translator_prompts/getting_started.pdf
+translator_prompts/questionnaire.docx
+translator_prompts/questionnaire.pdf
+translator_prompts/README.txt
 
 # Working-copy artefacts the user no longer wants tracked
 .ipcc_text/

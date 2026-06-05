@@ -104,7 +104,7 @@ cattle-ghg-uncertainty/
 ├── docs/                        # Find-out-more topic page sources (Rmd)
 ├── doc/                         # Methodology + user guide source documents
 ├── config/                      # Runtime config (approved_users.csv whitelist)
-├── claude_project_assets/       # AI Translator knowledge files (md)
+├── translator_prompts/          # AI Translator system-prompt knowledge files (md)
 ├── scripts/                     # Build, test, deploy tooling
 │   ├── audit.R                  #   Regression test suite
 │   ├── build_methodology.R      #   Render methodology.pdf

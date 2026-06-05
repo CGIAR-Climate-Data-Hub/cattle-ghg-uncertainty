@@ -21,14 +21,14 @@
 .OPENAI_ENDPOINT      <- "https://api.openai.com/v1/chat/completions"
 
 # Assemble the system prompt from the four translator-kit asset files.
-# Reuses the same .md files already in claude_project_assets/ that the
+# Reuses the same .md files already in translator_prompts/ that the
 # user-facing translator kit ships, so the in-app translator and the
 # downloadable kit share a single source of truth.
 #
 # Returns a single character string ready to be sent as the first message
 # in the conversation (role = "system"). At repo root the assembled
 # prompt is roughly 12-15K tokens.
-assemble_translator_system_prompt <- function(asset_dir = "claude_project_assets") {
+assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") {
   files <- c("system_instructions.md", "param_catalogue.md",
              "template_schema.md", "mapping_examples.md",
              "worked_example.md", "questionnaire.md")
