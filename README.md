@@ -76,50 +76,6 @@ If your raw inventory data lives in your own Excel or CSV files with column name
 
 **Workflow.** Open the **Resources** tab → the *AI Translator* card sits at the top. Sign in with your email (CGIAR addresses are auto-approved; other addresses require a one-time admin OK). Drop in your file. The AI reads every sheet, asks 2-5 clarifying questions, then — when you say *"go ahead"* — produces a downloadable .xlsx in the exact shape the **Data Input** tab expects.
 
-**Privacy & cost.** Hosted on a CGIAR-owned OpenAI account with a US$10/month soft cap. Your uploaded data isn't stored; only your email and a per-call token count are logged. See `R/openai_client.R` for the full client and `R/usage_log.R` for the ledger schema.
-
----
-
-## Input data — Excel template
-
-The app expects a single Excel workbook with up to 6 sheets. **Only the `Parameters` sheet is required.**
-
-| Sheet | Required? | Purpose |
-|---|---|---|
-| `Parameters` | **Yes** | One row per (sub-category × parameter): mean, uncertainty %, bounds, distribution |
-| `Inventory_Metadata` | Optional | Country, year, region, species, IPCC version, prepared-by |
-| `Manure_Management` | Optional | MMS-type allocation per sub-category, with MCF, EF3, Frac_GasMS, Frac_LeachMS |
-| `Parameter_TimeSeries` | Optional | Year-by-parameter historical data → automatic correlation estimation |
-| `Vocab`, `_Lists`, `README` | Auto-generated | Reference tables + dropdown sources (read-only) |
-
-**Three ways to get a filled template:**
-
-1. **Use the AI Translator** (recommended) — *Resources* tab → upload your raw data → download a filled template.
-2. **Download a blank template** — *Data Input* tab → pick an IPCC version → *Download Blank Template* → fill it in by hand.
-3. **Start from an example** — *Data Input* tab → pick *Country X* or *Country Y* → no upload needed, just go straight to the *Simulate & Results* tab.
-
----
-
-## Run locally
-
-If you prefer to run the app on your own machine:
-
-**1. Install R (≥ 4.3)** from [r-project.org](https://www.r-project.org/) and optionally [RStudio](https://posit.co/download/rstudio-desktop/).
-
-**2. Install dependencies** — run this once in the R console:
-
-```r
-source("install.R")
-```
-
-**3. Launch the app:**
-
-```r
-shiny::runApp(".")
-```
-
-The app opens in your default browser.
-
 ---
 
 ## Repository structure
@@ -150,7 +106,7 @@ cattle-ghg-uncertainty/
 ├── config/                      # Runtime config (approved_users.csv whitelist)
 ├── claude_project_assets/       # AI Translator knowledge files (md)
 ├── scripts/                     # Build, test, deploy tooling
-│   ├── audit.R                  #   Regression test suite (91/91)
+│   ├── audit.R                  #   Regression test suite
 │   ├── build_methodology.R      #   Render methodology.pdf
 │   ├── build_user_guide.R       #   Render user_guide.pdf / .docx
 │   ├── build_help_docs.R        #   Render in-app Find-out-more HTML pages
@@ -160,69 +116,6 @@ cattle-ghg-uncertainty/
 │   └── make_stress_test_data.R  #   Generate stress-test dataset for the AI Translator
 └── rsconnect/                   # shinyapps.io deploy state (auto-generated)
 ```
-
-All scripts run from the project root, for example:
-
-```bash
-Rscript scripts/audit.R
-Rscript scripts/build_methodology.R
-Rscript scripts/deploy.R
-```
-
----
-
-## Correlation handling
-
-The tool uses a **Gaussian copula** (rank-correlation-preserving restricted-pairing per IPCC Vol.1 Ch.3 §3.2.3.2) for every correlated path: time-series-derived, preset, manual entry, and structural defaults. Activity-data correlations are estimated automatically when you upload a Parameter_TimeSeries sheet. For emission factors, a single ρ ∈ [0, 1] slider lets you express systematic methodological bias; ρ = 0 is the IPCC Approach 2 default. Manure-management allocations can be made uncertain via the optional `lower_fraction` / `upper_fraction` / `distribution_fraction` columns; each Monte Carlo iteration is renormalised so the per-group simplex sums to 100 %.
-
-See the in-app *Find-out-more* page (Tab 4 → ? icon) for a worked example with screenshots, or [doc/methodology.Rmd](doc/methodology.Rmd) for the full technical specification.
-
----
-
-## Deploy your own instance
-
-To host the app on [shinyapps.io](https://www.shinyapps.io/) (free tier: 5 apps, 25 active hours / month):
-
-1. Create a free account at [shinyapps.io](https://www.shinyapps.io/).
-2. In RStudio, **Tools → Global Options → Publishing → Connect your account**.
-3. Edit [`scripts/deploy.R`](scripts/deploy.R) — change the `account = "mlolita26"` line to your username.
-4. (Optional, for the AI Translator) Create a local `.Renviron` at the project root with:
-   ```
-   OPENAI_API_KEY=sk-...
-   SENDGRID_API_KEY=SG....
-   APP_BASE_URL=https://YOUR-USERNAME.shinyapps.io/cattle-ghg-uncertainty/
-   ADMIN_EMAIL=you@example.org
-   MAGIC_LINK_FROM=you@example.org
-   SESSION_SIGNING_KEY=<openssl rand -hex 32>
-   MONTHLY_BUDGET_CAP_USD=10
-   ```
-   This file is bundled into the deploy but gitignored, so secrets never enter the repository.
-5. Run:
-   ```r
-   Rscript scripts/deploy.R
-   ```
-
----
-
-## Testing & validation
-
-Run the regression suite:
-
-```bash
-Rscript scripts/audit.R
-```
-
-The audit covers (currently 91 checks): the full IPCC equation chain on a golden-case hand-computed input; trend-mode plausibility; correlation modes against synthetic and built-in country examples; @Risk-comparable end-to-end output; and source-filter / GWP / template-parse correctness. Output is written to `AUDIT_REPORT.md`.
-
-A complementary script — `Rscript scripts/example_verify.R` — runs the two built-in examples (Country X and Country Y) end-to-end and prints per-pathway emissions next to hand-computed reference values for spot-checking.
-
----
-
-## Citation
-
-If you use this tool in published work, please cite:
-
-> Muller, L., *et al.* (2026). *IPCC Tier 2 Livestock GHG Uncertainty Calculator*. CGIAR Alliance of Bioversity International and CIAT (Climate Action initiative). GitHub: https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
 
 ---
 
