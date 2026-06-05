@@ -124,7 +124,7 @@ cattle-ghg-uncertainty/
 This tool was developed as part of project **D614 — GMH Emissions Uncertainty** funded by the **Global Methane Hub** (Grant R-2026-01051), implemented by the CGIAR Alliance of Bioversity International and CIAT under the **CGIAR Climate Action Programme**.
 
 <p align="center">
-  <img src="www/alliance_logo.png" alt="Alliance of Bioversity International and CIAT" height="80">
+  <img src="www/alliance_logo_readme.webp" alt="Alliance of Bioversity International and CIAT" height="80">
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="www/climate_action_logo.png" alt="CGIAR Climate Action Programme" height="80">
   &nbsp;&nbsp;&nbsp;&nbsp;
