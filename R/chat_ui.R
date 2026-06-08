@@ -293,6 +293,10 @@ translator_chat_server <- function(input, output, session) {
     updateTextAreaInput(session, "translator_input", value = "")
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = txt, display = txt)
+    # Persist BEFORE the AI call. If the user clicks Stop/reload
+    # mid-call, this ensures their typed message survives the reload.
+    tryCatch(conversation_save(state$user_email, state$messages),
+              error = function(e) NULL)
     if (.translator_is_generate_trigger(txt) && length(state$messages) >= 2) {
       # Paint an inline 'working…' bubble with a fake-determinate
       # progress bar for the non-streaming force-template call (30-
@@ -558,6 +562,21 @@ translator_chat_server <- function(input, output, session) {
                    class = "btn-outline-secondary",
                    style = "font-size:0.82rem;",
                    title = "Clear the chat and start over from scratch."),
+      # Stop button — escape hatch when the AI is generating a template
+      # and the Shiny event loop is blocked on the OpenAI call. Plain
+      # JS onclick (window.location.reload) bypasses the blocked R
+      # session entirely. The OpenAI call continues in the background
+      # but its result is discarded; the user gets their UI back
+      # immediately. Conversation history is persisted to disk before
+      # the call starts, so the user sees their messages on reload.
+      tags$button(
+        type = "button",
+        class = "btn btn-outline-danger",
+        style = "font-size:0.82rem;",
+        onclick = "if (confirm('Stop the AI generation and reload the page? Your conversation is saved — you will not lose it.')) { window.location.reload(); }",
+        title = "Use this if the AI is generating a template and the page is unresponsive. Reloads the page; the OpenAI call is abandoned. Your conversation history is preserved.",
+        tagList(icon("ban"), " Stop / reload")
+      ),
       conditionalPanel(
         condition = "output.translator_template_ready",
         downloadButton("translator_download_template",
@@ -1539,23 +1558,37 @@ translator_chat_server <- function(input, output, session) {
 .translator_is_generate_trigger <- function(txt) {
   if (is.null(txt) || !nzchar(txt)) return(FALSE)
   t <- tolower(trimws(txt))
+  # Length guard. The trigger detection used to match any message
+  # containing "produce template" or "go ahead" ANYWHERE in the text —
+  # which mis-fired on long instruction messages like "answer X, Y, Z
+  # then I'll click Produce template now." Real "go" commands from
+  # users are short — typically under 80 chars and 15 words. If the
+  # message is longer than that, it's an instruction or answer, not a
+  # generate command, even if it mentions the phrase. Users who really
+  # want to trigger generation from a long message can always click the
+  # "Produce template now" button instead.
+  n_chars <- nchar(t)
+  n_words <- length(strsplit(t, "\\s+")[[1]])
+  if (n_chars > 80L || n_words > 15L) return(FALSE)
   patterns <- c(
-    "produce (the |a )?template",
-    "generate (the |a )?(template|file|output|xlsx)",
-    "create (the |a )?(template|file|output|xlsx)",
-    "make (the |a )?(template|file|output|xlsx)",
-    "build (the |a )?(template|file|output|xlsx)",
-    "give me (the |a )?(template|file|output|xlsx)",
-    "translate (the |my )?data",
-    "go ahead",
-    "do (it|as you think)",
-    "you decide",
-    "i'?m ready",
-    "ready to (generate|produce|go|download)",
-    "let'?s? go",
-    "ok go",
-    "yes( please)?,? (do|generate|produce|go)",
-    "(produire|générer|créer) (le |la |un |une )?(template|fichier)"
+    # Anchored to start (^) where possible — prevents matches inside
+    # quoted phrases or instruction sentences mid-message.
+    "^(please |now |ok |okay |yes,? )?produce (the |a )?template",
+    "^(please |now |ok |okay |yes,? )?generate (the |a )?(template|file|output|xlsx)",
+    "^(please |now |ok |okay |yes,? )?create (the |a )?(template|file|output|xlsx)",
+    "^(please |now |ok |okay |yes,? )?make (the |a )?(template|file|output|xlsx)",
+    "^(please |now |ok |okay |yes,? )?build (the |a )?(template|file|output|xlsx)",
+    "^(please |now |ok |okay |yes,? )?give me (the |a )?(template|file|output|xlsx)",
+    "^(please |now |ok |okay |yes,? )?translate (the |my )?data",
+    "^go ahead\\b",
+    "^do (it|as you think)\\b",
+    "^you decide\\b",
+    "^i'?m ready\\b",
+    "^ready to (generate|produce|go|download)\\b",
+    "^let'?s? go\\b",
+    "^ok go\\b",
+    "^yes( please)?,? (do|generate|produce|go)\\b",
+    "^(produire|générer|créer) (le |la |un |une )?(template|fichier)"
   )
   any(vapply(patterns, function(p) grepl(p, t, perl = TRUE), logical(1)))
 }
