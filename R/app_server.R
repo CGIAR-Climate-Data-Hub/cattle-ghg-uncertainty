@@ -75,7 +75,19 @@ app_server <- function(input, output, session) {
     comp <- ensure_completeness(rv$param_specs, region = region)
     if (isTRUE(comp$valid) && length(comp$auto_filled) > 0) {
       rv$param_specs <- comp$param_specs
+      .bump_unc_token()
     }
+  }
+
+  # Bump rv$param_specs_bulk_token to force a full re-render of the
+  # uncertainty table (Tab 3). Call this AFTER every BULK replacement of
+  # rv$param_specs (file load, example load, quickset apply/undo, etc.).
+  # Do NOT call from cell-edit observers — those go through the
+  # proxy_unc / replaceData path which preserves the user's search filter
+  # and paging across edits.
+  .bump_unc_token <- function() {
+    rv$param_specs_bulk_token <-
+      (isolate(rv$param_specs_bulk_token) %||% 0L) + 1L
   }
 
   # 2026-06: hardcode first-difference detrending. The user-facing "Treatment
@@ -95,6 +107,7 @@ app_server <- function(input, output, session) {
     # smallholder vs pastoral non-dairy). No real-country attribution.
     if (name == "country_x") {
       rv$param_specs <- fill_bounds(generate_country_x_example())
+      .bump_unc_token()
       # R2.2: built-in example now ships with synthetic 5-year time-series so
       # that Tab 4's "From template (auto)" correlation mode works without
       # requiring a separate Excel upload.
@@ -108,6 +121,7 @@ app_server <- function(input, output, session) {
       rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded — 12 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
+      .bump_unc_token()
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
       rv$manure_data <- generate_country_y_manure()
@@ -147,6 +161,7 @@ app_server <- function(input, output, session) {
              "(see the Vocab sheet of the template).")
 
       rv$param_specs    <- parsed$param_specs
+      .bump_unc_token()
       rv$inv_metadata   <- parsed$metadata
       rv$manure_data    <- parsed$manure
       rv$population     <- parsed$population
@@ -253,6 +268,7 @@ app_server <- function(input, output, session) {
       showNotification("Set all activity-data parameters to Normal ±15% (click again to undo).",
                        type = "message", duration = 4)
     }
+    .bump_unc_token()
   })
   observeEvent(input$set_all_pert, {
     req(rv$param_specs)
@@ -268,6 +284,7 @@ app_server <- function(input, output, session) {
       showNotification("Set all coefficients to PERT (click again to undo).",
                        type = "message", duration = 4)
     }
+    .bump_unc_token()
   })
 
   # If the user edits the parameter table directly after applying a preset,
@@ -352,6 +369,21 @@ app_server <- function(input, output, session) {
     }
 
     rv$param_specs <- ps
+
+    # Cross-tab sync: a Tab 1 edit should be reflected on Tab 3 the next
+    # time the user looks at it, but WITHOUT discarding Tab 3's filter
+    # state. Push the update via the Tab 3 proxy. (proxy_unc is defined
+    # below where the Tab 3 renderDT lives — Shiny is fine with the
+    # late binding because this observer fires after the session has
+    # finished initialising.)
+    if (exists("proxy_unc", inherits = TRUE)) {
+      tryCatch(
+        DT::replaceData(proxy_unc,
+                         rv$param_specs[, .unc_visible_cols],
+                         resetPaging = FALSE,
+                         rownames    = FALSE),
+        error = function(e) NULL)
+    }
   })
 
   # Validation — surfaces upload status (success/failure) AND data validation errors
@@ -571,26 +603,53 @@ app_server <- function(input, output, session) {
   })
 
   # Uncertainty table.
-  # Andreas 2026-06-02 review: when a user searched the table for a parameter
-  # (e.g. "MW") and edited a cell, the whole DT re-rendered from scratch and
-  # the search filter was cleared — forcing a fresh search for every edit on
-  # large inventories. stateSave = TRUE + stateDuration = -1 tells the
-  # underlying DataTables JS to persist search, ordering, and paging in the
-  # browser's sessionStorage and re-apply on every re-init. Cleared on tab
-  # close so it doesn't bleed across sessions.
+  # Andreas 2026-06-02 review (round 1): when a user searched the table for
+  # a parameter (e.g. "MW") and edited a cell, the whole DT re-rendered from
+  # scratch and the search filter was cleared — forcing a fresh search for
+  # every edit on large inventories. stateSave = TRUE alone wasn't enough
+  # because Shiny's reactivity tears down the DataTable instance on every
+  # rv$param_specs change, and the saved-state restore races with the
+  # re-init.
+  #
+  # 2026-06-08 follow-up (Lolita): users still seeing the filter reset.
+  # Switched to a dataTableProxy: the initial render only fires on bulk
+  # data changes (file load, example load, quickset apply, reset). Cell
+  # edits go through DT::replaceData(proxy, ...) which mutates the live
+  # DataTable instance in-place — search filter, paging, and ordering
+  # are preserved natively. rv$unc_render_token is bumped at every
+  # bulk-replacement of rv$param_specs to force the initial render path.
+  .unc_visible_cols <- c("parameter", "mean", "uncertainty_pct",
+                          "distribution", "lower", "upper", "param_type")
+
   output$uncertainty_table <- DT::renderDT({
-    req(rv$param_specs)
-    DT::datatable(
-      rv$param_specs[, c("parameter", "mean", "uncertainty_pct", "distribution",
-                          "lower", "upper", "param_type")],
-      options = list(
-        pageLength    = 20,
-        stateSave     = TRUE,
-        stateDuration = -1   # sessionStorage; cleared when tab closes
-      ),
-      editable = TRUE, rownames = FALSE
-    )
+    # Take a reactive dependency ONLY on the render token, not on the
+    # per-cell contents of rv$param_specs. Cell edits use the proxy.
+    rv$unc_render_token
+    isolate({
+      req(rv$param_specs)
+      DT::datatable(
+        rv$param_specs[, .unc_visible_cols],
+        options = list(
+          pageLength    = 20,
+          stateSave     = TRUE,
+          stateDuration = -1
+        ),
+        editable = TRUE, rownames = FALSE
+      )
+    })
   })
+
+  proxy_unc <- DT::dataTableProxy("uncertainty_table")
+
+  # Initialise the render token, and bump it whenever rv$param_specs is
+  # BULK-replaced (file upload, example load, quickset apply / undo,
+  # post-import update). Single-cell edits do NOT bump the token; they
+  # update via the proxy. Triggered by `rv$param_specs_bulk_token`
+  # which the bulk-replacement code paths bump explicitly.
+  if (is.null(isolate(rv$unc_render_token))) rv$unc_render_token <- 0L
+  observeEvent(rv$param_specs_bulk_token, {
+    rv$unc_render_token <- isolate(rv$unc_render_token) + 1L
+  }, ignoreInit = FALSE, ignoreNULL = TRUE)
 
   # Round 7 R1.16: persist Tab 3 cell edits (including param_type override)
   # back into rv$param_specs and cascade bounds the same way the Tab 1 DT does.
@@ -647,6 +706,16 @@ app_server <- function(input, output, session) {
     }
 
     rv$param_specs <- ps
+
+    # Push the updated data to the live DT instance via the proxy. This
+    # preserves the user's search filter, page, and ordering — they don't
+    # get bounced back to the top of the table after every edit. The
+    # output$uncertainty_table render path is gated on rv$unc_render_token
+    # which we deliberately do NOT bump here.
+    DT::replaceData(proxy_unc,
+                    rv$param_specs[, .unc_visible_cols],
+                    resetPaging = FALSE,
+                    rownames    = FALSE)
   })
 
   # Template downloads. Round 7.1: filename and MMS dropdown reflect the
@@ -1125,6 +1194,7 @@ app_server <- function(input, output, session) {
     }
     if (length(comp$auto_filled) > 0) {
       rv$param_specs <- comp$param_specs
+      .bump_unc_token()
       showNotification(comp$message, type = "warning", duration = 6)
       rv$sim_log <- paste0(rv$sim_log,
                            "Auto-fill: ", comp$message, "\n")
