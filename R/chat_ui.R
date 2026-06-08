@@ -1441,6 +1441,24 @@ translator_chat_server <- function(input, output, session) {
 
         # If the AI provided this parameter for this sub-cat, write its
         # value / uncertainty / bounds / distribution.
+        #
+        # Column layout in the official template:
+        #   7  = value (yellow user-data cell)
+        #   8  = uncertainty_pct (symmetric ±% input)
+        #   9  = lower_bound (catalogue reference — display only)
+        #   10 = upper_bound (catalogue reference — display only)
+        #   11 = distribution
+        #   12 = lower (asymmetric override — what the simulator reads)
+        #   13 = upper (asymmetric override — what the simulator reads)
+        #   16 = data_source
+        #
+        # The AI's bounds MUST go into cols 12/13 so the simulator picks
+        # them up. Previously they were written to 9/10 (the catalogue
+        # display columns) and the simulator saw NA in 12/13 — which the
+        # NA-bounds guard in sample_distribution() turned into NA samples
+        # for every row, eventually crashing the quantile() convergence
+        # check on total_co2e. Cols 9/10 keep the catalogue default
+        # values that the blank template pre-fills.
         if (!is.null(ai)) {
           .put_param <- function(col_idx, v) {
             if (is.null(v) || length(v) == 0) return()
@@ -1451,8 +1469,8 @@ translator_chat_server <- function(input, output, session) {
           }
           .put_param(7,  ai$mean %||% ai$value)
           .put_param(8,  ai$uncertainty_pct)
-          .put_param(9,  ai$lower_bound %||% ai$lower)
-          .put_param(10, ai$upper_bound %||% ai$upper)
+          .put_param(12, ai$lower_bound %||% ai$lower)
+          .put_param(13, ai$upper_bound %||% ai$upper)
           .put_param(11, ai$distribution)
           .put_param(16, ai$data_source %||% "AI translator")
         }
