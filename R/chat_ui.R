@@ -329,13 +329,24 @@ translator_chat_server <- function(input, output, session) {
     showNotification("Conversation reset.", type = "message", duration = 3)
   })
 
-  # The old translator_force_template button has been removed. Users
-  # now trigger generation by typing a natural-language phrase like
-  # 'produce the template' or 'go ahead' (detected by
-  # .translator_is_generate_trigger, which is called inline from
-  # observeEvent(input$translator_send) above). The hard-requirements
-  # user message that the old observer prepended is now built inside
-  # .translator_force_template itself so both paths use it.
+  # ---- Produce template now: explicit emission trigger ---------------------
+  # The chat-trigger detection (.translator_is_generate_trigger) still works
+  # for users who type natural language, but this button gives explicit
+  # control — recommended path now that the workflow is 3-pass
+  # (Explore → Clarify → Emit). Calls the same .translator_force_template
+  # function as the trigger detection.
+  observeEvent(input$translator_force_template, {
+    req(state$user_email)
+    if (length(state$messages) < 2L) {
+      showNotification(
+        "Upload a file and answer the AI's clarifying questions before producing the template.",
+        type = "warning", duration = 5)
+      return()
+    }
+    session$sendCustomMessage("translatorAppendInfoBubble",
+      "Generating the full template now — please wait, this can take 30 to 120 seconds for an inventory with many sub-categories. The Download button will appear right after.")
+    .translator_force_template(state, session)
+  })
 
   # ---- Render the message history ------------------------------------------
   # IMPORTANT: this output renders ONLY the completed-message bubbles.
@@ -549,13 +560,19 @@ translator_chat_server <- function(input, output, session) {
       actionButton("translator_send", "Send", class = "btn-success",
                    style = "min-width:80px; height:42px;")
     ),
-    # Secondary action row — reset + download. The 'Produce template
-    # now' button was removed; users now trigger generation by saying
-    # 'produce the template' / 'go ahead' / etc. in chat, and the
-    # server auto-calls the same code path. See observeEvent for
-    # translator_send and the .translator_is_generate_trigger helper.
+    # Secondary action row — Produce | Reset | Stop | Download.
+    # The chat-trigger detection ("produce the template", "go ahead",
+    # etc.) still works, but the explicit button gives the user clear
+    # control over when emission fires and prevents accidental triggers
+    # mid-clarification.
     tags$div(
       style = "display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; align-items:center;",
+      actionButton("translator_force_template",
+                   tagList(icon("file-arrow-down"),
+                            " Produce template now"),
+                   class = "btn-primary",
+                   style = "font-size:0.82rem;",
+                   title = "Emit the JSON template from your section B + C exploration. Use this when you've finished answering the AI's section D clarifications."),
       actionButton("translator_reset",
                    tagList(icon("rotate-left"),
                             " Reset conversation"),
