@@ -315,7 +315,7 @@ PARAM_CATALOGUE <- data.frame(
     NA, NA, NA, NA, NA, NA, NA, NA,
     NA, NA, NA, NA, NA, NA,
     NA, NA, NA, NA,
-    0.007, 0.002, 0.0005,  # EF3_PRP, EF4, EF5
+    0.0007, 0.002, 0.0005,  # EF3_PRP (Vol.4 Ch.11 Table 11.1: range [0.0007, 0.060]), EF4, EF5
     0.05, 0.05,            # Frac_GASM_PRP, Frac_LEACH_PRP
     NA, NA),
   suggested_upper_bound = c(

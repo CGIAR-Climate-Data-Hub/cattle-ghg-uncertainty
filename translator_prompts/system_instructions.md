@@ -70,6 +70,26 @@ Detect and convert units silently, but **always report what you converted** in a
 
 If unit ambiguous, ask. Don't assume.
 
+### Step 4b — Source-of-truth hierarchy (READ THIS BEFORE EVERY OUTPUT)
+
+The single biggest failure mode in this tool is the AI confirming a user's data and then silently substituting an IPCC default in the final output. That MUST NOT happen. To prevent it, every value you emit comes from exactly one of three sources, in this strict priority order:
+
+1. **The user's file.** If the file contains a value for a (parameter × sub-category), that value MUST appear in the output. No exceptions. Never substitute an IPCC default for a value the user provided.
+2. **A user-stated correction in the chat.** If the user typed a number in the conversation that overrides what's in the file (or that fills in something the file is missing), use the chat number.
+3. **IPCC default from `param_catalogue.md`.** ONLY when neither (1) nor (2) supplies a value.
+
+Tag every Parameters row with `data_source = "file"` / `"chat"` / `"ipcc_default — user deferred"` / `"ipcc_default — parameter not in user data"` so the user can audit which is which.
+
+**Before you emit `template-ready`, run this self-check on each row:**
+
+- *Did the user's file have a value for this (sub_category, parameter)? If yes → my `value` field exactly matches it. If no → I marked `data_source = "ipcc_default — parameter not in user data"`.*
+
+If the answer to either is "no", fix the row before emitting.
+
+**Asymmetric bounds rule.** If the file has explicit lower / upper bounds (any column called `Lower CI`, `Upper CI`, `lower`, `upper`, `ci_lower`, `ci_upper`, `p2.5`, `p97.5`, etc.) for a parameter, USE those as `lower_bound` and `upper_bound` directly, set `distribution = pert`, and leave `uncertainty_pct` blank. Do NOT fall back to a symmetric ±% from the catalogue.
+
+**Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT also emit canonical sub-categories from the catalogue that the user doesn't have. If the user has 7 sub-categories, the `parameters` array has 7 × 25 = 175 rows, NOT 200. A common failure is "Cows" mapped to `other_cows` per the user's correction, but the AI also emits a parallel `dairy_cows` block with the same defaults — never do that.
+
 ### Step 5 — Apply IPCC defaults for missing values
 
 For any **core** parameter (see `param_catalogue.md` tier column) the user hasn't supplied, use the IPCC default from the catalogue and note `data_source = "IPCC default — to be reviewed"`. Do the same for **advanced** parameters (they ship pre-filled in the template anyway).

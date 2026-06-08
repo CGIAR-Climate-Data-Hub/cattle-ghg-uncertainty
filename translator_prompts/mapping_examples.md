@@ -201,3 +201,36 @@ These pairs are auto-recognised; don't ask the user, just convert and note:
 | `Frac_GasPRP` | `Frac_GASM_PRP` |
 
 Note: a raw column for managed-storage volatilisation / leaching (e.g. `Frac_GasMS`, `Frac_LeachMS`) or a managed-storage direct EF (`EF3_S`) is **not** a Parameters row — map it to the per-MMS `Frac_GasMS_pct` / `Frac_LeachMS_pct` / `EF3` columns in the Manure_Management sheet instead.
+
+---
+
+## Example 11 — Pre-aggregated columns + parallel breakdown blocks
+
+This pattern bites repeatedly with real survey data, so call it out explicitly. Typical layout (real example from a 2026 Zambia inventory):
+
+```
+| Param | Sub-cat | sex | Local breed % | mean | s.d. | n | DEFF | Cross breed % | mean | s.d. | n | DEFF | ... | Sub-category | mean | MoEcomb | Lower CI | Upper CI |
+| LW    | Cows    |     | 0.633         | 300  | 65   | 291 | 5.2  | 0.366         | 334  | 67   | 114 | 2.9 | ... | Cows         | 312.78 | 0.22    | 243.3    | 382.2    |
+| LW    | Bulls   |     | 0.652         | 319  | 119  | 91  | 4.8  | 0.347         | 445  | 137  | 41  | 2.0 | ... | Bulls        | 362.89 | 0.33    | 243.0    | 482.7    |
+```
+
+The file has **two parallel breakdown blocks** (Local breed / Cross breed, each with mean / s.d. / n / DEFF) AND a final block with the **already-computed weighted aggregate** (mean / lower CI / upper CI, indexed by a second `Sub-category` label).
+
+**Rule: PREFER THE PRE-AGGREGATED COLUMNS.** They sit after the breakdown blocks, usually next to a label that repeats the sub-category name. They:
+
+- already apply the file author's weighting scheme (which may use sample-design effects you can't reproduce),
+- carry the asymmetric CI bounds you want for `lower_bound` / `upper_bound`,
+- are the values the file author would put in a table if asked.
+
+For the Zambia example above, the correct mapping for `BW` is:
+
+| sub_category | value | lower_bound | upper_bound | distribution | data_source |
+|---|---|---|---|---|---|
+| other_cows | 312.78 | 243.3 | 382.2 | pert | file |
+| bulls | 362.89 | 243.0 | 482.7 | pert | file |
+
+**DO NOT** pick just the Local-breed mean (300) or the Cross-breed mean (334) — that ignores 30%+ of the data and the file author's aggregation work.
+
+**Signals that an aggregated column is present:** a repeated sub-category label sitting further right in the file; column names like `W-av`, `weighted_mean`, `combined`, `consolidated`, `pooled`, `mean (all)`, `aggregate`, or just `mean` sitting next to a `Sub-category` label after several breakdown blocks; a column named `MoEcomb` or `combined CI` nearby; presence of `Lower CI` / `Upper CI` columns *only on the aggregate side*, not on the breakdowns.
+
+**If you can't tell which is the aggregate column, ASK the user before guessing.** Don't pick a breakdown column and pretend it's the answer.

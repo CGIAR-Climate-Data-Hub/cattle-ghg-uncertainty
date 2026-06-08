@@ -70,6 +70,26 @@ Detect and convert units silently, but **always report what you converted** in a
 
 If unit ambiguous, ask. Don't assume.
 
+### Step 4b — Source-of-truth hierarchy (READ THIS BEFORE EVERY OUTPUT)
+
+The single biggest failure mode in this tool is the AI confirming a user's data and then silently substituting an IPCC default in the final output. That MUST NOT happen. To prevent it, every value you emit comes from exactly one of three sources, in this strict priority order:
+
+1. **The user's file.** If the file contains a value for a (parameter × sub-category), that value MUST appear in the output. No exceptions. Never substitute an IPCC default for a value the user provided.
+2. **A user-stated correction in the chat.** If the user typed a number in the conversation that overrides what's in the file (or that fills in something the file is missing), use the chat number.
+3. **IPCC default from `param_catalogue.md`.** ONLY when neither (1) nor (2) supplies a value.
+
+Tag every Parameters row with `data_source = "file"` / `"chat"` / `"ipcc_default — user deferred"` / `"ipcc_default — parameter not in user data"` so the user can audit which is which.
+
+**Before you emit `template-ready`, run this self-check on each row:**
+
+- *Did the user's file have a value for this (sub_category, parameter)? If yes → my `value` field exactly matches it. If no → I marked `data_source = "ipcc_default — parameter not in user data"`.*
+
+If the answer to either is "no", fix the row before emitting.
+
+**Asymmetric bounds rule.** If the file has explicit lower / upper bounds (any column called `Lower CI`, `Upper CI`, `lower`, `upper`, `ci_lower`, `ci_upper`, `p2.5`, `p97.5`, etc.) for a parameter, USE those as `lower_bound` and `upper_bound` directly, set `distribution = pert`, and leave `uncertainty_pct` blank. Do NOT fall back to a symmetric ±% from the catalogue.
+
+**Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT also emit canonical sub-categories from the catalogue that the user doesn't have. If the user has 7 sub-categories, the `parameters` array has 7 × 25 = 175 rows, NOT 200. A common failure is "Cows" mapped to `other_cows` per the user's correction, but the AI also emits a parallel `dairy_cows` block with the same defaults — never do that.
+
 ### Step 5 — Apply IPCC defaults for missing values
 
 For any **core** parameter (see `param_catalogue.md` tier column) the user hasn't supplied, use the IPCC default from the catalogue and note `data_source = "IPCC default — to be reviewed"`. Do the same for **advanced** parameters (they ship pre-filled in the template anyway).
@@ -79,6 +99,25 @@ For any **core** parameter (see `param_catalogue.md` tier column) the user hasn'
 For per-MMS Frac_GasMS / Frac_LeachMS, use the IPCC 2019 Refinement defaults from the table in `template_schema.md`.
 
 If the user expresses any uncertainty about the **MMS allocation itself** (e.g. "about 70 % on pasture, but it could be anywhere from 60 to 80"), populate `lower_fraction` / `upper_fraction` / `distribution_fraction` on the matching MMS row(s). Default `distribution_fraction = pert`. The app renormalises each Monte Carlo iteration so the simplex (rows sum to 100) is preserved. Leave these three columns blank if the user is confident in the central allocation — that's the default and matches the IPCC Inventory Software's deterministic behaviour.
+
+### Step 5b — Completeness when the user defers ("do as you think best")
+
+If the user EVER says "do as you think best", "use IPCC defaults", "translate it however you want", "I don't know, you decide", or any similar deferral — you take FULL responsibility for completing every cell. Empty cells = silent zeros in the Monte Carlo and produce a systematic UNDERESTIMATE of emissions. The single biggest accuracy failure mode in this tool is the AI translating only the activity data (N, BW, MW, WG, Milk, Fat, DE, CP, Ym) and leaving every coefficient empty.
+
+When the user defers, you MUST:
+
+1. **Fill EVERY parameter from `param_catalogue.md`, for EVERY sub-category in the inventory.** That means N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw — all of them, per sub-category. Use the catalogue's IPCC defaults. Use `data_source = "IPCC default — user deferred"`.
+
+2. **Apply sensible `pct_pregnant` defaults** when no info is given:
+   - `dairy_cows`, `other_cows` → 0.85
+   - `heifers` (if pregnant heifers are bundled here) → 0.5
+   - `oxen`, `bulls`, `growing_males`, `calves_male`, `calves_female` → 0.0
+
+3. **Broadcast herd-wide manure-management allocations.** If the user's raw data has a single MMS table that applies to the whole herd (typical for African inventories — one allocation, no per-sub-category breakdown), copy that allocation to EVERY sub-category in the inventory, not just one. A common AI mistake is putting MMS rows only against `dairy_cows`, which silently zeros the manure-CH4 and manure-N2O contribution of the other 6-8 sub-categories. Also fill `MCF_pct`, `EF3`, `Frac_GasMS_pct`, `Frac_LeachMS_pct` on every MMS row using the IPCC 2019 Refinement defaults for the (mms_type, climate) pair from `template_schema.md`.
+
+4. **Set `species = cattle_mixed`** when the herd contains BOTH dairy and non-dairy sub-categories in the same file. Use `cattle_dairy` or `cattle_non_dairy` only when the herd is genuinely one or the other. Picking arbitrarily ("cattle_non_dairy" for a herd with 295k dairy cows) misclassifies the inventory.
+
+5. **In your reply, summarise what you filled with defaults vs. what came from the user's data**, so they can audit. One short bulleted list — no narrative explanation needed when they explicitly deferred.
 
 ### Step 6 — Choose distributions and bounds
 

@@ -38,7 +38,7 @@ These parameters use absolute IPCC-derived lower/upper bounds rather than a symm
 
 | code | lower | central | upper |
 |------|-------|---------|-------|
-| `EF3_PRP` | 0.007 | 0.004 | 0.06 |
+| `EF3_PRP` | 0.0007 | 0.004 | 0.06 |
 | `EF4` | 0.002 | 0.01 | 0.02 |
 | `EF5` | 0.0005 | 0.011 | 0.025 |
 | `Frac_GASM_PRP` | 0.05 | 0.21 | 0.5 |
