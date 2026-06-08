@@ -1237,6 +1237,45 @@ app_server <- function(input, output, session) {
       return()
     }
 
+    # 2026-06-08 (Lolita): block the run when ANY row has bounds that
+    # don't bracket the mean (lower > mean OR mean > upper). Without this,
+    # mc2d::rpert / rtriang / etc. emit NaN, NaN flows into total_co2e,
+    # and the simulation crashes at quantile() with the unhelpful
+    # 'missing values and NaN's not allowed' error after 20 000+ iterations.
+    # The QA/QC tab catches the same issue but users sometimes skip QA
+    # and go straight to Run — so duplicate the check here, source-aware
+    # (only flag rows for parameters used by the selected emission sources).
+    ps_check <- rv$param_specs
+    has_b <- !is.na(ps_check$mean) & !is.na(ps_check$lower) & !is.na(ps_check$upper)
+    not_constant <- ps_check$distribution != "constant" |
+                      is.na(ps_check$distribution)
+    in_scope <- ps_check$parameter %in% needed_params
+    bad_idx <- which(has_b & not_constant & in_scope &
+                       (ps_check$lower > ps_check$mean |
+                          ps_check$mean  > ps_check$upper))
+    if (length(bad_idx) > 0) {
+      preview_cols <- intersect(c("sub_category", "parameter", "mean",
+                                    "lower", "upper"),
+                                 names(ps_check))
+      preview <- ps_check[bad_idx[seq_len(min(6, length(bad_idx)))],
+                          preview_cols, drop = FALSE]
+      preview_txt <- paste(apply(preview, 1, function(r)
+        paste(trimws(as.character(r)), collapse = " / ")),
+        collapse = "; ")
+      msg <- sprintf(
+        paste0("Cannot run simulation: %d Parameters row(s) have bounds ",
+               "that don't bracket the mean (lower > mean OR mean > upper). ",
+               "These would produce NaN samples and crash the run. Fix on ",
+               "Tab 1 or Tab 3 — also check the QA/QC tab for the full list. ",
+               "Rows: %s"),
+        length(bad_idx),
+        if (nchar(preview_txt) > 400) paste0(substr(preview_txt, 1, 400), " ...")
+        else preview_txt)
+      showNotification(msg, type = "error", duration = 15)
+      rv$sim_log <- paste0(rv$sim_log, msg, "\n")
+      return()
+    }
+
     rv$sim_running <- TRUE
     rv$sim_error   <- NULL
     # selectInput returns a character string; coerce once here so all downstream
