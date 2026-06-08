@@ -185,11 +185,27 @@ translator_chat_server <- function(input, output, session) {
               sheet_label, s$n_rows, s$n_cols, nrow(s$preview),
               .translator_table_to_md(s$preview))
     })
+    # Server-side scan: explicitly tell the AI which canonical parameters
+    # appear ANYWHERE in the file. Defense against the previous failure
+    # mode where the AI mapped only the first parameter block (LW / WG /
+    # MW / % preg / Milk) and skipped DE / CP / Fat / Hours / MMS%
+    # because they sat further down the same sheet.
+    detected <- .translator_scan_param_labels(parsed$sheets)
+    detect_block <- if (length(detected) == 0) "" else paste0(
+      "## Parameter labels DETECTED IN THIS FILE (server-side scan)\n\n",
+      "These IPCC parameters appear somewhere in the file — search the ",
+      "preview tables below for them and map EVERY one. If you cannot ",
+      "find the row a label refers to, ask before defaulting to IPCC ",
+      "values:\n\n",
+      paste0("- ", detected, collapse = "\n"),
+      "\n\nDo NOT substitute IPCC defaults for any parameter on this ",
+      "list — the user's file has a value for it.\n\n---\n\n")
     user_msg <- sprintf(
-      "I have uploaded a file (%s) with %d sheet%s. Below is the head of each sheet. Please identify which columns map to which IPCC parameters across all the sheets, and ask any clarifying questions you need.\n\n%s",
+      "I have uploaded a file (%s) with %d sheet%s. Below is the head of each sheet. Please identify which columns map to which IPCC parameters across all the sheets, and ask any clarifying questions you need.\n\n%s%s",
       fi$name,
       parsed$n_total_sheets,
       if (parsed$n_total_sheets == 1L) "" else "s",
+      detect_block,
       paste(sheet_blocks, collapse = "\n\n---\n\n"))
     # The on-screen "display" stays terse — the user doesn't want a wall
     # of markdown tables in their own bubble; only the AI needs that.
@@ -532,14 +548,14 @@ translator_chat_server <- function(input, output, session) {
       kind   = "csv",
       sheets = list(list(name = NA_character_,
                          n_rows = nrow(df), n_cols = ncol(df),
-                         preview = utils::head(df, 100))),
+                         preview = utils::head(df, 200))),
       n_total_sheets = 1L
     ))
   }
   sheet_names <- readxl::excel_sheets(path)
   out <- list()
   for (s in sheet_names) {
-    df <- tryCatch(readxl::read_excel(path, sheet = s, n_max = 200),
+    df <- tryCatch(readxl::read_excel(path, sheet = s, n_max = 300),
                     error = function(e) NULL)
     if (is.null(df) || nrow(df) == 0 || ncol(df) == 0) next
     # Drop sheets that have zero non-NA cells — pure empty placeholders.
@@ -548,9 +564,13 @@ translator_chat_server <- function(input, output, session) {
       name    = s,
       n_rows  = nrow(df),
       n_cols  = ncol(df),
-      preview = utils::head(df, 40)   # cap per-sheet preview at 40 rows
-                                       # to keep the prompt size reasonable
-                                       # for multi-sheet uploads
+      # 2026-06-08 (Zambia case): bumped from 40 → 200 because a real
+      # survey-data file had parameters (DE, CP, Fat, Hours, MMS%)
+      # spread across rows 5-45, and the 40-row cap silently dropped
+      # everything past the LW/WG/MW/% preg blocks. Sending more rows
+      # costs a few hundred extra prompt tokens — negligible vs. the
+      # cost of producing a template that's missing key parameters.
+      preview = utils::head(df, 200)
     )
   }
   if (length(out) == 0)
@@ -558,12 +578,64 @@ translator_chat_server <- function(input, output, session) {
   list(kind = "xlsx", sheets = out, n_total_sheets = length(out))
 }
 
+# Scan every sheet of the uploaded file for known parameter labels and
+# return a deduplicated, human-readable list. Appended to the AI's first
+# user message so the model has a structured ground-truth checklist
+# even if the markdown-preview table truncates further down. Catches
+# the failure mode where the AI silently skips DE / CP / Fat / Hours /
+# MMS allocation because they sit further down a long sheet.
+.translator_scan_param_labels <- function(sheets) {
+  patterns <- list(
+    "N (population / head count)"     = c("^n$", "^head_?count", "^population", "^cattle_?pop"),
+    "BW (body weight, kg)"            = c("^bw$", "^lw$", "^live_?weight", "^live_?wt", "^body_?weight"),
+    "MW (mature weight, kg)"          = c("^mw$", "^mature_?weight", "^mature_?wt"),
+    "WG (daily weight gain, kg/d)"    = c("^wg$", "^adg$", "^weight_?gain", "^daily_?gain"),
+    "Milk (milk yield, kg/d)"         = c("^milk", "^my\\b", "^my\\s*-", "^lait", "^my_?offtake"),
+    "Fat (milk fat %)"                = c("^fat$", "^milkfat", "^milk_?fat", "^fat\\s*\\("),
+    "pct_pregnant (fraction)"         = c("^%\\s*preg", "^pct_?pregnant", "^pct_?preg", "^%\\s*pregnancy", "^pregnancy_?rate", "^pct_?lactating"),
+    "DE (digestible energy %)"        = c("^de$", "^de\\s*pct", "^de\\s*%", "^digestibility", "^digestible_?energy"),
+    "CP (crude protein %)"            = c("^cp$", "^cp\\s*pct", "^crude_?protein", "^diet\\s*cp"),
+    "Ym (methane conversion %)"       = c("^ym$", "^ym\\s*pct", "^methane_?conv"),
+    "Bo (methane potential)"          = c("^bo$"),
+    "ASH (fraction)"                  = c("^ash$"),
+    "UE (urinary energy fraction)"    = c("^ue$"),
+    "hours (work hours / fraction)"   = c("^hours?$", "^work_?hours", "^heures"),
+    "MMS allocation (manure mgmt %)"  = c("^mms", "^manure_?management", "^système.*gestion", "^systeme.*gestion", "^manure_?system")
+  )
+  found <- character(0)
+  for (sheet in sheets) {
+    df <- sheet$preview
+    if (is.null(df) || nrow(df) == 0) next
+    # Check up to first 3 columns + the column headers — that's where
+    # parameter labels sit in typical wide-format survey spreadsheets.
+    candidates <- character(0)
+    candidates <- c(candidates, names(df))
+    for (col_idx in seq_len(min(3L, ncol(df)))) {
+      candidates <- c(candidates, as.character(df[[col_idx]]))
+    }
+    candidates <- candidates[!is.na(candidates) & nzchar(trimws(candidates))]
+    cand_lower <- tolower(trimws(candidates))
+    for (pname in names(patterns)) {
+      if (pname %in% found) next
+      for (pat in patterns[[pname]]) {
+        if (any(grepl(pat, cand_lower, perl = TRUE))) {
+          found <- c(found, pname); break
+        }
+      }
+    }
+  }
+  found
+}
+
 # Render a small data.frame as a markdown table the LLM can read.
 .translator_table_to_md <- function(df) {
   if (is.null(df) || nrow(df) == 0) return("(empty data)")
   hdr <- paste("|", paste(names(df), collapse = " | "), "|")
   sep <- paste("|", paste(rep("---", ncol(df)), collapse = " | "), "|")
-  rows <- vapply(seq_len(min(nrow(df), 30)), function(i) {
+  # 2026-06-08: bumped row cap 30 → 200 to match the preview cap. A
+  # 30-row table dropped DE / CP / Fat / Hours / MMS rows that sit
+  # further down typical survey spreadsheets.
+  rows <- vapply(seq_len(min(nrow(df), 200)), function(i) {
     paste("|", paste(sapply(df[i, ], function(x) {
       v <- if (is.na(x)) "" else as.character(x)
       gsub("\\|", "/", v)
