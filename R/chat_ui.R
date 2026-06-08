@@ -22,11 +22,16 @@ translator_chat_ui <- function() {
     bslib::card_body(
       tags$p(style = "margin: 0 0 14px 0; color: #475569; font-size: 0.92rem;
                        line-height: 1.5;",
-        "Drop in your raw cattle data file (.xlsx or .csv). The AI reads ",
-        "every sheet, asks any clarifying questions in plain English, ",
-        "then produces a downloadable .xlsx in the exact format the Data ",
-        "Input tab expects. No setup — sign in once with your email and ",
-        "you're ready."),
+        "Drop in your raw cattle data file (.xlsx or .csv). The AI works ",
+        "in three short steps: ",
+        tags$strong("(1) Explore"), " — it reads every sheet and reports ",
+        "back what it found (which parameters live where, units, ",
+        "ambiguities). ",
+        tags$strong("(2) Clarify"), " — you answer its questions in plain ",
+        "English. ",
+        tags$strong("(3) Emit"), " — click Produce template now and ",
+        "download the .xlsx in the exact format the Data Input tab expects. ",
+        "No setup — sign in once with your email and you're ready."),
       uiOutput("translator_panel")
     )
   )
@@ -200,21 +205,69 @@ translator_chat_server <- function(input, output, session) {
       paste0("- ", detected, collapse = "\n"),
       "\n\nDo NOT substitute IPCC defaults for any parameter on this ",
       "list — the user's file has a value for it.\n\n---\n\n")
+    # STEP 1 OF 3 — EXPLORATION contract. The AI's first response after
+    # upload MUST be a structured exploration of what's in the file
+    # (sections A-D below), not a mapping proposal and not a JSON
+    # template. This persistent artifact is what the force-template
+    # path re-injects at emission time — preventing the "AI drops file
+    # values and emits catalogue defaults" failure mode.
+    exploration_block <- paste0(
+      "## STEP 1 OF 3 — EXPLORATION (your task this turn)\n\n",
+      "Your ONLY job in this turn is to produce a structured exploration ",
+      "report describing what's in this file. **Do NOT propose final ",
+      "mappings yet. Do NOT produce a JSON template.** The user will ",
+      "answer your section D questions in Step 2 (Clarification), and ",
+      "only then click Produce template now for Step 3 (Emission). ",
+      "Producing a template now would be wrong — you don't have the ",
+      "clarifications yet.\n\n",
+      "Output the following FOUR sections, in order, with verbatim ",
+      "section headers `### A.`, `### B.`, `### C.`, `### D.`:\n\n",
+      "### A. File shape\n\n",
+      "For each sheet, classify the layout pattern (pick one):\n",
+      "- `column-oriented` — one row per sub-category, one column per parameter (e.g. row 1 = Cows; cols = N, BW, MW, …)\n",
+      "- `wide-stacked` — one row per parameter, columns repeat across sub-categories and mean/lower/upper triples (e.g. row = LW; cols = Cows mean, Cows Lower CI, Cows Upper CI, Bulls mean, …)\n",
+      "- `parameter-labeled` — a `parameter` column + `sub-category` column + mean/lower/upper triple\n",
+      "- `reference-table` — vocab / dropdown lists / catalogues, NOT data to extract\n",
+      "- `calc-sheet` — derived / computed (e.g. NRC calculations behind an aggregated value)\n\n",
+      "### B. Inventory of values found\n\n",
+      "For EVERY (parameter, sub-category) pair you can identify, list:\n",
+      "`parameter | sub-category (raw label as in file) | sheet | row | col | mean | lower (if present) | upper (if present) | units | qualifier (e.g. 'Local breed only', or blank)`.\n\n",
+      "Use a markdown table. Cover every parameter from the server-side ",
+      "scan above. If you cannot find a row a label points to, say so ",
+      "in section D rather than skipping silently.\n\n",
+      "### C. Inventory of GAPS\n\n",
+      "List every IPCC catalogue parameter that is NOT in the file. These will need IPCC defaults at emission time. Be exhaustive — N / BW / MW / WG / Milk / Fat / pct_pregnant / DE / Cfi / Ca / C / Cp / hours / CP / Ym / Bo / ASH / UE / EF3_PRP / EF4 / EF5 / Frac_GASM_PRP / Frac_LEACH_PRP / MilkPR / Tw, minus what's in section B.\n\n",
+      "### D. Ambiguities to ask the user\n\n",
+      "Enumerate every ambiguity you'd like the user to resolve before ",
+      "emission. Don't propose answers — just list the questions. ",
+      "Common ambiguities to look for:\n",
+      "- Sub-category vocabulary mapping (raw label → template controlled vocab, e.g. \"Cows\" → `other_cows` or `dairy_cows`?)\n",
+      "- Unit conversions (kg vs lb, % vs fraction, L vs kg of milk, °C vs °F)\n",
+      "- Biological zeros (does the file's Milk row apply only to lactating cows?)\n",
+      "- MMS code meanings (PIT → liquid_slurry or solid_storage?)\n",
+      "- Breed disaggregation (Local vs Cross — treat together or split?)\n",
+      "- Sheet purpose (is Sheet2 a separate dataset or a calc behind Sheet1?)\n",
+      "- Per-sub-cat vs herd-wide allocations (MMS rows apply to everyone or per group?)\n\n",
+      "End with a one-line prompt to the user: \"Please answer the section D questions, then click **Produce template now** when ready.\"\n\n",
+      "---\n\n")
     user_msg <- sprintf(
-      "I have uploaded a file (%s) with %d sheet%s. Below is the head of each sheet. Please identify which columns map to which IPCC parameters across all the sheets, and ask any clarifying questions you need.\n\n%s%s",
+      "I have uploaded a file (%s) with %d sheet%s. The contents are below.\n\n%s%s%s",
       fi$name,
       parsed$n_total_sheets,
       if (parsed$n_total_sheets == 1L) "" else "s",
+      exploration_block,
       detect_block,
       paste(sheet_blocks, collapse = "\n\n---\n\n"))
     # The on-screen "display" stays terse — the user doesn't want a wall
     # of markdown tables in their own bubble; only the AI needs that.
+    # We also tell the user what's coming next so the AI's exploration
+    # output isn't a surprise.
     display_summary <- if (parsed$n_total_sheets == 1L)
-      sprintf("Uploaded %s (%d rows × %d columns shown).",
+      sprintf("Uploaded %s (%d rows × %d columns shown). Step 1 of 3 — the AI will now explore your file and report what it found.",
               fi$name, nrow(parsed$sheets[[1]]$preview),
               ncol(parsed$sheets[[1]]$preview))
     else
-      sprintf("Uploaded %s (%d sheets: %s).",
+      sprintf("Uploaded %s (%d sheets: %s). Step 1 of 3 — the AI will now explore your file and report what it found.",
               fi$name, parsed$n_total_sheets,
               paste(sapply(parsed$sheets, `[[`, "name"),
                     collapse = ", "))
@@ -823,7 +876,39 @@ translator_chat_server <- function(input, output, session) {
   # previously lived in the (now-removed) force-template button's
   # observeEvent.
   hard_requirements <- paste(
-    "Produce the final filled template JSON now.",
+    "STEP 3 OF 3 — EMISSION. Produce the final filled template JSON now.",
+    "",
+    "Earlier in this conversation you produced an exploration report",
+    "with FOUR sections (A: file shape, B: inventory of values found,",
+    "C: gaps, D: ambiguities to ask the user). The user has answered",
+    "section D's questions in subsequent messages. NOW produce the JSON",
+    "template as a MECHANICAL TRANSLATION of B + C + biological zeros —",
+    "not a re-derivation from scratch.",
+    "",
+    "The translation rule, applied row-by-row:",
+    "  (1) Every (parameter, sub-cat) pair in your section B inventory →",
+    "      one row with: value = file mean, lower = file lower (if listed),",
+    "      upper = file upper (if listed), distribution = pert,",
+    "      data_source = 'user_file'. Apply the user's clarifications",
+    "      from section D (e.g. unit conversions, sub-cat vocabulary",
+    "      mapping, biological-zero overrides).",
+    "  (2) Every (parameter, sub-cat) pair in your section C gaps →",
+    "      one row with the catalogue default value + distribution,",
+    "      data_source = 'ipcc_default'.",
+    "  (3) Biological zeros confirmed by the user (Milk=0 in males,",
+    "      hours=0 in non-oxen, pct_pregnant=0 in males, etc.) →",
+    "      value = 0, distribution = constant,",
+    "      data_source = 'biological_zero'.",
+    "",
+    "Total row count = |B| + |C| + |biological_zeros| per sub-category,",
+    "summed across the sub-categories you mapped in section B. Do NOT",
+    "skip rows. Do NOT substitute defaults for B-list entries.",
+    "",
+    "THIS IS NOT A STEP-5b DEFERRAL. The user pressed 'Produce template",
+    "now' after explicit exploration + clarification. Their request is",
+    "'emit the B/C/zero translation', NOT 'fill everything with catalogue",
+    "defaults'. If you emit an all-IPCC-defaults grid, your output is",
+    "REJECTED and the user gets a failure message — your work is wasted.",
     "",
     "HARD REQUIREMENTS — your output is rejected if any of these fail:",
     "",
@@ -842,33 +927,55 @@ translator_chat_server <- function(input, output, session) {
     "   using their number, not a default? If no on the second",
     "   question, fix the row.",
     "",
-    "2. EVERY sub-category you identified in this conversation (after",
-    "   the user's corrections) must appear in `parameters`. ONLY",
-    "   those sub-categories — do not add canonical sub-categories",
-    "   from the catalogue that the user doesn't have. If the user",
-    "   corrected 'Cows' to map to `other_cows` (not `dairy_cows`),",
-    "   `dairy_cows` MUST NOT appear in the output.",
+    "   You MUST set `data_source` on EVERY parameters row to ONE of:",
+    "     - \"user_file\"          (value from the uploaded file)",
+    "     - \"user_chat\"          (value the user typed in chat)",
+    "     - \"ipcc_default\"       (catalogue default — only when neither",
+    "                              file nor chat provided a value)",
+    "     - \"biological_zero\"    (e.g. Milk=0 for bulls, hours=0 for cows)",
+    "     - \"placeholder\"        (e.g. N=1 for sub-categories the user",
+    "                              hasn't supplied a population for)",
+    "   An output where every row's data_source is \"ipcc_default\" or",
+    "   missing/blank is automatically REJECTED.",
     "",
-    "3. For each sub-category, fill ALL 25 parameters from the IPCC",
+    "2. SUB-CATEGORIES. Emit EXACTLY the sub-categories the user mapped",
+    "   in chat — not the canonical 8 from the catalogue. If the user",
+    "   corrected 'Cows' to `other_cows` (not `dairy_cows`), then",
+    "   `dairy_cows` MUST NOT appear anywhere in `parameters` or",
+    "   `manure_management`. The post-processor strips dairy_cows from",
+    "   any cattle_non_dairy inventory; the post-processor strips",
+    "   non-dairy sub-cats from any cattle_dairy inventory. Match the",
+    "   species you set in `inventory_metadata.species` to the",
+    "   sub-categories you actually emit.",
+    "",
+    "3. SPECIES. Set `inventory_metadata.species` from the sub-cats:",
+    "     - any `dairy_cows` mapped + any non-dairy sub-cat → cattle_mixed",
+    "     - `dairy_cows` only                              → cattle_dairy",
+    "     - NO `dairy_cows` (only non-dairy sub-cats)      → cattle_non_dairy",
+    "   For beef-only and smallholder African inventories (no",
+    "   dairy_cows) the answer is `cattle_non_dairy`. NEVER default to",
+    "   `cattle_mixed` as a hedge.",
+    "",
+    "4. For each sub-category, fill ALL 25 parameters from the IPCC",
     "   catalogue (N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi,",
     "   Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5,",
     "   Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw) — but honour rule 1:",
     "   user-supplied values OVERRIDE defaults.",
     "",
-    "4. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
+    "5. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
     "   upper bounds (Lower CI / Upper CI / lower / upper / ci_lower",
     "   / ci_upper / p2.5 / p97.5), USE those as `lower` and `upper`",
     "   directly, set `distribution = pert`, and leave",
     "   `uncertainty_pct` blank. Do NOT fall back to a symmetric",
     "   ±% from the catalogue.",
     "",
-    "5. Manure_Management must contain rows for EVERY sub-category,",
+    "6. Manure_Management must contain rows for EVERY sub-category,",
     "   not just one. If the user's raw data has a single herd-wide",
     "   MMS allocation, copy that same allocation to every",
     "   sub-category. Each MMS row must have fraction_pct, MCF_pct,",
     "   EF3, Frac_GasMS_pct, AND Frac_LeachMS_pct filled.",
     "",
-    "6. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
+    "7. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
     "   'for brevity not shown' placeholders, no trailing commas.",
     "",
     "Do not ask any more questions. Just emit the complete",
@@ -976,7 +1083,10 @@ translator_chat_server <- function(input, output, session) {
         25 * length(history_subcats),
         " parameter rows, plus manure_management for ALL ",
         length(history_subcats),
-        " sub-categories. Use IPCC defaults for every cell. ",
+        " sub-categories. Use the user's file values for parameters ",
+        "they supplied (data_source = 'user_file' on those rows); use ",
+        "IPCC catalogue defaults ONLY for parameters the file does not ",
+        "supply (data_source = 'ipcc_default' on those rows). ",
         "Strict JSON, no comments, no shortcuts. List every row."))))
     resp2 <- openai_chat_template_force(msgs_retry)
     if (is.null(resp2$error) && .translator_template_is_well_formed(resp2$reply)) {
@@ -995,6 +1105,109 @@ translator_chat_server <- function(input, output, session) {
       output_subcats <- if (!is.null(parsed_check) &&
                               is.data.frame(parsed_check$parameters))
         unique(parsed_check$parameters$sub_category) else character(0)
+      missing_subcats <- setdiff(history_subcats, output_subcats)
+    }
+  }
+
+  # NEW: defaults-only rejection. If a file was uploaded but the AI's
+  # output has zero rows tagged data_source = "user_file" (or similar),
+  # the AI did the Step-5b failure: emitted an all-IPCC-defaults grid
+  # and threw away every value from the file. Retry ONCE with a stronger
+  # error message, then surface the failure to the user if it persists.
+  file_was_uploaded <- any(vapply(state$messages, function(m) {
+    content <- m$content %||% ""
+    grepl("Parameter labels DETECTED IN THIS FILE", content, fixed = TRUE)
+  }, logical(1)))
+  count_user_file_rows <- function(pj) {
+    if (is.null(pj) || !is.data.frame(pj$parameters)) return(0L)
+    ds <- pj$parameters$data_source
+    if (is.null(ds)) return(0L)
+    sum(grepl("^user[_ ]?(file|chat)$|^file$|^chat$", ds,
+              ignore.case = TRUE), na.rm = TRUE)
+  }
+  user_file_rows <- count_user_file_rows(parsed_check)
+  if (file_was_uploaded && user_file_rows == 0L &&
+        length(output_subcats) > 0L) {
+    message("translator: force-template emitted ZERO user_file rows ",
+            "despite uploaded file — retrying with explicit demand.")
+    msgs_retry_vals <- c(msgs, list(list(
+      role    = "user",
+      content = paste0(
+        "REJECTED — your output has ZERO rows tagged ",
+        "data_source = 'user_file'. The user uploaded a file with ",
+        "specific values for parameters like BW / MW / WG / pct_pregnant ",
+        "/ DE / CP / Milk / Fat / hours / MMS allocation. You did NOT ",
+        "use any of those values — you emitted catalogue defaults across ",
+        "the board. This is the Step-5b failure mode the system prompt ",
+        "warns about. Re-emit the complete template-ready JSON now and: ",
+        "(1) For EVERY parameter present in the user's uploaded file: ",
+        "    - value = the file's mean value (NOT the catalogue default) ",
+        "    - lower / upper = the file's Lower CI / Upper CI ",
+        "    - distribution = 'pert' ",
+        "    - data_source = 'user_file' ",
+        "(2) For parameters the file does NOT supply: ",
+        "    - use the catalogue default ",
+        "    - data_source = 'ipcc_default' ",
+        "(3) For biological zeros (Milk=0 for males/calves, hours=0 for ",
+        "    non-oxen, etc.): data_source = 'biological_zero', ",
+        "    distribution = 'constant'. ",
+        "Strict JSON. No shortcuts. Every row must have data_source set."))))
+    resp_v <- openai_chat_template_force(msgs_retry_vals)
+    if (is.null(resp_v$error) &&
+          .translator_template_is_well_formed(resp_v$reply)) {
+      usage_log_append(
+        user_email        = state$user_email,
+        model             = resp_v$model,
+        prompt_tokens     = resp_v$usage$prompt_tokens,
+        completion_tokens = resp_v$usage$completion_tokens,
+        cached_tokens     = resp_v$usage$cached_tokens %||% 0L,
+        cost_usd          = resp_v$cost_usd)
+      pcheck_v <- tryCatch(jsonlite::fromJSON(resp_v$reply,
+                                              simplifyVector = TRUE),
+                            error = function(e) NULL)
+      if (count_user_file_rows(pcheck_v) > user_file_rows) {
+        resp <- resp_v               # promote
+        parsed_check <- pcheck_v
+        output_subcats <- if (is.data.frame(parsed_check$parameters))
+          unique(parsed_check$parameters$sub_category) else character(0)
+        missing_subcats <- setdiff(history_subcats, output_subcats)
+        user_file_rows <- count_user_file_rows(parsed_check)
+      }
+    }
+  }
+
+  # NEW: strip sub-categories that contradict the declared species. If
+  # species = "cattle_non_dairy" then dairy_cows must not appear; if
+  # species = "cattle_dairy" then beef sub-cats must not appear. The AI
+  # frequently emits the full canonical 8-block grid regardless of what
+  # the user mapped; this filter prevents the orphan blocks from
+  # reaching the .xlsx.
+  NON_DAIRY_SC <- c("other_cows", "bulls", "oxen", "heifers",
+                     "growing_males", "calves_male", "calves_female")
+  DAIRY_SC     <- c("dairy_cows")
+  if (!is.null(parsed_check) && is.data.frame(parsed_check$parameters)) {
+    species <- parsed_check$inventory_metadata$species %||% ""
+    drop_subcats <- character(0)
+    if (identical(species, "cattle_non_dairy")) {
+      drop_subcats <- intersect(output_subcats, DAIRY_SC)
+    } else if (identical(species, "cattle_dairy")) {
+      drop_subcats <- intersect(output_subcats, NON_DAIRY_SC)
+    }
+    if (length(drop_subcats) > 0L) {
+      message("translator: stripping sub-cats incompatible with species=",
+              species, ": ", paste(drop_subcats, collapse = ", "))
+      keep <- !(parsed_check$parameters$sub_category %in% drop_subcats)
+      parsed_check$parameters <- parsed_check$parameters[keep, , drop = FALSE]
+      if (is.data.frame(parsed_check$manure_management)) {
+        keep_mm <- !(parsed_check$manure_management$sub_category %in%
+                       drop_subcats)
+        parsed_check$manure_management <-
+          parsed_check$manure_management[keep_mm, , drop = FALSE]
+      }
+      resp$reply <- jsonlite::toJSON(parsed_check, auto_unbox = TRUE,
+                                       na = "null", null = "null",
+                                       dataframe = "rows")
+      output_subcats <- unique(parsed_check$parameters$sub_category)
       missing_subcats <- setdiff(history_subcats, output_subcats)
     }
   }
