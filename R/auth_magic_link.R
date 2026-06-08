@@ -52,23 +52,73 @@ auth_is_approved <- function(email,
   grepl("@cgiar\\.org$", e, ignore.case = TRUE)
 }
 
-# ----- Magic-link token store (in-memory) ----------------------------------
+# ----- Magic-link token store (file-backed) --------------------------------
+#
+# Tokens used to live in an in-memory environment. That breaks on
+# shinyapps.io because:
+#   - Each container has its own R session (= its own memory).
+#   - shinyapps.io can route the magic-link click to a DIFFERENT
+#     container than the one that issued the token, even on a single-
+#     user app (load balancing, instance recycling, etc.).
+#   - The user then sees 'link expired' on first try and has to
+#     resubmit.
+#
+# Fix: persist tokens to auth_tokens.csv in the container working dir.
+# All instances of the deployed app see the same CSV (it's bundled in
+# the deploy and any new writes go to the container's writable wd).
+# Tokens are still single-use + 15-min TTL; expired rows are pruned on
+# every read/write.
+#
+# Concurrency note: this is best-effort. With multiple users signing
+# in simultaneously, a race could lose a write. For our scale (a few
+# users a day) the trade-off is fine.
 
-# A simple environment used as a hashmap. Cleared on container restart.
-.auth_token_store <- new.env(parent = emptyenv())
+.AUTH_TOKEN_FILE <- "auth_tokens.csv"
 
 .auth_token_make <- function() {
-  # 32 hex chars, ~128 bits of entropy. Avoids depending on extra packages.
   paste(as.hexmode(sample.int(2^31 - 1, size = 4)), collapse = "")
+}
+
+# Read the current CSV. Returns a data.frame with columns
+# (token, email, expires_at) — drops expired rows on the way out.
+.auth_token_read <- function() {
+  empty <- data.frame(token = character(),
+                      email = character(),
+                      expires_at = as.POSIXct(character(), tz = "UTC"),
+                      stringsAsFactors = FALSE)
+  if (!file.exists(.AUTH_TOKEN_FILE)) return(empty)
+  df <- tryCatch(
+    utils::read.csv(.AUTH_TOKEN_FILE, stringsAsFactors = FALSE),
+    error = function(e) NULL)
+  if (is.null(df) || nrow(df) == 0) return(empty)
+  df$expires_at <- as.POSIXct(df$expires_at, tz = "UTC",
+                                format = "%Y-%m-%dT%H:%M:%SZ")
+  alive <- !is.na(df$expires_at) & df$expires_at > Sys.time()
+  df[alive, , drop = FALSE]
+}
+
+.auth_token_write <- function(df) {
+  if (nrow(df) == 0) {
+    if (file.exists(.AUTH_TOKEN_FILE)) file.remove(.AUTH_TOKEN_FILE)
+    return(invisible(NULL))
+  }
+  out <- df
+  out$expires_at <- format(out$expires_at, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  utils::write.csv(out, .AUTH_TOKEN_FILE, row.names = FALSE)
+  invisible(NULL)
 }
 
 # Store a new token; returns the token string.
 auth_token_issue <- function(email, ttl_seconds = 15 * 60) {
   tok <- .auth_token_make()
-  .auth_token_store[[tok]] <- list(
-    email      = tolower(trimws(email)),
-    expires_at = Sys.time() + ttl_seconds
-  )
+  df  <- .auth_token_read()
+  df  <- rbind(df, data.frame(
+    token = tok,
+    email = tolower(trimws(email)),
+    expires_at = Sys.time() + ttl_seconds,
+    stringsAsFactors = FALSE
+  ))
+  .auth_token_write(df)
   tok
 }
 
@@ -77,8 +127,14 @@ auth_token_issue <- function(email, ttl_seconds = 15 * 60) {
 # URL is single-use.
 auth_token_consume <- function(token) {
   if (is.null(token) || !nzchar(token)) return(NULL)
-  rec <- .auth_token_store[[token]]
-  rm(list = token, envir = .auth_token_store, inherits = FALSE)
+  df  <- .auth_token_read()
+  hit <- df$token == token
+  rec <- if (any(hit)) df[which(hit)[1], , drop = FALSE] else NULL
+  # Always remove the matched row, even on failure
+  if (any(hit)) {
+    df <- df[!hit, , drop = FALSE]
+    .auth_token_write(df)
+  }
   if (is.null(rec)) return(NULL)
   if (Sys.time() > rec$expires_at) return(NULL)
   rec$email
