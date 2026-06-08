@@ -1077,6 +1077,20 @@ translator_chat_server <- function(input, output, session) {
   parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE),
                             error = function(e) NULL)
   history_subcats <- .translator_detect_subcategories_in_history(state$messages)
+  # Filter history_subcats against the declared species. Without this,
+  # a chat message saying "no dairy_cows" or "species = cattle_non_dairy"
+  # would falsely flag dairy_cows as a missing sub-category, producing
+  # the spurious "skipped dairy_cows" warning (and an unnecessary retry).
+  # Same logic as the post-JSON sub-cat strip below.
+  declared_species <- if (!is.null(parsed_check))
+    parsed_check$inventory_metadata$species %||% "" else ""
+  if (identical(declared_species, "cattle_non_dairy")) {
+    history_subcats <- setdiff(history_subcats, "dairy_cows")
+  } else if (identical(declared_species, "cattle_dairy")) {
+    history_subcats <- setdiff(history_subcats,
+      c("other_cows", "bulls", "oxen", "heifers", "growing_males",
+        "calves_male", "calves_female"))
+  }
   output_subcats <- if (!is.null(parsed_check) &&
                           is.data.frame(parsed_check$parameters))
     unique(parsed_check$parameters$sub_category) else character(0)
