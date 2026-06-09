@@ -1131,11 +1131,22 @@ build_trend_summary_docx <- function(path,
                 any(grepl(" \\| ", as.character(top$parameter), fixed = FALSE))
   subtitle <- if (has_groups) "Top 10 drivers across all cattle groups" else NULL
 
+  # Bar-end value label: number formatted to 2 dp, placed just outside the
+  # bar tip (hjust depends on sign so labels always sit on the bar's outer
+  # edge, never overlap the axis line).
+  top$lbl <- sprintf("%+.2f", top[[val_col]])
+  top$lbl_hjust <- ifelse(top[[val_col]] >= 0, -0.15, 1.15)
+  x_range <- range(top[[val_col]], na.rm = TRUE)
+  x_pad   <- 0.18 * diff(x_range)
+
   ggplot2::ggplot(top, ggplot2::aes(x = .data[[val_col]], y = parameter,
                                      fill = .data[[val_col]] > 0)) +
     ggplot2::geom_col() +
+    ggplot2::geom_text(ggplot2::aes(label = lbl, hjust = lbl_hjust),
+                        size = 3.0, colour = "#1B4332") +
     ggplot2::scale_fill_manual(values = c(`TRUE` = .GREEN_MID, `FALSE` = "#C1121F"),
                                 guide = "none") +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(add = c(x_pad, x_pad))) +
     ggplot2::labs(x = toupper(val_col), y = NULL, subtitle = subtitle) +
     ggplot2::theme_minimal(base_size = 10)
 }
@@ -1219,8 +1230,13 @@ build_trend_summary_docx <- function(path,
   df$category <- factor(df$category, levels = c("AD only", "EF only", "Combined"))
   df$variable <- factor(df$variable, levels = labels)
 
+  df$lbl <- sprintf("%.1f%%", df$moe_pct)
   ggplot2::ggplot(df, ggplot2::aes(x = variable, y = moe_pct, fill = category)) +
     ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.75), width = 0.7) +
+    ggplot2::geom_text(ggplot2::aes(label = lbl),
+                        position = ggplot2::position_dodge(width = 0.75),
+                        vjust = -0.4, size = 3.0, colour = "#1B4332") +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.12))) +
     ggplot2::scale_fill_manual(values = c("AD only"  = "#40916C",
                                             "EF only"  = "#4361EE",
                                             "Combined" = .GREEN_DARK),
@@ -1257,8 +1273,13 @@ build_trend_summary_docx <- function(path,
   df <- df[!is.na(df$moe_pct), , drop = FALSE]
   if (nrow(df) == 0) return(NULL)
 
+  df$lbl <- sprintf("%.1f%%", df$moe_pct)
   ggplot2::ggplot(df, ggplot2::aes(x = variable, y = moe_pct, fill = scenario)) +
     ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.75), width = 0.7) +
+    ggplot2::geom_text(ggplot2::aes(label = lbl),
+                        position = ggplot2::position_dodge(width = 0.75),
+                        vjust = -0.4, size = 3.0, colour = "#1B4332") +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.12))) +
     ggplot2::scale_fill_manual(values = c("With correlations"    = .GREEN_DARK,
                                             "Without correlations" = "#9CA3AF"),
                                  name = NULL) +
@@ -1332,9 +1353,14 @@ build_trend_summary_docx <- function(path,
   df <- trend_results[!is.na(trend_results$YoY_pct), , drop = FALSE]
   if (nrow(df) == 0) return(NULL)
   df$sign <- df$YoY_pct >= 0
+  df$lbl  <- sprintf("%+.1f%%", df$YoY_pct)
   ggplot2::ggplot(df, ggplot2::aes(x = factor(Year), y = YoY_pct, fill = sign)) +
     ggplot2::geom_col(width = 0.7) +
+    ggplot2::geom_text(ggplot2::aes(label = lbl,
+                                      vjust = ifelse(YoY_pct >= 0, -0.4, 1.3)),
+                        size = 3.0, colour = "#1B4332") +
     ggplot2::geom_hline(yintercept = 0, colour = "#555", linewidth = 0.5) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.12, 0.12))) +
     ggplot2::scale_fill_manual(values = c(`TRUE` = .GREEN_MID, `FALSE` = "#C1121F"),
                                 guide = "none") +
     ggplot2::labs(x = "Year", y = "Δ vs prior year (%)",

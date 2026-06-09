@@ -402,7 +402,74 @@ app_ui <- function() {
              }
              t = t.parentElement;
            }
-         }, false);"
+         }, false);
+
+         // 2026-06-09: progress banner for the Word-summary downloads.
+         // The docx build runs synchronously inside downloadHandler and can
+         // take 30-120 seconds; without a visible cue the user thinks the
+         // app is frozen. We catch clicks on the download buttons in the
+         // capture phase (so we run BEFORE Shiny's own click handler fires
+         // the download) and show a fixed-position banner with a spinner.
+         // Auto-hides after 180s or on click anywhere on the banner.
+         var _docxBannerTimer = null;
+         function _docxShowBanner(label) {
+           var el = document.getElementById('docx_download_banner');
+           if (!el) {
+             el = document.createElement('div');
+             el.id = 'docx_download_banner';
+             el.style.cssText = 'position:fixed; top:14px; left:50%;' +
+               'transform:translateX(-50%); z-index:9999;' +
+               'background:#FFF8E1; color:#1B4332;' +
+               'border:1px solid #FFE082; border-left:4px solid #FF6F00;' +
+               'border-radius:8px; padding:12px 16px;' +
+               'box-shadow:0 4px 16px rgba(0,0,0,0.18);' +
+               'font-size:0.92rem; line-height:1.4;' +
+               'display:flex; align-items:center; gap:12px;' +
+               'max-width:540px; cursor:pointer;';
+             el.title = 'Click to dismiss';
+             el.addEventListener('click', _docxHideBanner);
+             // Spinner
+             var sp = document.createElement('div');
+             sp.style.cssText = 'width:18px; height:18px; flex-shrink:0;' +
+               'border:3px solid #FFE082; border-top-color:#FF6F00;' +
+               'border-radius:50%;' +
+               'animation: translatorSpin 0.8s linear infinite;';
+             el.appendChild(sp);
+             var txt = document.createElement('div');
+             txt.id = 'docx_download_banner_text';
+             el.appendChild(txt);
+             document.body.appendChild(el);
+           }
+           var txtEl = document.getElementById('docx_download_banner_text');
+           if (txtEl) txtEl.innerHTML =
+             '<strong>' + (label || 'Generating Word summary') + '</strong><br>' +
+             'This can take 30 to 120 seconds for a 10 000-iteration run. ' +
+             'Your browser will start the download automatically when the ' +
+             'file is ready. (Click this banner to dismiss.)';
+           el.style.display = 'flex';
+           if (_docxBannerTimer) clearTimeout(_docxBannerTimer);
+           _docxBannerTimer = setTimeout(_docxHideBanner, 180000);
+         }
+         function _docxHideBanner() {
+           var el = document.getElementById('docx_download_banner');
+           if (el) el.style.display = 'none';
+           if (_docxBannerTimer) { clearTimeout(_docxBannerTimer);
+                                    _docxBannerTimer = null; }
+         }
+         document.addEventListener('click', function(ev) {
+           var t = ev.target;
+           while (t && t !== document.body) {
+             if (t.id === 'download_docx') {
+               _docxShowBanner('Generating Word summary');
+               return;
+             }
+             if (t.id === 'download_trend_docx') {
+               _docxShowBanner('Generating trend Word report');
+               return;
+             }
+             t = t.parentElement;
+           }
+         }, true);"
       )))
     ),
     fillable = FALSE,
