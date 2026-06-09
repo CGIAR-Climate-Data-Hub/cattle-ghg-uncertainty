@@ -91,10 +91,7 @@ resolve_sub_category_matches <- function(param_specs, manure_data) {
 
   if (length(to_resolve) > 0 && !have_manure) {
     add_issue("(template)", "sub_category_no_mms_sheet", "info",
-              paste("No Manure_Management sheet present — manure CH4 and N2O",
-                    "fall back to default 70% pasture / 30% solid_storage",
-                    "allocation. Add a Manure_Management sheet to use per-MMS",
-                    "values."))
+              t("qa_msg_no_mms"))
     return(list(matched = matched,
                 issues  = do.call(rbind, issues) %||% empty_issues))
   }
@@ -111,13 +108,8 @@ resolve_sub_category_matches <- function(param_specs, manure_data) {
                                             x[2] == p_agg,
                                 logical(1))]
     if (length(same_group) == 0) {
-      add_issue(grp_label, "sub_category_no_match", "warn", sprintf(
-        paste("Parameters sub_category '%s' has no matching Manure_Management",
-              "rows (no rows for cattle_type='%s', aggregation_level='%s').",
-              "Falls back to default 70%% pasture / 30%% solid_storage",
-              "allocation, which under-counts MM N2O. Either add MM rows for",
-              "this group or remove it from Parameters."),
-        p_sub, p_cattle, p_agg))
+      add_issue(grp_label, "sub_category_no_match", "warn",
+                qa_msg("sub_no_match", p_sub, p_cattle, p_agg))
       next
     }
 
@@ -133,30 +125,20 @@ resolve_sub_category_matches <- function(param_specs, manure_data) {
       matched[p_key] <- candidates[1]
       cand_sub <- strsplit(candidates[1], "||", fixed = TRUE)[[1]][3]
       min_d <- min(dists[is_cand], na.rm = TRUE)
-      add_issue(grp_label, "sub_category_auto_match", "warn", sprintf(
-        paste("Parameters sub_category '%s' was auto-matched to",
-              "Manure_Management sub_category '%s' (same cattle_type +",
-              "aggregation_level, edit distance %d). Verify this is the same",
-              "animal sub-category. Fix the spelling in either sheet to",
-              "silence this warning."),
-        p_sub, cand_sub, min_d))
+      add_issue(grp_label, "sub_category_auto_match", "warn",
+                qa_msg("sub_auto_match", p_sub, cand_sub, min_d))
     } else if (length(candidates) > 1L) {
       cand_subs <- vapply(strsplit(candidates, "||", fixed = TRUE),
                           function(x) x[3], character(1))
-      add_issue(grp_label, "sub_category_ambiguous", "fail", sprintf(
-        paste("Parameters sub_category '%s' is ambiguously close to multiple",
-              "Manure_Management sub-categories: %s. Cannot auto-match. Fix",
-              "the spelling in either sheet so exactly one MM sub-category",
-              "matches."),
-        p_sub, paste(sprintf("'%s'", cand_subs), collapse = ", ")))
+      add_issue(grp_label, "sub_category_ambiguous", "fail",
+                qa_msg("sub_ambiguous",
+                       p_sub,
+                       paste(sprintf("'%s'", cand_subs), collapse = ", ")))
     } else {
-      add_issue(grp_label, "sub_category_no_match", "warn", sprintf(
-        paste("Parameters sub_category '%s' has no matching Manure_Management",
-              "row in cattle_type='%s' / aggregation_level='%s'. MM",
-              "sub-categories available in this group: %s. Falls back to",
-              "default 70%% pasture / 30%% solid_storage allocation."),
-        p_sub, p_cattle, p_agg,
-        paste(sprintf("'%s'", m_subs), collapse = ", ")))
+      add_issue(grp_label, "sub_category_no_match", "warn",
+                qa_msg("sub_no_match_listed",
+                       p_sub, p_cattle, p_agg,
+                       paste(sprintf("'%s'", m_subs), collapse = ", ")))
     }
   }
 
@@ -222,15 +204,15 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     if (!is_constant && !is_zero_mean && !is.na(lo) && !is.na(hi) && !is.na(mu)) {
       if (lo > mu) {
         add(grp, p, "bounds_order", "fail",
-            sprintf("Lower (%.4g) > mean (%.4g). Bounds must bracket the mean.", lo, mu))
+            qa_msg("bounds_order_fail_lo", lo, mu))
       } else if (mu > hi) {
         add(grp, p, "bounds_order", "fail",
-            sprintf("Mean (%.4g) > upper (%.4g). Bounds must bracket the mean.", mu, hi))
+            qa_msg("bounds_order_fail_hi", mu, hi))
       } else {
-        add(grp, p, "bounds_order", "pass", "Lower <= mean <= upper")
+        add(grp, p, "bounds_order", "pass", t("qa_msg_bounds_order_pass"))
       }
     } else if (is_zero_mean) {
-      add(grp, p, "bounds_order", "pass", "Zero-mean parameter (degenerate constant)")
+      add(grp, p, "bounds_order", "pass", t("qa_msg_bounds_order_zero"))
     }
 
     # ------------------------------------------------------------------
@@ -239,9 +221,9 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     if (!is.na(lo)) {
       if (lo < 0) {
         add(grp, p, "non_negative", "warn",
-            sprintf("Lower bound (%.4g) is negative. All IPCC livestock parameters should be >= 0.", lo))
+            qa_msg("nonneg_warn", lo))
       } else {
-        add(grp, p, "non_negative", "pass", "Lower bound >= 0")
+        add(grp, p, "non_negative", "pass", t("qa_msg_nonneg_pass"))
       }
     }
 
@@ -252,28 +234,28 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       if (p == "DE_pct") {
         if (mu < 1 || mu > 100) {
           add(grp, p, "range_check", "fail",
-              sprintf("DE_pct = %.1f%%. Must be in [1, 100].", mu))
+              qa_msg("range_de_fail", mu))
         } else {
           add(grp, p, "range_check", "pass",
-              sprintf("DE_pct = %.1f%% (valid range 1-100%%)", mu))
+              qa_msg("range_de_pass", mu))
         }
       }
       if (p == "Ym_pct") {
         if (mu < 1 || mu > 15) {
           add(grp, p, "range_check", "warn",
-              sprintf("Ym_pct = %.1f%%. Typical IPCC range is 3-12%%; values outside 1-15%% are unusual.", mu))
+              qa_msg("range_ym_warn", mu))
         } else {
           add(grp, p, "range_check", "pass",
-              sprintf("Ym_pct = %.1f%% (within typical IPCC range)", mu))
+              qa_msg("range_ym_pass", mu))
         }
       }
       if (p %in% FRACTION_PARAMS) {
         if (mu < 0 || mu > 1) {
           add(grp, p, "range_check", "fail",
-              sprintf("%s = %.4g. Must be a fraction in [0, 1].", p, mu))
+              qa_msg("frac_fail", p, mu))
         } else {
           add(grp, p, "range_check", "pass",
-              sprintf("%s = %.4g (valid fraction in [0, 1])", p, mu))
+              qa_msg("frac_pass", p, mu))
         }
       }
     }
@@ -285,26 +267,26 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       if (d == "beta") {
         if (mu <= 0 || mu >= 1) {
           add(grp, p, "dist_suitability", "fail",
-              sprintf("Beta distribution requires mean in (0,1). Got %.4g.", mu))
+              qa_msg("beta_mean_fail", mu))
         } else if (!is.na(lo) && !is.na(hi) && (lo < 0 || hi > 1)) {
           add(grp, p, "dist_suitability", "fail",
-              sprintf("Beta distribution requires bounds in [0,1]. Got [%.4g, %.4g].", lo, hi))
+              qa_msg("beta_bounds_fail", lo, hi))
         } else {
-          add(grp, p, "dist_suitability", "pass", "Beta: mean in (0,1) and bounds in [0,1]")
+          add(grp, p, "dist_suitability", "pass", t("qa_msg_beta_pass"))
         }
       } else if (d == "lognormal") {
         if (mu <= 0) {
           add(grp, p, "dist_suitability", "fail",
-              sprintf("Log-normal requires a strictly positive mean. Got %.4g.", mu))
+              qa_msg("lognorm_fail", mu))
         } else {
-          add(grp, p, "dist_suitability", "pass", "Log-normal: mean > 0")
+          add(grp, p, "dist_suitability", "pass", t("qa_msg_lognorm_pass"))
         }
       } else if (d == "tnorm_0_1") {
         if (!is.na(lo) && !is.na(hi) && (lo < 0 || hi > 1)) {
           add(grp, p, "dist_suitability", "warn",
-              sprintf("tnorm_0_1 clips to [0,1]; bounds [%.4g, %.4g] extend beyond this.", lo, hi))
+              qa_msg("tnorm_warn", lo, hi))
         } else {
-          add(grp, p, "dist_suitability", "pass", "tnorm_0_1: bounds within [0,1]")
+          add(grp, p, "dist_suitability", "pass", t("qa_msg_tnorm_pass"))
         }
       }
     }
@@ -339,16 +321,13 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       ref_str <- sprintf("%s%s", ipcc_ref_msg, region_str)
       if (pct_dev > 200) {
         add(grp, p, "benchmark_deviation", "fail",
-            sprintf("Mean (%.4g) deviates %.0f%% from %s default (%.4g). Verify the value or document the country-specific source.",
-                    mu, pct_dev, ref_str, ipcc_def))
+            qa_msg("bench_fail", mu, pct_dev, ref_str, ipcc_def))
       } else if (pct_dev > 50) {
         add(grp, p, "benchmark_deviation", "warn",
-            sprintf("Mean (%.4g) deviates %.0f%% from %s default (%.4g). Large deviation — please document the source.",
-                    mu, pct_dev, ref_str, ipcc_def))
+            qa_msg("bench_warn", mu, pct_dev, ref_str, ipcc_def))
       } else {
         add(grp, p, "benchmark_deviation", "pass",
-            sprintf("Mean (%.4g) within 50%% of %s default (%.4g)",
-                    mu, ref_str, ipcc_def))
+            qa_msg("bench_pass", mu, ref_str, ipcc_def))
       }
     }
 
@@ -359,8 +338,7 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       ptype <- tolower(trimws(as.character(ps$param_type[i])))
       if (!ptype %in% c("activity_data", "coefficient", "emission_factor")) {
         add(grp, p, "param_type_invalid", "fail",
-            sprintf("param_type = '%s' is not recognised. Use 'activity_data' or 'coefficient'.",
-                    ps$param_type[i]))
+            qa_msg("paramtype_fail", ps$param_type[i]))
       }
     }
 
@@ -381,34 +359,25 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
         ps$ipcc_ref_cat[i]
       } else "IPCC default"
       context_hint <- CONTEXT_DEPENDENT_HINTS[[p]]
-      base_msg <- sprintf(
-        "%s not supplied in upload - auto-filled with IPCC default %.4g %s (%s). Override in template if local data is available.",
-        p, mu, unit_str, ref_str)
+      base_msg <- qa_msg("missing", p, mu, unit_str, ref_str)
       msg <- if (!is.null(context_hint)) paste0(base_msg, " ", context_hint) else base_msg
       add(grp, p, "missing_parameter", "missing", msg)
     }
 
     # ------------------------------------------------------------------
     # Check 5b (T2.3): fractional parameter with unbounded distribution
-    # If a fractional parameter (must lie in [0,1]) uses an unbounded
-    # continuous distribution (normal, lognormal), MC samples can fall outside
-    # the legal range. Recommend tnorm_0_1 or beta instead.
     # ------------------------------------------------------------------
     UNBOUNDED_DISTS <- c("normal", "lognormal", "posnorm")
     if (p %in% FRACTION_PARAMS && !is.na(d) && tolower(d) %in% UNBOUNDED_DISTS) {
       add(grp, p, "fraction_distribution", "warn",
-          sprintf(
-            "%s must lie in [0,1] but uses '%s' which can produce out-of-range samples. Use 'tnorm_0_1' or 'beta' instead.",
-            p, d))
+          qa_msg("frac_dist_warn", p, d))
     } else if (p %in% FRACTION_PARAMS && !is.na(d)) {
       add(grp, p, "fraction_distribution", "pass",
-          sprintf("%s: bounded distribution '%s' used", p, d))
+          qa_msg("frac_dist_pass", p, d))
     }
 
     # ------------------------------------------------------------------
     # Check 6: asymmetric bound check for right-skewed IPCC parameters
-    # EF3, EF4, EF5 and Frac_* have right-skewed uncertainty documented in
-    # IPCC 2006/2019 guideline tables; symmetric bounds underestimate upper tail.
     # ------------------------------------------------------------------
     if (p %in% ASYMMETRIC_PARAMS && !is.na(lo) && !is.na(hi) && !is.na(mu) && mu > 0) {
       lower_span <- mu - lo
@@ -417,12 +386,10 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
         ratio <- upper_span / lower_span
         if (ratio < 1.5) {
           add(grp, p, "asymmetric_bounds", "warn",
-              sprintf(
-                "%s has right-skewed uncertainty (IPCC 2006/2019 guideline tables). Detected near-symmetric bounds (upper span / lower span = %.1f). Consider using the IPCC-recommended asymmetric bounds from the blank template.",
-                p, ratio))
+              qa_msg("asym_warn", p, ratio))
         } else {
           add(grp, p, "asymmetric_bounds", "pass",
-              sprintf("%s: asymmetric bounds applied (upper/lower span ratio = %.1f)", p, ratio))
+              qa_msg("asym_pass", p, ratio))
         }
       }
     }
@@ -470,12 +437,20 @@ qaqc_summary <- function(qaqc_df) {
 }
 
 qaqc_icon <- function(status) {
-  switch(status,
-    pass    = '<span style="color:#2D6A4F;font-weight:bold;">&#10003; pass</span>',
-    info    = '<span style="color:#1565C0;font-weight:bold;">&#9432; info</span>',
-    warn    = '<span style="color:#B45309;font-weight:bold;">&#9651; warn</span>',
-    fail    = '<span style="color:#C1121F;font-weight:bold;">&#10007; fail</span>',
-    missing = '<span style="color:#92400E;font-weight:bold;background-color:#FEF3C7;padding:1px 6px;border-radius:3px;">&#9888; missing</span>',
+  label <- switch(status,
+    pass    = t("qa_icon_pass"),
+    info    = t("qa_icon_info"),
+    warn    = t("qa_icon_warn"),
+    fail    = t("qa_icon_fail"),
+    missing = t("qa_icon_missing"),
     status
+  )
+  switch(status,
+    pass    = sprintf('<span style="color:#2D6A4F;font-weight:bold;">&#10003; %s</span>', label),
+    info    = sprintf('<span style="color:#1565C0;font-weight:bold;">&#9432; %s</span>', label),
+    warn    = sprintf('<span style="color:#B45309;font-weight:bold;">&#9651; %s</span>', label),
+    fail    = sprintf('<span style="color:#C1121F;font-weight:bold;">&#10007; %s</span>', label),
+    missing = sprintf('<span style="color:#92400E;font-weight:bold;background-color:#FEF3C7;padding:1px 6px;border-radius:3px;">&#9888; %s</span>', label),
+    label
   )
 }

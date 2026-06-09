@@ -490,12 +490,96 @@ app_ui <- function(request = NULL) {
            var m = document.cookie.match(/(?:^|;)\\s*app_lang=([^;]+)/);
            return m ? decodeURIComponent(m[1]) : 'en';
          }
+         // Read the currently-active navbar tab so we can restore it after
+         // reload. bslib renders nav-links with data-value matching the
+         // nav_panel title; we encode it into the URL hash before reload.
+         function _activeTabValue() {
+           var el = document.querySelector(
+             '#nav .nav-link.active, .nav-tabs .nav-link.active');
+           if (!el) return null;
+           return el.getAttribute('data-value') ||
+                  el.getAttribute('data-bs-target') ||
+                  el.textContent.trim();
+         }
+         // Translucent overlay shown the instant the user clicks EN/FR so
+         // the change feels immediate. Removed automatically on the next
+         // page load.
+         function _showLangSwitchOverlay(target) {
+           if (document.getElementById('lang-switch-overlay')) return;
+           var o = document.createElement('div');
+           o.id = 'lang-switch-overlay';
+           o.style.cssText =
+             'position:fixed; inset:0; z-index:99999;' +
+             'background:rgba(255,255,255,0.78);' +
+             'display:flex; align-items:center; justify-content:center;' +
+             'flex-direction:column; gap:10px;' +
+             'font-family:DM Sans, Arial, sans-serif;' +
+             'opacity:0; transition:opacity 0.12s ease-out;';
+           var spinner = document.createElement('div');
+           spinner.style.cssText =
+             'width:36px; height:36px; border-radius:50%;' +
+             'border:4px solid #D8F3DC; border-top-color:#2D6A4F;' +
+             'animation:langSpin 0.7s linear infinite;';
+           var label = document.createElement('div');
+           label.style.cssText =
+             'font-weight:600; color:#1B4332; font-size:0.95rem;';
+           label.textContent = target === 'fr'
+             ? 'Passage en français…' : 'Switching to English…';
+           o.appendChild(spinner);
+           o.appendChild(label);
+           if (!document.getElementById('lang-switch-keyframes')) {
+             var s = document.createElement('style');
+             s.id = 'lang-switch-keyframes';
+             s.textContent =
+               '@keyframes langSpin { from { transform:rotate(0deg); } ' +
+               'to { transform:rotate(360deg); } }';
+             document.head.appendChild(s);
+           }
+           document.body.appendChild(o);
+           // Force a frame before fade so the transition runs.
+           requestAnimationFrame(function(){ o.style.opacity = '1'; });
+         }
          function _setLang(lang) {
+           if (_readLangCookie() === lang) return;
            var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years
            document.cookie = 'app_lang=' + lang +
              '; max-age=' + maxAge +
              '; path=/; SameSite=Lax';
+           // Persist the active tab so reload restores it.
+           var tab = _activeTabValue();
+           var hash = tab ? '#tab=' + encodeURIComponent(tab) : '';
+           _showLangSwitchOverlay(lang);
+           // Replace state first so the back button after switching still
+           // makes sense; then reload.
+           try {
+             history.replaceState(null, '', window.location.pathname +
+               window.location.search + hash);
+           } catch (e) { window.location.hash = hash; }
            window.location.reload();
+         }
+         // Restore the previously-active tab when the page comes back up.
+         // Runs after Shiny has bound its inputs (deferred to next tick).
+         function _restoreActiveTab() {
+           var m = (window.location.hash || '').match(/tab=([^&]+)/);
+           if (!m) return;
+           var want = decodeURIComponent(m[1]);
+           if (!window.Shiny || !Shiny.setInputValue) return;
+           // Use Shiny's input API — drives the bslib navbar reactively.
+           Shiny.setInputValue('nav', want, { priority: 'event' });
+           // Also click the matching nav-link as a belt-and-braces fallback
+           // (in case the navbar id is not 'nav' on some bslib versions).
+           var anchors = document.querySelectorAll(
+             '#nav .nav-link, .nav-tabs .nav-link');
+           for (var i = 0; i < anchors.length; i++) {
+             var dv = anchors[i].getAttribute('data-value') ||
+                       anchors[i].textContent.trim();
+             if (dv === want) { anchors[i].click(); break; }
+           }
+           // Clear the hash so a manual reload doesn't redundantly fire.
+           try {
+             history.replaceState(null, '', window.location.pathname +
+               window.location.search);
+           } catch (e) {}
          }
          function _installLangToggle() {
            if (document.getElementById('lang-toggle-floating')) return;
@@ -515,6 +599,7 @@ app_ui <- function(request = NULL) {
              b.style.cssText =
                'border:0; cursor:pointer; padding:4px 12px;' +
                'border-radius:14px; font-weight:700; font-size:0.85rem;' +
+               'transition:background 0.12s, color 0.12s;' +
                (current === lang
                  ? 'background:#2D6A4F; color:#FFFFFF;'
                  : 'background:transparent; color:#475569;');
@@ -529,7 +614,13 @@ app_ui <- function(request = NULL) {
            document.addEventListener('DOMContentLoaded', _installLangToggle);
          } else {
            _installLangToggle();
-         }"
+         }
+         // Restore tab after Shiny is connected. Shiny:connected fires once
+         // per session, so this runs exactly when the server-side inputs
+         // are ready to receive setInputValue.
+         $(document).on('shiny:connected', function() {
+           setTimeout(_restoreActiveTab, 50);
+         });"
       )))
     ),
     fillable = FALSE,
@@ -681,8 +772,7 @@ app_ui <- function(request = NULL) {
             tags$ul(
               tags$li(t("not_do_li1")),
               tags$li(t("not_do_li2")),
-              tags$li(t("not_do_li3")),
-              tags$li(t("not_do_li4"))
+              tags$li(t("not_do_li3"))
             )
           )
         ),
@@ -1225,16 +1315,17 @@ app_ui <- function(request = NULL) {
                 t("info_ef_corr")),
             radioButtons("ef_corr_mode",
                          label = tagList(
-                           "Mode ",
+                           paste0(t("corr_mode_label"), " "),
                            bslib::tooltip(
                              span(icon("circle-question"),
                                   style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                             "Should emission factors share systematic bias? The IPCC default is independence. Pick block-structured if you suspect one literature is biased (e.g. all your Ym-equation coefficients come from the same regional database).",
+                             t("tip_ef_corr_mode"),
                              placement = "right"
                            )
                          ),
-                         choices = c("No EF correlations (default)" = "none",
-                                     "Block-structured EF correlation" = "block")),
+                         choices = setNames(c("none", "block"),
+                                              c(t("corr_ef_mode_none"),
+                                                t("corr_ef_mode_block")))),
             div(class = "small text-muted",
                 style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
                 tags$ul(style = "padding-left:18px; margin:0;",
@@ -1469,47 +1560,44 @@ app_ui <- function(request = NULL) {
       conditionalPanel(
         condition = "output.sim_view == 'results'",
         div(style = "margin: 12px 16px;",
-            actionButton("show_settings_btn", HTML("&#8592; Back to settings"),
+            actionButton("show_settings_btn",
+                         HTML(paste0("&#8592; ", t("res_back_to_settings"))),
                          class = "btn-outline-secondary",
                          icon = icon("arrow-left"))),
-        h3("Simulation results", style = "margin: 8px 16px;"),
+        h3(t("res_sim_results_h"), style = "margin: 8px 16px;"),
 
-        # Round 9: single-year results layout (visible when mode != trend)
-        # Andreas 2026-05 C1: headline value-boxes by IPCC source category
-        # instead of total CH₄ / N₂O. CV and Margin of Error moved into the
-        # inline footnote alongside Total CO₂eq.
         conditionalPanel(
           condition = "input.analysis_mode != 'trend'",
           bslib::layout_columns(
             col_widths = NULL,
-            bslib::value_box(title = "Enteric CH₄ (t)",
+            bslib::value_box(title = t("res_vb_enteric_ch4_t"),
                               value = textOutput("vb_enteric_ch4"),
                               showcase = icon("fire"), theme = "success"),
-            bslib::value_box(title = "Manure CH₄ (t)",
+            bslib::value_box(title = t("res_vb_manure_ch4_t"),
                               value = textOutput("vb_manure_ch4"),
                               showcase = icon("recycle"), theme = "success"),
-            bslib::value_box(title = "Manure N₂O (t)",
+            bslib::value_box(title = t("res_vb_manure_n2o_t"),
                               value = textOutput("vb_manure_n2o"),
-                              p("Direct + indirect"),
+                              p(t("res_vb_direct_indirect")),
                               showcase = icon("cloud"), theme = "primary"),
-            bslib::value_box(title = "Pasture N₂O (t)",
+            bslib::value_box(title = t("res_vb_pasture_n2o_t"),
                               value = textOutput("vb_pasture_n2o"),
-                              p("Direct + indirect"),
+                              p(t("res_vb_direct_indirect")),
                               showcase = icon("seedling"), theme = "primary"),
-            # Andreas 28/5/26 #6: the headline uncertainty bubble now shows
-            # 95% MoE (the IPCC reporting convention per Vol.1 Ch.3 Table 3.3)
-            # instead of CV. CV is still available alongside MoE in the
-            # by-system / by-category tables further down the page.
-            bslib::value_box(title = "Total 95% MoE (%)",
+            bslib::value_box(title = t("res_vb_total_moe_pct"),
                               value = textOutput("vb_moe_total"),
-                              p("± half-width of 95% CI / mean — IPCC convention"),
+                              p(t("res_vb_total_moe_sub")),
                               showcase = icon("percent"), theme = "warning")
           ),
           div(style = "padding: 0 12px 8px; color: #555; font-size: 0.85rem;",
-              tags$em("Total CO₂eq: "), textOutput("vb_co2e_inline", inline = TRUE),
-              tags$em(" · 95% MoE: "), textOutput("vb_moe", inline = TRUE),
-              tags$em(" · Total CH₄: "), textOutput("vb_ch4", inline = TRUE),
-              tags$em(" · Total N₂O: "), textOutput("vb_n2o", inline = TRUE)),
+              tags$em(paste0(t("res_inline_total_co2e"), " ")),
+              textOutput("vb_co2e_inline", inline = TRUE),
+              tags$em(paste0(" · ", t("res_inline_moe"), " ")),
+              textOutput("vb_moe", inline = TRUE),
+              tags$em(paste0(" · ", t("res_inline_total_ch4"), " ")),
+              textOutput("vb_ch4", inline = TRUE),
+              tags$em(paste0(" · ", t("res_inline_total_n2o"), " ")),
+              textOutput("vb_n2o", inline = TRUE)),
           # Andreas 28/5/26 #7.1: headline split by cattle_type so dairy and
           # non-dairy contributions are visible without having to drill into
           # the aggregation-level selector below. Only rendered when the
@@ -1517,11 +1605,10 @@ app_ui <- function(request = NULL) {
           conditionalPanel(
             condition = "output.has_multi_cattle_type == true",
             bslib::card(
-              bslib::card_header("Headline by cattle type (dairy / other)"),
+              bslib::card_header(t("res_headline_by_cattle_h")),
               bslib::card_body(
                 p(tags$em(style = "color:#555; font-size:0.85rem;",
-                  "One row per cattle_type from the Parameters sheet. ",
-                  "Per-source means are inventory-summed across iterations; ± is the 95 % margin of error (MoE).")),
+                          t("res_headline_by_cattle_note"))),
                 DT::DTOutput("results_headline_by_cattle_type")
               )
             )
@@ -1529,11 +1616,11 @@ app_ui <- function(request = NULL) {
           bslib::layout_columns(
             col_widths = c(6, 6),
             bslib::card(
-              bslib::card_header("Emission Distribution (Total CO₂eq)"),
+              bslib::card_header(t("res_emission_dist_h")),
               bslib::card_body(plotly::plotlyOutput("results_histogram"))
             ),
             bslib::card(
-              bslib::card_header("Uncertainty Decomposition"),
+              bslib::card_header(t("res_decomp_h")),
               bslib::card_body(
                 plotly::plotlyOutput("decomposition_plot")
               )
@@ -1606,30 +1693,26 @@ app_ui <- function(request = NULL) {
             )
           ),
 
-          # Andreas 2026-05 #32, C2: aggregation level selector — default to
-          # cattle_type (IPCC reporting convention: dairy / other cattle), with
-          # optional drill-down to aggregation_level (production system) or
-          # sub_category for advanced users.
           div(style = "padding: 0 16px 8px; display: flex; align-items: center; gap: 12px;",
-              tags$strong("Aggregation level:"),
+              tags$strong(paste0(t("res_agg_level_label"), " ")),
               selectInput("results_aggregation_level", label = NULL,
-                          choices = c(
-                            "Cattle type (dairy / other)"  = "cattle_type",
-                            "Production system"            = "aggregation_level",
-                            "Sub-category"                 = "sub_category"),
+                          choices = setNames(
+                            c("cattle_type", "aggregation_level", "sub_category"),
+                            c(t("res_agg_cattle_type"),
+                              t("res_agg_production_system"),
+                              t("res_agg_sub_category"))),
                           selected = "cattle_type",
                           width = "260px"),
               tags$em(style = "color:#666; font-size:0.85rem;",
-                      "Tables below aggregate per-iteration results at this level.")),
+                      t("res_agg_level_note"))),
           bslib::card(
-            bslib::card_header("By-System Breakdown"),
+            bslib::card_header(t("res_by_system_h")),
             bslib::card_body(DT::DTOutput("results_by_system"))
           ),
           bslib::card(
-            bslib::card_header("By Reporting Category (IPCC Table 3.3 layout)"),
+            bslib::card_header(t("res_by_category_h")),
             bslib::card_body(
-              p("Each row is one IPCC inventory reporting line (group × source). ",
-                "Rows match the granularity used in IPCC Volume 1 Chapter 3 uncertainty reporting."),
+              p(t("res_by_category_note")),
               DT::DTOutput("results_by_category")
             )
           ),
@@ -1642,19 +1725,19 @@ app_ui <- function(request = NULL) {
           condition = "input.analysis_mode == 'trend'",
           bslib::layout_columns(
             col_widths = c(3, 3, 3, 3),
-            bslib::value_box(title = "Δ vs base year",
+            bslib::value_box(title = t("res_vb_trend_delta"),
                               value = textOutput("vb_trend_delta"),
                               p(textOutput("vb_trend_delta_sub", inline = TRUE)),
                               showcase = icon("arrow-trend-up"), theme = "primary"),
-            bslib::value_box(title = "Trend slope",
+            bslib::value_box(title = t("res_vb_trend_slope_short"),
                               value = textOutput("vb_trend_slope"),
                               p(textOutput("vb_trend_slope_sub", inline = TRUE)),
                               showcase = icon("chart-line"), theme = "success"),
-            bslib::value_box(title = "Latest year",
+            bslib::value_box(title = t("res_vb_trend_latest_short"),
                               value = textOutput("vb_trend_latest"),
                               p(textOutput("vb_trend_latest_sub", inline = TRUE)),
                               showcase = icon("calendar-days"), theme = "info"),
-            bslib::value_box(title = "Largest YoY change",
+            bslib::value_box(title = t("res_vb_trend_yoy_largest"),
                               value = textOutput("vb_trend_yoy"),
                               p(textOutput("vb_trend_yoy_sub", inline = TRUE)),
                               showcase = icon("bolt"), theme = "warning")
@@ -1664,30 +1747,30 @@ app_ui <- function(request = NULL) {
           bslib::layout_columns(
             col_widths = c(7, 5),
             bslib::card(
-              bslib::card_header("Trend chart — Total CO₂eq with 95% CI band"),
+              bslib::card_header(t("card_trend_chart_h")),
               bslib::card_body(plotly::plotlyOutput("trend_plot", height = "360px"))
             ),
             bslib::card(
-              bslib::card_header("Year-over-year % change"),
+              bslib::card_header(t("res_trend_yoy_h")),
               bslib::card_body(plotly::plotlyOutput("trend_yoy_chart", height = "360px"))
             )
           ),
           bslib::card(
-            bslib::card_header("Distribution of Δ Y_N − Y_1 — uncertainty on the trend itself"),
+            bslib::card_header(t("res_trend_delta_hist_h")),
             bslib::card_body(
-              p(tags$em("This histogram shows the Monte Carlo distribution of the absolute change in CO₂eq between the first and last year. The dashed red lines mark the 95% CI; the dotted line marks zero. If zero falls inside the CI, the trend is not statistically distinguishable from no change at this confidence level.")),
+              p(tags$em(t("res_trend_delta_hist_note"))),
               plotly::plotlyOutput("trend_delta_histogram", height = "300px")
             )
           ),
           bslib::card(
-            bslib::card_header("Trend table"),
+            bslib::card_header(t("card_trend_table_h")),
             bslib::card_body(
-              p(tags$em("Year-by-year mean, 95% CI bounds, 95% MoE, Δ vs. base year, and year-over-year change.")),
+              p(tags$em(t("trend_table_note"))),
               DT::DTOutput("trend_table")
             )
           ),
           div(style = "margin: 8px 16px; font-size:0.85rem; color:#555;",
-              tags$em("Sensitivity drivers (per-year + Δ Y_N − Y_1) are on Tab 6 (Sensitivity). Word / Excel / CSV trend reports are on Tab 7 (IPCC Report)."))
+              tags$em(t("res_trend_footer_note")))
         )
       ),
       # R1.5: placeholder removed — settings panel itself shows when sim_view is settings

@@ -1,6 +1,7 @@
 source("R/i18n.R")
 ids <- names(.STRINGS)
-files <- c("R/app_ui.R", "R/chat_ui.R", "R/auth_magic_link.R", "R/utils_contact.R")
+files <- c("R/app_ui.R", "R/chat_ui.R", "R/auth_magic_link.R",
+           "R/utils_contact.R", "R/app_server.R", "R/utils_qaqc.R")
 used <- character(0)
 for (f in files) {
   lines <- readLines(f, warn = FALSE)

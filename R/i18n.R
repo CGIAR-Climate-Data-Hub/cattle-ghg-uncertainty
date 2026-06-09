@@ -261,10 +261,6 @@ t <- function(id, lang = NULL) {
     en = "It does not validate your country's IPCC categorisation choices — sub-category structure is the user's responsibility.",
     fr = "Il ne valide pas les choix de catégorisation IPCC de votre pays — la structure des sous-catégories relève de l'utilisateur."
   ),
-  not_do_li4 = list(
-    en = "Cross-block correlations between activity data and emission factors are not yet supported (planned for v3.0).",
-    fr = "Les corrélations inter-blocs entre données d'activité et facteurs d'émission ne sont pas encore prises en charge (prévues pour la v3.0)."
-  ),
 
   # =====================================================================
   # RESOURCES TAB
@@ -1024,5 +1020,606 @@ t <- function(id, lang = NULL) {
   cf_try_again = list(en = "Please try again in a moment.",
                         fr = "Veuillez réessayer dans un instant."),
   cf_network_error = list(en = "Network error. Please try again.",
-                            fr = "Erreur réseau. Veuillez réessayer.")
+                            fr = "Erreur réseau. Veuillez réessayer."),
+
+  # =====================================================================
+  # DEFINITIONS TABLE — column headers + categorical values
+  # =====================================================================
+
+  def_col_variable = list(en = "Variable name", fr = "Nom de variable"),
+  def_col_definition = list(en = "Definition", fr = "Définition"),
+  def_col_unit = list(en = "Unit", fr = "Unité"),
+  def_col_ipcc_default = list(en = "IPCC default", fr = "Valeur IPCC par défaut"),
+  def_col_dist = list(en = "Suggested distribution",
+                       fr = "Distribution suggérée"),
+  def_col_level = list(en = "Level", fr = "Niveau"),
+  def_col_ipcc_framing = list(en = "IPCC framing", fr = "Cadrage IPCC"),
+  def_col_ipcc_ref = list(en = "IPCC reference", fr = "Référence IPCC"),
+
+  def_framing_ad = list(en = "Activity data (population)",
+                          fr = "Donnée d'activité (population)"),
+  def_framing_coef = list(en = "Coefficient (combines into EF)",
+                            fr = "Coefficient (entre dans le FE)"),
+
+  def_tier_core = list(en = "core", fr = "de base"),
+  def_tier_advanced = list(en = "advanced", fr = "avancé"),
+
+  # =====================================================================
+  # AUTO-FILLED PARAMETERS NOTICE
+  # =====================================================================
+
+  imputed_load_data_first = list(en = "Load data first.", fr = "Chargez d'abord les données."),
+  imputed_card_body_single = list(
+    en = "%d parameter not supplied in your upload — auto-filled from IPCC defaults so the simulation could run. Override these values in the template if you have country-specific data.",
+    fr = "%d paramètre non fourni dans votre téléversement — rempli automatiquement à partir des valeurs IPCC par défaut afin que la simulation puisse s'exécuter. Remplacez ces valeurs dans le modèle si vous disposez de données nationales."
+  ),
+  imputed_card_body_plural = list(
+    en = "%d parameters not supplied in your upload — auto-filled from IPCC defaults so the simulation could run. Override these values in the template if you have country-specific data.",
+    fr = "%d paramètres non fournis dans votre téléversement — remplis automatiquement à partir des valeurs IPCC par défaut afin que la simulation puisse s'exécuter. Remplacez ces valeurs dans le modèle si vous disposez de données nationales."
+  ),
+  imputed_dt_col_param = list(en = "Parameter", fr = "Paramètre"),
+  imputed_dt_col_default = list(en = "Default value used", fr = "Valeur par défaut utilisée"),
+  imputed_dt_col_unit = list(en = "Unit", fr = "Unité"),
+  imputed_dt_col_ref = list(en = "IPCC reference", fr = "Référence IPCC"),
+  imputed_dt_col_source = list(en = "Source", fr = "Source"),
+  imputed_default_source = list(en = "AUTO-FILLED (IPCC default)",
+                                  fr = "REMPLI AUTO (IPCC par défaut)"),
+  imputed_notice_title_single = list(en = " %d parameter auto-filled from IPCC defaults",
+                                       fr = " %d paramètre rempli automatiquement avec une valeur IPCC par défaut"),
+  imputed_notice_title_plural = list(en = " %d parameters auto-filled from IPCC defaults",
+                                       fr = " %d paramètres remplis automatiquement avec des valeurs IPCC par défaut"),
+  imputed_notice_params_label = list(en = "Parameters:", fr = "Paramètres :"),
+  imputed_th_param = list(en = "Parameter", fr = "Paramètre"),
+  imputed_th_default = list(en = "IPCC default used", fr = "Valeur IPCC par défaut utilisée"),
+  imputed_th_ref = list(en = "IPCC reference", fr = "Référence IPCC"),
+  imputed_notice_tail_pre = list(
+    en = " These are IPCC defaults — replace with country-specific values in your template where available. Full details and QA flags are on the ",
+    fr = " Ce sont des valeurs IPCC par défaut — remplacez par des valeurs nationales dans votre modèle lorsque possible. Tous les détails et les indicateurs QA sont sur l'onglet "
+  ),
+  imputed_notice_tail_qaqc = list(en = "QA/QC", fr = "QA/QC"),
+  imputed_notice_tail_post = list(en = " tab.", fr = "."),
+
+  # =====================================================================
+  # QA/QC table — status icons, summary badges, check labels
+  # =====================================================================
+
+  qa_icon_pass = list(en = "pass", fr = "OK"),
+  qa_icon_info = list(en = "info", fr = "info"),
+  qa_icon_warn = list(en = "warn", fr = "attention"),
+  qa_icon_fail = list(en = "fail", fr = "échec"),
+  qa_icon_missing = list(en = "missing", fr = "manquant"),
+  qa_badge_autofilled = list(en = "auto-filled", fr = "remplis auto"),
+  qa_badge_pass = list(en = "pass", fr = "OK"),
+  qa_badge_info = list(en = "info", fr = "info"),
+  qa_badge_warn = list(en = "warn", fr = "attention"),
+  qa_badge_fail = list(en = "fail", fr = "échec"),
+  qa_col_group = list(en = "Group", fr = "Groupe"),
+  qa_col_parameter = list(en = "Parameter", fr = "Paramètre"),
+  qa_col_check = list(en = "Check", fr = "Vérification"),
+  qa_col_status = list(en = "Status", fr = "Statut"),
+  qa_col_message = list(en = "Message", fr = "Message"),
+  qa_no_data = list(en = "No data loaded.", fr = "Aucune donnée chargée."),
+
+  # QA verdict messages — sprintf templates keyed by check id + verdict.
+  # Use `qa_msg(key, ...)` (see helper below) to fetch the right language.
+  qa_msg_bounds_order_fail_lo = list(
+    en = "Lower (%.4g) > mean (%.4g). Bounds must bracket the mean.",
+    fr = "Borne inférieure (%.4g) > moyenne (%.4g). Les bornes doivent encadrer la moyenne."
+  ),
+  qa_msg_bounds_order_fail_hi = list(
+    en = "Mean (%.4g) > upper (%.4g). Bounds must bracket the mean.",
+    fr = "Moyenne (%.4g) > borne supérieure (%.4g). Les bornes doivent encadrer la moyenne."
+  ),
+  qa_msg_bounds_order_pass = list(en = "Lower <= mean <= upper",
+                                    fr = "Inférieure ≤ moyenne ≤ supérieure"),
+  qa_msg_bounds_order_zero = list(en = "Zero-mean parameter (degenerate constant)",
+                                    fr = "Paramètre à moyenne nulle (constante dégénérée)"),
+  qa_msg_nonneg_warn = list(
+    en = "Lower bound (%.4g) is negative. All IPCC livestock parameters should be >= 0.",
+    fr = "Borne inférieure (%.4g) négative. Tous les paramètres d'élevage IPCC doivent être ≥ 0."
+  ),
+  qa_msg_nonneg_pass = list(en = "Lower bound >= 0",
+                              fr = "Borne inférieure ≥ 0"),
+  qa_msg_range_de_fail = list(en = "DE_pct = %.1f%%. Must be in [1, 100].",
+                                fr = "DE_pct = %.1f %%. Doit être dans [1, 100]."),
+  qa_msg_range_de_pass = list(en = "DE_pct = %.1f%% (valid range 1-100%%)",
+                                fr = "DE_pct = %.1f %% (plage valide 1-100 %%)"),
+  qa_msg_range_ym_warn = list(
+    en = "Ym_pct = %.1f%%. Typical IPCC range is 3-12%%; values outside 1-15%% are unusual.",
+    fr = "Ym_pct = %.1f %%. La plage typique IPCC est 3-12 %% ; les valeurs hors 1-15 %% sont inhabituelles."
+  ),
+  qa_msg_range_ym_pass = list(en = "Ym_pct = %.1f%% (within typical IPCC range)",
+                                fr = "Ym_pct = %.1f %% (dans la plage IPCC typique)"),
+  qa_msg_frac_fail = list(en = "%s = %.4g. Must be a fraction in [0, 1].",
+                            fr = "%s = %.4g. Doit être une fraction dans [0, 1]."),
+  qa_msg_frac_pass = list(en = "%s = %.4g (valid fraction in [0, 1])",
+                            fr = "%s = %.4g (fraction valide dans [0, 1])"),
+  qa_msg_beta_mean_fail = list(
+    en = "Beta distribution requires mean in (0,1). Got %.4g.",
+    fr = "La distribution beta requiert une moyenne dans (0,1). Reçu %.4g."
+  ),
+  qa_msg_beta_bounds_fail = list(
+    en = "Beta distribution requires bounds in [0,1]. Got [%.4g, %.4g].",
+    fr = "La distribution beta requiert des bornes dans [0,1]. Reçu [%.4g, %.4g]."
+  ),
+  qa_msg_beta_pass = list(en = "Beta: mean in (0,1) and bounds in [0,1]",
+                            fr = "Beta : moyenne dans (0,1) et bornes dans [0,1]"),
+  qa_msg_lognorm_fail = list(
+    en = "Log-normal requires a strictly positive mean. Got %.4g.",
+    fr = "La loi log-normale requiert une moyenne strictement positive. Reçu %.4g."
+  ),
+  qa_msg_lognorm_pass = list(en = "Log-normal: mean > 0",
+                               fr = "Log-normale : moyenne > 0"),
+  qa_msg_tnorm_warn = list(
+    en = "tnorm_0_1 clips to [0,1]; bounds [%.4g, %.4g] extend beyond this.",
+    fr = "tnorm_0_1 tronque à [0,1] ; les bornes [%.4g, %.4g] dépassent cette plage."
+  ),
+  qa_msg_tnorm_pass = list(en = "tnorm_0_1: bounds within [0,1]",
+                             fr = "tnorm_0_1 : bornes dans [0,1]"),
+  qa_msg_bench_fail = list(
+    en = "Mean (%.4g) deviates %.0f%% from %s default (%.4g). Verify the value or document the country-specific source.",
+    fr = "La moyenne (%.4g) s'écarte de %.0f %% par rapport à la valeur par défaut %s (%.4g). Vérifiez la valeur ou documentez la source nationale."
+  ),
+  qa_msg_bench_warn = list(
+    en = "Mean (%.4g) deviates %.0f%% from %s default (%.4g). Large deviation — please document the source.",
+    fr = "La moyenne (%.4g) s'écarte de %.0f %% par rapport à la valeur par défaut %s (%.4g). Écart important — veuillez documenter la source."
+  ),
+  qa_msg_bench_pass = list(
+    en = "Mean (%.4g) within 50%% of %s default (%.4g)",
+    fr = "La moyenne (%.4g) est à moins de 50 %% de la valeur par défaut %s (%.4g)"
+  ),
+  qa_msg_paramtype_fail = list(
+    en = "param_type = '%s' is not recognised. Use 'activity_data' or 'coefficient'.",
+    fr = "param_type = '%s' non reconnu. Utilisez « activity_data » ou « coefficient »."
+  ),
+  qa_msg_missing = list(
+    en = "%s not supplied in upload - auto-filled with IPCC default %.4g %s (%s). Override in template if local data is available.",
+    fr = "%s non fourni dans le téléversement — rempli automatiquement avec la valeur IPCC par défaut %.4g %s (%s). Remplacez dans le modèle si des données locales sont disponibles."
+  ),
+  qa_msg_frac_dist_warn = list(
+    en = "%s must lie in [0,1] but uses '%s' which can produce out-of-range samples. Use 'tnorm_0_1' or 'beta' instead.",
+    fr = "%s doit être dans [0,1] mais utilise « %s » qui peut produire des échantillons hors plage. Utilisez plutôt « tnorm_0_1 » ou « beta »."
+  ),
+  qa_msg_frac_dist_pass = list(en = "%s: bounded distribution '%s' used",
+                                  fr = "%s : distribution bornée « %s » utilisée"),
+  qa_msg_asym_warn = list(
+    en = "%s has right-skewed uncertainty (IPCC 2006/2019 guideline tables). Detected near-symmetric bounds (upper span / lower span = %.1f). Consider using the IPCC-recommended asymmetric bounds from the blank template.",
+    fr = "%s a une incertitude asymétrique à droite (tableaux IPCC 2006/2019). Bornes quasi symétriques détectées (étendue sup. / étendue inf. = %.1f). Envisagez les bornes asymétriques recommandées par l'IPCC depuis le modèle vierge."
+  ),
+  qa_msg_asym_pass = list(
+    en = "%s: asymmetric bounds applied (upper/lower span ratio = %.1f)",
+    fr = "%s : bornes asymétriques appliquées (ratio étendue sup./inf. = %.1f)"
+  ),
+  qa_msg_no_mms = list(
+    en = "No Manure_Management sheet present — manure CH4 and N2O fall back to default 70%% pasture / 30%% solid_storage allocation. Add a Manure_Management sheet to use per-MMS values.",
+    fr = "Pas de feuille Manure_Management — CH4 et N2O du fumier reviennent à l'allocation par défaut 70 %% pâturage / 30 %% solid_storage. Ajoutez une feuille Manure_Management pour utiliser des valeurs par-MMS."
+  ),
+  qa_msg_sub_no_match = list(
+    en = "Parameters sub_category '%s' has no matching Manure_Management rows (no rows for cattle_type='%s', aggregation_level='%s'). Falls back to default 70%% pasture / 30%% solid_storage allocation, which under-counts MM N2O. Either add MM rows for this group or remove it from Parameters.",
+    fr = "La sous-catégorie « %s » des Parameters n'a pas de lignes Manure_Management correspondantes (aucune pour cattle_type='%s', aggregation_level='%s'). Repli sur l'allocation 70 %% pâturage / 30 %% solid_storage, qui sous-estime le N2O de MM. Ajoutez des lignes MM pour ce groupe ou retirez-le des Parameters."
+  ),
+  qa_msg_sub_auto_match = list(
+    en = "Parameters sub_category '%s' was auto-matched to Manure_Management sub_category '%s' (same cattle_type + aggregation_level, edit distance %d). Verify this is the same animal sub-category. Fix the spelling in either sheet to silence this warning.",
+    fr = "La sous-catégorie Parameters « %s » a été auto-appariée à la sous-catégorie Manure_Management « %s » (mêmes cattle_type + aggregation_level, distance d'édition %d). Vérifiez qu'il s'agit de la même sous-catégorie animale. Corrigez l'orthographe dans l'une ou l'autre feuille pour faire taire cet avertissement."
+  ),
+  qa_msg_sub_ambiguous = list(
+    en = "Parameters sub_category '%s' is ambiguously close to multiple Manure_Management sub-categories: %s. Cannot auto-match. Fix the spelling in either sheet so exactly one MM sub-category matches.",
+    fr = "La sous-catégorie Parameters « %s » est ambiguë vis-à-vis de plusieurs sous-catégories Manure_Management : %s. Auto-appariement impossible. Corrigez l'orthographe dans une feuille pour qu'une seule sous-catégorie MM corresponde."
+  ),
+  qa_msg_sub_no_match_listed = list(
+    en = "Parameters sub_category '%s' has no matching Manure_Management row in cattle_type='%s' / aggregation_level='%s'. MM sub-categories available in this group: %s. Falls back to default 70%% pasture / 30%% solid_storage allocation.",
+    fr = "La sous-catégorie Parameters « %s » n'a pas de ligne Manure_Management correspondante pour cattle_type='%s' / aggregation_level='%s'. Sous-catégories MM disponibles dans ce groupe : %s. Repli sur l'allocation 70 %% pâturage / 30 %% solid_storage."
+  ),
+
+  # =====================================================================
+  # CORRELATIONS TAB — radio options + TS status + Compare toggle
+  # =====================================================================
+
+  corr_mode_none = list(en = "No correlations (default)",
+                          fr = "Pas de corrélations (par défaut)"),
+  corr_mode_preset = list(en = "Structural defaults (expert-elicited)",
+                            fr = "Valeurs structurelles par défaut (jugement d'expert)"),
+  corr_mode_ts = list(en = "From template (auto, time-series)",
+                       fr = "Depuis le modèle (auto, séries temporelles)"),
+  corr_mode_manual = list(en = "Advanced — manual matrix entry",
+                            fr = "Avancé — saisie manuelle de la matrice"),
+  corr_mode_unavailable_ts = list(
+    en = " — needs a non-empty Parameter_TimeSeries sheet",
+    fr = " — nécessite une feuille Parameter_TimeSeries non vide"
+  ),
+  corr_mode_unavailable_manual = list(
+    en = " — needs an uploaded matrix",
+    fr = " — nécessite une matrice téléversée"
+  ),
+
+  corr_ef_mode_none = list(en = "No EF correlations (default)",
+                             fr = "Pas de corrélations FE (par défaut)"),
+  corr_ef_mode_block = list(en = "Block-structured EF correlation",
+                              fr = "Corrélation FE structurée par blocs"),
+
+  corr_ts_status_ok = list(
+    en = "Time-series sheet loaded — correlations computed from your data.",
+    fr = "Feuille de séries temporelles chargée — corrélations calculées à partir de vos données."
+  ),
+  corr_ts_status_missing = list(
+    en = "No Parameter_TimeSeries sheet found in your upload. Upload a template with this sheet, or pick another correlation mode.",
+    fr = "Aucune feuille Parameter_TimeSeries trouvée dans votre téléversement. Téléversez un modèle contenant cette feuille ou choisissez un autre mode de corrélation."
+  ),
+  corr_ts_status_empty = list(
+    en = "Parameter_TimeSeries sheet found but is empty. Fill it with multi-year activity data or pick another correlation mode.",
+    fr = "Feuille Parameter_TimeSeries trouvée mais vide. Remplissez-la avec des données pluriannuelles ou choisissez un autre mode de corrélation."
+  ),
+
+  corr_ef_zero_warning = list(
+    en = "All three within-block ρ sliders are at 0 — block-structured EF correlation has no effect. Move at least one slider above 0 to add a correlation.",
+    fr = "Les trois curseurs ρ inter-blocs sont à 0 — la corrélation FE structurée par blocs n'a aucun effet. Déplacez au moins un curseur au-dessus de 0 pour ajouter une corrélation."
+  ),
+
+  cmp_run_label = list(en = "Compare with/without correlations",
+                         fr = "Comparer avec/sans corrélations"),
+  cmp_run_tooltip = list(
+    en = "When ticked, the simulation runs twice — once with the correlations you picked, once with all correlations off — and the Results tab shows both side-by-side so you can see the impact.",
+    fr = "Quand coché, la simulation s'exécute deux fois — une avec les corrélations choisies, une avec les corrélations désactivées — et l'onglet Résultats les affiche côte à côte pour voir l'effet."
+  ),
+  cmp_disabled_note = list(
+    en = "No correlations selected on the Correlations tab — comparison would be identical, so this toggle is disabled.",
+    fr = "Aucune corrélation sélectionnée sur l'onglet Corrélations — la comparaison serait identique, ce bouton est donc désactivé."
+  ),
+
+  # Correlations tab — radio mode label + tooltip + per-mode help text
+  corr_mode_label = list(en = "Mode", fr = "Mode"),
+  tip_corr_mode = list(
+    en = "How should the tool decide which input parameters move together? Modes whose prerequisites are missing (no time-series, no manual matrix uploaded) are greyed out below.",
+    fr = "Comment l'outil doit-il décider quels paramètres bougent ensemble ? Les modes dont les prérequis manquent (pas de séries temporelles, pas de matrice manuelle téléversée) sont grisés ci-dessous."
+  ),
+  corr_disabled_prefix = list(en = "Disabled — ", fr = "Désactivé — "),
+  corr_help_none = list(
+    en = "Pick this if you have no information about how your parameters move together. Matches the standard IPCC Approach 2 starting point.",
+    fr = "Choisissez ceci si vous n'avez aucune information sur la manière dont vos paramètres bougent ensemble. Correspond au point de départ standard IPCC Approche 2."
+  ),
+  corr_help_ts_pre = list(en = "Pick this when your upload contains a ",
+                            fr = "Choisissez ceci lorsque votre téléversement contient une feuille "),
+  corr_help_ts_post = list(en = " sheet with ≥5 years of data. ",
+                             fr = " avec ≥ 5 années de données. "),
+  corr_help_ts_em = list(en = "Recommended whenever you have the data.",
+                           fr = "Recommandé dès que vous avez les données."),
+  corr_help_ts_disabled_pre = list(en = "your ",
+                                      fr = "votre feuille "),
+  corr_help_ts_disabled_post = list(
+    en = " sheet is empty or missing. Upload a template with a populated TS sheet (≥5 years, ≥2 numeric columns) to enable.",
+    fr = " est vide ou absente. Téléversez un modèle avec une feuille TS remplie (≥ 5 années, ≥ 2 colonnes numériques) pour l'activer."
+  ),
+  corr_help_preset = list(
+    en = "Known biological linkages (BW↔MW, DE↔Ym, Milk↔BW, Milk↔DE, etc.) applied automatically. ",
+    fr = "Liens biologiques connus (BW↔MW, DE↔Ym, Milk↔BW, Milk↔DE, etc.) appliqués automatiquement. "
+  ),
+  corr_help_preset_em = list(en = "Recommended for single-year inventories.",
+                                fr = "Recommandé pour les inventaires d'une seule année."),
+  corr_help_preset_disabled = list(
+    en = "no parameter data loaded yet. Load Country X / Country Y or upload your own template to enable.",
+    fr = "aucune donnée de paramètres chargée. Chargez Pays X / Pays Y ou téléversez votre propre modèle pour l'activer."
+  ),
+  corr_help_manual_loaded = list(
+    en = "A manual CSV matrix is loaded — using it for the run. Re-upload below to replace.",
+    fr = "Une matrice CSV manuelle est chargée — utilisée pour l'exécution. Téléversez à nouveau ci-dessous pour remplacer."
+  ),
+  corr_help_manual_pick = list(
+    en = "Pick this to use a CSV correlation matrix. Two starting templates appear below — a blank matrix with all parameter names pre-labelled, and an example pre-filled with the structural-defaults pairs. Edit cells and re-upload.",
+    fr = "Choisissez ceci pour utiliser une matrice de corrélation CSV. Deux modèles de départ apparaissent ci-dessous — une matrice vierge avec tous les noms de paramètres pré-étiquetés, et un exemple pré-rempli avec les paires des valeurs structurelles par défaut. Modifiez les cellules et téléversez à nouveau."
+  ),
+  corr_mode_advanced_manual_short = list(en = "Advanced — manual entry",
+                                            fr = "Avancé — saisie manuelle"),
+
+  # Correlations TS status messages (server-rendered)
+  corr_ts_no_data = list(
+    en = " No time-series data in the loaded inventory. To enable auto-correlation, upload a template with a populated ",
+    fr = " Aucune donnée de séries temporelles dans l'inventaire chargé. Pour activer l'auto-corrélation, téléversez un modèle avec une feuille "
+  ),
+  corr_ts_param_ts = list(en = "Parameter_TimeSeries", fr = "Parameter_TimeSeries"),
+  corr_ts_no_data_tail = list(
+    en = " sheet, or load Country X / Country Y from the dropdown (both ship with example time-series).",
+    fr = " remplie, ou chargez Pays X / Pays Y depuis le menu déroulant (les deux incluent des séries temporelles d'exemple)."
+  ),
+  corr_ts_loaded = list(en = " Correlation matrix loaded: %d parameters (%s).",
+                          fr = " Matrice de corrélation chargée : %d paramètres (%s)."),
+
+  # Compare-with-without-correlations
+  cmp_disabled_long = list(
+    en = " No correlations selected on Tab 4 — comparison would be identical to the main run, so this option is disabled. Enable a correlation mode to activate it.",
+    fr = " Aucune corrélation sélectionnée sur l'onglet 4 — la comparaison serait identique à l'exécution principale, cette option est donc désactivée. Activez un mode de corrélation pour l'activer."
+  ),
+
+  # Correlation heatmap labels
+  corr_heatmap_no_matrix = list(en = "No correlation matrix loaded",
+                                  fr = "Aucune matrice de corrélation chargée"),
+  corr_heatmap_title_ad = list(en = "Activity Data Correlation Matrix",
+                                  fr = "Matrice de corrélation des données d'activité"),
+  corr_heatmap_title_ef = list(en = "EF Correlation Matrix",
+                                  fr = "Matrice de corrélation des FE"),
+  corr_ef_no_corr = list(en = "No EF correlations applied (IPCC default)",
+                          fr = "Aucune corrélation FE appliquée (IPCC par défaut)"),
+  tip_ef_corr_mode = list(
+    en = "Should emission factors share systematic bias? The IPCC default is independence. Pick block-structured if you suspect one literature is biased (e.g. all your Ym-equation coefficients come from the same regional database).",
+    fr = "Les facteurs d'émission partagent-ils un biais systématique ? La valeur IPCC par défaut est l'indépendance. Choisissez « par blocs » si vous suspectez qu'une littérature est biaisée (par ex. tous vos coefficients d'équation Ym proviennent de la même base régionale)."
+  ),
+
+  # =====================================================================
+  # RESULTS VIEW (Simulate tab — post-run)
+  # =====================================================================
+
+  res_back_to_settings = list(en = "Back to settings", fr = "Retour aux paramètres"),
+  res_headline_h = list(en = "Headline results", fr = "Résultats principaux"),
+  res_summary_intro = list(
+    en = "Mean and 95% confidence interval for each emission source, with the margin of error as a percentage.",
+    fr = "Moyenne et intervalle de confiance à 95 % pour chaque source d'émission, avec la marge d'erreur en pourcentage."
+  ),
+
+  res_vb_enteric_label = list(en = "Enteric fermentation CH₄",
+                                 fr = "Fermentation entérique CH₄"),
+  res_vb_manure_ch4_label = list(en = "Manure management CH₄",
+                                    fr = "Gestion du fumier CH₄"),
+  res_vb_manure_n2o_label = list(en = "Manure management N₂O",
+                                    fr = "Gestion du fumier N₂O"),
+  res_vb_pasture_n2o_label = list(en = "Pasture deposition N₂O",
+                                     fr = "Dépôts au pâturage N₂O"),
+  res_vb_moe_label = list(en = "Total CO₂eq — 95% MoE",
+                            fr = "CO₂éq total — MoE 95 %"),
+  res_vb_mean_label = list(en = "mean", fr = "moyenne"),
+  res_vb_ci_label = list(en = "95% CI", fr = "IC 95 %"),
+  res_vb_moe_pct_label = list(en = "± of mean", fr = "± de la moyenne"),
+
+  res_histogram_title = list(en = "Total CO₂eq distribution",
+                                fr = "Distribution du CO₂éq total"),
+  res_histogram_subtitle = list(
+    en = "Monte Carlo iterations across the whole inventory. Vertical lines mark the 2.5%/50%/97.5% quantiles.",
+    fr = "Itérations Monte Carlo sur l'inventaire complet. Les lignes verticales marquent les quantiles 2,5 % / 50 % / 97,5 %."
+  ),
+
+  res_decomp_h = list(en = "Uncertainty decomposition", fr = "Décomposition de l'incertitude"),
+  res_decomp_intro = list(
+    en = "How much of the 95% margin of error comes from activity-data (population) uncertainty vs. coefficient (per-head EF) uncertainty.",
+    fr = "Quelle part de la marge d'erreur 95 % provient de l'incertitude des données d'activité (population) vs des coefficients (FE par tête)."
+  ),
+  res_decomp_ad_label = list(en = "Activity data", fr = "Données d'activité"),
+  res_decomp_ef_label = list(en = "Coefficients (EF)", fr = "Coefficients (FE)"),
+  res_decomp_combined_label = list(en = "Combined", fr = "Combinée"),
+
+  res_by_system_h = list(en = "Results by sub-category",
+                            fr = "Résultats par sous-catégorie"),
+  res_by_system_intro = list(
+    en = "Per-sub-category mean and 95% CI for each emission source.",
+    fr = "Moyenne et IC 95 % par sous-catégorie pour chaque source d'émission."
+  ),
+
+  res_by_category_h = list(en = "Results by cattle type",
+                              fr = "Résultats par type de bétail"),
+  res_by_category_intro = list(
+    en = "Aggregated by cattle type (dairy, non-dairy, buffalo).",
+    fr = "Agrégés par type de bétail (laitier, non laitier, buffle)."
+  ),
+
+  res_comparison_h = list(en = "With vs without correlations",
+                             fr = "Avec vs sans corrélations"),
+  res_comparison_intro = list(
+    en = "Side-by-side comparison of the same Monte Carlo run with the correlations you picked vs. with all correlations turned off. The difference shows how much the correlation structure widens or narrows the uncertainty range.",
+    fr = "Comparaison côte à côte de la même simulation Monte Carlo avec les corrélations choisies vs. toutes corrélations désactivées. La différence montre comment la structure des corrélations élargit ou réduit la plage d'incertitude."
+  ),
+  res_comparison_with_label = list(en = "With correlations", fr = "Avec corrélations"),
+  res_comparison_without_label = list(en = "Without correlations", fr = "Sans corrélations"),
+  res_comparison_delta_label = list(en = "Δ (% points)", fr = "Δ (points de %)"),
+
+  # Trend Results value boxes
+  res_vb_trend_latest = list(en = "Latest year — Total CO₂eq",
+                                fr = "Année la plus récente — CO₂éq total"),
+  res_vb_trend_delta = list(en = "Δ vs base year",
+                              fr = "Δ vs année de base"),
+  res_vb_trend_slope = list(en = "Trend slope (per year)",
+                              fr = "Pente de tendance (par an)"),
+  res_vb_trend_yoy = list(en = "Year-over-year change (latest)",
+                            fr = "Variation interannuelle (dernière)"),
+
+  # Simulation status messages
+  sim_status_running = list(en = "Running simulation…", fr = "Simulation en cours…"),
+  sim_status_done = list(en = "Simulation complete.", fr = "Simulation terminée."),
+  sim_status_done_with_decomp = list(
+    en = "Simulation complete. Decomposition computed.",
+    fr = "Simulation terminée. Décomposition calculée."
+  ),
+  sim_status_idle = list(en = "Idle. Click Run to start a simulation.",
+                           fr = "En attente. Cliquez sur Lancer pour démarrer une simulation."),
+  sim_status_failed = list(en = "Simulation failed:", fr = "Échec de la simulation :"),
+  trend_status_running = list(en = "Running trend analysis…",
+                                fr = "Analyse de tendance en cours…"),
+  trend_status_done = list(en = "Trend analysis complete.",
+                             fr = "Analyse de tendance terminée."),
+  trend_status_failed = list(en = "Trend analysis failed:",
+                               fr = "Échec de l'analyse de tendance :"),
+
+  # Results — DT column headers + chart titles
+  res_col_cattle_type    = list(en = "Cattle type", fr = "Type de bétail"),
+  res_col_group          = list(en = "Group", fr = "Groupe"),
+  res_col_source         = list(en = "Source", fr = "Source"),
+  res_col_enteric_ch4_t  = list(en = "Enteric CH₄ (t)", fr = "CH₄ entérique (t)"),
+  res_col_manure_ch4_t   = list(en = "Manure CH₄ (t)", fr = "CH₄ du fumier (t)"),
+  res_col_manure_n2o_t   = list(en = "Manure N₂O (t)", fr = "N₂O du fumier (t)"),
+  res_col_pasture_n2o_t  = list(en = "Pasture N₂O (t)", fr = "N₂O au pâturage (t)"),
+  res_col_total_co2e_t   = list(en = "Total CO₂eq (t)", fr = "CO₂éq total (t)"),
+  res_col_mean_ch4_t     = list(en = "Mean CH₄ (t)", fr = "Moy. CH₄ (t)"),
+  res_col_mean_n2o_t     = list(en = "Mean N₂O (t)", fr = "Moy. N₂O (t)"),
+  res_col_mean_co2e_t    = list(en = "Mean CO₂eq (t)", fr = "Moy. CO₂éq (t)"),
+  res_col_mean_t_ch4     = list(en = "Mean (t CH₄)", fr = "Moy. (t CH₄)"),
+  res_col_mean_t_n2o     = list(en = "Mean (t N₂O)", fr = "Moy. (t N₂O)"),
+  res_col_mean_t_co2e    = list(en = "Mean (t CO₂eq)", fr = "Moy. (t CO₂éq)"),
+  res_col_moe_pct        = list(en = "MoE 95% (%)", fr = "MoE 95 % (%)"),
+  res_col_ci_lower_t     = list(en = "CI lower (t CO₂eq)", fr = "Borne inf. IC (t CO₂éq)"),
+  res_col_ci_upper_t     = list(en = "CI upper (t CO₂eq)", fr = "Borne sup. IC (t CO₂éq)"),
+
+  res_hist_chart_title = list(en = "Distribution of Total CO2eq Emissions",
+                                fr = "Distribution des émissions totales CO₂éq"),
+  res_hist_xaxis = list(en = "Total CO2eq (tonnes)", fr = "CO₂éq total (tonnes)"),
+  res_hist_yaxis = list(en = "Frequency", fr = "Fréquence"),
+  res_decomp_chart_title = list(
+    en = "Uncertainty Decomposition (95% MoE, total CO2eq)",
+    fr = "Décomposition de l'incertitude (MoE 95 %, CO₂éq total)"
+  ),
+  res_decomp_yaxis = list(en = "95% MoE (%)", fr = "MoE 95 % (%)"),
+
+  res_cmp_total_co2e = list(en = "Total CO2eq", fr = "CO₂éq total"),
+  res_cmp_total_ch4  = list(en = "Total CH4", fr = "CH₄ total"),
+  res_cmp_total_n2o  = list(en = "Total N2O", fr = "N₂O total"),
+  res_cmp_chart_title = list(
+    en = "95% MoE comparison: with vs. without correlations",
+    fr = "Comparaison MoE 95 % : avec vs sans corrélations"
+  ),
+
+  sens_view_label = list(en = "View:", fr = "Vue :"),
+
+  res_sim_results_h = list(en = "Simulation results", fr = "Résultats de la simulation"),
+  res_vb_enteric_ch4_t = list(en = "Enteric CH₄ (t)", fr = "CH₄ entérique (t)"),
+  res_vb_manure_ch4_t  = list(en = "Manure CH₄ (t)", fr = "CH₄ du fumier (t)"),
+  res_vb_manure_n2o_t  = list(en = "Manure N₂O (t)", fr = "N₂O du fumier (t)"),
+  res_vb_pasture_n2o_t = list(en = "Pasture N₂O (t)", fr = "N₂O au pâturage (t)"),
+  res_vb_total_moe_pct = list(en = "Total 95% MoE (%)", fr = "MoE 95 % total (%)"),
+  res_vb_total_moe_sub = list(
+    en = "± half-width of 95% CI / mean — IPCC convention",
+    fr = "± demi-largeur IC 95 % / moyenne — convention IPCC"
+  ),
+  res_vb_direct_indirect = list(en = "Direct + indirect", fr = "Direct + indirect"),
+
+  res_inline_total_co2e = list(en = "Total CO₂eq:", fr = "CO₂éq total :"),
+  res_inline_moe = list(en = "95% MoE:", fr = "MoE 95 % :"),
+  res_inline_total_ch4 = list(en = "Total CH₄:", fr = "CH₄ total :"),
+  res_inline_total_n2o = list(en = "Total N₂O:", fr = "N₂O total :"),
+
+  res_headline_by_cattle_h = list(
+    en = "Headline by cattle type (dairy / other)",
+    fr = "Synthèse par type de bétail (laitier / autre)"
+  ),
+  res_headline_by_cattle_note = list(
+    en = "One row per cattle_type from the Parameters sheet. Per-source means are inventory-summed across iterations; ± is the 95 % margin of error (MoE).",
+    fr = "Une ligne par cattle_type de la feuille Parameters. Les moyennes par source sont sommées sur les itérations ; ± est la marge d'erreur 95 % (MoE)."
+  ),
+  res_emission_dist_h = list(en = "Emission Distribution (Total CO₂eq)",
+                                fr = "Distribution des émissions (CO₂éq total)"),
+
+  res_agg_level_label = list(en = "Aggregation level:", fr = "Niveau d'agrégation :"),
+  res_agg_cattle_type = list(en = "Cattle type (dairy / other)",
+                                fr = "Type de bétail (laitier / autre)"),
+  res_agg_production_system = list(en = "Production system",
+                                      fr = "Système de production"),
+  res_agg_sub_category = list(en = "Sub-category", fr = "Sous-catégorie"),
+  res_agg_level_note = list(en = "Tables below aggregate per-iteration results at this level.",
+                              fr = "Les tableaux ci-dessous agrègent les résultats par itération à ce niveau."),
+
+  res_by_system_h = list(en = "By-System Breakdown",
+                            fr = "Détail par système"),
+  res_by_category_h = list(en = "By Reporting Category (IPCC Table 3.3 layout)",
+                              fr = "Par catégorie de rapport (mise en page IPCC Tableau 3.3)"),
+  res_by_category_note = list(
+    en = "Each row is one IPCC inventory reporting line (group × source). Rows match the granularity used in IPCC Volume 1 Chapter 3 uncertainty reporting.",
+    fr = "Chaque ligne est une ligne de rapport d'inventaire IPCC (groupe × source). La granularité correspond à celle des rapports d'incertitude IPCC Volume 1 Chapitre 3."
+  ),
+
+  res_vb_trend_slope_short = list(en = "Trend slope", fr = "Pente de tendance"),
+  res_vb_trend_latest_short = list(en = "Latest year", fr = "Année la plus récente"),
+  res_vb_trend_yoy_largest = list(en = "Largest YoY change",
+                                     fr = "Plus grande variation interannuelle"),
+
+  res_trend_yoy_h = list(en = "Year-over-year % change",
+                           fr = "Variation interannuelle (%)"),
+  res_trend_delta_hist_h = list(
+    en = "Distribution of Δ Y_N − Y_1 — uncertainty on the trend itself",
+    fr = "Distribution de Δ Y_N − Y_1 — incertitude sur la tendance elle-même"
+  ),
+  res_trend_delta_hist_note = list(
+    en = "This histogram shows the Monte Carlo distribution of the absolute change in CO₂eq between the first and last year. The dashed red lines mark the 95% CI; the dotted line marks zero. If zero falls inside the CI, the trend is not statistically distinguishable from no change at this confidence level.",
+    fr = "Cet histogramme montre la distribution Monte Carlo de la variation absolue de CO₂éq entre la première et la dernière année. Les lignes rouges pointillées marquent l'IC 95 % ; la ligne en pointillés marque zéro. Si zéro tombe dans l'IC, la tendance n'est pas statistiquement distinguable d'aucun changement à ce niveau de confiance."
+  ),
+  res_trend_footer_note = list(
+    en = "Sensitivity drivers (per-year + Δ Y_N − Y_1) are on Tab 6 (Sensitivity). Word / Excel / CSV trend reports are on Tab 7 (IPCC Report).",
+    fr = "Les pilotes de sensibilité (par année + Δ Y_N − Y_1) sont sur l'onglet 6 (Sensibilité). Les rapports de tendance Word / Excel / CSV sont sur l'onglet 7 (Rapport IPCC)."
+  ),
+  res_trend_plot_title = list(en = "Trend in total CO₂eq emissions (95% CI)",
+                                fr = "Tendance des émissions CO₂éq totales (IC 95 %)"),
+  res_trend_xaxis_year = list(en = "Inventory year", fr = "Année d'inventaire")
+)
+
+# =============================================================================
+# QA verdict helper — fetches a translated sprintf template by key
+# =============================================================================
+# Usage: qa_msg("bounds_order_fail_lo", lo, mu) returns the formatted string
+# in the current language. Falls back to English if the key or language
+# isn't in .STRINGS. Saves wrapping every QA `add()` call in a manual
+# t() + sprintf() pair.
+qa_msg <- function(key, ...) {
+  tmpl <- t(paste0("qa_msg_", key))
+  if (grepl("^\\[\\?", tmpl)) return(tmpl)  # missing key — propagate
+  sprintf(tmpl, ...)
+}
+
+# =============================================================================
+# Parameter definitions (Definitions tab) — French translations
+# =============================================================================
+# Keyed by canonical parameter name. The English versions live in
+# PARAM_CATALOGUE$definition (R/utils_template.R) and stay authoritative;
+# we only override the displayed `definition` column when .LANG_CURRENT == "fr".
+# IPCC codes (BW, MW, Ym, Bo, EF3_PRP, etc.) and table/equation references
+# (IPCC Vol.4 Ch.10 Eq 10.X, Table 10.Y, 2019R, …) are kept verbatim — they
+# are international identifiers, not translatable text.
+.PARAM_DEFINITIONS_FR <- c(
+  N            = "Nombre d'animaux dans cette sous-catégorie",
+  BW           = "Poids vif moyen des animaux",
+  MW           = "Poids vif adulte (mature) des animaux",
+  WG           = "Gain de poids quotidien moyen — fixer 0 pour les animaux adultes (non en croissance)",
+  Milk         = "Rendement laitier quotidien par vache en lactation (pas la moyenne de la sous-catégorie — l'outil multiplie par pct_pregnant en interne). Fixer 0 pour les sous-catégories qui ne lactent pas.",
+  Fat          = "Teneur en matière grasse du lait (% en poids)",
+  pct_pregnant = "Fraction des femelles de cette sous-catégorie gestantes pendant l'année, entre 0 et 1 — inclut les génisses gestantes n'ayant pas encore vêlé. Pondère Cpregnancy dans l'Éq IPCC 10.13 (NEp) et le terme de rétention de N du lait dans l'Éq 10.33 ; l'outil l'applique aussi comme poids de lactation dans l'Éq 10.8 (NEl). Pour les sous-catégories où les populations en lactation et en gestation diffèrent, entrer la fraction gestante.",
+  DE           = "Énergie digestible en pourcentage de l'énergie brute — plage typique 45-75 %",
+  Cfi          = "Coefficient d'énergie d'entretien — dépend du sexe et de l'état de lactation (IPCC Tableau 10.4)",
+  Ca           = "Coefficient d'activité pour l'énergie de locomotion — dépend de la situation alimentaire (IPCC Tableau 10.5)",
+  C            = "Coefficient de croissance pour l'équation NEg — dépend du sexe et de l'état physiologique (IPCC Éq 10.6)",
+  Cp           = "Coefficient de gestation — 0,10 pour les animaux gestants (IPCC Tableau 10.7)",
+  hours        = "Heures de travail quotidiennes (Éq. 10.11) — fixer 0 si les animaux ne travaillent pas ; pertinent uniquement lorsque les animaux sont utilisés pour la traction/portage",
+  CP           = "Teneur en protéines brutes (CP %) de la ration — utilisée pour estimer l'excrétion d'azote",
+  Ym           = "Facteur de conversion en méthane : % de l'énergie brute convertie en méthane (IPCC Tableau 10.12)",
+  Bo           = "Capacité maximale de production de CH₄ du fumier (IPCC Tableau 10.16)",
+  ASH          = "Teneur en cendres du fumier — valeur IPCC par défaut 0,08 (note de bas de page Éq 10.24)",
+  UE           = "Énergie urinaire en fraction de l'énergie brute — valeur IPCC par défaut 0,04 (note de bas de page Éq 10.24)",
+  EF3_PRP      = "Facteur d'émission N₂O pour les excréments/urine au pâturage (IPCC Vol.4 Ch.11 Tableau 11.1). 2019R EF3_PRP,CPP pour bovins/volailles/porcs : agrégé 0,004 ; climat humide 0,006 ; climat sec 0,002. 2006 = 0,02.",
+  EF4          = "FE N₂O pour le dépôt atmosphérique d'azote (IPCC Vol.4 Ch.11 Tableau 11.3). 2019R agrégé EF4 = 0,010 (plage 0,002-0,018) ; climat humide 0,014 ; climat sec 0,005. 2006 = 0,010.",
+  EF5          = "FE N₂O pour le lessivage/ruissellement d'azote (IPCC Vol.4 Ch.11 Tableau 11.3). 2019R EF5 = 0,011 (plage 0,000-0,020), sans désagrégation climatique. 2006 = 0,0075.",
+  Frac_GASM_PRP = "Fraction d'azote volatilisée à partir des excréments/urine au pâturage (IPCC Vol.4 Ch.11 Tableau 11.3, FracGASM). 2019R = 0,21 (plage 0,00-0,31) ; 2006 = 0,20.",
+  Frac_LEACH_PRP = "Fraction d'azote lessivée à partir du dépôt au pâturage (IPCC Vol.4 Ch.11 Tableau 11.3, FracLEACH-(H), climats humides uniquement). 2019R = 0,24 (plage 0,01-0,73) ; 2006 = 0,30 ; en climats secs = 0.",
+  MilkPR       = "Teneur en protéines du lait — alimente le terme N du lait dans l'Éq IPCC Vol.4 Ch.10 10.33 (rétention d'azote pour les bovins, où la conversion 6,38 protéine-laitière-vers-N est définie)",
+  Tw           = "Température moyenne quotidienne en hiver (°C) — ajustement Cfi climat froid selon IPCC Vol.4 Ch.10 Éq 10.2 (modifie Cfi de l'Éq 10.3). Laisser vide ou fixer 20 pour désactiver l'ajustement"
+)
+
+# Unit strings (French). Most physical units stay identical; only words like
+# "head", "fraction", "dimensionless" change.
+.PARAM_UNITS_FR <- c(
+  N            = "têtes",
+  BW           = "kg",
+  MW           = "kg",
+  WG           = "kg/jour",
+  Milk         = "kg/tête/jour",
+  Fat          = "%",
+  pct_pregnant = "fraction (0-1)",
+  DE           = "%",
+  Cfi          = "MJ/jour/kg^0,75",
+  Ca           = "sans dimension",
+  C            = "sans dimension",
+  Cp           = "sans dimension",
+  hours        = "heures/jour",
+  CP           = "%",
+  Ym           = "%",
+  Bo           = "m3 CH₄/kg VS",
+  ASH          = "fraction",
+  UE           = "fraction",
+  EF3_PRP      = "kg N2O-N/kg N",
+  EF4          = "kg N2O-N/kg N",
+  EF5          = "kg N2O-N/kg N",
+  Frac_GASM_PRP = "fraction",
+  Frac_LEACH_PRP = "fraction",
+  MilkPR       = "%",
+  Tw           = "°C"
 )

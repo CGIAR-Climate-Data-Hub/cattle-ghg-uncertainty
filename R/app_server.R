@@ -454,12 +454,11 @@ app_server <- function(input, output, session) {
   output$imputed_params_card <- renderUI({
     rows <- imputed_rows()
     if (is.null(rows)) return(NULL)
+    n <- nrow(rows)
+    body_tmpl <- if (n == 1L) t("imputed_card_body_single") else t("imputed_card_body_plural")
     tagList(
-      tags$p(
-        sprintf("%d parameter%s not supplied in your upload — auto-filled from IPCC defaults so the simulation could run. Override these values in the template if you have country-specific data.",
-                nrow(rows), if (nrow(rows) == 1) "" else "s"),
-        style = "margin-bottom:8px; color:#92400E;"
-      ),
+      tags$p(sprintf(body_tmpl, n),
+             style = "margin-bottom:8px; color:#92400E;"),
       DT::DTOutput("imputed_params_dt")
     )
   })
@@ -482,17 +481,22 @@ app_server <- function(input, output, session) {
     ref_user  <- if ("ipcc_ref" %in% names(rows)) rows$ipcc_ref else rep(NA_character_, nrow(rows))
     unit_disp <- pick(unit_user, rows$unit_cat)
     ref_disp  <- pick(ref_user,  rows$ipcc_ref_cat)
-    src_disp  <- if ("data_source" %in% names(rows)) rows$data_source else rep("AUTO-FILLED (IPCC default)", nrow(rows))
+    src_disp  <- if ("data_source" %in% names(rows)) rows$data_source else rep(t("imputed_default_source"), nrow(rows))
 
     display <- data.frame(
-      Parameter = rows$parameter,
-      `Default value used` = formatC(rows$mean, digits = 4, format = "g"),
-      Unit = unit_disp,
-      `IPCC reference` = ref_disp,
-      Source = src_disp,
+      param = rows$parameter,
+      default = formatC(rows$mean, digits = 4, format = "g"),
+      unit = unit_disp,
+      ref = ref_disp,
+      source = src_disp,
       check.names = FALSE,
       stringsAsFactors = FALSE
     )
+    names(display) <- c(t("imputed_dt_col_param"),
+                         t("imputed_dt_col_default"),
+                         t("imputed_dt_col_unit"),
+                         t("imputed_dt_col_ref"),
+                         t("imputed_dt_col_source"))
 
     DT::datatable(
       display,
@@ -510,21 +514,21 @@ app_server <- function(input, output, session) {
     if (is.null(rows) || nrow(rows) == 0) return(NULL)
     n <- nrow(rows)
     param_list <- paste(rows$parameter, collapse = ", ")
+    title_tmpl <- if (n == 1L) t("imputed_notice_title_single") else t("imputed_notice_title_plural")
     tags$div(
       style = "background:#FEF3C7; border-left:4px solid #F59E0B; border-radius:8px; padding:14px 16px; margin-bottom:14px;",
       tags$p(style = "margin:0 0 6px; font-weight:600; color:#92400E;",
              icon("triangle-exclamation"),
-             sprintf(" %d parameter%s auto-filled from IPCC defaults",
-                     n, if (n == 1) "" else "s")),
+             sprintf(title_tmpl, n)),
       tags$p(style = "margin:0 0 8px; font-size:0.88rem; color:#92400E;",
-             tags$strong("Parameters: "), param_list),
+             tags$strong(paste0(t("imputed_notice_params_label"), " ")), param_list),
       tags$table(
         style = "width:100%; border-collapse:collapse; font-size:0.82rem;",
         tags$thead(
           tags$tr(style = "background:rgba(245,158,11,0.15);",
-            tags$th(style = "padding:4px 8px; text-align:left;", "Parameter"),
-            tags$th(style = "padding:4px 8px; text-align:left;", "IPCC default used"),
-            tags$th(style = "padding:4px 8px; text-align:left;", "IPCC reference")
+            tags$th(style = "padding:4px 8px; text-align:left;", t("imputed_th_param")),
+            tags$th(style = "padding:4px 8px; text-align:left;", t("imputed_th_default")),
+            tags$th(style = "padding:4px 8px; text-align:left;", t("imputed_th_ref"))
           )
         ),
         tags$tbody(
@@ -545,8 +549,9 @@ app_server <- function(input, output, session) {
       ),
       tags$p(style = "margin:8px 0 0; font-size:0.8rem; color:#92400E;",
              icon("info-circle"),
-             " These are IPCC defaults — replace with country-specific values in your template where available. Full details and QA flags are on the ",
-             tags$strong("QA/QC"), " tab.")
+             t("imputed_notice_tail_pre"),
+             tags$strong(t("imputed_notice_tail_qaqc")),
+             t("imputed_notice_tail_post"))
     )
   })
   outputOptions(output, "imputed_params_notice_tab1", suspendWhenHidden = FALSE)
@@ -555,41 +560,44 @@ app_server <- function(input, output, session) {
     df <- qaqc_result()
     s  <- qaqc_summary(df)
     if (nrow(df) == 0)
-      return(tags$p("Load data first.", style = "color:#888;"))
+      return(tags$p(t("imputed_load_data_first"), style = "color:#888;"))
     tags$div(
       style = "display:flex; gap:8px; flex-wrap:wrap;",
       if ((s$n_missing %||% 0) > 0)
         tags$span(
           style = "font-size:1rem; padding:6px 14px; background-color:#FEF3C7; color:#92400E; border-radius:4px; font-weight:600;",
-          paste(s$n_missing, "auto-filled")),
+          paste(s$n_missing, t("qa_badge_autofilled"))),
       tags$span(class = "badge bg-success",
                 style = "font-size:1rem; padding:6px 14px;",
-                paste(s$n_pass, "pass")),
+                paste(s$n_pass, t("qa_badge_pass"))),
       if ((s$n_info %||% 0) > 0)
         tags$span(class = "badge",
                   style = "font-size:1rem; padding:6px 14px; background-color:#1565C0; color:#fff;",
-                  paste(s$n_info, "info")),
+                  paste(s$n_info, t("qa_badge_info"))),
       tags$span(class = "badge bg-warning text-dark",
                 style = "font-size:1rem; padding:6px 14px;",
-                paste(s$n_warn, "warn")),
+                paste(s$n_warn, t("qa_badge_warn"))),
       tags$span(class = "badge bg-danger",
                 style = "font-size:1rem; padding:6px 14px;",
-                paste(s$n_fail, "fail"))
+                paste(s$n_fail, t("qa_badge_fail")))
     )
   })
 
   output$qaqc_table <- DT::renderDT({
     df <- qaqc_result()
-    if (nrow(df) == 0)
-      return(DT::datatable(data.frame(message = "No data loaded."),
-                           rownames = FALSE, options = list(dom = "t")))
+    if (nrow(df) == 0) {
+      empty <- data.frame(message = t("qa_no_data"))
+      names(empty) <- t("qa_col_message")
+      return(DT::datatable(empty, rownames = FALSE, options = list(dom = "t")))
+    }
     df$status_icon <- sapply(df$status, qaqc_icon)
     display <- df[, c("group", "parameter", "check", "status_icon", "message")]
     DT::datatable(
       display,
       escape    = FALSE,
       rownames  = FALSE,
-      colnames  = c("Group", "Parameter", "Check", "Status", "Message"),
+      colnames  = c(t("qa_col_group"), t("qa_col_parameter"),
+                     t("qa_col_check"), t("qa_col_status"), t("qa_col_message")),
       options   = list(
         pageLength = 50,
         dom        = "ftp",
@@ -860,20 +868,16 @@ app_server <- function(input, output, session) {
       tagList(
         tags$div(
           style = "opacity:0.55; pointer-events:none;",
-          checkboxInput("run_comparison",
-                        "Compare with/without correlations",
-                        value = FALSE)
+          checkboxInput("run_comparison", t("cmp_run_label"), value = FALSE)
         ),
         tags$div(
           style = "font-size:0.78rem; color:#92400E; background:#FEF3C7; padding:6px 10px; border-radius:4px; margin-top:-6px; margin-bottom:8px;",
           icon("info-circle"),
-          tags$em(" No correlations selected on Tab 4 — comparison would be identical to the main run, so this option is disabled. Enable a correlation mode to activate it.")
+          tags$em(t("cmp_disabled_long"))
         )
       )
     } else {
-      checkboxInput("run_comparison",
-                    "Compare with/without correlations",
-                    value = FALSE)
+      checkboxInput("run_comparison", t("cmp_run_label"), value = FALSE)
     }
   })
 
@@ -917,7 +921,7 @@ app_server <- function(input, output, session) {
 
     label_for <- function(value, title, enabled, help_enabled, help_disabled) {
       help <- if (enabled) help_enabled
-              else tagList(tags$strong("Disabled — "), help_disabled)
+              else tagList(tags$strong(t("corr_disabled_prefix")), help_disabled)
       help_style <- "font-size:0.78rem; color:#52525B; line-height:1.4; margin-top:-2px; margin-bottom:6px;"
       wrap_style <- if (!enabled) "opacity:0.45; cursor:not-allowed;" else ""
       tags$span(
@@ -929,36 +933,37 @@ app_server <- function(input, output, session) {
 
     radio <- radioButtons("corr_mode",
       label = tagList(
-        "Mode ",
+        paste0(t("corr_mode_label"), " "),
         bslib::tooltip(
           tags$span(icon("circle-question"),
                     style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-          "How should the tool decide which input parameters move together? Modes whose prerequisites are missing (no time-series, no manual matrix uploaded) are greyed out below.",
+          t("tip_corr_mode"),
           placement = "right"
         )
       ),
       choiceValues = c("none", "timeseries", "preset", "manual"),
       choiceNames = list(
-        label_for("none", "No correlations (default)",
+        label_for("none", t("corr_mode_none"),
           enabled       = TRUE,
-          help_enabled  = "Pick this if you have no information about how your parameters move together. Matches the standard IPCC Approach 2 starting point."),
-        label_for("timeseries", "From template (auto, time-series)",
+          help_enabled  = t("corr_help_none")),
+        label_for("timeseries", t("corr_mode_ts"),
           enabled       = ts_ok,
-          help_enabled  = tagList("Pick this when your upload contains a ", tags$code("Parameter_TimeSeries"), " sheet with ≥5 years of data. ", tags$em("Recommended whenever you have the data.")),
-          help_disabled = tagList("your ", tags$code("Parameter_TimeSeries"), " sheet is empty or missing. Upload a template with a populated TS sheet (≥5 years, ≥2 numeric columns) to enable.")),
-        label_for("preset", "Structural defaults (expert-elicited)",
+          help_enabled  = tagList(t("corr_help_ts_pre"),
+                                   tags$code(t("corr_ts_param_ts")),
+                                   t("corr_help_ts_post"),
+                                   tags$em(t("corr_help_ts_em"))),
+          help_disabled = tagList(t("corr_help_ts_disabled_pre"),
+                                   tags$code(t("corr_ts_param_ts")),
+                                   t("corr_help_ts_disabled_post"))),
+        label_for("preset", t("corr_mode_preset"),
           enabled       = has_template,
-          help_enabled  = tagList("Known biological linkages (BW↔MW, DE↔Ym, Milk↔BW, Milk↔DE, etc.) applied automatically. ", tags$em("Recommended for single-year inventories.")),
-          help_disabled = "no parameter data loaded yet. Load Country X / Country Y or upload your own template to enable."),
-        label_for("manual", "Advanced — manual entry",
-          # Always enabled: the file picker is inside this option's conditional
-          # panel, so the user has to be able to select it to reach the upload.
-          # Help text adapts to whether a CSV is already loaded.
+          help_enabled  = tagList(t("corr_help_preset"),
+                                   tags$em(t("corr_help_preset_em"))),
+          help_disabled = t("corr_help_preset_disabled")),
+        label_for("manual", t("corr_mode_advanced_manual_short"),
           enabled       = TRUE,
-          help_enabled  = if (manual_ok)
-            "A manual CSV matrix is loaded — using it for the run. Re-upload below to replace."
-          else
-            "Pick this to use a CSV correlation matrix. Two starting templates appear below — a blank matrix with all parameter names pre-labelled, and an example pre-filled with the structural-defaults pairs. Edit cells and re-upload.")
+          help_enabled  = if (manual_ok) t("corr_help_manual_loaded")
+                            else t("corr_help_manual_pick"))
       ),
       selected = current_mode)
 
@@ -990,7 +995,7 @@ app_server <- function(input, output, session) {
     mtx <- effective_corr_matrix()
     if (is.null(mtx)) {
       plotly::plot_ly() %>%
-        plotly::layout(title = "No correlation matrix loaded",
+        plotly::layout(title = t("corr_heatmap_no_matrix"),
                        xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
     } else {
       # 2026-05 audit follow-up: when the structural-defaults preset is active,
@@ -1013,28 +1018,22 @@ app_server <- function(input, output, session) {
                       text = hover, hoverinfo = "x+y+z+text",
                       colorscale = list(c(0, "#C1121F"), c(0.5, "#FFFFFF"), c(1, "#2D6A4F")),
                       zmin = -1, zmax = 1) %>%
-        plotly::layout(title = "Activity Data Correlation Matrix")
+        plotly::layout(title = t("corr_heatmap_title_ad"))
     }
   })
 
   output$corr_ts_status <- renderUI({
     if (is.null(rv$corr_matrix)) {
-      # R2.2: message disambiguates "no template loaded yet" from "template
-      # has no time-series sheet". The built-in examples now include
-      # time-series, so the most likely cause of seeing this card is a real
-      # upload that didn't include the Parameter_TimeSeries sheet.
       div(style = "font-size:0.85rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px;",
           icon("exclamation-triangle"),
-          " No time-series data in the loaded inventory. To enable auto-correlation, ",
-          "upload a template with a populated ",
-          tags$strong("Parameter_TimeSeries"),
-          " sheet, or load Country X / Country Y from the dropdown ",
-          "(both ship with example time-series).")
+          t("corr_ts_no_data"),
+          tags$strong(t("corr_ts_param_ts")),
+          t("corr_ts_no_data_tail"))
     } else {
       n <- nrow(rv$corr_matrix)
       nms <- paste(rownames(rv$corr_matrix), collapse = ", ")
       div(style = "font-size:0.85rem; color:#1B4332; background:#D8F3DC; padding:8px 10px; border-radius:6px;",
-          icon("check-circle"), sprintf(" Correlation matrix loaded: %d parameters (%s).", n, nms))
+          icon("check-circle"), sprintf(t("corr_ts_loaded"), n, nms))
     }
   })
 
@@ -1090,7 +1089,7 @@ app_server <- function(input, output, session) {
       tags$div(
         style = "font-size:0.82rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px; margin-top:8px;",
         icon("exclamation-triangle"),
-        " All three within-block ρ sliders are at 0 — block-structured EF correlation will have no effect. Move at least one slider above 0, or switch the mode above back to ", tags$strong("No EF correlations"), "."
+        " ", t("corr_ef_zero_warning")
       )
     }
   })
@@ -1099,10 +1098,11 @@ app_server <- function(input, output, session) {
     mat <- ef_corr_reactive()
     if (is.null(mat)) {
       plotly::plot_ly() %>%
-        plotly::layout(title = "No EF correlation (independent sampling)",
+        plotly::layout(title = t("corr_ef_no_corr"),
                        xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
     } else {
-      title_str <- sprintf("EF Correlation Matrix — block (energy=%.2f, manureCH=%.2f, manureN=%.2f)",
+      title_str <- sprintf("%s — energy=%.2f, manureCH=%.2f, manureN=%.2f",
+                           t("corr_heatmap_title_ef"),
                            input$ef_rho_energy   %||% 0,
                            input$ef_rho_manureCH %||% 0,
                            input$ef_rho_manureN  %||% 0)
@@ -2053,9 +2053,9 @@ app_server <- function(input, output, session) {
     plotly::plot_ly(x = co2e, type = "histogram", nbinsx = 50,
                     marker = list(color = "#2D6A4F", line = list(color = "#1B4332", width = 1))) %>%
       plotly::layout(
-        title = "Distribution of Total CO2eq Emissions",
-        xaxis = list(title = "Total CO2eq (tonnes)"),
-        yaxis = list(title = "Frequency"),
+        title = t("res_hist_chart_title"),
+        xaxis = list(title = t("res_hist_xaxis")),
+        yaxis = list(title = t("res_hist_yaxis")),
         shapes = list(
           list(type = "line", x0 = ci[1], x1 = ci[1], y0 = 0, y1 = 1,
                yref = "paper", line = list(color = "#C1121F", dash = "dash")),
@@ -2072,9 +2072,9 @@ app_server <- function(input, output, session) {
   # rv$decomposition directly.
   output$decomposition_plot <- plotly::renderPlotly({
     req(rv$decomposition)
-    categories <- c("AD Only", "EF Only", "Combined")
-    moe_vals <- sapply(categories, function(cat) {
-      df <- switch(cat,
+    cat_keys <- c("AD Only", "EF Only", "Combined")
+    moe_vals <- sapply(cat_keys, function(k) {
+      df <- switch(k,
         "AD Only"  = rv$decomposition$ad_only,
         "EF Only"  = rv$decomposition$ef_only,
         "Combined" = rv$decomposition$combined
@@ -2082,11 +2082,14 @@ app_server <- function(input, output, session) {
       row <- df[df$variable == "total_co2e", ]
       if (nrow(row) > 0) row$moe_pct else NA
     })
+    cat_labels <- c(t("res_decomp_ad_label"),
+                     t("res_decomp_ef_label"),
+                     t("res_decomp_combined_label"))
 
-    plotly::plot_ly(x = categories, y = moe_vals, type = "bar",
+    plotly::plot_ly(x = cat_labels, y = moe_vals, type = "bar",
                     marker = list(color = c("#40916C", "#4361EE", "#2D6A4F"))) %>%
-      plotly::layout(title = "Uncertainty Decomposition (95% MoE, total CO2eq)",
-                     yaxis = list(title = "95% MoE (%)"))
+      plotly::layout(title = t("res_decomp_chart_title"),
+                     yaxis = list(title = t("res_decomp_yaxis")))
   })
 
   # ---- Simulation diagnostics ----
@@ -2276,15 +2279,21 @@ app_server <- function(input, output, session) {
       manure_n2o  <- r$direct_n2o_mm_total  + r$indirect_n2o_mm_total
       pasture_n2o <- r$direct_n2o_prp_total + r$indirect_n2o_prp_total
       data.frame(
-        `Cattle type`        = gn,
-        `Enteric CH₄ (t)`    = fmt(r$enteric_ch4_total),
-        `Manure CH₄ (t)`     = fmt(r$manure_ch4_total),
-        `Manure N₂O (t)`     = fmt(manure_n2o),
-        `Pasture N₂O (t)`    = fmt(pasture_n2o),
-        `Total CO₂eq (t)`    = fmt(r$total_co2e),
+        cattle = gn,
+        enteric = fmt(r$enteric_ch4_total),
+        m_ch4 = fmt(r$manure_ch4_total),
+        m_n2o = fmt(manure_n2o),
+        p_n2o = fmt(pasture_n2o),
+        co2e  = fmt(r$total_co2e),
         check.names = FALSE)
     })
     df <- do.call(rbind, rows)
+    names(df) <- c(t("res_col_cattle_type"),
+                    t("res_col_enteric_ch4_t"),
+                    t("res_col_manure_ch4_t"),
+                    t("res_col_manure_n2o_t"),
+                    t("res_col_pasture_n2o_t"),
+                    t("res_col_total_co2e_t"))
     DT::datatable(df, rownames = FALSE,
                   options = list(dom = "t", paging = FALSE, ordering = FALSE,
                                  scrollX = TRUE))
@@ -2301,19 +2310,22 @@ app_server <- function(input, output, session) {
       lo  <- quantile(res$total_co2e, 0.025, names = FALSE)
       hi  <- quantile(res$total_co2e, 0.975, names = FALSE)
       data.frame(
-        Group = gn,
-        `Mean CH₄ (t)` = round(mean(res$total_ch4), 2),
-        `Mean N₂O (t)` = round(mean(res$total_n2o), 4),
-        `Mean CO₂eq (t)` = round(m, 2),
-        # 2026-06: dropped CV column — every user-facing uncertainty figure
-        # in the app reports as 95% MoE (IPCC Vol.1 Ch.3 Table 3.3 convention).
-        `MoE 95% (%)` = round(((hi - lo) / 2) / m * 100, 1),
-        `CI lower (t CO₂eq)` = round(lo, 2),
-        `CI upper (t CO₂eq)` = round(hi, 2),
+        g    = gn,
+        ch4  = round(mean(res$total_ch4), 2),
+        n2o  = round(mean(res$total_n2o), 4),
+        co2e = round(m, 2),
+        moe  = round(((hi - lo) / 2) / m * 100, 1),
+        lo   = round(lo, 2),
+        hi   = round(hi, 2),
         check.names = FALSE
       )
     })
-    DT::datatable(do.call(rbind, summary_rows), rownames = FALSE,
+    df <- do.call(rbind, summary_rows)
+    names(df) <- c(t("res_col_group"), t("res_col_mean_ch4_t"),
+                    t("res_col_mean_n2o_t"), t("res_col_mean_co2e_t"),
+                    t("res_col_moe_pct"),
+                    t("res_col_ci_lower_t"), t("res_col_ci_upper_t"))
+    DT::datatable(df, rownames = FALSE,
                   options = list(pageLength = 20, scrollX = TRUE))
   })
 
@@ -2354,12 +2366,12 @@ app_server <- function(input, output, session) {
     g_n2o <- gwp_vals$N2O
 
     sources <- list(
-      list(label = "Enteric fermentation CH₄",        gas = "CH4", col = "enteric_ch4_total"),
-      list(label = "Manure management CH₄",           gas = "CH4", col = "manure_ch4_total"),
-      list(label = "Manure management N₂O direct",    gas = "N2O", col = "direct_n2o_mm_total"),
-      list(label = "Manure management N₂O indirect",  gas = "N2O", col = "indirect_n2o_mm_total"),
-      list(label = "Pasture deposition N₂O direct",   gas = "N2O", col = "direct_n2o_prp_total"),
-      list(label = "Pasture deposition N₂O indirect", gas = "N2O", col = "indirect_n2o_prp_total")
+      list(label = t("src_enteric_ch4"),   gas = "CH4", col = "enteric_ch4_total"),
+      list(label = t("src_manure_ch4"),    gas = "CH4", col = "manure_ch4_total"),
+      list(label = t("src_manure_n2o_d"),  gas = "N2O", col = "direct_n2o_mm_total"),
+      list(label = t("src_manure_n2o_i"),  gas = "N2O", col = "indirect_n2o_mm_total"),
+      list(label = t("src_pasture_n2o_d"), gas = "N2O", col = "direct_n2o_prp_total"),
+      list(label = t("src_pasture_n2o_i"), gas = "N2O", col = "indirect_n2o_prp_total")
     )
 
     rows <- list()
@@ -2376,28 +2388,30 @@ app_server <- function(input, output, session) {
         lo <- quantile(co2e, 0.025, names = FALSE)
         hi <- quantile(co2e, 0.975, names = FALSE)
         rows[[length(rows) + 1]] <- data.frame(
-          `Cattle type`        = ct,
-          Group                = gn,
-          Source               = s$label,
-          `Mean (t CH₄)`       = if (s$gas == "CH4") round(m_raw, 3)  else NA_real_,
-          `Mean (t N₂O)`       = if (s$gas == "N2O") round(m_raw, 4)  else NA_real_,
-          `Mean (t CO₂eq)`     = round(m_co2e, 2),
-          # 2026-06: dropped the redundant CV (%) column — every user-facing
-          # uncertainty figure in the app now reports as 95% MoE (the IPCC Vol.1
-          # Ch.3 Table 3.3 convention). cv_pct is still in calc_all_uncertainty()
-          # output for advanced reproducibility.
-          `MoE 95% (%)`        = if (m_co2e > 0) round(((hi - lo) / 2) / m_co2e * 100, 1) else NA_real_,
-          `CI lower (t CO₂eq)` = round(lo, 2),
-          `CI upper (t CO₂eq)` = round(hi, 2),
+          cattle  = ct,
+          group   = gn,
+          source  = s$label,
+          m_ch4   = if (s$gas == "CH4") round(m_raw, 3)  else NA_real_,
+          m_n2o   = if (s$gas == "N2O") round(m_raw, 4)  else NA_real_,
+          m_co2e  = round(m_co2e, 2),
+          moe     = if (m_co2e > 0) round(((hi - lo) / 2) / m_co2e * 100, 1) else NA_real_,
+          ci_lo   = round(lo, 2),
+          ci_hi   = round(hi, 2),
           check.names = FALSE
         )
       }
     }
     if (length(rows) == 0) return(DT::datatable(data.frame()))
     df <- do.call(rbind, rows)
-    # When the secondary level IS cattle_type, the Group column duplicates
-    # the new Cattle-type column; drop it for a tidier table.
-    if (level == "cattle_type") df$Group <- NULL
+    if (level == "cattle_type") df$group <- NULL
+    new_names <- c(t("res_col_cattle_type"))
+    if (level != "cattle_type") new_names <- c(new_names, t("res_col_group"))
+    new_names <- c(new_names, t("res_col_source"),
+                    t("res_col_mean_t_ch4"), t("res_col_mean_t_n2o"),
+                    t("res_col_mean_t_co2e"),
+                    t("res_col_moe_pct"),
+                    t("res_col_ci_lower_t"), t("res_col_ci_upper_t"))
+    names(df) <- new_names
     DT::datatable(df, rownames = FALSE,
                   options = list(pageLength = 30, scrollX = TRUE))
   })
@@ -2406,7 +2420,7 @@ app_server <- function(input, output, session) {
   output$comparison_card <- renderUI({
     if (is.null(rv$comparison_result)) return(NULL)
     bslib::card(
-      bslib::card_header("Effect of Correlations on Uncertainty"),
+      bslib::card_header(t("res_comparison_h")),
       bslib::card_body(plotly::plotlyOutput("comparison_plot", height = "320px"))
     )
   })
@@ -2415,14 +2429,11 @@ app_server <- function(input, output, session) {
     req(rv$mc_results, rv$comparison_result)
 
     vars   <- c("total_co2e", "total_ch4", "total_n2o")
-    labels <- c("Total CO2eq", "Total CH4", "Total N2O")
+    labels <- c(t("res_cmp_total_co2e"), t("res_cmp_total_ch4"), t("res_cmp_total_n2o"))
 
     unc_with    <- calc_all_uncertainty(rv$mc_results$inventory)
     unc_without <- calc_all_uncertainty(rv$comparison_result$inventory)
 
-    # 2026-06: switched from cv_pct to moe_pct to match the IPCC 2006 Vol.1
-    # Ch.3 Table 3.3 reporting convention used by every other uncertainty
-    # display in the app (Results tables, IPCC Annex 7, Word report).
     get_moe <- function(unc, v) {
       row <- unc[unc$variable == v, ]
       if (nrow(row) > 0) round(row$moe_pct, 1) else NA_real_
@@ -2432,14 +2443,16 @@ app_server <- function(input, output, session) {
     moe_without <- sapply(vars, get_moe, unc = unc_without)
 
     plotly::plot_ly() %>%
-      plotly::add_bars(x = labels, y = moe_with,    name = "With correlations",
+      plotly::add_bars(x = labels, y = moe_with,
+                       name = t("res_comparison_with_label"),
                        marker = list(color = "#2D6A4F")) %>%
-      plotly::add_bars(x = labels, y = moe_without, name = "Without correlations",
+      plotly::add_bars(x = labels, y = moe_without,
+                       name = t("res_comparison_without_label"),
                        marker = list(color = "#90A4AE")) %>%
       plotly::layout(
         barmode = "group",
-        title   = "95% MoE comparison: with vs. without correlations",
-        yaxis   = list(title = "95% MoE (%)"),
+        title   = t("res_cmp_chart_title"),
+        yaxis   = list(title = t("res_decomp_yaxis")),
         xaxis   = list(title = ""),
         legend  = list(orientation = "h", y = -0.25)
       )
@@ -2452,9 +2465,10 @@ app_server <- function(input, output, session) {
     if (is.null(rv$comparison_result)) return(NULL)
     div(
       style = "margin: 0 16px 12px 16px;",
-      radioButtons("sens_view", "View:",
-                   choices = c("With correlations"    = "with",
-                               "Without correlations" = "without"),
+      radioButtons("sens_view", t("sens_view_label"),
+                   choices = setNames(c("with", "without"),
+                                        c(t("res_comparison_with_label"),
+                                          t("res_comparison_without_label"))),
                    selected = "with", inline = TRUE)
     )
   })
@@ -2664,23 +2678,34 @@ app_server <- function(input, output, session) {
   # renamed to "Variable name".
   output$definitions_table <- DT::renderDT({
     cat <- PARAM_CATALOGUE
+    is_fr <- identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                             ifnotfound = "en"), "fr")
+    # Swap French definitions / units when the user picked French. IPCC codes
+    # (Ym, Bo, EF3_PRP, …) and table refs stay verbatim — see R/i18n.R.
+    if (is_fr) {
+      fr_def <- .PARAM_DEFINITIONS_FR[cat$parameter]
+      fr_unit <- .PARAM_UNITS_FR[cat$parameter]
+      cat$definition <- ifelse(is.na(fr_def), cat$definition, fr_def)
+      cat$unit       <- ifelse(is.na(fr_unit), cat$unit, fr_unit)
+      cat$param_tier <- ifelse(cat$param_tier == "core",
+                                t("def_tier_core"),
+                                t("def_tier_advanced"))
+    }
     cat$ipcc_framing <- ifelse(cat$parameter %in% c("cattle_pop", "N"),
-                               "Activity data (population)",
-                               "Coefficient (combines into EF)")
+                               t("def_framing_ad"),
+                               t("def_framing_coef"))
     DT::datatable(
       cat[, c("parameter", "definition", "unit",
               "ipcc_default", "suggested_distribution",
               "param_tier", "ipcc_framing", "ipcc_ref")],
       rownames = FALSE,
-      colnames = c("Variable name" = "parameter",
-                   "Definition" = "definition",
-                   "Unit" = "unit",
-                   "IPCC default" = "ipcc_default",
-                   "Suggested distribution" = "suggested_distribution",
-                   "Level" = "param_tier",
-                   "IPCC framing" = "ipcc_framing",
-                   "IPCC reference" = "ipcc_ref"),
-      # Show all 28 parameters in a single scrollable list (no pagination).
+      colnames = setNames(
+        c("parameter", "definition", "unit", "ipcc_default",
+          "suggested_distribution", "param_tier",
+          "ipcc_framing", "ipcc_ref"),
+        c(t("def_col_variable"), t("def_col_definition"), t("def_col_unit"),
+          t("def_col_ipcc_default"), t("def_col_dist"), t("def_col_level"),
+          t("def_col_ipcc_framing"), t("def_col_ipcc_ref"))),
       options = list(pageLength = -1, dom = "t", scrollX = TRUE),
       class = "compact stripe"
     )
@@ -3270,17 +3295,19 @@ app_server <- function(input, output, session) {
     } else NULL
     plotly::plot_ly() |>
       plotly::add_ribbons(x = df$Year, ymin = df$CI_Lower_t, ymax = df$CI_Upper_t,
-                          name = "95% CI", line = list(color = "transparent"),
+                          name = t("res_vb_ci_label"),
+                          line = list(color = "transparent"),
                           fillcolor = "rgba(45,106,79,0.25)") |>
       plotly::add_trace(x = df$Year, y = df$Mean_t_CO2eq,
                         type = "scatter", mode = "lines+markers",
-                        name = "Mean", line = list(color = "#1B4332", width = 3),
+                        name = t("res_vb_mean_label"),
+                        line = list(color = "#1B4332", width = 3),
                         marker = list(size = 8, color = "#1B4332")) |>
       plotly::layout(
-        title = list(text = paste0("Trend in total CO₂eq emissions (95% CI)",
+        title = list(text = paste0(t("res_trend_plot_title"),
                                     if (!is.null(sub)) paste0("<br><sub>", sub, "</sub>") else "")),
-        xaxis = list(title = "Inventory year"),
-        yaxis = list(title = "Total CO₂eq (tonnes)"),
+        xaxis = list(title = t("res_trend_xaxis_year")),
+        yaxis = list(title = t("res_hist_xaxis")),
         hovermode = "x unified"
       )
   })
@@ -3473,17 +3500,19 @@ app_server <- function(input, output, session) {
     } else NULL
     plotly::plot_ly() |>
       plotly::add_ribbons(x = df$Year, ymin = df$CI_Lower_t, ymax = df$CI_Upper_t,
-                          name = "95% CI", line = list(color = "transparent"),
+                          name = t("res_vb_ci_label"),
+                          line = list(color = "transparent"),
                           fillcolor = "rgba(45,106,79,0.25)") |>
       plotly::add_trace(x = df$Year, y = df$Mean_t_CO2eq,
                         type = "scatter", mode = "lines+markers",
-                        name = "Mean", line = list(color = "#1B4332", width = 3),
+                        name = t("res_vb_mean_label"),
+                        line = list(color = "#1B4332", width = 3),
                         marker = list(size = 8, color = "#1B4332")) |>
       plotly::layout(
-        title = list(text = paste0("Trend in total CO₂eq emissions (95% CI)",
+        title = list(text = paste0(t("res_trend_plot_title"),
                                     if (!is.null(sub)) paste0("<br><sub>", sub, "</sub>") else "")),
-        xaxis = list(title = "Inventory year"),
-        yaxis = list(title = "Total CO₂eq (tonnes)"),
+        xaxis = list(title = t("res_trend_xaxis_year")),
+        yaxis = list(title = t("res_hist_xaxis")),
         hovermode = "x unified"
       )
   })
