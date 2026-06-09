@@ -41,8 +41,9 @@ if (basename(getwd()) == "scripts") setwd("..")
         "  5. Upload your raw cattle data file. The AI reads it, asks any ",
         "clarifying questions, and produces a downloadable .xlsx ready to ",
         "upload to the Data Input tab.\n\n",
-        "Sign-in is remembered for 30 days, so you only do this once per ",
-        "browser.\n\n",
+        "Once you sign in, it is remembered indefinitely on that ",
+        "browser — you only do this once per browser. To sign out, ",
+        "clear the site data in your browser settings.\n\n",
         "If you run into anything, just reply to this email.\n\n",
         "Thanks,\n",
         "Lolita (CGIAR Alliance, Climate Action Programme)\n"

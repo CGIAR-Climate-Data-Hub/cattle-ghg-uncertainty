@@ -91,8 +91,9 @@ translator_chat_server <- function(input, output, session) {
     } else if (auth_is_approved(email)) {
       state$user_email <- email
       state$login_status <- NULL
-      # Drop a 30-day signed cookie so the next refresh keeps the user
-      # signed in without another magic-link round-trip.
+      # Drop a long-lived (~100-year) signed cookie so the next refresh
+      # keeps the user signed in without another magic-link round-trip.
+      # Functionally permanent; user can sign out via Clear site data.
       tryCatch({
         sess_cookie <- auth_session_cookie_issue(email)
         session$sendCustomMessage("setTranslatorSession", sess_cookie)

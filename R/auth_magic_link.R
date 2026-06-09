@@ -19,9 +19,9 @@
 # Persistent storage caveat (same as usage_log.R): shinyapps.io's
 # free/starter tiers don't persist files across container restarts.
 # For tokens that's fine — they're short-lived (15 min). For the
-# 30-day "stay-logged-in" cookie, the cookie is stored client-side
-# (browser localStorage); on the server we just validate that a
-# cookie-supplied email matches the approved list.
+# long-lived (~100-year) "stay-logged-in" cookie, the cookie is stored
+# client-side (browser document.cookie); on the server we just validate
+# that a cookie-supplied email matches the approved list.
 
 # ----- Approved-users whitelist --------------------------------------------
 
@@ -239,9 +239,11 @@ auth_notify_admin_of_request <- function(requesting_email,
 
 # ----- Long-lived session cookie -------------------------------------------
 #
-# After a successful magic-link consume we drop a 30-day cookie in the
-# browser so the user doesn't have to re-verify every time they reload
-# the page. The cookie is a signed token:
+# After a successful magic-link consume we drop a long-lived (~100-year)
+# cookie in the browser so the user doesn't have to re-verify on every
+# reload. Functionally permanent — the cookie outlives the browser
+# install. Users can still sign out by clearing site data. The cookie
+# is a signed token:
 #
 #   <email>|<expires_at_epoch>|<hmac_hex>
 #
@@ -268,10 +270,13 @@ auth_notify_admin_of_request <- function(requesting_email,
   paste(as.character(hmac_raw), collapse = "")
 }
 
-# Issue a 30-day cookie value for the given email. Returns the full
-# cookie string ready to push to the browser.
+# Issue a long-lived (default ~100-year) cookie value for the given
+# email. Returns the full cookie string ready to push to the browser.
+# 36 500 days places the expiry comfortably beyond any realistic
+# browser-install lifetime, which is what the user asked for: once an
+# email is approved, it stays signed in indefinitely.
 auth_session_cookie_issue <- function(email,
-                                      ttl_days = 30) {
+                                      ttl_days = 36500L) {
   email <- tolower(trimws(email))
   expires_at <- as.integer(Sys.time()) + ttl_days * 86400L
   payload    <- paste(email, expires_at, sep = "|")

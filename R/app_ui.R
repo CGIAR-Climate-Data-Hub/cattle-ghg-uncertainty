@@ -114,12 +114,15 @@ app_ui <- function() {
          });
          // 2026-06: persistent sign-in. After magic-link consume, server
          // sends a signed cookie value here; we drop it into document.cookie
-         // for 30 days. On the next refresh the server reads the Cookie:
+         // with a 100-year max-age — functionally permanent, so once an
+         // email is approved the user stays signed in indefinitely on
+         // this browser. On the next refresh the server reads the Cookie:
          // header (session$request$HTTP_COOKIE), HMAC-verifies it, and
          // restores the signed-in state without a fresh magic link.
+         // Server-side ttl matches (auth_session_cookie_issue default).
          Shiny.addCustomMessageHandler('setTranslatorSession', function(value) {
            if (!value) return;
-           var maxAge = 30 * 24 * 60 * 60;  // 30 days in seconds
+           var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years in seconds
            document.cookie = 'translator_session=' + encodeURIComponent(value) +
              '; max-age=' + maxAge + '; path=/; SameSite=Lax; Secure';
          });

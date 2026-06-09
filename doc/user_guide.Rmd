@@ -139,7 +139,7 @@ If your raw inventory data lives in your own Excel or CSV files with column name
 
 \begin{enumerate}
 \item Open the \textbf{Resources tab}. The "AI Translator" card is the first item, with a green left-edge accent and a short intro paragraph explaining what it does.
-\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day). The sign-in is remembered for 30 days, so you only do this once per browser.
+\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day). The sign-in is then remembered indefinitely on this browser — once an email has been approved, it stays signed in. To sign out, clear the site data in your browser settings.
 \item \textbf{Step 1 — Explore.} Upload your raw data file (\texttt{.xlsx} or \texttt{.csv}) using the file picker at the top of the chat panel. The AI reads every sheet, classifies the layout (column-oriented vs wide-stacked vs reference table vs calc sheet), and responds with a four-section \emph{exploration report}: (A) file shape, (B) inventory of values found per parameter and sub-category with bounds and units, (C) gaps that will need IPCC defaults, (D) ambiguities to ask you about. Read it carefully — section B should list every parameter your file actually contains.
 \item \textbf{Step 2 — Clarify.} Answer the AI's section D questions in plain English in the chat box (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}, or \textit{``Your MMS row labelled `PIT' --- does that map to} \texttt{liquid\_slurry} \textit{or} \texttt{solid\_storage}\textit{?''}). If section B missed a parameter that IS in your file, point that out. If you want to add data the file doesn't have (population numbers, country-specific defaults), type them now. If you'd rather defer specific parameters to IPCC defaults, just say so.
 \item \textbf{Step 3 — Emit.} When section D is fully answered, click \textbf{"Produce template now"} (left-most button below the chat box). The AI translates section B + section C + the biological zeros you confirmed, mechanically, into the JSON template. A green \textbf{"Download template (.xlsx)"} button appears alongside the Reset conversation button.
@@ -159,7 +159,21 @@ The table below lists all parameters accepted by the tool. Required parameters d
 \begin{landscape}
 \small
 \setlength{\LTcapwidth}{\linewidth}
-\begin{longtable}{p{1.8cm} p{5.2cm} p{1.5cm} p{1.6cm} p{1.5cm} p{1.8cm} p{2.5cm}}
+% Widths re-balanced 2026-06-09: the IPCC default column (was 1.6cm) carried
+% multi-value entries like "2019R: 0.13 (Other regions, low productivity
+% cattle); 0.24 (intensive dairy NA/W.Europe); 2006 Africa = 0.10" that
+% overflowed and visually collided with the next column. Bumped to 3.5cm,
+% with all p{} columns set to \raggedright so a long unbreakable token
+% can't force adjacent cells into overlap. Total = ~18.5cm fits comfortably
+% in landscape A4 (text area ~24cm).
+\begin{longtable}{
+  >{\raggedright\arraybackslash}p{1.5cm}
+  >{\raggedright\arraybackslash}p{5.3cm}
+  >{\raggedright\arraybackslash}p{1.4cm}
+  >{\raggedright\arraybackslash}p{3.5cm}
+  >{\raggedright\arraybackslash}p{1.7cm}
+  >{\raggedright\arraybackslash}p{1.9cm}
+  >{\raggedright\arraybackslash}p{2.6cm}}
 \caption{Complete parameter reference — all Tier 2 inputs accepted by the tool.} \label{tab:params} \\
 \toprule
 \textbf{Code} & \textbf{Definition} & \textbf{Unit} & \textbf{IPCC default} & \textbf{Suggested uncertainty} & \textbf{Suggested distribution} & \textbf{IPCC reference} \\
