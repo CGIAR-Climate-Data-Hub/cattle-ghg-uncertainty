@@ -1,5 +1,13 @@
 # Master UI Function
-app_ui <- function() {
+#
+# Accepts `request` so we can read the `app_lang` cookie before building
+# the UI. The current language is then stored in .LANG_CURRENT (see
+# R/i18n.R) and every t("…") call during UI construction returns the
+# matching language string. The language toggle in the navbar (defined
+# below, right-side nav_item) writes the cookie + reloads the page; on
+# reload, this function runs again with the new cookie value.
+app_ui <- function(request = NULL) {
+  i18n_set_lang(i18n_lang_from_request(request))
   bslib::page_navbar(
     id = "nav",
     # Round 9 follow-up: stacked header — big centered title row above the
@@ -472,6 +480,29 @@ app_ui <- function() {
              }
              t = t.parentElement;
            }
+         }, true);
+
+         // 2026-06-09: language toggle in the navbar. Click writes the
+         // `app_lang` cookie (100-year max-age) and reloads the page;
+         // R/app_ui.R re-runs with the new cookie value and serves the
+         // requested language. Two buttons share the .lang-btn class
+         // and a data-lang attribute (en or fr).
+         document.addEventListener('click', function(ev) {
+           var t = ev.target;
+           while (t && t !== document.body) {
+             if (t.classList && t.classList.contains('lang-btn')) {
+               var lang = t.getAttribute('data-lang');
+               if (lang === 'en' || lang === 'fr') {
+                 var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years
+                 document.cookie = 'app_lang=' + lang +
+                   '; max-age=' + maxAge +
+                   '; path=/; SameSite=Lax; Secure';
+                 window.location.reload();
+               }
+               return;
+             }
+             t = t.parentElement;
+           }
          }, true);"
       )))
     ),
@@ -479,7 +510,7 @@ app_ui <- function() {
 
     # ==================== HOME TAB ====================
     bslib::nav_panel(
-      title = "Home",
+      title = t("tab_home"),
       icon = icon("home"),
       div(
         style = "max-width: 960px; margin: 0 auto; padding: 24px;",
@@ -646,7 +677,7 @@ app_ui <- function() {
 
     # ==================== DEFINITIONS TAB (T1.4 + R1.7 + R1.8) ====================
     bslib::nav_panel(
-      title = "Definitions",
+      title = t("tab_definitions"),
       icon = icon("book"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong("Parameter glossary. "),
@@ -664,7 +695,7 @@ app_ui <- function() {
 
     # ==================== USEFUL RESOURCES TAB (T0.2) ====================
     bslib::nav_panel(
-      title = "Resources",
+      title = t("tab_resources"),
       icon = icon("book-open"),
       div(style = "max-width: 960px; margin: 0 auto; padding: 24px;",
         # Tool-specific resources — methodology + user guide. Kept first so it
@@ -783,7 +814,7 @@ app_ui <- function() {
 
     # ==================== TAB 1: DATA INPUT ====================
     bslib::nav_panel(
-      title = "1. Data Input",
+      title = t("tab_data_input"),
       icon = icon("upload"),
       # Andreas 2026-05 #3: analysis-mode toggle moved here from Home page.
       bslib::card(
@@ -969,7 +1000,7 @@ app_ui <- function() {
 
     # ==================== TAB 2: QA/QC ====================
     bslib::nav_panel(
-      title = "2. QA/QC",
+      title = t("tab_qaqc"),
       icon = icon("check-square"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong("What to do: "),
@@ -1041,7 +1072,7 @@ app_ui <- function() {
 
     # ==================== TAB 3: UNCERTAINTY ====================
     bslib::nav_panel(
-      title = "3. Uncertainty",
+      title = t("tab_uncertainty"),
       icon = icon("sliders-h"),
       div(class = "info-panel", style = "margin: 16px;",
           # A2: paragraphs cleanly separated to avoid mid-sentence break
@@ -1092,7 +1123,7 @@ app_ui <- function() {
 
     # ==================== TAB 4: CORRELATIONS ====================
     bslib::nav_panel(
-      title = "4. Correlations",
+      title = t("tab_correlations"),
       icon = icon("th"),
       # 2026-05 UX overhaul: two-block intro (replaces the previous wall of text).
       # Block 1: plain-language "what is this page about?". Block 2: a small
@@ -1297,7 +1328,7 @@ app_ui <- function() {
 
     # ==================== TAB 5: SIMULATE & RESULTS (merged, B2) ====================
     bslib::nav_panel(
-      title = "5. Simulate & Results",
+      title = t("tab_simulate"),
       icon = icon("play"),
       value = "5. Simulate & Results",
       div(class = "info-panel", style = "margin: 16px;",
@@ -1697,7 +1728,7 @@ app_ui <- function() {
     # rankings table); trend mode shows the per-year + Δ tornadoes
     # previously displayed inside Tab 5's results panel.
     bslib::nav_panel(
-      title = "6. Sensitivity",
+      title = t("tab_sensitivity"),
       icon = icon("bullseye"),
 
       # ---------- Single-year sensitivity ----------
@@ -1818,7 +1849,7 @@ app_ui <- function() {
     # report a user sees matches the route they picked on Home (single year vs
     # trend). The downloads on each side are mode-specific too.
     bslib::nav_panel(
-      title = "7. IPCC Report",
+      title = t("tab_ipcc_report"),
       icon = icon("file-alt"),
 
       # ---------- Single-year report layout ----------
@@ -1977,7 +2008,7 @@ app_ui <- function() {
     # for the actual relay; the access key (which is public-facing by design,
     # see R/utils_contact.R) is embedded in the form.
     bslib::nav_panel(
-      title = "Contact / Feedback",
+      title = t("tab_contact"),
       icon = icon("envelope"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong("We welcome feedback, bug reports, feature suggestions, and methodology questions."),
@@ -2017,7 +2048,43 @@ app_ui <- function() {
     bslib::nav_spacer(),
     bslib::nav_item(
       tags$span(style = "color: #6B6B6B; font-size: 0.85rem;",
-                "Developed by CIAT/CGIAR Alliance | Funded by Global Methane Hub")
+                t("footer_credit"))
+    ),
+    # Language toggle. EN | FR pill buttons on the right edge of the
+    # navbar. Click writes the `app_lang` cookie and reloads the page;
+    # on reload, app_ui(request) reads the cookie and serves every
+    # t("...") call in the new language.
+    bslib::nav_item(
+      tags$div(class = "lang-toggle",
+        style = "display:flex; align-items:center; gap:4px;
+                 margin-left:14px; padding:2px 6px;
+                 border:1px solid #CFD8D3; border-radius:14px;
+                 background:#F8F9FA; font-size:0.82rem;",
+        tags$button(type = "button",
+                    class = paste0("lang-btn",
+                                   if (.LANG_CURRENT == "en") " lang-btn-active" else ""),
+                    "data-lang" = "en",
+                    title = t("tip_lang_toggle_en"),
+                    style = paste0(
+                      "border:0; background:transparent; cursor:pointer;",
+                      " padding:2px 8px; border-radius:10px; font-weight:600;",
+                      if (.LANG_CURRENT == "en")
+                        " background:#2D6A4F; color:#FFFFFF;"
+                      else " color:#475569;"),
+                    "EN"),
+        tags$button(type = "button",
+                    class = paste0("lang-btn",
+                                   if (.LANG_CURRENT == "fr") " lang-btn-active" else ""),
+                    "data-lang" = "fr",
+                    title = t("tip_lang_toggle_fr"),
+                    style = paste0(
+                      "border:0; background:transparent; cursor:pointer;",
+                      " padding:2px 8px; border-radius:10px; font-weight:600;",
+                      if (.LANG_CURRENT == "fr")
+                        " background:#2D6A4F; color:#FFFFFF;"
+                      else " color:#475569;"),
+                    "FR")
+      )
     )
   )
 }

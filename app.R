@@ -27,5 +27,10 @@ library(flextable)
 library(httr2)
 library(jsonlite)
 
-# Launch app
-shinyApp(ui = app_ui(), server = app_server)
+# Launch app.
+# IMPORTANT: pass `app_ui` (the function itself), NOT `app_ui()` (a call).
+# Shiny invokes the UI function with the incoming `request` object on every
+# new session, which lets R/i18n.R read the `app_lang` cookie and serve the
+# right language. With `app_ui()` (call), the UI would be built ONCE at app
+# startup and the language toggle would not work.
+shinyApp(ui = app_ui, server = app_server)
