@@ -326,15 +326,13 @@ auth_login_panel <- function(id_prefix = "translator") {
       style = "max-width: 480px; margin: 24px auto; padding: 24px;
                background:#F8FAF7; border:1px solid #D8E4D6; border-radius:8px;",
       tags$h4(style = "margin-top:0; color:#2D6A4F;",
-              "Sign in to the AI translator"),
+              t("auth_signin_title")),
       tags$p(style = "font-size:0.9rem; color:#52525B;",
-             "Enter your email address. We will send you a one-time sign-in link. ",
-             "No password required. CGIAR email addresses are approved automatically; ",
-             "other addresses are reviewed manually by the administrator."),
+             t("auth_signin_body")),
       textInput(ns("email"), label = NULL,
                 placeholder = "your.name@example.org",
                 width = "100%"),
-      actionButton(ns("submit"), "Send sign-in link",
+      actionButton(ns("submit"), t("btn_auth_send_link"),
                    class = "btn-success", width = "100%"),
       uiOutput(ns("status"))
     )

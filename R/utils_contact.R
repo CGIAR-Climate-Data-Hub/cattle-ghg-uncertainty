@@ -39,33 +39,38 @@ contact_form_html <- function() {
   <!-- Honeypot field per Web3Forms spec (https://web3forms.com/docs/spam-protection) -->
   <input type="checkbox" name="botcheck" style="display:none !important;" tabindex="-1" autocomplete="off">
   <div>
-    <label for="cf-name" style="font-weight:600; font-size:0.9rem;">Your name *</label>
+    <label for="cf-name" style="font-weight:600; font-size:0.9rem;">%s *</label>
     <input id="cf-name" type="text" name="name" required class="form-control"
-           placeholder="First Last" autocomplete="name">
+           placeholder="%s" autocomplete="name">
   </div>
   <div>
-    <label for="cf-affiliation" style="font-weight:600; font-size:0.9rem;">Affiliation *</label>
+    <label for="cf-affiliation" style="font-weight:600; font-size:0.9rem;">%s *</label>
     <input id="cf-affiliation" type="text" name="affiliation" required class="form-control"
-           placeholder="Organisation / project / institution" autocomplete="organization">
+           placeholder="%s" autocomplete="organization">
   </div>
   <div>
-    <label for="cf-email" style="font-weight:600; font-size:0.9rem;">Email *</label>
+    <label for="cf-email" style="font-weight:600; font-size:0.9rem;">%s *</label>
     <input id="cf-email" type="email" name="email" required class="form-control"
            placeholder="you@example.org" autocomplete="email">
   </div>
   <div>
-    <label for="cf-message" style="font-weight:600; font-size:0.9rem;">Message *</label>
+    <label for="cf-message" style="font-weight:600; font-size:0.9rem;">%s *</label>
     <textarea id="cf-message" name="message" rows="6" required class="form-control"
-              placeholder="Tell us what you would like to share — a bug, a feature idea, a methodology question, anything."></textarea>
+              placeholder="%s"></textarea>
   </div>
   <button type="submit" class="btn btn-primary w-100" id="cf-submit">
-    <i class="fa fa-paper-plane"></i> Send message
+    <i class="fa fa-paper-plane"></i> %s
   </button>
   <div id="cf-status" style="font-size:0.85rem; color:#666; margin-top:6px;">
-    <em>Submissions go directly to the development team. We aim to reply within a few working days.</em>
+    <em>%s</em>
   </div>
 </form>
-', key)
+', key,
+   t("cf_name"), t("cf_name_ph"),
+   t("cf_affiliation"), t("cf_affiliation_ph"),
+   t("cf_email"),
+   t("cf_message"), t("cf_message_ph"),
+   t("btn_cf_send"), t("cf_status_init"))
 
   # Round 9 sent animation: a CSS-only checkmark that draws itself + a
   # success card that fades + slides in. Keyed off classes added by JS.
@@ -142,11 +147,11 @@ async function submitContactFormW3(e) {
   var stat = document.getElementById("cf-status");
   if (form.botcheck && form.botcheck.checked) return false;
   btn.disabled = true;
-  btn.innerHTML = "<i class=\\"fa fa-spinner fa-spin\\"></i> Sending…";
+  btn.innerHTML = "<i class=\\"fa fa-spinner fa-spin\\"></i> %s";
   stat.style.background = "transparent";
   stat.style.color      = "#666";
   stat.style.padding    = "0";
-  stat.innerHTML  = "<em>Sending your message…</em>";
+  stat.innerHTML  = "<em>%s</em>";
 
   var fd = new FormData(form);
   fd.set("subject", "[Cattle GHG App] Feedback from " + (form.name.value || "anonymous"));
@@ -165,24 +170,29 @@ async function submitContactFormW3(e) {
         "    <path class=\\"cf-tick-check\\" d=\\"M14 27 l8 8 l16 -18\\"/>",
         "  </svg>",
         "  <div>",
-        "    <div class=\\"cf-sent-text\\">Message sent — thank you!</div>",
-        "    <div class=\\"cf-sent-sub\\">We aim to reply within a few working days.</div>",
+        "    <div class=\\"cf-sent-text\\">%s</div>",
+        "    <div class=\\"cf-sent-sub\\">%s</div>",
         "  </div>",
         "</div>"
       ].join("");
       form.reset();
     } else {
-      stat.innerHTML = "<div class=\\"cf-error-card\\"><i class=\\"fa fa-exclamation-triangle\\"></i> Send failed: " +
-        (j.message || "unknown error") + ". Please try again in a moment.</div>";
+      stat.innerHTML = "<div class=\\"cf-error-card\\"><i class=\\"fa fa-exclamation-triangle\\"></i> %s " +
+        (j.message || "%s") + ". %s</div>";
     }
   } catch (err) {
-    stat.innerHTML = "<div class=\\"cf-error-card\\"><i class=\\"fa fa-exclamation-triangle\\"></i> Network error. Please try again.</div>";
+    stat.innerHTML = "<div class=\\"cf-error-card\\"><i class=\\"fa fa-exclamation-triangle\\"></i> %s</div>";
   }
   btn.disabled = false;
-  btn.innerHTML = "<i class=\\"fa fa-paper-plane\\"></i> Send message";
+  btn.innerHTML = "<i class=\\"fa fa-paper-plane\\"></i> %s";
   return false;
 }
-', endpoint)
+', t("cf_sending_btn"), t("cf_sending_msg"),
+   endpoint,
+   t("cf_sent_text"), t("cf_sent_sub"),
+   t("cf_send_failed"), t("cf_unknown_error"), t("cf_try_again"),
+   t("cf_network_error"),
+   t("btn_cf_send"))
 
   # Return as a tagList: HTML form, <style>, then a separate script tag.
   # Splitting the script out is the bug fix — htmltools renders tags$script

@@ -584,90 +584,84 @@ app_ui <- function(request = NULL) {
         bslib::card(
           bslib::card_header(h4(t("card_what_does_title"), style = "margin: 0;")),
           bslib::card_body(
-            p("When a country reports cattle greenhouse gas emissions under the Paris Agreement, every input parameter
-              (animal populations, body weights, feed quality, emission factors) has some uncertainty. This tool:"),
+            p(t("what_does_intro")),
             tags$ol(
-              tags$li("Takes your country-specific input data aligned with the IPCC Tier 2 equations, with uncertainty ranges"),
-              tags$li("Runs thousands of Monte Carlo simulations, varying all parameters according to their probability distributions"),
-              tags$li("Produces the uncertainty range for your total emission estimate (95% confidence interval)"),
-              tags$li("Identifies which parameters contribute most to the uncertainty (sensitivity analysis)"),
-              tags$li("Formats results for IPCC inventory reporting (IPCC 2006 Vol. 1 Ch. 3, Table 3.3)")
+              tags$li(t("what_does_li1")),
+              tags$li(t("what_does_li2")),
+              tags$li(t("what_does_li3")),
+              tags$li(t("what_does_li4")),
+              tags$li(t("what_does_li5"))
             ),
-            p(tags$strong("Emission sources covered:"),
-              " Enteric fermentation CH₄, Manure management CH₄, Manure management N₂O (direct and indirect),
-              and N₂O (direct and indirect) from dung and urine deposited on pasture.")
+            p(tags$strong(t("what_does_sources_label")),
+              t("what_does_sources_body"))
           )
         ),
 
         # Workflow overview
         bslib::card(
-          bslib::card_header(h4("How to use this tool -- Step by step", style = "margin: 0;")),
+          bslib::card_header(h4(t("workflow_title"), style = "margin: 0;")),
           bslib::card_body(
-            p("Work through the tabs from left to right. Each tab has instructions at the top explaining what to do."),
+            p(t("workflow_intro")),
             tags$table(
               style = "width: 100%; border-collapse: collapse; margin-top: 8px;",
               tags$thead(
                 tags$tr(style = "background: #D8F3DC; text-align: left;",
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", "Step"),
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", "Tab"),
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", "What you do"),
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", "Time")
+                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_step")),
+                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_tab")),
+                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_what")),
+                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_time"))
                 )
               ),
               tags$tbody(
                 tags$tr(
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "1"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "Data Input"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "Load example data or upload your country data from the Excel template"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row1_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row1_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
                 ),
                 tags$tr(style = "background: #FAFAF7;",
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "2"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "QA/QC"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "Review automated quality checks -- fix any fails and document large deviations from IPCC defaults"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row2_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row2_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
                 ),
                 tags$tr(
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "3"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "Uncertainty"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "Review and adjust probability distributions and uncertainty ranges for each parameter"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row3_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row3_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "10 min")
                 ),
                 tags$tr(style = "background: #FAFAF7;",
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "4"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "Correlations"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "(Optional) Upload population time series or manually define correlations between activity data"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row4_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row4_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
                 ),
                 tags$tr(
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "Simulate"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "Choose number of iterations, GWP version, and click Run — results (emission distributions, 95% CI, decomposition) appear in the same tab"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row5_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row5_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5-7 min")
                 ),
                 tags$tr(style = "background: #FAFAF7;",
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "6"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "Sensitivity"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "Identify which parameters contribute most to uncertainty (tornado chart)"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row6_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row6_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
                 ),
                 tags$tr(
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "7"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", "IPCC Report"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "Download results formatted as IPCC Table 3.3 for your inventory submission"),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row7_tab")),
+                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row7_what")),
                   tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "2 min")
                 )
               )
             ),
             br(),
-            div(class = "info-panel",
-                tags$strong("Quick start: "),
-                "To try the tool immediately, go to ",
-                tags$strong("1. Data Input"), ", select 'Country X (hypothetical dairy)', then go to ",
-                tags$strong("5. Simulate"), " and click 'Run Monte Carlo Simulation'."),
+            div(class = "info-panel", HTML(t("quick_start_html"))),
             br(),
             div(style = "text-align: center;",
-                actionButton("goto_resources", "Methodology, user guide & downloads →",
+                actionButton("goto_resources", t("btn_goto_resources"),
                              class = "btn btn-outline-success",
                              style = "font-size:0.95rem; padding: 10px 24px;"))
           )
@@ -675,23 +669,20 @@ app_ui <- function(request = NULL) {
 
         # T0.4: prerequisites & limitations
         bslib::card(
-          bslib::card_header(h4("Before you start", style = "margin: 0;")),
+          bslib::card_header(h4(t("card_before_you_start_title"), style = "margin: 0;")),
           bslib::card_body(
-            tags$p(tags$strong("You will need:")),
+            tags$p(tags$strong(t("before_you_will_need"))),
             tags$ul(
-              tags$li("A Tier 2 input dataset for the inventory year(s) you wish to assess: ",
-                      "animal sub-categories with population, body weights, feed quality, and manure-management shares."),
-              tags$li("A defensible estimate of the uncertainty in each input (typically ±% half-width of the 95 % CI, or ",
-                      "lower / upper bounds for asymmetric parameters). The tool ", tags$strong("does not"),
-                      " estimate input uncertainties for you."),
-              tags$li("Optional but recommended: multi-year time series of activity data, used to compute correlations automatically.")
+              tags$li(t("before_li1")),
+              tags$li(HTML(t("before_li2_html"))),
+              tags$li(t("before_li3"))
             ),
-            tags$p(tags$strong("What this tool does NOT do:")),
+            tags$p(tags$strong(t("before_not_do_label"))),
             tags$ul(
-              tags$li("It does not collect data or estimate input uncertainties — those must be supplied by the user."),
-              tags$li("It does not produce Tier 1 estimates and is not designed for uncertainty analysis of country-specific Tier 2 methods — the IPCC Tier 2 equation chain is required."),
-              tags$li("It does not validate your country's IPCC categorisation choices — sub-category structure is the user's responsibility."),
-              tags$li("Cross-block correlations between activity data and emission factors are not yet supported (planned for v3.0).")
+              tags$li(t("not_do_li1")),
+              tags$li(t("not_do_li2")),
+              tags$li(t("not_do_li3")),
+              tags$li(t("not_do_li4"))
             )
           )
         ),
@@ -706,15 +697,13 @@ app_ui <- function(request = NULL) {
       title = t("tab_definitions"),
       icon = icon("book"),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong("Parameter glossary. "),
-          "All parameters used in the IPCC Tier 2 calculations, with their plain-language ",
-          "definition, unit, IPCC default value, suggested distribution, level (core / advanced), ",
-          "IPCC framing (activity data vs coefficient), and IPCC reference table or equation. ",
-          "Variable names are aligned with the ", tags$strong("IPCC Inventory Software"),
-          " (v2.95) and the symbols used in the IPCC 2006 Vol.4 Ch.10 / Ch.11 equations.")
+          tags$strong(paste0(t("info_definitions_label"), " ")),
+          t("info_definitions_body"),
+          tags$strong(t("info_definitions_software")),
+          t("info_definitions_tail"))
       ,
       bslib::card(
-        bslib::card_header("Parameter definitions"),
+        bslib::card_header(t("card_param_definitions")),
         bslib::card_body(DT::DTOutput("definitions_table"))
       )
     ),
@@ -724,19 +713,29 @@ app_ui <- function(request = NULL) {
       title = t("tab_resources"),
       icon = icon("book-open"),
       div(style = "max-width: 960px; margin: 0 auto; padding: 24px;",
+        # FR-only inline note about English-only docs (shown only when the
+        # current language is French; conditional rendering at UI-build time).
+        if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                            ifnotfound = "en"), "fr"))
+          div(class = "info-panel",
+              style = "margin-bottom: 16px; background: #FEF3C7; border-left: 3px solid #F59E0B;",
+              icon("circle-info"),
+              tags$strong(" Note : "),
+              t("resources_fr_only_note"))
+        else NULL,
         # Tool-specific resources — methodology + user guide. Kept first so it
         # is the first thing users see in the Resources tab.
         # The id is the scroll target for the Home tab "Methodology, user
         # guide & downloads" button (see goto_resources in app_server.R).
         bslib::card(
           id = "downloads-card",
-          bslib::card_header(h4("Tool-specific resources", style = "margin: 0;")),
+          bslib::card_header(h4(t("card_tool_resources"), style = "margin: 0;")),
           bslib::card_body(
-            tags$h5("How this tool works"),
+            tags$h5(t("resources_how_it_works")),
             tags$ul(
-              tags$li("Equation chain: IPCC 2006 Vol 4 Ch 10 (Eq 10.1–10.34) and Ch 11 for the per-head emission factor; population × EF for the per-sub-category total."),
-              tags$li("Monte Carlo: Approach 2 from IPCC 2006 Vol 1 Ch 3. Correlations are sampled via the rank-correlation-preserving restricted-pairing procedure per IPCC Vol 1 Ch 3 §3.2.3.2 — the same method is used for every correlated path (time-series, preset, manual, structural defaults)."),
-              tags$li("Sensitivity: Standardised regression coefficients (SRC) and partial rank correlation (PRCC) on the sampled inputs vs each output.")
+              tags$li(t("resources_eq_chain")),
+              tags$li(t("resources_mc")),
+              tags$li(t("resources_sensitivity"))
             ),
             div(style = "margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;",
               tags$a(
@@ -744,14 +743,14 @@ app_ui <- function(request = NULL) {
                 target = "_blank",
                 rel = "noopener noreferrer",
                 class = "btn btn-success",
-                icon("file-pdf"), " Open full methodology (PDF)"
+                icon("file-pdf"), " ", t("btn_open_methodology")
               ),
               tags$a(
                 href = "user_guide.pdf",
                 target = "_blank",
                 rel = "noopener noreferrer",
                 class = "btn btn-outline-success",
-                icon("book"), " Open user guide (PDF)"
+                icon("book"), " ", t("btn_open_userguide")
               )
             )
           )
@@ -765,73 +764,73 @@ app_ui <- function(request = NULL) {
         translator_chat_ui(),
 
         bslib::card(
-          bslib::card_header(h4("Useful resources", style = "margin: 0;")),
+          bslib::card_header(h4(t("card_useful_resources"), style = "margin: 0;")),
           bslib::card_body(
-            tags$h5("Methodological foundations"),
+            tags$h5(t("resources_method_foundations")),
             tags$p(style = "font-size: 0.9em; color: #555; margin-bottom: 8px;",
-                   "The six IPCC chapters that underpin the calculations and uncertainty methodology of this tool. Links open the official PDFs on the IPCC-NGGIP site."),
+                   t("resources_method_intro")),
             tags$ul(
-              tags$li(tags$strong("Vol. 4 (AFOLU) — Livestock & Manure Management:"),
+              tags$li(tags$strong(t("resources_vol4_livestock_label")),
                       tags$ul(
                         tags$li(tags$a(href = "https://www.ipcc-nggip.iges.or.jp/public/2006gl/pdf/4_Volume4/V4_10_Ch10_Livestock.pdf",
                                        target = "_blank",
-                                       "IPCC 2006 Guidelines — Vol. 4, Chapter 10 (Emissions from Livestock and Manure Management)")),
+                                       t("resources_vol4_livestock_2006"))),
                         tags$li(tags$a(href = "https://www.ipcc-nggip.iges.or.jp/public/2019rf/pdf/4_Volume4/19R_V4_Ch10_Livestock.pdf",
                                        target = "_blank",
-                                       "2019 Refinement — Vol. 4, Chapter 10 (Updated livestock equations, MMS table 10.17, Bo table 10.16a, Ym table 10.12)"))
+                                       t("resources_vol4_livestock_2019")))
                       )
               ),
-              tags$li(tags$strong("Vol. 4 (AFOLU) — Managed Soils (N₂O from soils, including PRP):"),
+              tags$li(tags$strong(t("resources_vol4_soils_label")),
                       tags$ul(
                         tags$li(tags$a(href = "https://www.ipcc-nggip.iges.or.jp/public/2006gl/pdf/4_Volume4/V4_11_Ch11_N2O&CO2.pdf",
                                        target = "_blank",
-                                       "IPCC 2006 Guidelines — Vol. 4, Chapter 11 (N₂O Emissions from Managed Soils, CO₂ from Lime/Urea)")),
+                                       t("resources_vol4_soils_2006"))),
                         tags$li(tags$a(href = "https://www.ipcc-nggip.iges.or.jp/public/2019rf/pdf/4_Volume4/19R_V4_Ch11_Soils_N2O_CO2.pdf",
                                        target = "_blank",
-                                       "2019 Refinement — Vol. 4, Chapter 11 (Updated EF3_PRP table 11.1, EF4/EF5/FracGASM/FracLEACH-(H) table 11.3)"))
+                                       t("resources_vol4_soils_2019")))
                       )
               ),
-              tags$li(tags$strong("Vol. 1 — Uncertainty methodology (Approach 1 vs Approach 2):"),
+              tags$li(tags$strong(t("resources_vol1_uncert_label")),
                       tags$ul(
                         tags$li(tags$a(href = "https://www.ipcc-nggip.iges.or.jp/public/2006gl/pdf/1_Volume1/V1_3_Ch3_Uncertainties.pdf",
                                        target = "_blank",
-                                       "IPCC 2006 Guidelines — Vol. 1, Chapter 3 (Uncertainties)")),
+                                       t("resources_vol1_uncert_2006"))),
                         tags$li(tags$a(href = "https://www.ipcc-nggip.iges.or.jp/public/2019rf/pdf/1_Volume1/19R_V1_Ch03_Uncertainties.pdf",
                                        target = "_blank",
-                                       "2019 Refinement — Vol. 1, Chapter 3 (Uncertainties; including §3.2.2.4 on temporal correlation of EFs)"))
+                                       t("resources_vol1_uncert_2019")))
                       )
               )
             ),
-            tags$h5("Activity data guidance"),
+            tags$h5(t("resources_ad_guidance")),
             tags$ul(
               tags$li(tags$a(href = "https://www.fao.org/livestock-systems/global-distributions/en/",
                              target = "_blank",
-                             "FAO Livestock Activity Data Guidance (L-ADG)")),
-              tags$li("Penman et al. (2000) — Good Practice Guidance and Uncertainty Management in National Greenhouse Gas Inventories")
+                             t("resources_fao_ladg"))),
+              tags$li(t("resources_penman"))
             ),
-            tags$h5("Distributions and Monte Carlo references"),
+            tags$h5(t("resources_dist_mc_title")),
             tags$ul(
-              tags$li("Frey & Rhodes (1998) — Characterizing, simulating, and analyzing variability and uncertainty"),
-              tags$li("IPCC GPG 2000 §6 — Quantifying uncertainties in practice (Approach 1 vs Approach 2)")
+              tags$li(t("resources_frey_rhodes")),
+              tags$li(t("resources_gpg_2000"))
             ),
-            tags$h5("Learning resources"),
+            tags$h5(t("resources_learning_title")),
             tags$ul(
               tags$li(tags$a(href = "https://elearning.fao.org/course/view.php?id=625",
                              target = "_blank",
-                             "FAO e-learning — Assessing uncertainty in the land sector")),
+                             t("resources_fao_elearn_uncert"))),
               tags$li(tags$a(href = "https://elearning.fao.org/course/view.php?id=531",
                              target = "_blank",
-                             "FAO e-learning — Tier 2 inventory for livestock")),
+                             t("resources_fao_elearn_tier2"))),
               tags$li(tags$a(href = "https://unfccc.int/topics/science/workstreams/methodological-issues-under-the-convention",
                              target = "_blank",
-                             "UNFCCC webinar notes — Uncertainty analysis for GHG inventories"))
+                             t("resources_unfccc_webinar")))
             ),
-            tags$h5("Case studies"),
+            tags$h5(t("resources_case_studies")),
             tags$ul(
-              tags$li("Monni et al. (2007) — Uncertainty in agricultural CH₄ and N₂O emissions from Finland"),
-              tags$li("Karimi-Zindashty et al. (2012) — Sources of uncertainty in livestock emission inventories: Canadian case study"),
-              tags$li("Milne et al. (2014) — Estimating uncertainty in pasture-based dairy CH₄ emissions"),
-              tags$li(tags$em("Additional national-inventory examples to be added."))
+              tags$li(t("resources_monni")),
+              tags$li(t("resources_karimi")),
+              tags$li(t("resources_milne")),
+              tags$li(tags$em(t("resources_more_to_come")))
             )
           )
         )
@@ -845,26 +844,26 @@ app_ui <- function(request = NULL) {
       # Andreas 2026-05 #3: analysis-mode toggle moved here from Home page.
       bslib::card(
         style = "margin: 16px;",
-        bslib::card_header(h5("Choose your analysis mode", style = "margin: 0;")),
+        bslib::card_header(h5(t("card_analysis_mode"), style = "margin: 0;")),
         bslib::card_body(
           radioButtons("analysis_mode",
             label = NULL,
             choiceNames = list(
               tagList(
-                "Single year — quantify uncertainty in one inventory year ",
+                paste0(t("analysis_mode_single"), " "),
                 bslib::tooltip(
                   span(icon("circle-question"),
                        style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                  "Use this mode to estimate the uncertainty for one specific inventory year. All parameters are sampled independently for each iteration. This is the most common mode and is sufficient for IPCC Table 3.3 reporting. Choose Trend if you also want to assess whether emission changes over time are statistically significant.",
+                  t("tip_analysis_mode_single"),
                   placement = "right"
                 )
               ),
               tagList(
-                "Trend — compare uncertainty across multiple years ",
+                paste0(t("analysis_mode_trend"), " "),
                 bslib::tooltip(
                   span(icon("circle-question"),
                        style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                  "Use this mode when you have activity data for several inventory years and want to assess whether the trend (change over time) is statistically distinguishable from zero. IPCC Vol 1 Ch 3 §3.7 recommends reporting trend uncertainty for inventory series. Requires a Parameter_TimeSeries sheet in your upload template, or use one of the built-in example datasets.",
+                  t("tip_analysis_mode_trend"),
                   placement = "right"
                 )
               )
@@ -874,48 +873,41 @@ app_ui <- function(request = NULL) {
           div(id = "analysis_mode_warning",
               style = "background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; margin-top:8px; font-size:0.85rem; color:#92400E; border-radius:4px;",
               icon("exclamation-triangle"),
-              tags$strong(" Selection required: "),
-              "pick Single year or Trend before moving on. The Run button on Tab 5 will block until a mode is chosen."),
+              tags$strong(paste0(" ", t("what_to_do_label"), " ")),
+              t("analysis_mode_warning")),
           tags$p(tags$em(
-            "What 'Trend' does in this tool: a full Monte Carlo uncertainty run ",
-            "is performed independently for every year present in your time-series ",
-            "upload, and the uncertainty on the trend itself is taken as the ",
-            "distribution of (Year_N − Year_1) — the absolute change in ",
-            "CO₂eq between the last and first year. ",
+            t("trend_explanation"),
             tags$br(), tags$br(),
-            "IPCC alignment: IPCC 2006 Vol.1 Ch.3 §3.7 (“Uncertainty in ",
-            "trends”) defines the trend as the change between a ",
-            tags$strong("base year"), " and a ", tags$strong("current year"),
-            ". The first / last years of the time series you upload are used ",
-            "as those base and current years respectively. §3.7 covers both ",
-            "Approach 1 (error-propagation, Eq. 3.1–3.2) and Approach 2 ",
-            "(Monte Carlo) for the trend; this tool implements the Approach 2 ",
-            "version. Use 'Trend' if you have multi-year data; use 'Single year' ",
-            "for a one-off uncertainty estimate."),
+            t("trend_ipcc_alignment"), " ",
+            tags$strong(t("trend_base_year")),
+            if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                                ifnotfound = "en"), "fr"))
+              " et une " else " and a ",
+            tags$strong(t("trend_current_year")),
+            t("trend_explanation_2")),
             style = "color:#555; font-size:0.85rem; margin-top:8px;")
         )
       ),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong("What to do: "),
-          "Select an example country dataset from the dropdown, or upload your own data using the Excel template. ",
-          "The parameter table on the right shows the loaded data -- ",
-          "you can click on any cell to edit values directly. Check the validation panel at the bottom left to ",
-          "ensure your data is complete and valid before proceeding to the next tab."),
+          tags$strong(paste0(t("what_to_do_label"), " ")),
+          t("info_data_input")),
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 320,
-          h5("Data Source"),
-          selectInput("country", "Country / Example Data",
-                      choices = c("Country X (hypothetical dairy)" = "country_x",
-                                  "Country Y (hypothetical pastoral)" = "country_y",
-                                  "Custom Upload" = "custom")),
+          h5(t("data_source_h")),
+          selectInput("country", t("country_label"),
+                      choices = setNames(
+                        c("country_x", "country_y", "custom"),
+                        c(t("country_x_label"),
+                          t("country_y_label"),
+                          t("country_custom_label")))),
           # B1: explicit hint when "Custom Upload" selected so the user knows the
           # dropdown registered (the example tables don't auto-load for "custom")
           conditionalPanel(
             condition = "input.country == 'custom'",
             div(style = "background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; margin-top:8px; font-size:0.85rem; color:#92400E; border-radius:4px;",
                 icon("info-circle"),
-                " Custom mode selected. Pick an IPCC version, download the matching template, fill it in, then upload below.")
+                t("custom_hint"))
           ),
           # Andreas 2026-05 follow-up: the IPCC version picker, template
           # downloads and upload section only apply to the Custom Upload
@@ -927,14 +919,14 @@ app_ui <- function(request = NULL) {
             # Round 7.1: IPCC version picker drives the downloaded template's
             # MMS dropdown (filtered to systems valid for that version) and
             # the Inventory_Metadata `ipcc_version` cell.
-            h5("1. Pick an IPCC Guidelines version"),
+            h5(t("data_h_pick_ipcc")),
             radioButtons("template_version", label = NULL,
-                          choices = c("IPCC 2006" = "2006",
-                                      "IPCC 2019 Refinement" = "2019_refinement"),
+                          choices = setNames(c("2006", "2019_refinement"),
+                                              c(t("ipcc_2006"), t("ipcc_2019"))),
                           selected = character(0), inline = TRUE),
             div(style = "font-size:0.78rem; color:#666; margin-top:-6px; margin-bottom:8px;",
-                tags$em("The MMS dropdown in the downloaded template will be filtered to manure systems valid for the version you pick here.")),
-            h5("2. Download a template"),
+                tags$em(t("ipcc_version_note"))),
+            h5(t("data_h_download_template")),
             # Active controls — visible only when an IPCC version is picked.
             conditionalPanel(
               condition = "input.template_version === '2006' || input.template_version === '2019_refinement'",
@@ -956,13 +948,13 @@ app_ui <- function(request = NULL) {
                             icon("download"), " Download Template with Example")),
               div(style = "font-size:0.82rem; color:#92400E; margin-top:6px;",
                   icon("circle-info"),
-                  tags$em(" Pick an IPCC version above first — then these buttons unlock."))
+                  tags$em(t("ipcc_pick_first_unlock")))
             ),
             div(style = "margin-top: 10px; padding: 8px 10px; background:#E8F5E9; border-left:3px solid #2D6A4F; border-radius:4px; font-size:0.82rem;",
               icon("robot"),
-              tags$strong(" Don't have the template filled yet?"),
+              tags$strong(t("ai_inline_promo_title")),
               tags$br(),
-              "Use the AI Translator on the ",
+              t("ai_inline_promo_body_pre"),
               tags$a(href = "#",
                      onclick = paste0(
                        # Click the actual Resources nav-tab. Shiny.setInputValue
@@ -982,11 +974,10 @@ app_ui <- function(request = NULL) {
                        "  if (el) el.scrollIntoView({behavior:'smooth', block:'start'}); ",
                        "}, 300); ",
                        "return false;"),
-                     "AI Translator card on the Resources tab"),
-              " — upload your raw data file and the AI produces a ",
-              "ready-to-upload .xlsx."),
+                     t("ai_inline_promo_body_link")),
+              t("ai_inline_promo_body_post")),
             hr(),
-            h5("3. Upload your filled template"),
+            h5(t("data_h_upload")),
             # Active upload — only after an IPCC version is picked.
             conditionalPanel(
               condition = "input.template_version === '2006' || input.template_version === '2019_refinement'",
@@ -1006,11 +997,11 @@ app_ui <- function(request = NULL) {
                                placeholder = "No file selected", readonly = "readonly"))),
               div(style = "font-size:0.82rem; color:#92400E; margin-top:4px;",
                   icon("circle-info"),
-                  tags$em(" Pick an IPCC version above first to enable upload."))
+                  tags$em(t("pick_ipcc_to_enable")))
             )
           ),
           hr(),
-          h5("Validation"),
+          h5(t("validation_h")),
           uiOutput("validation_status")
         ),
         conditionalPanel(
@@ -1018,7 +1009,7 @@ app_ui <- function(request = NULL) {
           uiOutput("imputed_params_notice_tab1")
         ),
         bslib::card(
-          bslib::card_header("Parameter Data"),
+          bslib::card_header(t("param_data_h")),
           bslib::card_body(DT::DTOutput("param_table"))
         )
       )
@@ -1029,39 +1020,38 @@ app_ui <- function(request = NULL) {
       title = t("tab_qaqc"),
       icon = icon("check-square"),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong("What to do: "),
-          "After loading data, review these automated quality checks. Each row flags a specific check for one parameter.",
+          tags$strong(paste0(t("what_to_do_label"), " ")),
+          t("info_qaqc"),
           tags$br(), tags$br(),
           div(style = "display:flex; flex-direction:column; gap:7px; margin-bottom:10px;",
             div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#92400E; background:#FEF3C7; border:1px solid #F59E0B; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", "Missing"),
-              tags$strong("(amber)"), " — the parameter was not in your upload and was auto-filled from the IPCC default. Verify or replace with country-specific data."
+              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#92400E; background:#FEF3C7; border:1px solid #F59E0B; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_missing")),
+              t("qa_missing_desc")
             ),
             div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#991B1B; background:#FEE2E2; border:1px solid #EF4444; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", "Fail"),
-              tags$strong("(red)"), " — the value or bounds will likely cause an error in the simulation."
+              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#991B1B; background:#FEE2E2; border:1px solid #EF4444; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_fail")),
+              t("qa_fail_desc")
             ),
             div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#92400E; background:#FEF3C7; border:1px solid #F59E0B; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", "Warn"),
-              tags$strong("(amber)"), " — the value is unusual compared with IPCC defaults or Penman/Monni uncertainty references. Investigate and document."
+              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#92400E; background:#FEF3C7; border:1px solid #F59E0B; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_warn")),
+              t("qa_warn_desc")
             ),
             div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#1E40AF; background:#DBEAFE; border:1px solid #3B82F6; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", "Info"),
-              tags$strong("(blue)"), " — informational only. Typically for emission factor parameters (EF3, EF4, EF5, Frac_*) where country-specific overrides are expected and the IPCC benchmark is a Monni-2007 / Penman-2000 mid-point, not a fixed table value. No action required unless the deviation is very large."
+              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#1E40AF; background:#DBEAFE; border:1px solid #3B82F6; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_info")),
+              t("qa_info_desc")
             ),
             div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#166534; background:#DCFCE7; border:1px solid #22C55E; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", "Pass"),
-              tags$strong("(green)"), " — check satisfied."
+              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#166534; background:#DCFCE7; border:1px solid #22C55E; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_pass")),
+              t("qa_pass_desc")
             )
           ),
-          "Fix any ", tags$strong("Fails"), " before running the simulation. ",
-          tags$strong("Warnings"), " are advisory — document your justification for large deviations from IPCC defaults.",
+          t("qa_fix_fails"), tags$strong(t("qa_status_fail")), t("qa_before_sim"),
+          tags$strong(t("qa_status_warn")), t("qa_warnings_advisory"),
           tags$br(), tags$br(),
-          tags$strong("Auto-filled parameters: "),
-          "If any parameters were absent from your upload, an ",
-          tags$strong("Auto-filled parameters"),
-          " panel appears above the results table showing which values were substituted from IPCC defaults. ",
-          "Review these and replace with country-specific data in your template where possible."),
+          tags$strong(paste0(t("qa_autofilled_label"), " ")),
+          t("qa_autofilled_intro"),
+          tags$strong(t("qa_autofilled_panel_label")),
+          t("qa_autofilled_outro")),
       conditionalPanel(
         condition = "output.has_imputed_params == true",
         div(style = "margin: 0 16px 16px 16px;",
@@ -1069,7 +1059,7 @@ app_ui <- function(request = NULL) {
               style = "border-left: 4px solid #F59E0B;",
               bslib::card_header(
                 style = "background-color:#FEF3C7; color:#92400E; font-weight:600;",
-                icon("triangle-exclamation"), " Auto-filled parameters"
+                icon("triangle-exclamation"), " ", t("qa_autofilled_panel_label")
               ),
               bslib::card_body(uiOutput("imputed_params_card"))
             ))
@@ -1077,20 +1067,16 @@ app_ui <- function(request = NULL) {
       bslib::layout_columns(
         col_widths = c(3, 9),
         bslib::card(
-          bslib::card_header("Summary"),
+          bslib::card_header(t("qa_summary_h")),
           bslib::card_body(
             uiOutput("qaqc_summary_ui"),
             hr(),
             p(style = "font-size:0.83rem; color:#555;",
-              "Checks run: bounds order, non-negative bounds, ",
-              "valid ranges (DE_pct, Ym_pct, fractions), ",
-              "distribution suitability (beta/lognormal/tnorm_0_1), ",
-              "benchmark deviation vs. IPCC defaults (>50% = warn, >200% = fail), ",
-              "and asymmetric-distribution warning for EF3/EF4/EF5/Frac_LEACH.")
+              t("qa_checks_run"))
           )
         ),
         bslib::card(
-          bslib::card_header("QA/QC Results"),
+          bslib::card_header(t("qa_results_h")),
           bslib::card_body(DT::DTOutput("qaqc_table"))
         )
       )
@@ -1101,31 +1087,20 @@ app_ui <- function(request = NULL) {
       title = t("tab_uncertainty"),
       icon = icon("sliders-h"),
       div(class = "info-panel", style = "margin: 16px;",
-          # A2: paragraphs cleanly separated to avoid mid-sentence break
           tags$p(
-            tags$strong("What to do: "),
-            "Review and adjust each parameter's probability distribution and uncertainty range. ",
-            "Click any cell in the table below to edit the distribution type ",
-            "(normal, lognormal, beta, triangular, pert, uniform, constant), ",
-            "the uncertainty percentage, or the lower/upper bounds."
+            tags$strong(paste0(t("what_to_do_label"), " ")),
+            t("info_unc_what")
           ),
           tags$p(
-            tags$strong("Note on triangular distributions: "),
-            tags$em(
-              "triangular is most often used when only the minimum, most-likely (mode), and maximum are known. ",
-              "The tool treats lower/upper as ", tags$strong("absolute min/max"),
-              ", not 95% CI bounds — for triangular, those are usually the same. ",
-              "If you have a 95% CI but want a triangular shape, use PERT instead ",
-              "(PERT uses the 95% bounds and a most-likely value)."
-            )
+            tags$strong(paste0(t("info_unc_triangular_label"), " ")),
+            tags$em(t("info_unc_triangular_body"))
           ),
           tags$p(
-            tags$strong("Quick-set buttons"),
-            " at the bottom of the table apply common settings to all parameters of one type ",
-            "(e.g. 'Set all activity data to Normal ±15%')."
+            tags$strong(t("info_unc_quickset_label")),
+            t("info_unc_quickset_body")
           )),
       bslib::card(
-        bslib::card_header("Distribution & Uncertainty Specification"),
+        bslib::card_header(t("unc_table_h")),
         bslib::card_body(DT::DTOutput("uncertainty_table")),
         # R2.1: quick-set buttons moved into card_footer so they remain visible
         # regardless of how tall the DT grows (pageLength = 20 was pushing them
@@ -1142,7 +1117,7 @@ app_ui <- function(request = NULL) {
               class = "btn-outline-primary btn-sm w-100"))
           ),
           tags$p(style = "font-size:0.78rem; color:#666; margin-top:6px;",
-                 tags$em("Click a preset to apply; click the same button again to undo and restore your previous values."))
+                 tags$em(t("quickset_undo_note")))
         )
       )
     ),
@@ -1156,25 +1131,19 @@ app_ui <- function(request = NULL) {
       # decision tree so a first-time user can pick the right option without
       # reading the bullets.
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong("What is this page about?"), tags$br(),
-          "Real-world uncertainties don't usually live in separate boxes. If your body-weight estimate ",
-          "is off because the census missed some animals, your population estimate is probably off too. ",
-          "Telling the tool which parameters move together — ",
-          tags$em("when you have evidence"), " — gives a more honest uncertainty range. ",
-          "If you don't have evidence, leave everything on ",
-          tags$strong("\"No correlations\""), ": that gives a conservative, defensible answer.",
+          tags$strong(t("info_corr_about_label")), tags$br(),
+          t("info_corr_about_body"),
           tags$br(), tags$br(),
-          tags$strong("Quick guide — which option do I pick?"),
+          tags$strong(t("info_corr_quickguide")),
           tags$ul(style = "margin-top:6px; margin-bottom:0;",
-            tags$li("Do you have ≥5 years of national time-series data in your upload? → ",
-                    tags$strong("From template (auto, time-series)"), "."),
-            tags$li("No time series, but you want to capture well-known biological linkages ",
-                    "(BW ↔ MW, Milk ↔ Fat, DE ↔ Ym, …)? → ",
-                    tags$strong("Structural defaults (expert-elicited)"), "."),
-            tags$li("You have your own correlation matrix from a study or expert elicitation? → ",
-                    tags$strong("Advanced — manual entry"), "."),
-            tags$li("None of the above? → leave ", tags$strong("No correlations"),
-                    " (the default; conservative and defensible).")
+            tags$li(t("info_corr_q1"),
+                    tags$strong(t("info_corr_q1_ans")), "."),
+            tags$li(t("info_corr_q2"),
+                    tags$strong(t("info_corr_q2_ans")), "."),
+            tags$li(t("info_corr_q3"),
+                    tags$strong(t("info_corr_q3_ans")), "."),
+            tags$li(t("info_corr_q4"), tags$strong(t("info_corr_no")),
+                    t("info_corr_q4_post"))
           )),
       bslib::layout_columns(
         col_widths = c(6, 6),
@@ -1184,14 +1153,11 @@ app_ui <- function(request = NULL) {
           bslib::card_header(
             tags$div(
               style = "display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;",
-              tags$span("Activity Data Correlations"),
-              # Lolita 2026-06-03 / Pete request: "Find out more" deep-link
-              # to the topic page with worked examples. Opens in a new tab
-              # so the user keeps their app session.
+              tags$span(t("card_ad_corr_h")),
               tags$a(
                 href = "docs/correlations.html", target = "_blank",
                 icon("circle-info"),
-                tags$span("Find out more", style = "margin-left:4px;"),
+                tags$span(t("ai_find_out_more_long"), style = "margin-left:4px;"),
                 style = paste("color:#2D6A4F; font-size:0.82rem; font-weight:500;",
                               "text-decoration:none; padding:4px 10px;",
                               "border:1px solid #2D6A4F; border-radius:14px;",
@@ -1201,10 +1167,8 @@ app_ui <- function(request = NULL) {
           ),
           bslib::card_body(
             div(class = "info-panel",
-                "Activity-data correlations describe how your input parameters move together. ",
-                "If you have a multi-year ", tags$strong("Parameter_TimeSeries"),
-                " sheet in your upload, the tool can learn the relationships from your own data. ",
-                "If not, pick a preset or skip."),
+                t("info_ad_corr"), tags$strong("Parameter_TimeSeries"),
+                t("info_ad_corr_post")),
             # 2026-06 Andreas review: the corr_mode radio is now rendered
             # server-side so that modes whose prerequisites are missing (TS
             # sheet empty / no manual CSV uploaded) appear visibly disabled.
@@ -1224,22 +1188,18 @@ app_ui <- function(request = NULL) {
             conditionalPanel(
               condition = "input.corr_mode == 'preset'",
               div(class = "info-panel",
-                  tags$strong("Structural defaults (expert-elicited): "),
-                  "applies a sparse correlation matrix with seven well-documented structural pairs ",
-                  "(BW ↔ MW, BW ↔ WG, Milk ↔ Fat, Milk ↔ BW, Milk ↔ DE, DE ↔ CP, DE ↔ Ym). ",
-                  tags$em("Note: these values reflect documented biological/statistical relationships from the IPCC equations and the livestock literature — they are not IPCC-published correlation coefficients."),
-                  " All other pairs are zero. Hover any non-zero cell in the heatmap for the per-pair source citation; full provenance and revision history are in the Methodology document.")
+                  tags$strong(paste0(t("info_struct_defaults_label"), " ")),
+                  t("info_struct_defaults_body"), " ",
+                  tags$em(t("info_struct_defaults_note")),
+                  t("info_struct_defaults_tail"))
             ),
             conditionalPanel(
               condition = "input.corr_mode == 'manual'",
               div(class = "info-panel",
-                  tags$strong("Advanced — manual matrix entry. "),
-                  "Upload a CSV with parameter names as both column headers and the first column. ",
-                  "Values must be in [-1, 1] with the diagonal = 1. ",
-                  "Don't write the matrix from scratch — download one of the templates below, ",
-                  "edit cells in Excel, save as CSV, and re-upload. ",
-                  tags$strong("Missing parameters are assumed to have zero correlation: "),
-                  "any parameter whose row/column is absent from the uploaded matrix (or whose name doesn't match the canonical list) is treated as independent of every other parameter — the simulation runs but no correlation is applied for that parameter."),
+                  tags$strong(paste0(t("info_manual_label"), " ")),
+                  t("info_manual_body"), " ",
+                  tags$strong(paste0(t("info_manual_zero_label"), " ")),
+                  t("info_manual_zero_body")),
               # Lolita 2026-06-02 review: provide a concrete starting CSV so
               # users don't have to hand-type parameter names (typos would be
               # silently dropped downstream).
@@ -1259,13 +1219,10 @@ app_ui <- function(request = NULL) {
 
         # --- Emission factor correlations ---
         bslib::card(
-          bslib::card_header("Coefficient Correlations (per-head EF inputs)"),
+          bslib::card_header(t("card_ef_corr_h")),
           bslib::card_body(
             div(class = "info-panel",
-                "Emission factors can share systematic bias if they come from the same measurement literature. ",
-                "The IPCC default is to treat them as independent. Pick block-structured if you suspect one ",
-                "literature is biased — for example, all your energy-equation coefficients come from the same ",
-                "regional database."),
+                t("info_ef_corr")),
             radioButtons("ef_corr_mode",
                          label = tagList(
                            "Mode ",
@@ -1358,41 +1315,33 @@ app_ui <- function(request = NULL) {
       icon = icon("play"),
       value = "5. Simulate & Results",
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong("What to do: "),
-          "Configure simulation settings on the left, then click ",
-          tags$strong("'Run Monte Carlo Simulation'"),
-          " at the bottom of the left-hand panel. ",
-          "The tool will sample all parameters from their distributions and run the IPCC equation chain ",
-          "thousands of times. 10,000+ iterations recommended; check convergence by re-running with a different seed (1,000 is fine for quick testing). ",
+          tags$strong(paste0(t("what_to_do_label"), " ")),
+          t("info_simulate"),
           tags$br(), tags$br(),
-          tags$strong("Once the simulation completes, this tab switches to the results view automatically."),
-          " Use the ", tags$em("Back to settings"), " button at the top of the results to change inputs and re-run — the next run will switch back to results when it finishes. ",
-          "Tab 7 (Sensitivity) and Tab 8 (IPCC Report) provide deeper drill-downs.",
+          tags$strong(t("info_simulate_results_switch")),
+          " ", tags$em(t("info_simulate_back")),
+          t("info_simulate_back_body"),
           tags$br(), tags$br(),
-          tags$strong("How many iterations to use: "),
-          "Use ", tags$strong("1,000 only for a quick test run"),
-          " to check that the model runs. Use a ", tags$strong("minimum of 10,000 iterations"),
-          " for any result you intend to use — convergence is not guaranteed below 10,000. ",
-          "Higher is always better: 25,000–30,000 is recommended for final reporting, especially when correlations are enabled or you have many sub-categories. ",
-          "To verify convergence, re-run with a different random seed: if the 95% MoE changes by more than ~2 percentage points, increase the number of iterations."),
+          tags$strong(paste0(t("info_simulate_n_label"), " ")),
+          t("info_simulate_n_body")),
       # R1.5: view toggle — output.sim_view is "settings" or "results"
       conditionalPanel(
         condition = "output.sim_view != 'results'",
         bslib::layout_columns(
         col_widths = c(4, 8),
         bslib::card(
-          bslib::card_header("Simulation Settings"),
+          bslib::card_header(t("card_sim_settings")),
           bslib::card_body(
-            sliderInput("n_iter", "Number of Iterations",
+            sliderInput("n_iter", t("sim_n_iter_label"),
               min = 1000, max = 50000, step = 1000,
               value = 10000, sep = ","),
             numericInput("seed",
               label = tagList(
-                "Random Seed (for reproducibility) ",
+                paste0(t("sim_seed_label"), " "),
                 bslib::tooltip(
                   span(icon("circle-question"),
                        style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                  "Fixing the seed makes results exactly reproducible — anyone using the same data, settings, and seed will get the same numbers. To check convergence, re-run with a different seed (e.g. 123 or 456): if the 95% MoE changes by more than ~2 percentage points, increase the number of iterations.",
+                  t("tip_sim_seed"),
                   placement = "right"
                 )
               ),
@@ -1402,11 +1351,11 @@ app_ui <- function(request = NULL) {
             # iterations, matching the IPCC Inventory Software's behaviour.
             selectInput("gwp_version",
               label = tagList(
-                "GWP Assessment Report ",
+                paste0(t("sim_gwp_label"), " "),
                 bslib::tooltip(
                   span(icon("circle-question"),
                        style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                  "GWP (Global Warming Potential) converts CH₄ and N₂O emissions to CO₂ equivalent for reporting. AR5 (CH₄=28, N₂O=265) is the most commonly required for current IPCC submissions. AR6 (CH₄=27, N₂O=273) is the latest IPCC assessment. Use whichever version your national reporting guidelines specify.",
+                  t("tip_sim_gwp"),
                   placement = "right"
                 )
               ),
@@ -1414,31 +1363,27 @@ app_ui <- function(request = NULL) {
                           "AR5 (CH₄=28, N₂O=265)" = "AR5",
                           "AR6 (CH₄=27, N₂O=273)" = "AR6"),
               selected = "AR5"),
-            # T1.12 / R1.4: emission source selector — none ticked by default,
-            # forcing the user to make an explicit choice before running.
-            checkboxGroupInput("emission_sources", "Emission sources to include",
-                               choices = c(
-                                 "Enteric fermentation CH₄"            = "enteric_ch4",
-                                 "Manure management CH₄"               = "manure_ch4",
-                                 "Manure management N₂O direct"        = "manure_n2o_direct",
-                                 "Manure management N₂O indirect"      = "manure_n2o_indirect",
-                                 "Pasture deposition N₂O direct"       = "pasture_n2o_direct",
-                                 "Pasture deposition N₂O indirect"     = "pasture_n2o_indirect"
-                               ),
+            checkboxGroupInput("emission_sources", t("sim_sources_label"),
+                               choices = setNames(
+                                 c("enteric_ch4", "manure_ch4",
+                                   "manure_n2o_direct", "manure_n2o_indirect",
+                                   "pasture_n2o_direct", "pasture_n2o_indirect"),
+                                 c(t("src_enteric_ch4"), t("src_manure_ch4"),
+                                   t("src_manure_n2o_d"), t("src_manure_n2o_i"),
+                                   t("src_pasture_n2o_d"), t("src_pasture_n2o_i"))),
                                selected = character(0)),
             uiOutput("select_all_btn"),
             div(style = "font-size:0.78rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px; margin-bottom:8px; margin-top:4px;",
                 icon("exclamation-triangle"),
-                tags$strong(" Tick at least one source above"),
-                " — the simulation cannot run without an explicit selection. ",
-                tags$em("(Most users tick all 6 for a full inventory.)")),
+                tags$strong(paste0(" ", t("sim_must_tick_one"))),
+                t("sim_must_tick_body")),
             hr(),
             # Round 9: single-year-only options (decomposition + comparison).
             # Trend mode doesn't use these — the trend's IPCC-§3.7 framework
             # already separates AD vs coefficient via the year_corr radio.
             conditionalPanel(
               condition = "input.analysis_mode != 'trend'",
-              checkboxInput("run_decomposition", "Run uncertainty decomposition (AD/EF/Combined)",
+              checkboxInput("run_decomposition", t("sim_run_decomp"),
                             value = TRUE),
               # Round 6a #5: rendered server-side so we can grey it out when no
               # correlations are selected on Tab 4 (the comparison would be
@@ -1497,12 +1442,12 @@ app_ui <- function(request = NULL) {
             # observeEvent(input$run_trend) handler).
             conditionalPanel(
               condition = "input.analysis_mode != 'trend'",
-              actionButton("run_sim", "Run Monte Carlo Simulation",
+              actionButton("run_sim", t("btn_run_sim"),
                            class = "run-btn w-100", icon = icon("play"))
             ),
             conditionalPanel(
               condition = "input.analysis_mode == 'trend'",
-              actionButton("run_trend", "Run Trend Analysis",
+              actionButton("run_trend", t("btn_run_trend"),
                            class = "run-btn w-100", icon = icon("play")),
               hr(),
               uiOutput("trend_status")
@@ -1761,56 +1706,49 @@ app_ui <- function(request = NULL) {
       conditionalPanel(
         condition = "input.analysis_mode != 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
-            tags$strong("What to do: "),
-            "This page shows which input parameters contribute most to the overall emission uncertainty. ",
-            "The ", tags$strong("tornado chart"), " on the left ranks parameters by their influence -- ",
-            "longer bars mean more influential parameters. Green bars indicate a positive relationship ",
-            "(higher value = higher emissions) and red bars indicate a negative relationship. ",
-            "Use the dropdown on the right to switch between SRC (linear influence) and PRCC (rank-based, more robust). ",
+            tags$strong(paste0(t("what_to_do_label"), " ")),
+            t("info_sens_what"),
             tags$br(), tags$br(),
-            tags$strong("Note: "),
-            tags$em("These rankings show which parameters drive the "),
-            tags$em(tags$strong("uncertainty")),
-            tags$em(" of total emissions, not the absolute emission level."),
+            tags$strong(paste0(t("info_sens_note_label"), " ")),
+            tags$em(t("info_sens_note_body")),
+            tags$em(tags$strong(t("info_sens_note_uncertainty"))),
+            tags$em(t("info_sens_note_tail")),
             tags$br(),
-            tags$strong("Action item: "), "Focus your data improvement efforts on the top 3-5 parameters ",
-            "to get the biggest reduction in overall inventory uncertainty.",
+            tags$strong(paste0(t("info_sens_action_label"), " ")),
+            t("info_sens_action_body"),
             tags$br(), tags$br(),
-            tags$strong("Sensitivity methods explained: "),
-            tags$strong("SRC (Standardized Regression Coefficients)"),
-            " — fits a linear model between each input parameter and the output; fast and easy to interpret. ",
-            "A positive SRC means higher values of that input produce higher emissions. ",
-            tags$strong("PRCC (Partial Rank Correlation Coefficients)"),
-            " — rank-based method, more robust when the input-output relationship is non-linear or when the output distribution is skewed. ",
-            "For most livestock inventories both methods give similar rankings. ",
-            "Use PRCC as a cross-check when SRC rankings seem counterintuitive or when distributions are highly asymmetric."),
+            tags$strong(paste0(t("info_sens_methods_label"), " ")),
+            tags$strong(t("info_sens_src_label")),
+            t("info_sens_src_body"), " ",
+            tags$strong(t("info_sens_prcc_label")),
+            t("info_sens_prcc_body")),
         uiOutput("sens_view_toggle"),
         div(style = "margin: 0 16px 12px 16px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;",
-            selectInput("sens_source", "Output variable",
-                        choices = c(
-                          "Total CO₂eq (all sources)"             = "total_co2e",
-                          "Enteric fermentation CH₄"              = "enteric_ch4_total",
-                          "Manure management CH₄"                 = "manure_ch4_total",
-                          "Manure management N₂O direct"          = "direct_n2o_mm_total",
-                          "Manure management N₂O indirect"        = "indirect_n2o_mm_total",
-                          "Pasture deposition N₂O direct"         = "direct_n2o_prp_total",
-                          "Pasture deposition N₂O indirect"       = "indirect_n2o_prp_total"
-                        ),
+            selectInput("sens_source", t("sens_output_var"),
+                        choices = setNames(
+                          c("total_co2e", "enteric_ch4_total", "manure_ch4_total",
+                            "direct_n2o_mm_total", "indirect_n2o_mm_total",
+                            "direct_n2o_prp_total", "indirect_n2o_prp_total"),
+                          c(t("sens_total_co2e"), t("src_enteric_ch4"),
+                            t("src_manure_ch4"), t("src_manure_n2o_d"),
+                            t("src_manure_n2o_i"), t("src_pasture_n2o_d"),
+                            t("src_pasture_n2o_i"))),
                         selected = "total_co2e", width = "340px"),
             uiOutput("sens_group_filter_ui")
         ),
         bslib::layout_columns(
           col_widths = c(6, 6),
           bslib::card(
-            bslib::card_header("Tornado Chart - Top Parameters"),
+            bslib::card_header(t("card_tornado_h")),
             bslib::card_body(plotly::plotlyOutput("tornado_chart"))
           ),
           bslib::card(
-            bslib::card_header("Sensitivity Rankings"),
+            bslib::card_header(t("card_sens_rankings")),
             bslib::card_body(
-              selectInput("sens_method", "Method",
-                          choices = c("Standardized Regression (SRC)" = "src",
-                                      "Partial Rank Correlation (PRCC)" = "prcc")),
+              selectInput("sens_method", t("sens_method"),
+                          choices = setNames(c("src", "prcc"),
+                                              c(t("sens_method_src"),
+                                                t("sens_method_prcc")))),
               DT::DTOutput("sensitivity_table")
             )
           )
@@ -1821,48 +1759,54 @@ app_ui <- function(request = NULL) {
       conditionalPanel(
         condition = "input.analysis_mode == 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
-            tags$strong("What to do: "),
-            "Trend sensitivity has two complementary views. ",
-            tags$strong("Per-year (latest)"),
-            " — which parameters dominate the uncertainty in the most recent year. ",
-            tags$strong("Trend driver (Δ Y_N − Y_1)"),
-            " — which parameters drive the change between the first and last year (per IPCC Vol 1 Ch 3 §3.7). ",
-            "Bars are coloured by ", tags$strong("user-reducibility"),
-            " (same scheme as the single-year tornado): ",
-            tags$span(style = "color:#2D6A4F;font-weight:bold;", "■ green"),
-            " = the user can improve uncertainty on this parameter with better local data; ",
-            tags$span(style = "color:#78909C;font-weight:bold;", "■ grey"),
-            " = IPCC coefficient (requires dedicated measurement research to improve). ",
+            tags$strong(paste0(t("what_to_do_label"), " ")),
+            t("info_trend_sens_what"),
+            tags$strong(t("info_trend_sens_per_year_label")),
+            t("info_trend_sens_per_year_body"),
+            tags$strong(t("info_trend_sens_delta_label")),
+            t("info_trend_sens_delta_body"),
+            tags$strong(t("info_trend_sens_user_red")),
+            t("info_trend_sens_legend"),
+            tags$span(style = "color:#2D6A4F;font-weight:bold;", "■ ",
+                      if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                                          ifnotfound = "en"), "fr"))
+                        "vert" else "green"),
+            t("info_trend_sens_green_note"),
+            tags$span(style = "color:#78909C;font-weight:bold;", "■ ",
+                      if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                                          ifnotfound = "en"), "fr"))
+                        "gris" else "grey"),
+            t("info_trend_sens_grey_note"),
             tags$br(), tags$br(),
-            tags$strong("Action item: "),
-            "Focus your data improvement efforts on green-coloured parameters in the top 5 — those give you the biggest uncertainty reduction with locally-collectible data."),
-        h4("Per-year drivers (latest year)",
+            tags$strong(paste0(t("info_sens_action_label"), " ")),
+            t("info_trend_sens_action")),
+        h4(t("trend_sens_per_year_h"),
             style = "color:#1B4332; margin: 8px 16px 4px;"),
         bslib::layout_columns(
           col_widths = c(7, 5),
           bslib::card(
-            bslib::card_header("Tornado — top 10"),
+            bslib::card_header(t("tornado_top10")),
             bslib::card_body(plotly::plotlyOutput("trend_tornado_per_year_sens",
                                                    height = "420px"))
           ),
           bslib::card(
-            bslib::card_header("Rankings — top 15 (SRC + PRCC)"),
+            bslib::card_header(t("trend_rankings_top15")),
             bslib::card_body(DT::DTOutput("trend_sens_per_year_table"))
           )
         ),
-        h4("Trend driver (Δ Y_N − Y_1)",
+        h4(t("trend_sens_delta_h"),
             style = "color:#1B4332; margin: 16px 16px 4px;"),
         div(style = "margin: 0 16px 8px; font-size:0.82rem; color:#666;",
-            tags$em("Combined Y_1 + Y_N inputs are sensitivity-tested against the per-iteration ΔCO₂eq. Suffixes _y1 / _yN distinguish the same parameter at different years.")),
+            tags$em(t("trend_combined_note"))),
         bslib::layout_columns(
           col_widths = c(7, 5),
           bslib::card(
-            bslib::card_header("Tornado — top 10"),
+            bslib::card_header(t("tornado_top10")),
             bslib::card_body(plotly::plotlyOutput("trend_tornado_delta_sens",
                                                    height = "420px"))
           ),
           bslib::card(
-            bslib::card_header("Rankings — top 15 (SRC + PRCC)"),
+            bslib::card_header(t("trend_rankings_top15")),
             bslib::card_body(DT::DTOutput("trend_sens_delta_table"))
           )
         )
@@ -1882,93 +1826,86 @@ app_ui <- function(request = NULL) {
       conditionalPanel(
         condition = "input.analysis_mode != 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
-            tags$strong("What to do: "),
-            "This page shows your uncertainty results formatted as IPCC Table 3.3, ready for your national ",
-            "inventory submission. ",
-            "The table has three uncertainty columns — ",
-            tags$strong("AD uncertainty (%)"), ", ",
-            tags$strong("EF uncertainty (%)"), ", and ",
-            tags$strong("Combined uncertainty (%)"),
-            " — all expressed as ", tags$strong("% uncertainty"), " (half-width of the 95% CI ÷ mean × 100), ",
-            "following IPCC 2006 Vol. 1 Ch. 3 Table 3.3 conventions. ",
-            "AD = population/activity-data uncertainty only; EF = per-head emission factor uncertainty driven by the 23 IPCC coefficients; Combined = both sources together. ",
-            "Click ", tags$strong("'Download Excel Report'"), " to get a complete workbook with all results, ",
-            "sensitivity rankings, run settings, and metadata. Click ", tags$strong("'Download CSV'"), " for a simpler file ",
-            "with uncertainty metrics only."),
+            tags$strong(paste0(t("what_to_do_label"), " ")),
+            t("info_ipcc_report_intro"), " ",
+            t("info_ipcc_three_cols"),
+            tags$strong(t("col_ad_uncert")), ", ",
+            tags$strong(t("col_ef_uncert")),
+            if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                                ifnotfound = "en"), "fr"))
+              ", et " else ", and ",
+            tags$strong(t("col_combined_uncert")),
+            if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                                ifnotfound = "en"), "fr"))
+              " — toutes exprimées en " else " — all expressed as ",
+            tags$strong(t("info_ipcc_pct_label")),
+            t("info_ipcc_pct_body"),
+            " ", t("info_ipcc_click_label"),
+            tags$strong(t("info_ipcc_xlsx_label")),
+            t("info_ipcc_xlsx_body"),
+            tags$strong(t("info_ipcc_csv_label")),
+            t("info_ipcc_csv_body")),
         div(style = "margin: 0 16px 12px; font-size:0.82rem; color:#1B4332; background:#D8F3DC; border-left:3px solid #2D6A4F; padding:10px 12px; border-radius:4px;",
-            tags$strong("AD vs EF column convention: "),
-            "in this version, ", tags$em("AD"),
-            " = population uncertainty only (N), and ", tags$em("EF"),
-            " = the per-head emission factor uncertainty driven by the IPCC coefficients (live weight, feed quality, ",
-            "Ym, Bo, EF3_PRP, etc.). This matches IPCC Volume 1 Chapter 3 reporting conventions."),
+            tags$strong(paste0(t("ad_ef_convention_label"), " ")),
+            t("ad_ef_convention_body")),
         bslib::card(
-          bslib::card_header("IPCC Table 3.3 - Uncertainty Report"),
+          bslib::card_header(t("card_ipcc_table_h")),
           bslib::card_body(
             uiOutput("ipcc_table_notice"),
             DT::DTOutput("ipcc_table")
           )
         ),
-        # Download buttons in their own card directly below the table — keeps
-        # them out of the DT's scroll region (where they used to overlap on
-        # wide screens) and gives them a clear header so users find them.
         bslib::card(
           style = "border-left: 4px solid #2D6A4F;",
-          bslib::card_header("Download reports"),
+          bslib::card_header(t("card_downloads_h")),
           bslib::card_body(
             p(style = "margin: 0 0 12px 0; color: #475569; font-size: 0.92rem;",
-              "Export the run results — Excel for the full workbook with ",
-              "sensitivity / settings / metadata sheets, CSV for the bare ",
-              "uncertainty table, Word for the IPCC-style narrative summary."),
+              t("downloads_intro")),
             fluidRow(
               column(4, downloadButton("download_xlsx",
-                                        "Download Excel Report",
+                                        t("btn_download_xlsx"),
                                         class = "btn-success",
                                         style = "width:100%;")),
               column(4, downloadButton("download_csv",
-                                        "Download CSV",
+                                        t("btn_download_csv"),
                                         class = "btn-outline-success",
                                         style = "width:100%;")),
               column(4, downloadButton("download_docx",
-                                        "Download Word summary",
+                                        t("btn_download_docx"),
                                         class = "btn-primary",
                                         style = "width:100%;"))
             )
           )
         ),
         bslib::card(
-          bslib::card_header("Uncertainty distributions per emission source"),
+          bslib::card_header(t("card_dist_per_source")),
           bslib::card_body(
-            p("Histograms of the Monte Carlo output for each emission source. ",
-              "Useful for third-party QA review of which sources contribute the most variance. ",
-              "When you hover over a bar, the tooltip shows two numbers: ",
-              "the ", tags$strong("x-range"), " (e.g. '37k–38k') is the emission value interval for that bin in tonnes — ",
-              "the width of this interval reflects the spread of the distribution for that source; ",
-              "the ", tags$strong("count"), " (e.g. '530') is the number of Monte Carlo iterations that fell in that bin. ",
-              "A narrow x-range with a tall peak indicates low uncertainty; a wide x-range with a flat histogram indicates high uncertainty."),
+            p(t("body_dist_per_source"),
+              tags$strong(t("xrange_label")),
+              t("body_dist_per_source_mid"),
+              tags$strong(t("count_label")),
+              t("body_dist_per_source_tail")),
             plotly::plotlyOutput("report_source_histograms", height = "420px")
           )
         ),
         bslib::card(
-          bslib::card_header("Top sensitivity drivers (Total CO₂eq)"),
+          bslib::card_header(t("card_top_drivers")),
           bslib::card_body(
-            p("Standardised regression coefficients for the top 10 input parameters driving total uncertainty."),
+            p(t("body_top_drivers")),
             plotly::plotlyOutput("report_tornado", height = "380px")
           )
         ),
         bslib::card(
-          bslib::card_header("Input distributions used"),
+          bslib::card_header(t("card_input_dists")),
           bslib::card_body(
-            p("Density plots of each input parameter's fitted distribution — confirms each ",
-              "parameter was sampled with the marginal distribution specified in the input table."),
+            p(t("body_input_dists")),
             plotly::plotlyOutput("report_input_densities", height = "520px")
           )
         ),
         bslib::card(
-          bslib::card_header("Input parameters used in this run"),
+          bslib::card_header(t("card_inputs_doc")),
           bslib::card_body(
-            p("Full record of every parameter value, distribution, and bounds ",
-              "used in the simulation — included for inventory documentation and ",
-              "third-party QA review."),
+            p(t("body_inputs_doc")),
             DT::DTOutput("inputs_doc_table")
           )
         )
@@ -1978,46 +1915,45 @@ app_ui <- function(request = NULL) {
       conditionalPanel(
         condition = "input.analysis_mode == 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
-            tags$strong("What to do: "),
-            "This page presents the trend results — year-by-year totals, the trend slope and Δ across years with their own 95% CIs, and the sensitivity drivers per IPCC Vol 1 Ch 3 §3.7. ",
-            "Use the downloads below to export the trend report as Excel (multi-sheet workbook), CSV (table only), or Word (full IPCC-style narrative report including the executive summary and methodological notes on the year-correlation mode you chose)."),
+            tags$strong(paste0(t("what_to_do_label"), " ")),
+            t("info_trend_report_what")),
         bslib::card(
-          bslib::card_header("Trend report — downloads"),
+          bslib::card_header(t("card_trend_downloads")),
           bslib::card_body(
-            p(tags$em("Available after a successful trend run on the Simulate tab. Filename includes the year-correlation mode you picked.")),
+            p(tags$em(t("trend_downloads_note"))),
             fluidRow(
-              column(3, downloadButton("download_trend_xlsx", "Download Excel Report",
+              column(3, downloadButton("download_trend_xlsx", t("btn_download_xlsx"),
                                         class = "btn-success")),
-              column(3, downloadButton("download_trend_csv", "Download CSV",
+              column(3, downloadButton("download_trend_csv", t("btn_download_csv"),
                                         class = "btn-outline-success")),
-              column(3, downloadButton("download_trend_docx", "Download Word summary",
+              column(3, downloadButton("download_trend_docx", t("btn_download_docx"),
                                         class = "btn-primary"))
             )
           )
         ),
         bslib::card(
-          bslib::card_header("Trend chart — Total CO₂eq with 95% CI band"),
+          bslib::card_header(t("card_trend_chart_h")),
           bslib::card_body(plotly::plotlyOutput("trend_plot_report", height = "400px"))
         ),
         bslib::card(
-          bslib::card_header("Trend table"),
+          bslib::card_header(t("card_trend_table_h")),
           bslib::card_body(
-            p(tags$em("Year-by-year mean, 95% CI bounds, CV%, MoE%, Δ vs. base year, and year-over-year change.")),
+            p(tags$em(t("trend_table_note"))),
             DT::DTOutput("trend_table_report")
           )
         ),
         bslib::card(
-          bslib::card_header("Sensitivity drivers (per-year + trend)"),
+          bslib::card_header(t("card_trend_sens_h")),
           bslib::card_body(
-            p(tags$em("Per-year tornado shows drivers of the latest year; Δ Y_N − Y_1 tornado shows what drives the change between the first and last year (per IPCC Vol 1 Ch 3 §3.7).")),
+            p(tags$em(t("trend_sens_note"))),
             bslib::layout_columns(
               col_widths = c(6, 6),
               div(
-                h6("Per-year (latest)", style = "color:#1B4332;"),
+                h6(t("info_trend_sens_per_year_label"), style = "color:#1B4332;"),
                 plotly::plotlyOutput("trend_tornado_per_year_report", height = "320px")
               ),
               div(
-                h6("Trend driver (Δ Y_N − Y_1)", style = "color:#1B4332;"),
+                h6(t("info_trend_sens_delta_label"), style = "color:#1B4332;"),
                 plotly::plotlyOutput("trend_tornado_delta_report", height = "320px")
               )
             )
@@ -2037,34 +1973,31 @@ app_ui <- function(request = NULL) {
       title = t("tab_contact"),
       icon = icon("envelope"),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong("We welcome feedback, bug reports, feature suggestions, and methodology questions."),
+          tags$strong(t("contact_intro_label")),
           tags$br(), tags$br(),
-          "Submissions are sent to the development team. We aim to reply within a few working days."),
+          t("contact_intro_body")),
       bslib::layout_columns(
         col_widths = c(6, 6),
         bslib::card(
-          bslib::card_header("Send us a message"),
-          # Round 9 follow-up: contact_form_html() returns a tagList (form HTML
-          # + <style> + <script>). Pass it directly — wrapping in HTML() would
-          # re-stringify the script and break the submit handler again.
+          bslib::card_header(t("card_contact_send")),
           bslib::card_body(contact_form_html())
         ),
         bslib::card(
-          bslib::card_header("What kind of feedback helps most"),
+          bslib::card_header(t("card_contact_helps")),
           bslib::card_body(
             tags$ul(
-              tags$li(tags$strong("Bug reports"),
-                      " — with steps to reproduce, the example dataset or your upload, and the error message."),
-              tags$li(tags$strong("Methodology questions"),
-                      " — e.g. how a particular IPCC equation is implemented, or whether your country's data fits the assumptions."),
-              tags$li(tags$strong("Feature requests"),
-                      " — missing parameters, additional emission sources, integration with national inventory tools."),
-              tags$li(tags$strong("Documentation gaps"),
-                      " — if a tab or label was confusing, tell us where you got stuck.")
+              tags$li(tags$strong(t("contact_bug_label")),
+                      t("contact_bug_body")),
+              tags$li(tags$strong(t("contact_method_label")),
+                      t("contact_method_body")),
+              tags$li(tags$strong(t("contact_feat_label")),
+                      t("contact_feat_body")),
+              tags$li(tags$strong(t("contact_doc_label")),
+                      t("contact_doc_body"))
             ),
             hr(),
             div(style = "font-size:0.8rem; color:#666;",
-                tags$em("Privacy note: messages are relayed via Web3Forms, an HTTPS form-relay service. We don't store your message; we don't share your email."))
+                tags$em(t("contact_privacy_note")))
           )
         )
       )

@@ -12,30 +12,32 @@
 # ============================================================================
 
 translator_chat_ui <- function() {
+  is_fr <- identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
+                           ifnotfound = "en"), "fr")
   bslib::card(
     id = "ai-translator-card",
     style = "border-left: 4px solid #2D6A4F;",
     bslib::card_header(
-      h4("AI Translator — turn your raw cattle data into the tool's template",
-         style = "margin: 0;")
+      h4(t("ai_card_title"), style = "margin: 0;")
     ),
     bslib::card_body(
       tags$p(style = "margin: 0 0 14px 0; color: #475569; font-size: 0.92rem;
                        line-height: 1.5;",
-        "Drop in your raw cattle data file (.xlsx or .csv). The AI works ",
-        "in three short steps: ",
-        tags$strong("(1) Explore"), " — it reads every sheet and reports ",
-        "back what it found (which parameters live where, units, ",
-        "ambiguities). ",
-        tags$strong("(2) Clarify"), " — you answer its questions in plain ",
-        "English. ",
-        tags$strong("(3) Emit"), " — click Produce template now and ",
-        "download the .xlsx in the exact format the Data Input tab expects. ",
-        "No setup — sign in once with your email and you're ready. ",
+        t("ai_intro_part1"), " ",
+        tags$strong(t("ai_step1_label")), " ", t("ai_step1_body"), " ",
+        tags$strong(t("ai_step2_label")), " ", t("ai_step2_body"), " ",
+        tags$strong(t("ai_step3_label")), " ", t("ai_step3_body"), " ",
+        t("ai_intro_signin_note"), " ",
         tags$a(href = "docs/ai_translator.html", target = "_blank",
                style = "color: #2D6A4F; font-weight: 600;
                         text-decoration: underline;",
-               "Find out more")),
+               t("ai_find_out_more"))),
+      if (is_fr)
+        tags$div(style = "margin: 0 0 14px 0; padding: 8px 12px;
+                          background: #FEF3C7; border-left: 3px solid #F59E0B;
+                          border-radius: 4px; font-size: 0.85rem; color: #5D4037;",
+                 icon("circle-info"), " ", t("ai_fr_chat_note"))
+      else NULL,
       uiOutput("translator_panel")
     )
   )
@@ -368,7 +370,7 @@ translator_chat_server <- function(input, output, session) {
   output$translator_messages <- renderUI({
     if (length(state$messages) == 0 && !isTRUE(state$pending))
       return(tags$p(style = "color:#888; font-style:italic;",
-                    "Upload your raw cattle data above or type a question to get started."))
+                    t("ai_empty_messages")))
     msgs <- lapply(state$messages, function(m) {
       # User vs AI bubble distinction — standard chat convention:
       #   user  : light blue, right-aligned
@@ -490,7 +492,7 @@ translator_chat_server <- function(input, output, session) {
     tags$div(
       style = "display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;",
       tags$div(
-        tags$strong("Signed in: "),
+        tags$strong(paste0(t("ai_signed_in"), " ")),
         tags$code(state$user_email)
       )
     ),
@@ -498,9 +500,9 @@ translator_chat_server <- function(input, output, session) {
 
     fileInput("translator_file",
               label = tagList(
-                tags$strong("1.  Upload your raw cattle data"),
+                tags$strong(t("ai_upload_label")),
                 tags$span(style = "color:#52525B; font-weight:400;",
-                          " (.xlsx or .csv) — the AI reads it and starts the conversation.")
+                          t("ai_upload_hint"))
               ),
               accept = c(".xlsx", ".xls", ".csv"),
               width = "100%"),
@@ -524,7 +526,7 @@ translator_chat_server <- function(input, output, session) {
              # labels (Analyzing your file… / Producing the final template… /
              # Sending sign-in link… / default working message).
              tags$span(`data-translator-spinner-label` = "true",
-                       "Translator is working — calling the AI, waiting for the first reply…")),
+                       t("ai_spinner_default"))),
     # Inline keyframes for the spinner's rotation (avoids needing a
     # custom CSS file just for this).
     tags$head(tags$style(HTML(
@@ -559,10 +561,10 @@ translator_chat_server <- function(input, output, session) {
       style = "display:flex; gap:8px; align-items:flex-end;",
       div(style = "flex:1;",
           textAreaInput("translator_input",
-                        label = "2.  Your reply to the AI",
-                        placeholder = "Answer the AI's questions, or ask your own…",
+                        label = t("ai_reply_label"),
+                        placeholder = t("ai_reply_placeholder"),
                         rows = 2, width = "100%")),
-      actionButton("translator_send", "Send", class = "btn-success",
+      actionButton("translator_send", t("btn_ai_send"), class = "btn-success",
                    style = "min-width:80px; height:42px;")
     ),
     # Secondary action row — Produce | Reset | Stop | Download.
@@ -574,16 +576,16 @@ translator_chat_server <- function(input, output, session) {
       style = "display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; align-items:center;",
       actionButton("translator_force_template",
                    tagList(icon("file-arrow-down"),
-                            " Produce template now"),
+                            t("btn_ai_produce")),
                    class = "btn-primary",
                    style = "font-size:0.82rem;",
-                   title = "Emit the JSON template from your section B + C exploration. Use this when you've finished answering the AI's section D clarifications."),
+                   title = t("tip_ai_produce")),
       actionButton("translator_reset",
                    tagList(icon("rotate-left"),
-                            " Reset conversation"),
+                            t("btn_ai_reset")),
                    class = "btn-outline-secondary",
                    style = "font-size:0.82rem;",
-                   title = "Clear the chat and start over from scratch."),
+                   title = t("tip_ai_reset")),
       # Stop button — escape hatch when the AI is generating a template
       # and the Shiny event loop is blocked on the OpenAI call. Plain
       # JS onclick (window.location.reload) bypasses the blocked R
@@ -595,14 +597,15 @@ translator_chat_server <- function(input, output, session) {
         type = "button",
         class = "btn btn-outline-danger",
         style = "font-size:0.82rem;",
-        onclick = "if (confirm('Stop the AI generation and reload the page? Your conversation is saved — you will not lose it.')) { window.location.reload(); }",
-        title = "Use this if the AI is generating a template and the page is unresponsive. Reloads the page; the OpenAI call is abandoned. Your conversation history is preserved.",
-        tagList(icon("ban"), " Stop / reload")
+        onclick = sprintf("if (confirm('%s')) { window.location.reload(); }",
+                          gsub("'", "\\\\'", t("ai_stop_confirm"))),
+        title = t("tip_ai_stop"),
+        tagList(icon("ban"), t("btn_ai_stop"))
       ),
       conditionalPanel(
         condition = "output.translator_template_ready",
         downloadButton("translator_download_template",
-                        "Download template (.xlsx)",
+                        t("btn_ai_download"),
                         class = "btn-success",
                         icon = icon("file-arrow-down"),
                         style = "font-size:0.82rem;")
