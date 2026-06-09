@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>AI Translator — Find out more</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+
+
+
+
+
+
+
+<style type="text/css">
+:root {
+--green-dark: #1B4332;
+--green-mid: #2D6A4F;
+--green-light: #40916C;
+--green-bg: #D8F3DC;
+--beige: #F7F5F0;
+--grey-text: #3C3C3C;
+--grey-soft: #6B6B6B;
+--warn-amber: #F59E0B;
+}
+body {
+font-family: "DM Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+background: var(--beige);
+color: var(--grey-text);
+line-height: 1.6;
+max-width: 980px;
+margin: 0 auto;
+padding: 32px 28px 80px;
+}
+h1, h2, h3 {
+color: var(--green-dark);
+font-weight: 700;
+}
+h1 { font-size: 2rem; border-bottom: 2px solid var(--green-mid); padding-bottom: 8px; margin-top: 0; }
+h2 { font-size: 1.4rem; margin-top: 32px; }
+h3 { font-size: 1.1rem; color: var(--green-mid); margin-top: 24px; }
+a { color: var(--green-mid); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre {
+background: #F0EBE0;
+border-radius: 4px;
+padding: 1px 5px;
+font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+font-size: 0.92em;
+}
+pre { padding: 12px 14px; overflow-x: auto; }
+table {
+border-collapse: collapse;
+width: 100%;
+margin: 14px 0 22px;
+background: #FFF;
+box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+th, td { padding: 8px 12px; border-bottom: 1px solid #E0DDD5; text-align: left; vertical-align: top; }
+th { background: var(--green-bg); color: var(--green-dark); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+.tldr {
+background: #FFF;
+border-left: 4px solid var(--green-mid);
+padding: 14px 18px;
+margin: 16px 0 28px;
+border-radius: 0 6px 6px 0;
+box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.tldr strong { color: var(--green-dark); }
+.callout-warn {
+background: #FEF3C7;
+border-left: 4px solid var(--warn-amber);
+padding: 12px 16px;
+margin: 18px 0;
+border-radius: 0 6px 6px 0;
+font-size: 0.95em;
+color: #7A4F00;
+}
+.callout-warn strong { color: #7A4F00; }
+.callout-note {
+background: #FFF;
+border-left: 4px solid var(--green-light);
+padding: 12px 16px;
+margin: 18px 0;
+border-radius: 0 6px 6px 0;
+font-size: 0.95em;
+}
+.related {
+background: var(--green-bg);
+padding: 14px 18px;
+margin: 32px 0 0;
+border-radius: 8px;
+font-size: 0.92em;
+}
+.related h3 { margin-top: 0; }
+.related a { font-weight: 500; }
+footer {
+margin-top: 60px;
+padding-top: 18px;
+border-top: 1px solid #E0DDD5;
+font-size: 0.85em;
+color: var(--grey-soft);
+}
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">AI Translator — Find out more</h1>
+
+
+
+<p>This page describes what the in-app AI translator does, how to use it
+for a single inventory, and how access is granted to non-CGIAR email
+addresses. It complements the user guide and the methodology document
+with a step-by-step walk-through of the translator workflow.</p>
+<div id="what-the-ai-translator-is-for" class="section level2">
+<h2>What the AI translator is for</h2>
+<p>The Cattle Uncertainty App expects its data in a specific Excel
+template — three sheets (Inventory_Metadata, Parameters,
+Manure_Management), with controlled vocabularies for sub-categories and
+manure-management systems, and a fixed column order. Real national
+inventory data rarely arrives in that shape: column names differ, units
+may be in litres instead of kilograms, sub-category labels reflect local
+practice (“Local breed adult cows”, “draught oxen”), and uncertainty
+bounds are sometimes reported as a mean ± standard deviation rather than
+as an explicit 95% confidence interval.</p>
+<p>The AI translator converts raw inventory data, in whatever shape it
+arrives, into the exact template the tool needs. The user uploads an
+Excel or CSV file (multi-sheet is supported), answers a small number of
+clarification questions in natural language, and downloads a filled
+template ready to upload to the Data Input tab.</p>
+<p>The translator does column mapping and unit conversion. It does not
+do the emissions calculation itself; that happens after the filled
+template is uploaded.</p>
+</div>
+<div id="the-three-step-workflow" class="section level2">
+<h2>The three-step workflow</h2>
+<p>The translator works in three explicit passes — Explore, Clarify,
+Emit — rather than attempting all three at once. This separation
+prevents the AI from silently dropping rows or substituting catalogue
+defaults for values the user supplied.</p>
+<div id="step-1-explore" class="section level3">
+<h3>Step 1 — Explore</h3>
+<p>After file upload, the AI’s first response is a structured
+exploration report with four labelled sections:</p>
+<ul>
+<li><strong>A. File shape.</strong> For each sheet in the upload, the AI
+classifies the layout pattern (column-oriented, wide-stacked,
+parameter-labelled, reference-table, or calc-sheet).</li>
+<li><strong>B. Inventory of values found.</strong> A table listing every
+(parameter, sub-category) pair the AI could identify in the file, with
+the source sheet, row, column, central value, lower and upper bounds
+where present, units, and any qualifier (such as “Local breed only” or
+“Cross breed weighted average”).</li>
+<li><strong>C. Inventory of gaps.</strong> IPCC catalogue parameters
+that the file does not provide. These will need to be filled with IPCC
+defaults at emission time.</li>
+<li><strong>D. Ambiguities to resolve.</strong> Questions the user must
+answer before the template can be produced: sub-category vocabulary
+mapping, unit conversions, biological zeros, manure-management code
+interpretation, breed disaggregation, and similar.</li>
+</ul>
+<p>The exploration report is the persistent ground-truth artefact that
+drives the rest of the workflow. The user is expected to read it
+carefully — section B in particular should list every parameter present
+in the source file. A parameter missing from section B should be raised
+in the chat before proceeding.</p>
+</div>
+<div id="step-2-clarify" class="section level3">
+<h3>Step 2 — Clarify</h3>
+<p>The user answers the questions in section D in plain natural-language
+chat messages. There is no required template for the answers; the AI
+parses them and updates its internal mapping. Typical clarifications
+include:</p>
+<ul>
+<li>Sub-category vocabulary mapping (e.g., “Cows” →
+<code>other_cows</code>; “Adult males” → <code>bulls</code>; “Calves” →
+split equally into <code>calves_male</code> and
+<code>calves_female</code>).</li>
+<li>Unit conversions (litres of milk to kilograms using the cow-milk
+density 1.03 kg/L; digestibility expressed as a fraction 0.55 versus a
+percentage 55%).</li>
+<li>Biological zeros (Milk = 0 for non-lactating sub-categories; hours
+of work = 0 for non-oxen).</li>
+<li>Manure-management code interpretation (e.g., a file-level “PIT”
+entry → <code>liquid_slurry</code>; “DL” → <code>dry_lot</code>).</li>
+<li>Whether the file’s mean ± SD reporting should be converted to mean ±
+1.96·SD for the 95% confidence interval.</li>
+</ul>
+<p>If the user wants to add data that is not in the file (typically
+national population numbers), the values can be typed directly into the
+chat. They will be incorporated into the final template alongside the
+file-derived values.</p>
+</div>
+<div id="step-3-emit" class="section level3">
+<h3>Step 3 — Emit</h3>
+<p>When the section D questions are answered, the user clicks
+<strong>Produce template now</strong>. The AI translates section B
+(file-derived values), section C (catalogue gaps to be filled with IPCC
+defaults), and the biological zeros confirmed in section D,
+mechanically, into the JSON template. A green <strong>Download template
+(.xlsx)</strong> button appears alongside Reset conversation.</p>
+<p>The downloaded file follows the official template format exactly.
+After download, the user should open the file and skim the
+<code>data_source</code> column of the Parameters sheet to confirm that
+values from the source file are tagged <code>user_file</code>, IPCC
+catalogue values are tagged <code>ipcc_default</code>, and explicit zero
+values are tagged <code>biological_zero</code> or
+<code>placeholder</code>. This is the recommended spot-check for
+catching translation failures before the simulation runs.</p>
+</div>
+</div>
+<div id="access-for-non-cgiar-email-addresses" class="section level2">
+<h2>Access for non-CGIAR email addresses</h2>
+<p>The translator is gated behind a magic-link sign-in flow. Emails
+ending in <code>@cgiar.org</code> are auto-approved; any other email
+requires one-time manual approval by the administrator. The full
+sequence for a non-CGIAR email is as follows.</p>
+<div id="initial-request-first-sign-in" class="section level3">
+<h3>Initial request (first sign-in)</h3>
+<ol style="list-style-type: decimal">
+<li><p>Open the <strong>Resources tab</strong> of the Cattle Uncertainty
+App and locate the AI Translator card (the first item, identified by the
+green left-edge accent).</p></li>
+<li><p>Enter the email address into the sign-in field and click
+<strong>Send sign-in link</strong>.</p></li>
+<li><p>Within 1–2 minutes, an email arrives from
+<code>noreply@cattle-uncertainty.app</code> with subject “Sign in to the
+IPCC Cattle GHG Uncertainty tool”. The email contains a one-time sign-in
+link valid for 15 minutes.</p></li>
+<li><p>Click the link. The app opens in a browser tab and recognises
+that the email is not on the auto-approved list. A confirmation message
+is displayed:</p>
+<blockquote>
+<p>Thanks — your request to access the AI translator (<a href="mailto:your.email@example.org" class="email">your.email@example.org</a>) has been forwarded to the
+administrator for approval. You’ll receive an email once approved.</p>
+</blockquote>
+<p>At the same moment, the administrator receives a notification email
+summarising the request (email address, timestamp).</p></li>
+</ol>
+</div>
+<div id="approval-administrator-side" class="section level3">
+<h3>Approval (administrator side)</h3>
+<ol start="5" style="list-style-type: decimal">
+<li>The administrator reviews the request and, if appropriate, adds the
+email address to the approved-users list and redeploys the app. The
+administrator typically responds the same working day.</li>
+<li>Once added, the user automatically receives a welcome email
+confirming approval. The email contains a direct link back to the app
+and a brief reminder of the workflow.</li>
+</ol>
+</div>
+<div id="subsequent-sign-in-after-approval" class="section level3">
+<h3>Subsequent sign-in (after approval)</h3>
+<ol start="7" style="list-style-type: decimal">
+<li>Return to the AI Translator card on the Resources tab.</li>
+<li>Enter the same email address again and click <strong>Send sign-in
+link</strong>. A fresh magic-link email arrives within 1–2 minutes.</li>
+<li>Click the new link. The app verifies the email is now on the
+approved list, drops a long-lived sign-in cookie in the browser, and
+unlocks the chat panel.</li>
+<li>On subsequent visits from the same browser, the cookie keeps the
+user signed in. No additional magic-link step is required unless the
+user clears site data or switches browsers.</li>
+</ol>
+</div>
+</div>
+<div id="when-to-use-the-translator-and-when-to-skip-it" class="section level2">
+<h2>When to use the translator and when to skip it</h2>
+<p>The AI translator is intended for the common case in which raw
+inventory data does not match the tool’s template. It is most useful
+when:</p>
+<ul>
+<li>The user’s data is in a non-standard shape (multi-sheet workbook
+with section headers, form-style layout, free-text comments interspersed
+with values).</li>
+<li>Column names differ from the template (e.g., <code>cattle_pop</code>
+instead of <code>N</code>, <code>live_wt_lb</code> instead of
+<code>BW</code>).</li>
+<li>Units are inconsistent (mix of kg and lb, fractions and percentages,
+litres and kilograms of milk).</li>
+<li>IPCC defaults are needed for parameters the user does not
+measure.</li>
+</ul>
+<p>The translator is not required when the user already has a filled
+template — in that case, upload directly via the Data Input tab. The
+translator is also not the appropriate tool for converting an
+emissions-calculation result; it works on input parameters only.</p>
+</div>
+<div id="quality-control-and-limitations" class="section level2">
+<h2>Quality control and limitations</h2>
+<p>The translator performs column mapping and unit conversion. It does
+not validate the underlying values against external reference data, and
+it cannot detect systematic errors in the source file (e.g., a
+transcription mistake in the original survey). Two checks are
+recommended after every translation:</p>
+<ul>
+<li><strong>Spot-check the key numbers.</strong> Compare population,
+body weight, and milk yield in the downloaded template against the
+corresponding cells in the source file. Any discrepancy indicates a
+translation error to be raised in the chat.</li>
+<li><strong>Review the QA/QC tab after upload.</strong> Any value the
+translator filled from an IPCC default is flagged with
+<code>data_source = &quot;ipcc_default&quot;</code> in the QA tab, allowing the
+user to review whether the catalogue default is appropriate for the
+country context. For body weight (<code>BW</code>), the QA tab also runs
+a continental-default deviation check (Annex Tables 10A.1 / 10A.2 /
+10A.3) and warns on deviations larger than ±50%.</li>
+</ul>
+</div>
+<div id="privacy-and-operational-cost" class="section level2">
+<h2>Privacy and operational cost</h2>
+<p>The translator is hosted by the GMH project on a dedicated AI service
+account. The user is not billed for usage. The chat does not retain
+input data after the session ends; only the user’s email address and
+per-call token counts are logged so the administrator can monitor
+monthly consumption. A monthly global spending cap is in place; if the
+cap is reached, an explicit “monthly cap reached, contact administrator”
+message is shown and translation requests pause until the next
+cycle.</p>
+<p>The IPCC inventory data the translator handles is generally
+non-sensitive (it is destined for UNFCCC reporting, which is a
+public-record process). For ministries with internal policies
+restricting upload of pre-publication data to external AI services, the
+translator should not be used; the template can instead be filled
+manually using the IPCC defaults provided in the user guide.</p>
+<div id="related-material" class="section level3 related">
+<h3>Related material</h3>
+<ul>
+<li><a href="../user_guide.pdf">User Guide</a>, §“AI-assisted data
+preparation” — the same workflow described in the printable user guide,
+including the non-CGIAR step-by-step.</li>
+<li><a href="../methodology.pdf">Methodology document</a> — full
+equations, parameter definitions, and references for everything the
+translator outputs.</li>
+<li><a href="correlations.html">Find out more — Correlations</a> — the
+companion topic page covering the correlation modes on the Simulate
+tab.</li>
+</ul>
+</div>
+<footer>
+Generated by <code>scripts/build_help_docs.R</code> from
+<code>docs/ai_translator.Rmd</code>.
+</footer>
+</div>
+
+
+
+<!-- code folding -->
+
+
+
+</body>
+</html>

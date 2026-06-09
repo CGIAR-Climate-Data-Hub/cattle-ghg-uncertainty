@@ -212,7 +212,7 @@ cat("Cached", length(results), "simulation summaries to",
 # Render the topic Rmds. Each renders to www/docs/<name>.html and reads its
 # cached results via the params: argument in its YAML.
 # -----------------------------------------------------------------------------
-topics <- c("correlations")
+topics <- c("correlations", "ai_translator")
 # rmarkdown resolves output_file relative to the Rmd's directory unless it's
 # an absolute path. Build absolute paths from the current working dir so the
 # output lands in www/docs/ regardless of where the .Rmd lives.

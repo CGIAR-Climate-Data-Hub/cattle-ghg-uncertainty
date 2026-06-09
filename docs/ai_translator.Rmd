@@ -1,0 +1,121 @@
+---
+output:
+  html_document:
+    self_contained: true
+    css: _shared.css
+    theme: null
+    highlight: null
+    mathjax: null
+    pandoc_args: ["--metadata=title:AI Translator — Find out more"]
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+This page describes what the in-app AI translator does, how to use it for a single inventory, and how access is granted to non-CGIAR email addresses. It complements the user guide and the methodology document with a step-by-step walk-through of the translator workflow.
+
+## What the AI translator is for
+
+The Cattle Uncertainty App expects its data in a specific Excel template — three sheets (Inventory_Metadata, Parameters, Manure_Management), with controlled vocabularies for sub-categories and manure-management systems, and a fixed column order. Real national inventory data rarely arrives in that shape: column names differ, units may be in litres instead of kilograms, sub-category labels reflect local practice ("Local breed adult cows", "draught oxen"), and uncertainty bounds are sometimes reported as a mean ± standard deviation rather than as an explicit 95% confidence interval.
+
+The AI translator converts raw inventory data, in whatever shape it arrives, into the exact template the tool needs. The user uploads an Excel or CSV file (multi-sheet is supported), answers a small number of clarification questions in natural language, and downloads a filled template ready to upload to the Data Input tab.
+
+The translator does column mapping and unit conversion. It does not do the emissions calculation itself; that happens after the filled template is uploaded.
+
+## The three-step workflow
+
+The translator works in three explicit passes — Explore, Clarify, Emit — rather than attempting all three at once. This separation prevents the AI from silently dropping rows or substituting catalogue defaults for values the user supplied.
+
+### Step 1 — Explore
+
+After file upload, the AI's first response is a structured exploration report with four labelled sections:
+
+- **A. File shape.** For each sheet in the upload, the AI classifies the layout pattern (column-oriented, wide-stacked, parameter-labelled, reference-table, or calc-sheet).
+- **B. Inventory of values found.** A table listing every (parameter, sub-category) pair the AI could identify in the file, with the source sheet, row, column, central value, lower and upper bounds where present, units, and any qualifier (such as "Local breed only" or "Cross breed weighted average").
+- **C. Inventory of gaps.** IPCC catalogue parameters that the file does not provide. These will need to be filled with IPCC defaults at emission time.
+- **D. Ambiguities to resolve.** Questions the user must answer before the template can be produced: sub-category vocabulary mapping, unit conversions, biological zeros, manure-management code interpretation, breed disaggregation, and similar.
+
+The exploration report is the persistent ground-truth artefact that drives the rest of the workflow. The user is expected to read it carefully — section B in particular should list every parameter present in the source file. A parameter missing from section B should be raised in the chat before proceeding.
+
+### Step 2 — Clarify
+
+The user answers the questions in section D in plain natural-language chat messages. There is no required template for the answers; the AI parses them and updates its internal mapping. Typical clarifications include:
+
+- Sub-category vocabulary mapping (e.g., "Cows" → `other_cows`; "Adult males" → `bulls`; "Calves" → split equally into `calves_male` and `calves_female`).
+- Unit conversions (litres of milk to kilograms using the cow-milk density 1.03 kg/L; digestibility expressed as a fraction 0.55 versus a percentage 55%).
+- Biological zeros (Milk = 0 for non-lactating sub-categories; hours of work = 0 for non-oxen).
+- Manure-management code interpretation (e.g., a file-level "PIT" entry → `liquid_slurry`; "DL" → `dry_lot`).
+- Whether the file's mean ± SD reporting should be converted to mean ± 1.96·SD for the 95% confidence interval.
+
+If the user wants to add data that is not in the file (typically national population numbers), the values can be typed directly into the chat. They will be incorporated into the final template alongside the file-derived values.
+
+### Step 3 — Emit
+
+When the section D questions are answered, the user clicks **Produce template now**. The AI translates section B (file-derived values), section C (catalogue gaps to be filled with IPCC defaults), and the biological zeros confirmed in section D, mechanically, into the JSON template. A green **Download template (.xlsx)** button appears alongside Reset conversation.
+
+The downloaded file follows the official template format exactly. After download, the user should open the file and skim the `data_source` column of the Parameters sheet to confirm that values from the source file are tagged `user_file`, IPCC catalogue values are tagged `ipcc_default`, and explicit zero values are tagged `biological_zero` or `placeholder`. This is the recommended spot-check for catching translation failures before the simulation runs.
+
+## Access for non-CGIAR email addresses
+
+The translator is gated behind a magic-link sign-in flow. Emails ending in `@cgiar.org` are auto-approved; any other email requires one-time manual approval by the administrator. The full sequence for a non-CGIAR email is as follows.
+
+### Initial request (first sign-in)
+
+1. Open the **Resources tab** of the Cattle Uncertainty App and locate the AI Translator card (the first item, identified by the green left-edge accent).
+2. Enter the email address into the sign-in field and click **Send sign-in link**.
+3. Within 1–2 minutes, an email arrives from `noreply@cattle-uncertainty.app` with subject "Sign in to the IPCC Cattle GHG Uncertainty tool". The email contains a one-time sign-in link valid for 15 minutes.
+4. Click the link. The app opens in a browser tab and recognises that the email is not on the auto-approved list. A confirmation message is displayed:
+
+    > Thanks — your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.
+
+   At the same moment, the administrator receives a notification email summarising the request (email address, timestamp).
+
+### Approval (administrator side)
+
+5. The administrator reviews the request and, if appropriate, adds the email address to the approved-users list and redeploys the app. The administrator typically responds the same working day.
+6. Once added, the user automatically receives a welcome email confirming approval. The email contains a direct link back to the app and a brief reminder of the workflow.
+
+### Subsequent sign-in (after approval)
+
+7. Return to the AI Translator card on the Resources tab.
+8. Enter the same email address again and click **Send sign-in link**. A fresh magic-link email arrives within 1–2 minutes.
+9. Click the new link. The app verifies the email is now on the approved list, drops a long-lived sign-in cookie in the browser, and unlocks the chat panel.
+10. On subsequent visits from the same browser, the cookie keeps the user signed in. No additional magic-link step is required unless the user clears site data or switches browsers.
+
+## When to use the translator and when to skip it
+
+The AI translator is intended for the common case in which raw inventory data does not match the tool's template. It is most useful when:
+
+- The user's data is in a non-standard shape (multi-sheet workbook with section headers, form-style layout, free-text comments interspersed with values).
+- Column names differ from the template (e.g., `cattle_pop` instead of `N`, `live_wt_lb` instead of `BW`).
+- Units are inconsistent (mix of kg and lb, fractions and percentages, litres and kilograms of milk).
+- IPCC defaults are needed for parameters the user does not measure.
+
+The translator is not required when the user already has a filled template — in that case, upload directly via the Data Input tab. The translator is also not the appropriate tool for converting an emissions-calculation result; it works on input parameters only.
+
+## Quality control and limitations
+
+The translator performs column mapping and unit conversion. It does not validate the underlying values against external reference data, and it cannot detect systematic errors in the source file (e.g., a transcription mistake in the original survey). Two checks are recommended after every translation:
+
+- **Spot-check the key numbers.** Compare population, body weight, and milk yield in the downloaded template against the corresponding cells in the source file. Any discrepancy indicates a translation error to be raised in the chat.
+- **Review the QA/QC tab after upload.** Any value the translator filled from an IPCC default is flagged with `data_source = "ipcc_default"` in the QA tab, allowing the user to review whether the catalogue default is appropriate for the country context. For body weight (`BW`), the QA tab also runs a continental-default deviation check (Annex Tables 10A.1 / 10A.2 / 10A.3) and warns on deviations larger than ±50%.
+
+## Privacy and operational cost
+
+The translator is hosted by the GMH project on a dedicated AI service account. The user is not billed for usage. The chat does not retain input data after the session ends; only the user's email address and per-call token counts are logged so the administrator can monitor monthly consumption. A monthly global spending cap is in place; if the cap is reached, an explicit "monthly cap reached, contact administrator" message is shown and translation requests pause until the next cycle.
+
+The IPCC inventory data the translator handles is generally non-sensitive (it is destined for UNFCCC reporting, which is a public-record process). For ministries with internal policies restricting upload of pre-publication data to external AI services, the translator should not be used; the template can instead be filled manually using the IPCC defaults provided in the user guide.
+
+<div class="related">
+### Related material
+
+- [User Guide](../user_guide.pdf), §"AI-assisted data preparation" — the same workflow described in the printable user guide, including the non-CGIAR step-by-step.
+- [Methodology document](../methodology.pdf) — full equations, parameter definitions, and references for everything the translator outputs.
+- [Find out more — Correlations](correlations.html) — the companion topic page covering the correlation modes on the Simulate tab.
+
+</div>
+
+<footer>
+Generated by <code>scripts/build_help_docs.R</code> from <code>docs/ai_translator.Rmd</code>.
+</footer>

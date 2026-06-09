@@ -31,7 +31,11 @@ translator_chat_ui <- function() {
         "English. ",
         tags$strong("(3) Emit"), " — click Produce template now and ",
         "download the .xlsx in the exact format the Data Input tab expects. ",
-        "No setup — sign in once with your email and you're ready."),
+        "No setup — sign in once with your email and you're ready. ",
+        tags$a(href = "docs/ai_translator.html", target = "_blank",
+               style = "color: #2D6A4F; font-weight: 600;
+                        text-decoration: underline;",
+               "Find out more")),
       uiOutput("translator_panel")
     )
   )
