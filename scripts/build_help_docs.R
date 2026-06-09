@@ -87,8 +87,15 @@ file.copy("docs/_shared.css", file.path(out_dir, "_shared.css"), overwrite = TRU
 
 # -----------------------------------------------------------------------------
 # Run one (country, corr_mode) combination, return a compact summary frame.
+# Optional ef_rho_energy / ef_rho_manureCH / ef_rho_manureN — when any is
+# non-zero, a block-structured EF correlation matrix is built (via
+# make_block_corr() from R/mc_sampling.R) and merged into the unified matrix
+# alongside the AD-side correlations. Used by the help-doc figure that shows
+# the stacking effect of AD + EF correlations on Country X.
 # -----------------------------------------------------------------------------
-.run_one <- function(country, corr_mode, n_iter = 3000L) {
+.run_one <- function(country, corr_mode, n_iter = 3000L,
+                      ef_rho_energy = 0, ef_rho_manureCH = 0,
+                      ef_rho_manureN = 0) {
   if (country == "country_x") {
     specs  <- fill_bounds(generate_country_x_example())
     manure <- generate_country_x_manure()
@@ -101,15 +108,49 @@ file.copy("docs/_shared.css", file.path(out_dir, "_shared.css"), overwrite = TRU
   comp <- ensure_completeness(specs, region = NULL)
   if (isTRUE(comp$valid)) specs <- comp$param_specs
 
-  # Build the correlation matrix for this mode (NULL for "none")
+  # Build the AD correlation matrix for this mode (NULL for "none")
   all_names <- specs$parameter
-  corr_mtx <- switch(corr_mode,
+  ad_mtx <- switch(corr_mode,
     none       = NULL,
     preset     = build_ipcc_preset_corr(all_names),
     timeseries = compute_corr_from_population(pop, detrend = "first_diff"),
     manual     = build_ipcc_preset_corr(all_names)  # treat manual = preset CSV
   )
-  unified <- if (!is.null(corr_mtx)) expand_corr_matrix(corr_mtx, all_names) else NULL
+  ad_unified <- if (!is.null(ad_mtx)) expand_corr_matrix(ad_mtx, all_names) else NULL
+
+  # Build the EF block correlation matrix if any block ρ is non-zero. Merge
+  # into the unified matrix by inserting EF block correlations into the off-
+  # block-diagonal positions of the AD matrix.
+  ef_mtx <- NULL
+  if (any(c(ef_rho_energy, ef_rho_manureCH, ef_rho_manureN) != 0)) {
+    ef_params <- specs$parameter[specs$param_type == "coefficient"]
+    if (length(ef_params) >= 2) {
+      ef_mtx <- make_block_corr(
+        ef_params,
+        list(energy = ef_rho_energy, manureCH = ef_rho_manureCH,
+              manureN = ef_rho_manureN)
+      )
+    }
+  }
+  ef_unified <- if (!is.null(ef_mtx)) expand_corr_matrix(ef_mtx, all_names) else NULL
+
+  # Combine AD + EF into a single unified matrix. Each lives on its own
+  # parameter subset (AD = activity_data params, EF = coefficient params),
+  # so the two matrices overlap only on the identity diagonal.
+  unified <- NULL
+  if (!is.null(ad_unified) && !is.null(ef_unified)) {
+    # Both present — overlay the EF block onto the AD-extended identity matrix
+    unified <- ad_unified
+    ef_idx <- which(rownames(unified) %in% rownames(ef_unified))
+    if (length(ef_idx) >= 2) {
+      unified[ef_idx, ef_idx] <- ef_unified[rownames(unified)[ef_idx],
+                                              rownames(unified)[ef_idx]]
+    }
+  } else if (!is.null(ad_unified)) {
+    unified <- ad_unified
+  } else if (!is.null(ef_unified)) {
+    unified <- ef_unified
+  }
 
   systems_data <- .build_systems_data(specs, manure, n_iter, unified_corr = unified)
   sim <- run_inventory_simulation(systems_data, n_iter = n_iter,
@@ -132,11 +173,13 @@ file.copy("docs/_shared.css", file.path(out_dir, "_shared.css"), overwrite = TRU
   )
   smat <- t(sapply(out$variable, function(v) summarise(inv[[v]])))
   out  <- cbind(out, as.data.frame(smat))
-  list(summary = out, corr_matrix = corr_mtx, sub_category_names = all_names)
+  list(summary = out, corr_matrix = unified, ad_corr_matrix = ad_mtx,
+       ef_corr_matrix = ef_mtx, sub_category_names = all_names)
 }
 
 # -----------------------------------------------------------------------------
-# Pre-compute all 8 cells (2 countries × 4 modes) and cache.
+# Pre-compute all 8 baseline cells (2 countries × 4 AD modes) + 3 extra
+# EF cells for Country X to power the AD/EF stacking-effect figure.
 # -----------------------------------------------------------------------------
 modes <- c("none", "preset", "timeseries", "manual")
 countries <- c("country_x", "country_y")
@@ -148,6 +191,19 @@ for (cn in countries) {
     results[[key]] <- .run_one(cn, md)
   }
 }
+
+# Country X with EF block correlations on the energy block only (Cfi/Ca/Ym/etc).
+# AD=none isolates the EF effect; AD=preset shows the stacking effect with the
+# AD-side structural-defaults preset on top.
+cat("  running country_x / ef_energy_03 ...\n")
+results[["country_x_ef_energy_03"]] <- .run_one("country_x", "none",
+                                                  ef_rho_energy = 0.3)
+cat("  running country_x / ef_energy_05 ...\n")
+results[["country_x_ef_energy_05"]] <- .run_one("country_x", "none",
+                                                  ef_rho_energy = 0.5)
+cat("  running country_x / preset_plus_ef_03 ...\n")
+results[["country_x_preset_plus_ef_03"]] <- .run_one("country_x", "preset",
+                                                       ef_rho_energy = 0.3)
 saveRDS(results, file.path(cache_dir, "correlations_runs.rds"))
 cat("Cached", length(results), "simulation summaries to",
     file.path(cache_dir, "correlations_runs.rds"), "\n")

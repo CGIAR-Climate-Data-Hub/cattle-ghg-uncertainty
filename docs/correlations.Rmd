@@ -1,5 +1,4 @@
 ---
-title: "Correlations — Find out more"
 output:
   html_document:
     self_contained: true
@@ -7,15 +6,16 @@ output:
     theme: null
     highlight: null
     mathjax: null
+    pandoc_args: ["--metadata=title:Correlations — Find out more"]
 params:
   cache_dir: "www/docs/_cache"
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      dev = "png", dpi = 110)
 runs <- readRDS(file.path(params$cache_dir, "correlations_runs.rds"))
 
-# Compact summary table for a country across the 4 modes
 .compare_country <- function(cn) {
   modes <- c("none", "preset", "timeseries", "manual")
   out <- do.call(rbind, lapply(modes, function(md) {
@@ -36,97 +36,125 @@ runs <- readRDS(file.path(params$cache_dir, "correlations_runs.rds"))
   rownames(out) <- NULL
   out
 }
-
 .fmt_t <- function(x) format(round(x), big.mark = ",")
+
+# Iman–Conover for small inline scatter plots. Pure R, no app dependencies,
+# fast on n = 1000.
+.ic_pair <- function(n, rho, marg1 = rnorm, marg2 = rnorm) {
+  x1 <- marg1(n); x2 <- marg2(n)
+  z  <- MASS::mvrnorm(n, mu = c(0, 0),
+                       Sigma = matrix(c(1, rho, rho, 1), 2, 2))
+  # rank-match each marginal to the ranks in z
+  data.frame(x = x1[rank(z[, 1])], y = x2[rank(z[, 2])])
+}
 ```
 
-# Correlations — Find out more {.unlisted .unnumbered}
+We talk a lot about correlations in this tool. This page is a slow walk through what they actually do, with pictures.
 
-<div class="tldr">
-<strong>Quick answer.</strong> For a typical national inventory you have two sensible picks:
+The whole idea fits in one sentence: when two of your input parameters tend to move together, your Monte Carlo should know about it. If you let them move independently when they shouldn't, you sample combinations that don't exist in nature, and the result you get back is a little bit fake.
 
-- <strong>No multi-year historical data?</strong> Pick <strong>Structural defaults (expert-elicited)</strong>. This applies seven well-documented biological pairs (BW↔MW, DE↔Y<sub>m</sub>, Milk↔BW, …) drawn from the IPCC equations and the livestock literature. It is the recommended choice for single-year inventories.
-- <strong>You have ≥5 years of populated <code>Parameter_TimeSeries</code> data?</strong> Pick <strong>From template (auto, time-series)</strong>. The tool learns correlations directly from your country's history.
+## What "correlation" looks like
 
-<strong>No correlations</strong> is the conservative IPCC-Approach-2 default and is always defensible. <strong>Manual entry</strong> is only for users with a published correlation matrix or an expert-elicitation result.
+Pick two parameters. Draw 1000 samples of each. Now plot them as a cloud — one dot per Monte Carlo iteration, the first parameter on the x-axis, the second on the y-axis. Here is what changes when you turn on a correlation between them:
 
-<strong>Either way the central emission estimate barely moves</strong> — correlations affect only the <em>spread</em> (95% MoE). Expect a 3–10% widening of the MoE on a single-year inventory when you turn the preset on; mean change is essentially zero.
-</div>
-
-## Why correlations matter at all
-
-Monte Carlo without correlations draws each input parameter independently each iteration. That means an iteration can land on physically-implausible combinations — for example, a draw where DE = 60% (high-quality feed) <em>and</em> Y<sub>m</sub> = 7.5% (high methane conversion, which IPCC associates with low-quality feed). In reality those two values almost never co-occur in the same animal.
-
-Adding a correlation between DE and Y<sub>m</sub> tells the sampler "when one is high, the other tends to be low". Iterations now cluster around the physically-plausible combinations and the tails of the emission distribution shift.
-
-**Key effect on the headline:** correlations <em>widen</em> the 95% confidence interval, not narrow it. The strongly-linked extremes (high-DE / low-Y<sub>m</sub> at one end, low-DE / high-Y<sub>m</sub> at the other) become more likely than independent sampling makes them, and these extremes produce more extreme emission totals. **Correlations do not bias the central estimate** — the mean is preserved because correlations operate on the joint distribution of the inputs, not on each parameter's marginal mean.
-
-<div class="callout-info">
-<strong>"My inventory is for one year. Why does the tool talk about time series?"</strong>
-
-Correlation in this tool means correlation <strong>between parameters within one Monte Carlo iteration</strong> — not correlation across years. The Monte Carlo only ever simulates the single year of your inventory. The 10,000 iterations are alternative "what could 2024 actually be" tuples (BW, DE, Y<sub>m</sub>, …), and correlation decides which combinations of those values are jointly plausible.
-
-The historical <code>Parameter_TimeSeries</code> data — when you have it — is used purely as a <em>training set</em> to estimate the correlation pattern. The tool asks: "in this country's past, when body weight went up did digestibility usually go up too?" Whatever pattern the historical years show, that pattern is then imposed on the within-year Monte Carlo draws.
-
-If you have no historical data, the "Structural defaults" preset imposes correlations from external evidence (biology, the IPCC equations) — exactly the same single-year MC, just with a different source for the correlation values.
-</div>
-
-## Decision flow
-
-```
-Do you have a Parameter_TimeSeries sheet with ≥5 years of populated data?
-        │
-        ├── YES → "From template (auto, time-series)"
-        │        (the tool learns correlations from your own history)
-        │
-        └── NO  → "Structural defaults (expert-elicited)"   ← recommended
-                  (the tool applies seven biological pairs from the literature)
-        │
-        └── Want the strictly-conservative IPCC Approach-2 default?
-                → "No correlations"   (always defensible)
-
-Do you have a correlation matrix from a published study or expert elicitation?
-        │
-        └── YES → "Advanced — manual entry" with a CSV upload
+```{r fig-scatter-normals, fig.width = 9, fig.height = 3.2, fig.alt = "Three scatter plots showing independent, positively, and negatively correlated bivariate normal samples"}
+set.seed(7)
+par(mfrow = c(1, 3), mar = c(3.2, 3.2, 2.6, 0.6), mgp = c(2, 0.7, 0))
+for (rho in c(0, 0.7, -0.7)) {
+  z <- MASS::mvrnorm(1000, mu = c(0, 0),
+                      Sigma = matrix(c(1, rho, rho, 1), 2, 2))
+  ttl <- if (rho == 0) "ρ = 0    (independent)"
+         else if (rho > 0) sprintf("ρ = +%.1f  (move together)", rho)
+         else sprintf("ρ = %.1f  (move opposite)", rho)
+  plot(z, pch = 16, col = adjustcolor("#2D6A4F", 0.4),
+       cex = 0.5, xlab = "parameter 1", ylab = "parameter 2",
+       main = ttl, cex.main = 0.95, cex.lab = 0.85, cex.axis = 0.8,
+       xlim = c(-3.5, 3.5), ylim = c(-3.5, 3.5), asp = 1)
+  abline(h = 0, v = 0, col = "grey85")
+}
 ```
 
-<div class="callout-info">
-<strong>You can't pick a mode that won't work.</strong> The Tab 4 radio greys out automatically when its prerequisites are missing — "From template (auto)" is disabled when your upload has no populated <code>Parameter_TimeSeries</code> sheet, "Advanced — manual entry" is disabled until a CSV matrix is uploaded, and "Structural defaults" is disabled until at least one template has been loaded. Each greyed option carries a short note explaining why. The Run button also blocks the simulation with a clear error if a no-data mode somehow slips through.
-</div>
+Look at the middle picture. When parameter 1 is on the right (high), parameter 2 also tends to be on top (high). Same on the left: low and low. The cloud is tilted upward.
 
-## The four options compared
+In the right-hand picture, it's the opposite: high parameter 1 means low parameter 2. The cloud tilts downward.
 
-| Option | What it does | When to pick | Data needed |
-|---|---|---|---|
-| **No correlations** | All parameters sampled independently each iteration | Default. You have no information about co-movement, or want the strictly-conservative IPCC Approach 2 starting point. | None |
-| **Structural defaults** | Applies 7 expert-elicited pairs from the livestock literature: BW↔MW, BW↔WG, Milk↔Fat, Milk↔BW, Milk↔DE, DE↔CP, DE↔Y<sub>m</sub> | Single-year inventory with no historical data; you want the most well-documented links applied automatically. **Recommended** for typical national inventories. | None — built into the tool. |
-| **From template (auto, time-series)** | Computes a Spearman rank-correlation matrix from your `Parameter_TimeSeries` sheet (first-difference detrending applied internally to strip shared long-run growth). | You have ≥5 years of historical inventory data with non-constant parameters. | A populated `Parameter_TimeSeries` sheet (≥5 rows, ≥2 numeric columns). |
-| **Manual entry** | Use a square CSV correlation matrix you supply. | You have a published correlation matrix from a similar inventory, or expert-elicitation results. | A CSV — downloadable templates are inside the panel. |
+Notice what isn't changing. Each individual parameter's distribution is identical across all three pictures — same range on the x-axis, same range on the y-axis. Correlation doesn't change either parameter on its own. It only changes which combinations are likely.
 
-## How much will the result actually change?
+## The trick the tool uses
 
-The honest answer is **a few percent on the 95% MoE**, with the central estimate essentially unchanged. The detail:
+In real inventory parameters, your distributions aren't usually nice symmetric normals. Body weight is roughly symmetric. Milk yield has a long right tail. Methane conversion factor Y~m~ is bounded between 5 and 8%. You can't just use the standard correlated-normals recipe and call it a day.
 
-**Correlations move the result a lot when** (i) the linked parameters have wide uncertainty ranges, (ii) the correlation is strong (|ρ| ≥ 0.5), and (iii) **several pairs are correlated at once**. They move it **a little** when only one or two pairs are linked inside a long multiplication of many independent inputs — which is the situation in the IPCC equation chain (~13 multiplicative parameters, 7 correlated pairs in the preset).
+The tool uses a method called Iman–Conover. It samples each parameter from its own distribution (PERT, normal, lognormal, beta — whatever you specified for that row in the Parameters sheet), then re-orders the samples so that the *ranks* of one parameter match the ranks of the other to the desired correlation. The marginal distributions stay exactly what you asked for; only the joint pattern changes.
 
-Concrete dummy-data examples from our regression test suite (each line is the SD-ratio of the output **with** vs **without** the correlation):
+Here's a side-by-side. Two parameters with the same skewed Beta distribution. On the left: independent. On the right: ρ = −0.5 via Iman–Conover.
 
-| Setup | Correlation | Output spread |
-|---|---|---|
-| 2-parameter product, wide uncertainty (±60% each) | ρ = +0.8 | **32% wider** |
-| 2-parameter product, wide uncertainty | ρ = −0.5 | **28% narrower** |
-| 2-parameter product, realistic livestock CVs (DE & Y<sub>m</sub>) | ρ = −0.5 | **17% narrower** |
-| 10-parameter product, only ONE pair correlated | ρ = −0.5 | **5% narrower** (the rest of the product dilutes the effect) |
+```{r fig-iman-conover, fig.width = 8, fig.height = 4.2, fig.alt = "Two scatter plots showing two Beta-distributed parameters under independence and under negative rank correlation"}
+set.seed(13)
+n <- 1500
+marg <- function(n) qbeta(runif(n), 2, 5)  # right-skewed
+ind  <- data.frame(x = marg(n), y = marg(n))
+ic   <- .ic_pair(n, rho = -0.5, marg, marg)
+par(mfrow = c(1, 2), mar = c(3.5, 3.5, 2.6, 0.6), mgp = c(2, 0.7, 0))
+plot(ind, pch = 16, col = adjustcolor("#2D6A4F", 0.4), cex = 0.5,
+     xlab = "parameter 1", ylab = "parameter 2",
+     main = "Independent (ρ = 0)", cex.main = 0.95, cex.lab = 0.9,
+     xlim = c(0, 1), ylim = c(0, 1), asp = 1)
+plot(ic,  pch = 16, col = adjustcolor("#C0392B", 0.4), cex = 0.5,
+     xlab = "parameter 1", ylab = "parameter 2",
+     main = "Iman–Conover, ρ = −0.5", cex.main = 0.95, cex.lab = 0.9,
+     xlim = c(0, 1), ylim = c(0, 1), asp = 1)
+```
 
-The 10-parameter row is closest to the real situation in the IPCC equation chain: even the dominant DE↔Y<sub>m</sub> = −0.5 cross-block pair, sitting inside a product with ~12 other independent inputs, only nudges the headline by a few percent.
+The right-hand cloud tilts downward, but both pictures have the same lopsided shape on each axis. That's the whole point: the *shape* of each parameter is preserved, only the *joint pattern* changes.
 
-<div class="callout-info">
-<strong>See it on your own data.</strong> On Tab 5, tick <strong>"Compare with/without correlations"</strong> before pressing Run. The Results tab will then show a small bar chart labelled <em>"Effect of Correlations on Uncertainty"</em> — green bars are the 95% MoE with your selected correlations on, grey bars are the same simulation with all correlations cleared. The gap between green and grey is the actual effect of correlations on <em>your</em> inventory.
-</div>
+## Why the IPCC equations care
 
-## Worked example: Country X (smallholder dairy, 500 000 head)
+Now bring this back to cattle methane. The IPCC enteric-CH~4~ equation multiplies several inputs together, including digestible energy `DE` and the methane conversion factor `Y_m`. These two are biologically anti-correlated: when feed quality goes up (higher `DE`, more energy absorbed), less methane is wasted (lower `Y_m`). When feed quality goes down, the rumen ferments more and `Y_m` climbs.
 
-Each cell below is a full simulation of the Country X built-in example (4 manure-management systems, 3 000 iterations, seed = 42, AR5 GWP). The only thing that changes between rows is the correlation mode.
+If you let the Monte Carlo sample these two independently, half your iterations land on combinations that don't exist — a cow on excellent feed (high `DE`) somehow also producing massive methane (high `Y_m`). The product `DE × Y_m` for those impossible cows is unrealistically high.
+
+What you should be doing: tie `DE` and `Y_m` together at ρ = −0.5, and the impossible combinations vanish. Watch what happens to the distribution of the product:
+
+```{r fig-de-ym-product, fig.width = 8, fig.height = 3.6, fig.alt = "Two histograms showing the DE x Ym product under independence and under negative correlation"}
+set.seed(31)
+n <- 5000
+# PERT-ish samples around Country X central values
+de_marg <- function(n) mc2d::rpert(n, min = 40, mode = 55, max = 70, shape = 4)
+ym_marg <- function(n) mc2d::rpert(n, min = 5.5, mode = 6.5, max = 7.5, shape = 4)
+ind <- data.frame(de = de_marg(n), ym = ym_marg(n))
+cor <- .ic_pair(n, rho = -0.5, de_marg, ym_marg)
+names(cor) <- c("de", "ym")
+prod_ind <- ind$de * ind$ym
+prod_cor <- cor$de * cor$ym
+xlim <- range(c(prod_ind, prod_cor))
+par(mfrow = c(1, 2), mar = c(3.7, 3.7, 2.5, 0.6), mgp = c(2.2, 0.7, 0))
+hist(prod_ind, breaks = 50, col = "#94A3B8", border = "white",
+     freq = FALSE, xlim = xlim, ylim = c(0, 0.012),
+     main = "DE × Yₘ — independent",
+     xlab = "DE × Yₘ", ylab = "density",
+     cex.main = 0.95, cex.lab = 0.9)
+abline(v = mean(prod_ind), col = "black", lwd = 2, lty = 2)
+hist(prod_cor, breaks = 50, col = "#2D6A4F", border = "white",
+     freq = FALSE, xlim = xlim, ylim = c(0, 0.012),
+     main = "DE × Yₘ — correlated ρ = −0.5",
+     xlab = "DE × Yₘ", ylab = "density",
+     cex.main = 0.95, cex.lab = 0.9)
+abline(v = mean(prod_cor), col = "black", lwd = 2, lty = 2)
+```
+
+Two things to read off the picture:
+
+The means (dashed lines) are almost identical. Correlations don't shift your central estimate. They never have. They never will. Anyone who tells you correlations change the headline emission number is mistaken.
+
+The right-hand histogram is *narrower*. Negative correlation pulls the extreme combinations toward each other and shrinks the spread of the product. If you'd been using independent sampling for this pair, you would have overstated your uncertainty. Positive correlations do the opposite: they widen the spread of products.
+
+Across the full IPCC equation chain, with seven correlated pairs and a dozen other independent inputs, these effects mostly partially-cancel, and the net result is usually a small widening of your final 95% MoE — a few percentage points. The mean of the final emission total stays put.
+
+## Country X (smallholder dairy)
+
+Country X is the built-in dairy example: 500,000 head, milking cows on improved pasture and concentrate supplement, `DE ≈ 55%`, `Milk ≈ 4 kg/lactating cow/day`, `Y_m ≈ 6.5%`. It's intensive enough that diet quality and methane conversion both vary substantially — exactly the system where the `DE ↔ Y_m` anti-correlation has the most room to bite.
+
+Each row below is a full 3000-iteration simulation of Country X. The only thing that changes is which correlation mode is selected.
 
 ```{r tbl-x}
 tx <- .compare_country("country_x")
@@ -143,9 +171,13 @@ knitr::kable(
 )
 ```
 
-**Reading the table:** the mean barely moves across the four modes (correlations preserve marginal means by construction). The 95% MoE shifts by a few percentage points: when you turn correlations on, the strongly-linked extreme combinations (high-DE / low-Y<sub>m</sub> on one side, low-DE / high-Y<sub>m</sub> on the other) become more likely, widening the CI. That is the honest representation when you believe those linkages exist.
+The mean is the same to within Monte Carlo noise. The 95% MoE shifts by a couple of percentage points when you turn correlations on. Most of that shift comes from `DE ↔ Y_m` — the strongest anti-correlation in the preset. The other six preset pairs contribute smaller, mostly partially-cancelling effects.
 
-## Worked example: Country Y (pastoral non-dairy, 2.4 million head)
+If you tick the "Compare with/without correlations" checkbox on Tab 5 before running, you'll get a small bar chart on the Results tab showing the green-versus-grey MoEs side by side. That's the cleanest way to see the effect on *your* inventory, not just on Country X.
+
+## Country Y (extensive pastoral, no dairy)
+
+Country Y is 2.4 million head of beef cattle on rangeland. `DE` is lower (around 50%, with a wider uncertainty bound), milk yield is essentially zero (calves only), and the population is dominated by adult animals on year-round grazing.
 
 ```{r tbl-y}
 ty <- .compare_country("country_y")
@@ -162,16 +194,59 @@ knitr::kable(
 )
 ```
 
-Country Y has wider per-parameter uncertainty bounds than Country X (pastoral systems are less surveyed), so all four modes show wider MoEs in absolute terms — but the relative effect of correlations is similar: a few percentage points wider when correlations are added.
+The same `DE ↔ Y_m` correlation is doing the same thing here, but Country Y's MoEs are wider in absolute terms across all four modes — because each individual parameter has wider uncertainty bounds in a pastoral system that's less well surveyed. The relative effect of correlations (the few-percentage-point shift you see going down the column) is similar to Country X. The biology is the same; the per-parameter uncertainty is what differs.
 
-## What's in the structural-defaults preset?
+Here's the headline shift side by side:
 
-The "Structural defaults" mode applies seven pairs drawn from the IPCC equation structure and the livestock literature. All other pairs are zero.
+```{r fig-country-shift, fig.width = 7, fig.height = 3.5, fig.alt = "Bar chart comparing 95% MoE under no correlations vs structural-defaults preset, for Country X and Country Y"}
+x_none   <- runs$country_x_none$summary
+x_preset <- runs$country_x_preset$summary
+y_none   <- runs$country_y_none$summary
+y_preset <- runs$country_y_preset$summary
+get_moe <- function(s) s[s$variable == "total_co2e", "moe_pct"]
+df <- data.frame(
+  country = rep(c("Country X (dairy)", "Country Y (pastoral)"), each = 2),
+  mode    = rep(c("No correlations", "Structural defaults"), 2),
+  moe     = c(get_moe(x_none), get_moe(x_preset),
+              get_moe(y_none), get_moe(y_preset))
+)
+par(mar = c(2.6, 4, 2.2, 0.6), mgp = c(2.6, 0.7, 0))
+bp <- barplot(matrix(df$moe, ncol = 2), beside = TRUE,
+              names.arg = c("Country X (dairy)", "Country Y (pastoral)"),
+              col = c("#94A3B8", "#2D6A4F"),
+              border = "white", ylab = "95% MoE on total CO₂eq (%)",
+              ylim = c(0, max(df$moe) * 1.2), cex.names = 0.95,
+              cex.axis = 0.85, cex.lab = 0.9)
+text(bp, df$moe + max(df$moe) * 0.04, sprintf("%.1f%%", df$moe),
+     cex = 0.85, font = 2)
+legend("topleft", fill = c("#94A3B8", "#2D6A4F"),
+       legend = c("No correlations", "Structural defaults"),
+       border = NA, bty = "n", cex = 0.85)
+```
 
-```{r preset-heatmap, fig.width = 9, fig.height = 7, fig.alt = "Structural-defaults correlation heatmap"}
-m <- runs$country_x_preset$corr_matrix
+## The seven pairs in the structural-defaults preset
+
+When you pick "Structural defaults" on the left-hand card, seven specific parameter pairs get correlated. Each one is anchored in published livestock science:
+
+- **BW ↔ MW** at ρ = +0.50. A heavier-than-average adult cow was probably a heavier-than-average juvenile too. From Brody's growth-curve work in the 1940s and the IPCC Eq 10.3 maintenance-energy formula.
+
+- **BW ↔ WG** at ρ = +0.40. Well-fed adult cattle that are both heavier and gaining more — typical of finishing systems. From NRC 2001 joint regression estimation of body weight and weight gain. The sign is system-dependent; for growing-young-stock systems it can flip negative.
+
+- **Milk ↔ Fat** at ρ = −0.30. The milk-dilution effect — when a cow makes more litres, the fat content per litre drops. From Wilmink (1987), VandeHaar (1998), and the standard dairy genetics literature.
+
+- **Milk ↔ BW** at ρ = +0.30. High-producing dairy breeds are physically larger. A Holstein (650 kg, 30 kg milk/day) versus a Jersey (450 kg, 20 kg milk/day) is the textbook contrast. NRC Dairy 2001.
+
+- **Milk ↔ DE** at ρ = +0.30. Higher feed digestibility lifts nutrient availability, which lifts milk yield. Strongest in concentrate-fed dairy. NRC Dairy 2001 Ch. 2.
+
+- **DE ↔ CP** at ρ = +0.50. Feed-quality co-variation. High-quality forages tend to have both high digestibility and high crude protein. From NRC, INRA, and Feedipedia cross-feedstuff data.
+
+- **DE ↔ Y~m~** at ρ = −0.50. The big one. IPCC 2019 Refinement Eq 10.21 makes Y~m~ an explicit decreasing function of `DE`. Observational meta-analyses (Niu et al. 2018, Hristov et al. 2013) confirm the slope. This is the pair that moves the headline the most in dairy systems.
+
+Here's the matrix laid out visually:
+
+```{r preset-heatmap, fig.width = 8, fig.height = 6, fig.alt = "Heatmap of the seven structural-defaults correlation pairs"}
+m <- runs$country_x_preset$ad_corr_matrix %||% runs$country_x_preset$corr_matrix
 if (!is.null(m)) {
-  # Show only parameters with at least one non-zero off-diagonal
   off_diag <- m; diag(off_diag) <- 0
   has_corr <- rowSums(abs(off_diag)) > 0 | colSums(abs(off_diag)) > 0
   if (sum(has_corr) >= 2) m <- m[has_corr, has_corr]
@@ -191,56 +266,140 @@ if (!is.null(m)) {
 }
 ```
 
-Each non-zero cell is documented in the methodology. The values:
+Green = positive (move together), red = negative (move opposite), white = independent. Notice how sparse it is. Most off-diagonal cells are white because the tool deliberately keeps the preset minimal — only the seven pairs with published evidence are non-zero. Everything else is assumed independent until you tell the tool otherwise.
 
-| Pair | ρ | Source / rationale (summary) |
+## Which of the four AD modes should you pick
+
+The left-hand card on the Simulate tab has four options. In one paragraph each, here's how to choose:
+
+**No correlations.** The strict IPCC Approach-2 default. Always defensible. Pick it when you want the conservative baseline, or when your activity data sources are all genuinely independent.
+
+**Structural defaults (expert-elicited).** Recommended for single-year inventories. The seven biology pairs above. Pick it when you're doing a one-year national inventory and you don't have a multi-year time series of feed quality / herd structure. Most users land here.
+
+**From template (auto, time-series).** Pick this if you have at least five years of populated `Parameter_TimeSeries` data in your upload. The tool computes Spearman rank correlations directly from your country's history (with first-difference detrending applied internally to strip out shared long-run growth). This is the most data-driven option, but it needs the data to actually be there — the radio greys out if your sheet is empty.
+
+**Manual (CSV upload).** Pick this only if you have a published correlation matrix from a study similar to your inventory, or a result from an expert-elicitation exercise. The tool ships an example template so you don't have to type the matrix from scratch.
+
+## The other card: emission-factor correlations
+
+The Simulate tab actually has **two** correlation toggles, side by side. Everything above is about the **left-hand card** — correlations between **activity data** (herd size, body weight, milk yield, feed quality — quantities measured from the population). The **right-hand card** is for something different: correlations between **emission-factor coefficients** (Y~m~, B~o~, MCF, EF3, EF4, EF5 — numbers that come from published studies, not from your survey).
+
+Why are they separate? Because the physical processes are different. Activity data co-varies because animals and feed move together in nature. Emission factors co-vary if and only if their published values share a common methodological bias — for example, when all your rumen-fermentation coefficients came from a single regional database, so they're all calibrated against the same dataset. That's a different kind of correlation, and it gets its own card.
+
+### The three blocks
+
+The right-hand card splits the IPCC coefficients into three groups based on which scientific literature they come from. Within a group, you can dial up a shared bias. Across groups, the tool always assumes independence (the three literatures don't talk to each other).
+
+| Block | Coefficients | What they have in common |
 |---|---|---|
-| BW ↔ MW | +0.50 | Growth-curve relation (Brody 1945); IPCC Eq 10.3. Set to 0.5 rather than 0.85 to reflect typical mixed-source provenance (BW from census, MW from breed reference). |
-| BW ↔ WG | +0.40 | IPCC Eq 10.6 joint estimation; NRC 2001. Sign system-dependent; +0.40 reflects well-fed dairy/beef. |
-| Milk ↔ Fat | −0.30 | Milk dilution effect, dairy genetics literature (Wilmink 1987; VandeHaar 1998). |
-| Milk ↔ BW | +0.30 | High-producing dairy breeds are physically larger. NRC Dairy 2001. |
-| Milk ↔ DE | +0.30 | Higher feed digestibility → higher milk yield, especially concentrate-fed. |
-| DE ↔ CP | +0.50 | Forage-quality co-variation across feed types (NRC; INRA). |
-| DE ↔ Y<sub>m</sub> | **−0.50** | IPCC 2019 Refinement Eq 10.21 + meta-analysis (Niu 2018, Hristov 2013). Cross-block — the dominant headline mover. |
+| **Energy** | Cfi, Ca, C, Cp, Y~m~ | All from rumen-fermentation and animal-energetics studies. IPCC Vol.4 Ch.10 §10.2. If you got them all from one regional rumen database, they share that database's calibration choices. |
+| **Manure-CH₄** | Bo, MCF, ASH | All from biogas-potential and lagoon studies. If you got them all from one anaerobic-digestion lab, they share its conditions. |
+| **Manure-N** | EF3, EF4, EF5, Frac_GasMS, Frac_LeachMS, UE | All from soil-emissions and N-volatilisation studies. If you got them all from one soil-emissions modelling group, they share its calibration. |
 
-## EF correlations (right-hand card on Tab 4)
+### What the ρ slider does
 
-The right-hand "Coefficient Correlations" card is a separate, opt-in switch for correlations <em>between emission-factor coefficients</em> that share a measurement literature (e.g.\ all rumen-fermentation coefficients from one regional database). It has two modes:
+When you pick "Block-structured EF correlation" and move the energy-block slider to ρ = 0.3, the sampler treats all five energy coefficients as if they share a common bias term with 30% strength. If Y~m~ samples high in a given iteration, Cfi gets nudged up too — but only weakly. Here's what that looks like for the Y~m~ / Cfi pair specifically:
 
-- **No EF correlations** (default) — emission factors are sampled independently. Standard IPCC Approach 2 assumption.
-- **Block-structured EF correlation** — three within-block ρ sliders (energy / manure-CH<sub>4</sub> / manure-N), each in the range 0–0.5. Cross-block correlation is always zero because the three literatures are independent.
+```{r fig-ef-scatter, fig.width = 9, fig.height = 3.2, fig.alt = "Three scatter plots showing Ym vs Cfi under EF block correlation of 0, 0.3, and 0.5"}
+set.seed(89)
+n <- 1200
+ym_marg  <- function(n) mc2d::rpert(n, min = 5.5, mode = 6.5, max = 7.5, shape = 4)
+cfi_marg <- function(n) rnorm(n, mean = 0.386, sd = 0.024)
+par(mfrow = c(1, 3), mar = c(3.5, 3.5, 2.5, 0.6), mgp = c(2.3, 0.7, 0))
+for (rho in c(0, 0.3, 0.5)) {
+  ic <- .ic_pair(n, rho = rho, marg1 = ym_marg, marg2 = cfi_marg)
+  ttl <- if (rho == 0) "ρ = 0   (independent)" else sprintf("ρ = +%.1f", rho)
+  plot(ic, pch = 16, col = adjustcolor("#2D6A4F", 0.4), cex = 0.5,
+       xlab = "Yₘ (% gross energy)", ylab = "Cfi (MJ/kg^0.75/day)",
+       main = ttl, cex.main = 0.95, cex.lab = 0.9, cex.axis = 0.85,
+       xlim = c(5.3, 7.7), ylim = c(0.32, 0.45))
+}
+```
 
-All three sliders default to 0, so the right-hand card does nothing until the user actively moves a slider. Setting one slider to ρ = 0.3 typically widens the 95% MoE by a few more percentage points on top of any activity-data correlation effect; ρ = 0.5 roughly doubles that. Most users will not engage this — it is for inventory compilers who believe their EFs come from a single biased source.
+At ρ = 0, the cloud is round — Y~m~ and Cfi sampled independently. At ρ = 0.3, you can see a faint upward tilt. At ρ = 0.5, the tilt is obvious. The same logic applies to the other coefficients in the energy block; the slider lifts all of them together by the same factor.
+
+### What it does to the headline
+
+This is the demonstration on Country X. Same dairy inventory, varying which correlations are switched on:
+
+```{r fig-ef-stacking, fig.width = 8, fig.height = 4.0, fig.alt = "Bar chart showing Country X 95% MoE under combinations of AD correlation and EF correlation modes"}
+get_moe <- function(key) {
+  s <- runs[[key]]$summary
+  s[s$variable == "total_co2e", "moe_pct"]
+}
+df <- data.frame(
+  config = c(
+    "Nothing on",
+    "EF only, ρ=0.3",
+    "EF only, ρ=0.5",
+    "AD preset only",
+    "AD preset + EF ρ=0.3"
+  ),
+  moe = c(
+    get_moe("country_x_none"),
+    get_moe("country_x_ef_energy_03"),
+    get_moe("country_x_ef_energy_05"),
+    get_moe("country_x_preset"),
+    get_moe("country_x_preset_plus_ef_03")
+  ),
+  ad  = c("none", "none", "none", "preset", "preset"),
+  ef  = c("0", "0.3", "0.5", "0", "0.3")
+)
+par(mar = c(5.5, 4, 1.5, 0.6), mgp = c(2.6, 0.7, 0))
+cols <- c("#94A3B8", "#94A3B8", "#94A3B8", "#2D6A4F", "#2D6A4F")
+bp <- barplot(df$moe, names.arg = df$config, col = cols, border = "white",
+              ylab = "95% MoE on total CO₂eq (%)",
+              ylim = c(0, max(df$moe) * 1.18),
+              las = 2, cex.names = 0.78, cex.axis = 0.85, cex.lab = 0.9)
+text(bp, df$moe + max(df$moe) * 0.04, sprintf("%.1f%%", df$moe),
+     cex = 0.82, font = 2)
+```
+
+The energy-block EF correlation on its own (ρ = 0.3) lifts the MoE a couple of percentage points above the no-correlation baseline. At ρ = 0.5 it lifts a bit more. Stack it on top of the structural-defaults AD preset and the effects mostly add — but only a little, because the AD effect already moved you partway and the EF effect is smaller in magnitude.
+
+### When you should — and shouldn't — engage it
+
+**Leave it off** if your emission factors come from IPCC defaults. The IPCC defaults are aggregated across many studies; no single methodological bias dominates them.
+
+**Leave it off** if your EFs come from country-specific measurements done at different labs in different years. The errors there are roughly independent.
+
+**Turn the energy block to ρ = 0.3** if all your energy-equation coefficients (Cfi, Ca, Y~m~, etc.) come from a single national feeding trial or one regional rumen database. ρ = 0.3 reflects a moderate shared bias, the kind that should give you pause but not full alarm. The "Currently:" caption under each slider tells you what band you're in: 0 is independent, 0.15 is weak, up to 0.35 is moderate, above 0.35 is strong (and should be justified in writing if you publish).
+
+**Same logic for the other two blocks.** Manure-CH~4~ block — engage if all your Bo / MCF / ASH numbers came from one anaerobic-digestion lab. Manure-N block — engage if all your N-volatilisation parameters came from one soil-emissions modelling exercise. Otherwise leave them at 0.
+
+If you toggle "Block-structured" on but leave all three sliders at 0, an inline amber warning appears under the sliders telling you the choice has no effect — heed it.
 
 ## Common mistakes
 
-<div class="callout-warn">
+Things that catch people out, and quick fixes:
 
-- **Expecting the mean to change.** It doesn't. Correlations widen the CI; they don't bias the central estimate.
+- **Expecting the mean to change.** It doesn't. Correlations widen or narrow the spread; they preserve the central estimate to within Monte Carlo noise. If you change correlation modes and the mean shifts more than a few tenths of a percent, you have a different problem (probably parameter rebroadcasting, not correlation).
 
-- **Picking "From template (auto)" on an empty Parameter_TimeSeries sheet.** Before June 2026 this silently fell back to "no correlations" — the simulation ran, the result was identical to the no-correlations case, and nothing in the UI warned the user. The radio now greys out automatically when the prerequisite is missing, but if you ever see the comparison bars (green vs grey on the Results tab) sitting at identical heights, double-check that the mode you selected actually had data to work with.
+- **Picking "From template (auto)" on an empty `Parameter_TimeSeries` sheet.** Before mid-2026 this silently fell back to no correlations. The radio now greys out automatically when the sheet is empty, and the Run button blocks with a clear error if a stale state slips through. If you see grey-vs-green bars sitting at identical heights on the comparison chart, you're probably in this case.
 
-- **Picking "Block-structured EF correlation" with all three sliders at 0.** Same silent-no-op trap on the EF side. An inline amber warning now surfaces underneath the sliders when all three are zero — heed it.
+- **Picking "Block-structured EF correlation" with all three sliders at 0.** Same silent-no-op trap on the right-hand card. The amber warning underneath the sliders is your cue — move at least one slider, or switch back to "No EF correlations".
 
-- **Renaming row/column headers in the manual matrix.** Names that don't match the canonical `PARAM_CATALOGUE` are silently dropped — the simulation runs but the correlation doesn't apply. Always start from the **downloadable example template**, which ships with the canonical names already in place.
+- **Renaming row/column headers in the manual matrix.** Names that don't match the canonical `PARAM_CATALOGUE` are silently dropped. Always start from the downloadable example template — the canonical names are already in place.
 
-- **Worrying about positive-definiteness.** If your uploaded matrix is not positive-definite, the tool projects it onto the nearest positive-definite correlation matrix via `Matrix::nearPD()` and warns you if any entry shifts by more than 0.01. You don't need to construct a perfectly valid matrix by hand.
+- **Worrying about positive-definiteness.** If your uploaded matrix isn't positive-definite, the tool projects it onto the nearest positive-definite correlation matrix automatically and warns you if any entry shifts by more than 0.01. You don't have to construct a perfectly valid matrix by hand.
 
-- **Missing parameters.** If your uploaded matrix only covers, say, 10 parameters, the simulation treats all pairs involving the missing 15 as independent (zero correlation). That's intentional graceful degradation, not an error.
+- **Reading a small effect as broken.** A single correlated pair inside a 13-input multiplicative chain only moves the headline 95% MoE by a few percent. That's the correct mathematical behaviour, not a bug. If you want a larger effect you need either richer multi-year time-series data (the "From template" mode harvests many correlated pairs at once) or genuinely wide per-parameter uncertainty bounds.
 
-- **Reading a small effect as "broken".** A single correlated pair inside the 13-input IPCC equation chain only moves the headline 95% MoE by a few percent. That is the correct mathematical behaviour — it is not a bug. If you want a larger effect, you need either richer multi-year time-series data (which the "From template" mode will harvest into multiple correlated pairs) or genuinely wide per-parameter uncertainty bounds.
+## See it on your own data
 
-</div>
+On Tab 5, tick the **"Compare with/without correlations"** checkbox before pressing Run. The Results tab will then show a green-vs-grey bar chart titled *"Effect of Correlations on Uncertainty"*. Green is your selected correlation mode; grey is the same simulation with all correlations turned off. The gap between them is the actual effect of correlations on *your* inventory.
+
+That's the most honest test. The Country X / Country Y examples above show how it can play out, but your inventory's per-parameter bounds and sub-category mix will produce its own characteristic gap.
 
 <div class="related">
 ### Related material
 
-- [Methodology document](../methodology.pdf), §Correlation Structure — the equations and rationale behind each preset pair, including the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) and why they were dropped in the June 2026 review.
-- [User Guide](../user_guide.pdf), §Correlations (Tab 4) — step-by-step app workflow including how to download the manual-entry CSV template and how to read the "Effect of Correlations on Uncertainty" comparison chart.
-- IPCC 2006 Vol.1 Ch.3 §3.2.3.2 — restricted-pairing rank-correlation procedure (Iman & Conover 1982) that the tool implements.
+- [Methodology document](../methodology.pdf), §Correlation Structure — the full equations behind each preset pair, the Iman–Conover sampling procedure, and the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) with reasons.
+- [User Guide](../user_guide.pdf), §Correlations (Simulate tab) — step-by-step workflow including how to download the manual-entry CSV template.
+- IPCC 2006 Vol.1 Ch.3 §3.2.3.2 — the restricted-pairing rank-correlation procedure (Iman & Conover 1982) that the tool implements.
 
 </div>
 
 <footer>
-Generated by <code>_build_help_docs.R</code> from <code>docs/correlations.Rmd</code>. Worked-example numbers reflect the Country X / Country Y built-in datasets at the current app version.
+Generated by <code>scripts/build_help_docs.R</code> from <code>docs/correlations.Rmd</code>. Worked-example numbers reflect the Country X / Country Y built-in datasets at the current app version.
 </footer>
