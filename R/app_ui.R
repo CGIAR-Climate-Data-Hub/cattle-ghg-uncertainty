@@ -491,15 +491,25 @@ app_ui <- function(request = NULL) {
            return m ? decodeURIComponent(m[1]) : 'en';
          }
          // Read the currently-active navbar tab so we can restore it after
-         // reload. bslib renders nav-links with data-value matching the
-         // nav_panel title; we encode it into the URL hash before reload.
-         function _activeTabValue() {
-           var el = document.querySelector(
-             '#nav .nav-link.active, .nav-tabs .nav-link.active');
-           if (!el) return null;
-           return el.getAttribute('data-value') ||
-                  el.getAttribute('data-bs-target') ||
-                  el.textContent.trim();
+         // reload. We use the INDEX position (0..N-1) rather than the tab
+         // title — titles are language-dependent, so a stored title from
+         // one language won't match the tab name after switching language.
+         // Indexing is stable because nav_panels are declared in the same
+         // order regardless of language.
+         function _activeTabIndex() {
+           var links = document.querySelectorAll(
+             '#nav > .navbar > .container-fluid .nav-link, ' +
+             '#nav .nav-link');
+           // De-duplicate (the selectors above can match the same elements);
+           // bslib renders one .nav-link per panel.
+           var seen = [];
+           for (var i = 0; i < links.length; i++) {
+             if (seen.indexOf(links[i]) === -1) seen.push(links[i]);
+           }
+           for (var j = 0; j < seen.length; j++) {
+             if (seen[j].classList.contains('active')) return j;
+           }
+           return null;
          }
          // Translucent overlay shown the instant the user clicks EN/FR so
          // the change feels immediate. Removed automatically on the next
@@ -545,12 +555,11 @@ app_ui <- function(request = NULL) {
            document.cookie = 'app_lang=' + lang +
              '; max-age=' + maxAge +
              '; path=/; SameSite=Lax';
-           // Persist the active tab so reload restores it.
-           var tab = _activeTabValue();
-           var hash = tab ? '#tab=' + encodeURIComponent(tab) : '';
+           // Persist the active tab INDEX (0..N-1) — language-independent.
+           var idx = _activeTabIndex();
+           var hash = (idx !== null && idx !== undefined)
+             ? '#tabidx=' + idx : '';
            _showLangSwitchOverlay(lang);
-           // Replace state first so the back button after switching still
-           // makes sense; then reload.
            try {
              history.replaceState(null, '', window.location.pathname +
                window.location.search + hash);
@@ -558,28 +567,44 @@ app_ui <- function(request = NULL) {
            window.location.reload();
          }
          // Restore the previously-active tab when the page comes back up.
-         // Runs after Shiny has bound its inputs (deferred to next tick).
+         // Resolves the index against the freshly-rendered nav-links and
+         // clicks the matching anchor (drives bslib's tab-show behaviour
+         // natively, including Shiny's input binding).
          function _restoreActiveTab() {
-           var m = (window.location.hash || '').match(/tab=([^&]+)/);
+           var m = (window.location.hash || '').match(/tabidx=(\\d+)/);
            if (!m) return;
-           var want = decodeURIComponent(m[1]);
-           if (!window.Shiny || !Shiny.setInputValue) return;
-           // Use Shiny's input API — drives the bslib navbar reactively.
-           Shiny.setInputValue('nav', want, { priority: 'event' });
-           // Also click the matching nav-link as a belt-and-braces fallback
-           // (in case the navbar id is not 'nav' on some bslib versions).
-           var anchors = document.querySelectorAll(
-             '#nav .nav-link, .nav-tabs .nav-link');
-           for (var i = 0; i < anchors.length; i++) {
-             var dv = anchors[i].getAttribute('data-value') ||
-                       anchors[i].textContent.trim();
-             if (dv === want) { anchors[i].click(); break; }
+           var want = parseInt(m[1], 10);
+           if (isNaN(want)) return;
+           function tryClick() {
+             var links = document.querySelectorAll(
+               '#nav > .navbar > .container-fluid .nav-link, ' +
+               '#nav .nav-link');
+             var seen = [];
+             for (var i = 0; i < links.length; i++) {
+               if (seen.indexOf(links[i]) === -1) seen.push(links[i]);
+             }
+             if (want < 0 || want >= seen.length || !seen[want]) return false;
+             // If it's already the active tab, nothing to do.
+             if (seen[want].classList.contains('active')) return true;
+             seen[want].click();
+             return true;
            }
-           // Clear the hash so a manual reload doesn't redundantly fire.
-           try {
-             history.replaceState(null, '', window.location.pathname +
-               window.location.search);
-           } catch (e) {}
+           // bslib may finish wiring the navbar a tick or two after
+           // shiny:connected fires; retry briefly until the click sticks
+           // or we time out.
+           var tries = 0;
+           function attempt() {
+             if (tryClick()) {
+               // Clear the hash so a manual reload doesn't redundantly fire.
+               try {
+                 history.replaceState(null, '', window.location.pathname +
+                   window.location.search);
+               } catch (e) {}
+               return;
+             }
+             if (++tries < 20) setTimeout(attempt, 50);
+           }
+           attempt();
          }
          function _installLangToggle() {
            if (document.getElementById('lang-toggle-floating')) return;
