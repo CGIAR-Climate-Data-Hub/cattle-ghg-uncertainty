@@ -124,5 +124,45 @@ t <- function(id, lang = NULL) {
   footer_credit = list(
     en = "Developed by CIAT/CGIAR Alliance | Funded by Global Methane Hub",
     fr = "Développé par CIAT/Alliance CGIAR | Financé par Global Methane Hub"
+  ),
+
+  # ---- App-wide title strip (top of navbar) -----------------------------
+  app_title = list(
+    en = "IPCC Tier 2 Livestock GHG Uncertainty Calculator",
+    fr = "Calculateur d'incertitude GES Bétail IPCC Niveau 2"
+  ),
+  app_subtitle = list(
+    en = "Approach 2 Monte Carlo · CGIAR Alliance / Bioversity-CIAT · funded by the Global Methane Hub",
+    fr = "Monte Carlo Approche 2 · Alliance CGIAR / Bioversity-CIAT · financé par le Global Methane Hub"
+  ),
+
+  # ---- Home tab — hero section -----------------------------------------
+  hero_title    = list(en = "IPCC Tier 2 Livestock GHG Uncertainty Calculator",
+                       fr = "Calculateur d'incertitude GES Bétail IPCC Niveau 2"),
+  hero_subtitle = list(en = "Monte Carlo uncertainty analysis for national cattle methane and nitrous oxide inventories.",
+                       fr = "Analyse Monte Carlo de l'incertitude pour les inventaires nationaux de méthane et de protoxyde d'azote du bétail."),
+  hero_credit   = list(en = "Developed by CGIAR Alliance of Bioversity International and CIAT | Funded by Global Methane Hub",
+                       fr = "Développé par l'Alliance CGIAR Bioversity International et CIAT | Financé par Global Methane Hub"),
+
+  # ---- Home tab — "What does this tool do?" card -----------------------
+  card_what_does_title = list(en = "What does this tool do?",
+                                fr = "À quoi sert cet outil ?"),
+
+  # ---- Home tab — "Before you start" card ------------------------------
+  card_before_you_start_title = list(en = "Before you start",
+                                       fr = "Avant de commencer"),
+
+  # ---- Home tab — "Three-step workflow" card ---------------------------
+  card_workflow_title = list(en = "The three-step workflow",
+                               fr = "Le flux en trois étapes"),
+
+  # ---- Resources tab — top intro --------------------------------------
+  resources_intro_title = list(en = "Resources & documentation",
+                                 fr = "Ressources & documentation"),
+
+  # ---- French-mode help-docs note (Resources tab) ----------------------
+  resources_fr_only_note = list(
+    en = "",  # never shown in English mode (conditional rendering)
+    fr = "La documentation détaillée (guide utilisateur, méthodologie, pages d'aide) est disponible en anglais uniquement pour le moment. Si vous lisez l'anglais, ces documents fournissent les équations, les références IPCC et des explications complètes."
   )
 )

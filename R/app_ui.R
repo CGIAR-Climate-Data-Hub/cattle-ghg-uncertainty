@@ -17,10 +17,8 @@ app_ui <- function(request = NULL) {
     # the navbar's existing background.
     title = tags$div(
       class = "app-title-block",
-      tags$div(class = "app-title",
-                "IPCC Tier 2 Livestock GHG Uncertainty Calculator"),
-      tags$div(class = "app-subtitle",
-                "Approach 2 Monte Carlo · CGIAR Alliance / Bioversity-CIAT · funded by the Global Methane Hub")
+      tags$div(class = "app-title", t("app_title")),
+      tags$div(class = "app-subtitle", t("app_subtitle"))
     ),
     theme = bslib::bs_theme(
       version = 5,
@@ -482,28 +480,56 @@ app_ui <- function(request = NULL) {
            }
          }, true);
 
-         // 2026-06-09: language toggle in the navbar. Click writes the
-         // `app_lang` cookie (100-year max-age) and reloads the page;
-         // R/app_ui.R re-runs with the new cookie value and serves the
-         // requested language. Two buttons share the .lang-btn class
-         // and a data-lang attribute (en or fr).
-         document.addEventListener('click', function(ev) {
-           var t = ev.target;
-           while (t && t !== document.body) {
-             if (t.classList && t.classList.contains('lang-btn')) {
-               var lang = t.getAttribute('data-lang');
-               if (lang === 'en' || lang === 'fr') {
-                 var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years
-                 document.cookie = 'app_lang=' + lang +
-                   '; max-age=' + maxAge +
-                   '; path=/; SameSite=Lax; Secure';
-                 window.location.reload();
-               }
-               return;
-             }
-             t = t.parentElement;
+         // 2026-06-09: language toggle. Injected as a fixed-position
+         // element in the top-right corner so it is bulletproof against
+         // bslib's navbar event handling. Click sets the `app_lang`
+         // cookie (100-year max-age) and reloads the page; on reload,
+         // app_ui(request) reads the cookie and serves t('...') in the
+         // requested language.
+         function _readLangCookie() {
+           var m = document.cookie.match(/(?:^|;)\\s*app_lang=([^;]+)/);
+           return m ? decodeURIComponent(m[1]) : 'en';
+         }
+         function _setLang(lang) {
+           var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years
+           document.cookie = 'app_lang=' + lang +
+             '; max-age=' + maxAge +
+             '; path=/; SameSite=Lax';
+           window.location.reload();
+         }
+         function _installLangToggle() {
+           if (document.getElementById('lang-toggle-floating')) return;
+           var current = _readLangCookie();
+           var wrap = document.createElement('div');
+           wrap.id = 'lang-toggle-floating';
+           wrap.style.cssText =
+             'position:fixed; top:10px; right:14px; z-index:9999;' +
+             'display:flex; align-items:center; gap:2px;' +
+             'padding:3px; background:#FFFFFF; border:1px solid #2D6A4F;' +
+             'border-radius:18px; box-shadow:0 2px 6px rgba(0,0,0,0.12);' +
+             'font-family:DM Sans, Arial, sans-serif;';
+           function makeBtn(lang, label) {
+             var b = document.createElement('button');
+             b.type = 'button';
+             b.textContent = label;
+             b.style.cssText =
+               'border:0; cursor:pointer; padding:4px 12px;' +
+               'border-radius:14px; font-weight:700; font-size:0.85rem;' +
+               (current === lang
+                 ? 'background:#2D6A4F; color:#FFFFFF;'
+                 : 'background:transparent; color:#475569;');
+             b.onclick = function() { _setLang(lang); };
+             return b;
            }
-         }, true);"
+           wrap.appendChild(makeBtn('en', 'EN'));
+           wrap.appendChild(makeBtn('fr', 'FR'));
+           document.body.appendChild(wrap);
+         }
+         if (document.readyState === 'loading') {
+           document.addEventListener('DOMContentLoaded', _installLangToggle);
+         } else {
+           _installLangToggle();
+         }"
       )))
     ),
     fillable = FALSE,
@@ -520,11 +546,11 @@ app_ui <- function(request = NULL) {
           style = "background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 50%, #40916C 100%);
                    color: white; border-radius: 16px; padding: 48px 40px; margin-bottom: 0;
                    position: relative; overflow: hidden;",
-          h1("IPCC Tier 2 Livestock GHG Uncertainty Calculator",
+          h1(t("hero_title"),
              style = "font-size: 2rem; font-weight: 700; margin-bottom: 12px;"),
-          p("Monte Carlo uncertainty analysis for national cattle methane and nitrous oxide inventories.",
+          p(t("hero_subtitle"),
             style = "font-size: 1.1rem; opacity: 0.9; margin-bottom: 8px;"),
-          p("Developed by CGIAR Alliance of Bioversity International and CIAT | Funded by Global Methane Hub",
+          p(t("hero_credit"),
             style = "font-size: 0.9rem; opacity: 0.7;")
         ),
         # Logo bar: developer (Alliance Bioversity & CIAT) and funder (GMH).
@@ -556,7 +582,7 @@ app_ui <- function(request = NULL) {
 
         # What this tool does
         bslib::card(
-          bslib::card_header(h4("What does this tool do?", style = "margin: 0;")),
+          bslib::card_header(h4(t("card_what_does_title"), style = "margin: 0;")),
           bslib::card_body(
             p("When a country reports cattle greenhouse gas emissions under the Paris Agreement, every input parameter
               (animal populations, body weights, feed quality, emission factors) has some uncertainty. This tool:"),
@@ -2049,42 +2075,6 @@ app_ui <- function(request = NULL) {
     bslib::nav_item(
       tags$span(style = "color: #6B6B6B; font-size: 0.85rem;",
                 t("footer_credit"))
-    ),
-    # Language toggle. EN | FR pill buttons on the right edge of the
-    # navbar. Click writes the `app_lang` cookie and reloads the page;
-    # on reload, app_ui(request) reads the cookie and serves every
-    # t("...") call in the new language.
-    bslib::nav_item(
-      tags$div(class = "lang-toggle",
-        style = "display:flex; align-items:center; gap:4px;
-                 margin-left:14px; padding:2px 6px;
-                 border:1px solid #CFD8D3; border-radius:14px;
-                 background:#F8F9FA; font-size:0.82rem;",
-        tags$button(type = "button",
-                    class = paste0("lang-btn",
-                                   if (.LANG_CURRENT == "en") " lang-btn-active" else ""),
-                    "data-lang" = "en",
-                    title = t("tip_lang_toggle_en"),
-                    style = paste0(
-                      "border:0; background:transparent; cursor:pointer;",
-                      " padding:2px 8px; border-radius:10px; font-weight:600;",
-                      if (.LANG_CURRENT == "en")
-                        " background:#2D6A4F; color:#FFFFFF;"
-                      else " color:#475569;"),
-                    "EN"),
-        tags$button(type = "button",
-                    class = paste0("lang-btn",
-                                   if (.LANG_CURRENT == "fr") " lang-btn-active" else ""),
-                    "data-lang" = "fr",
-                    title = t("tip_lang_toggle_fr"),
-                    style = paste0(
-                      "border:0; background:transparent; cursor:pointer;",
-                      " padding:2px 8px; border-radius:10px; font-weight:600;",
-                      if (.LANG_CURRENT == "fr")
-                        " background:#2D6A4F; color:#FFFFFF;"
-                      else " color:#475569;"),
-                    "FR")
-      )
     )
   )
 }
