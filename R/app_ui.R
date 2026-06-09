@@ -1778,15 +1778,33 @@ app_ui <- function() {
           bslib::card_header("IPCC Table 3.3 - Uncertainty Report"),
           bslib::card_body(
             uiOutput("ipcc_table_notice"),
-            DT::DTOutput("ipcc_table"),
-            hr(),
+            DT::DTOutput("ipcc_table")
+          )
+        ),
+        # Download buttons in their own card directly below the table — keeps
+        # them out of the DT's scroll region (where they used to overlap on
+        # wide screens) and gives them a clear header so users find them.
+        bslib::card(
+          style = "border-left: 4px solid #2D6A4F;",
+          bslib::card_header("Download reports"),
+          bslib::card_body(
+            p(style = "margin: 0 0 12px 0; color: #475569; font-size: 0.92rem;",
+              "Export the run results — Excel for the full workbook with ",
+              "sensitivity / settings / metadata sheets, CSV for the bare ",
+              "uncertainty table, Word for the IPCC-style narrative summary."),
             fluidRow(
-              column(3, downloadButton("download_xlsx", "Download Excel Report",
-                                        class = "btn-success")),
-              column(3, downloadButton("download_csv", "Download CSV",
-                                        class = "btn-outline-success")),
-              column(3, downloadButton("download_docx", "Download Word summary",
-                                        class = "btn-primary"))
+              column(4, downloadButton("download_xlsx",
+                                        "Download Excel Report",
+                                        class = "btn-success",
+                                        style = "width:100%;")),
+              column(4, downloadButton("download_csv",
+                                        "Download CSV",
+                                        class = "btn-outline-success",
+                                        style = "width:100%;")),
+              column(4, downloadButton("download_docx",
+                                        "Download Word summary",
+                                        class = "btn-primary",
+                                        style = "width:100%;"))
             )
           )
         ),

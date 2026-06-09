@@ -1286,7 +1286,7 @@ build_trend_summary_docx <- function(path,
 
   ncol_panels <- if (length(unique(long$parameter)) <= 6) 3 else 4
   ggplot2::ggplot(long, ggplot2::aes(x = value)) +
-    ggplot2::geom_histogram(ggplot2::aes(y = after_stat(density)),
+    ggplot2::geom_histogram(ggplot2::aes(y = ggplot2::after_stat(density)),
                               bins = 25, fill = .GREEN_MID, colour = "white") +
     ggplot2::facet_wrap(~ parameter, scales = "free", ncol = ncol_panels) +
     ggplot2::labs(x = NULL, y = "Density",
