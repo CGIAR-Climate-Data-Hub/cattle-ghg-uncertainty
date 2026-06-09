@@ -17,6 +17,11 @@ header-includes:
   - \usepackage{xcolor}
   - \usepackage{fancyhdr}
   - \usepackage{graphicx}
+  # Search both `doc/../www/` (when .tex compiles from doc/) and `www/` (when
+  # knit_root_dir=getwd() is used and the .tex sees project-root paths). This
+  # makes \includegraphics{www/...} resolve regardless of where the LaTeX
+  # compile step happens to run.
+  - \graphicspath{{../www/}{./www/}}
   - \usepackage{amsmath}
   - \usepackage{amssymb}
   - \usepackage{hyperref}
@@ -47,20 +52,13 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 \vspace{1cm}
 
 \begin{center}
-\IfFileExists{www/alliance_logo.png}{%
-  \includegraphics[height=1.6cm]{www/alliance_logo.png}\hspace{1.8cm}%
-  \IfFileExists{www/climate_action_logo.png}{%
-    \includegraphics[height=1.6cm]{www/climate_action_logo.png}\hspace{1.8cm}%
-  }{}%
-  \IfFileExists{www/gmh_logo.png}{%
-    \includegraphics[height=1.6cm]{www/gmh_logo.png}%
-  }{}%
-  \par\vspace{12pt}%
-}{%
-  \IfFileExists{www/gmh_logo.png}{%
-    \includegraphics[height=1.6cm]{www/gmh_logo.png}\par\vspace{12pt}%
-  }{}%
-}%
+% Logo paths reference filenames only (no www/ prefix). LaTeX picks the
+% correct directory via \graphicspath in the header-includes (set to
+% search both ../www/ when the .tex compiles from doc/ and ./www/ when
+% it compiles from project root).
+\includegraphics[height=1.6cm]{alliance_logo.png}\hspace{1.8cm}%
+\includegraphics[height=1.6cm]{climate_action_logo.png}\hspace{1.8cm}%
+\includegraphics[height=1.6cm]{gmh_logo.png}\par\vspace{12pt}%
 \textcolor{cgiargreen}{\rule{14cm}{1.5pt}}\\[6pt]
 \textcolor{cgiargreen}{\large\textbf{Version 1.0}}\\[4pt]
 \textcolor{darkgrey}{Developed under the Global Methane Hub initiative}\\[4pt]
