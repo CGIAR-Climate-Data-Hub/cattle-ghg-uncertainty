@@ -1011,6 +1011,19 @@ translator_chat_server <- function(input, output, session) {
     "   sub-category. Each MMS row must have fraction_pct, MCF_pct,",
     "   EF3, Frac_GasMS_pct, AND Frac_LeachMS_pct filled.",
     "",
+    "   If the user's file gives BOUNDS for the MMS allocation (e.g.",
+    "   'pasture 35% (range 28-42%)'), include them as lower_fraction /",
+    "   upper_fraction with distribution_fraction='pert'. Without these,",
+    "   MMS allocation contributes zero uncertainty to the simulation —",
+    "   which silently throws away a real source of inventory",
+    "   uncertainty. Same applies to the coefficients: if the user has",
+    "   country-specific bounds for MCF, EF3, Frac_GasMS_pct, or",
+    "   Frac_LeachMS_pct, include them as lower_mcf/upper_mcf,",
+    "   lower_ef3/upper_ef3, lower_frac_gas/upper_frac_gas,",
+    "   lower_frac_leach/upper_frac_leach with their respective",
+    "   distribution_* fields. When the user has no bounds, leave the",
+    "   bounds fields null and the catalogue defaults will be used.",
+    "",
     "7. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
     "   'for brevity not shown' placeholders, no trailing commas.",
     "",
@@ -1496,15 +1509,38 @@ translator_chat_server <- function(input, output, session) {
       .put_mm(3, mm$sub_category[i])
       .put_mm(4, mm$mms_type[i])
       .put_mm(5, mm$fraction_pct[i])
-      # Coefficient columns — read both lowercase and CamelCase keys
-      # because the AI is inconsistent. MM_COLS positions: 9=MCF_pct,
-      # 13=EF3, 17=Frac_GasMS_pct, 21=Frac_LeachMS_pct.
-      .put_mm(9,  mm$mcf[i] %||% mm$MCF_pct[i])
-      .put_mm(13, mm$ef3[i] %||% mm$EF3[i])
-      .put_mm(17, mm$Frac_GasMS_pct[i] %||% mm$frac_gasms_pct[i] %||%
+      # Fraction bounds — col 6/7/8. Sampled by the simulator if present;
+      # absent/equal-to-central → deterministic. The user often has
+      # uncertainty on the MMS allocation in the source file; this row
+      # propagates it through.
+      .put_mm(6, mm$lower_fraction[i])
+      .put_mm(7, mm$upper_fraction[i])
+      .put_mm(8, mm$distribution_fraction[i] %||% "pert")
+      # Coefficient columns + their bounds. Each block is [value, lower,
+      # upper, distribution] at consecutive positions:
+      #   MCF_pct        @ 9   (10 lower, 11 upper, 12 distribution)
+      #   EF3            @ 13  (14 lower, 15 upper, 16 distribution)
+      #   Frac_GasMS_pct @ 17  (18 lower, 19 upper, 20 distribution)
+      #   Frac_LeachMS_pct@ 21 (22 lower, 23 upper, 24 distribution)
+      # The AI can be inconsistent on key case; tolerate both.
+      .put_mm(9,  mm$mcf[i]              %||% mm$MCF_pct[i])
+      .put_mm(10, mm$lower_mcf[i])
+      .put_mm(11, mm$upper_mcf[i])
+      .put_mm(12, mm$distribution_mcf[i])
+      .put_mm(13, mm$ef3[i]              %||% mm$EF3[i])
+      .put_mm(14, mm$lower_ef3[i])
+      .put_mm(15, mm$upper_ef3[i])
+      .put_mm(16, mm$distribution_ef3[i])
+      .put_mm(17, mm$Frac_GasMS_pct[i]   %||% mm$frac_gasms_pct[i] %||%
                    mm$Frac_GasMS[i])
+      .put_mm(18, mm$lower_frac_gas[i])
+      .put_mm(19, mm$upper_frac_gas[i])
+      .put_mm(20, mm$distribution_frac_gas[i])
       .put_mm(21, mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
                    mm$Frac_LeachMS[i])
+      .put_mm(22, mm$lower_frac_leach[i])
+      .put_mm(23, mm$upper_frac_leach[i])
+      .put_mm(24, mm$distribution_frac_leach[i])
     }
   }
 

@@ -645,10 +645,31 @@ openai_chat_template_force <- function(messages,
                   sub_category      = list(type = "string"),
                   mms_type          = list(type = "string"),
                   fraction_pct      = list(type = "number"),
+                  # Optional bounds on the allocation fraction. The
+                  # simulator samples these when present; an absent or
+                  # equal-to-central value degenerates to deterministic.
+                  lower_fraction    = list(type = c("number", "null")),
+                  upper_fraction    = list(type = c("number", "null")),
+                  distribution_fraction = list(type = c("string", "null")),
                   MCF_pct           = list(type = c("number", "null")),
+                  # Optional bounds on the IPCC coefficients — populate
+                  # from user-supplied data when available, otherwise
+                  # leave null and the catalogue defaults are used.
+                  lower_mcf         = list(type = c("number", "null")),
+                  upper_mcf         = list(type = c("number", "null")),
+                  distribution_mcf  = list(type = c("string", "null")),
                   EF3               = list(type = c("number", "null")),
+                  lower_ef3         = list(type = c("number", "null")),
+                  upper_ef3         = list(type = c("number", "null")),
+                  distribution_ef3  = list(type = c("string", "null")),
                   Frac_GasMS_pct    = list(type = c("number", "null")),
-                  Frac_LeachMS_pct  = list(type = c("number", "null"))
+                  lower_frac_gas    = list(type = c("number", "null")),
+                  upper_frac_gas    = list(type = c("number", "null")),
+                  distribution_frac_gas = list(type = c("string", "null")),
+                  Frac_LeachMS_pct  = list(type = c("number", "null")),
+                  lower_frac_leach  = list(type = c("number", "null")),
+                  upper_frac_leach  = list(type = c("number", "null")),
+                  distribution_frac_leach = list(type = c("string", "null"))
                 ),
                 required = c("sub_category", "mms_type", "fraction_pct",
                               "MCF_pct", "EF3",
