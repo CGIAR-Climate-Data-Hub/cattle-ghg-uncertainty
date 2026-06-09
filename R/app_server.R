@@ -2959,9 +2959,15 @@ app_server <- function(input, output, session) {
   output$download_docx <- downloadHandler(
     filename = function() paste0("uncertainty_summary_", Sys.Date(), ".docx"),
     content = function(file) {
-      validate(
-        need(!is.null(rv$mc_results),  "Run a Monte Carlo simulation on Tab 5 before downloading the Word summary."),
-        need(!is.null(rv$uncertainty), "Uncertainty metrics not yet computed.")
+      # IMPORTANT: must be shiny::validate, NOT the bare `validate`. jsonlite
+      # is loaded after shiny in this app and masks shiny's validate() with
+      # its own single-argument JSON-validator. A bare `validate(need(...),
+      # need(...))` resolves to jsonlite::validate(), which rejects the
+      # second need() as an "unused argument" — producing a 500 on the
+      # download handler. Same applies to the three trend downloads below.
+      shiny::validate(
+        shiny::need(!is.null(rv$mc_results),  "Run a Monte Carlo simulation on Tab 5 before downloading the Word summary."),
+        shiny::need(!is.null(rv$uncertainty), "Uncertainty metrics not yet computed.")
       )
       settings <- list(
         n_iter            = as.integer(input$n_iter),
@@ -3521,7 +3527,7 @@ app_server <- function(input, output, session) {
   output$download_trend_xlsx <- downloadHandler(
     filename = function() .trend_filename("xlsx"),
     content = function(file) {
-      validate(need(!is.null(rv_trend$results),
+      shiny::validate(shiny::need(!is.null(rv_trend$results),
                     "Run a trend simulation on Tab 7 before downloading."))
       n_iter_val <- as.integer(input$n_iter %||% 10000)
       export_trend_xlsx(
@@ -3540,7 +3546,7 @@ app_server <- function(input, output, session) {
   output$download_trend_csv <- downloadHandler(
     filename = function() .trend_filename("csv"),
     content = function(file) {
-      validate(need(!is.null(rv_trend$results),
+      shiny::validate(shiny::need(!is.null(rv_trend$results),
                     "Run a trend simulation on Tab 7 before downloading."))
       write.csv(rv_trend$results, file, row.names = FALSE)
     }
@@ -3549,7 +3555,7 @@ app_server <- function(input, output, session) {
   output$download_trend_docx <- downloadHandler(
     filename = function() .trend_filename("docx"),
     content = function(file) {
-      validate(need(!is.null(rv_trend$results),
+      shiny::validate(shiny::need(!is.null(rv_trend$results),
                     "Run a trend simulation on Tab 7 before downloading."))
       n_iter_val <- as.integer(input$n_iter %||% 10000)
       build_trend_summary_docx(

@@ -1777,16 +1777,22 @@ section_F <- function() {
   if (file.exists(help_html)) {
     txt <- paste(readLines(help_html, warn = FALSE, encoding = "UTF-8"),
                   collapse = "\n")
+    # Renamed sections after the 2026-06-09 tone rewrite. The page no
+    # longer has a "Quick answer" TLDR block (replaced with a neutral
+    # opening paragraph) and the pitfalls section is now "Common pitfalls"
+    # (was "Common mistakes"). Country X / Y worked examples and the
+    # emission-factor (EF) section are required signals of structural
+    # completeness.
     size_ok       <- file.info(help_html)$size >= 50000
-    has_tldr      <- grepl("Quick answer", txt, fixed = TRUE)
     has_x         <- grepl("Country X", txt, fixed = TRUE)
     has_y         <- grepl("Country Y", txt, fixed = TRUE)
-    has_mistakes  <- grepl("Common mistakes", txt, fixed = TRUE)
+    has_pitfalls  <- grepl("Common pitfalls", txt, fixed = TRUE)
+    has_ef        <- grepl("Emission-factor correlations", txt, fixed = TRUE)
     check_bool("F23", "F",
-               "Correlations help page rendered with TL;DR + both worked examples + mistakes section",
-               size_ok && has_tldr && has_x && has_y && has_mistakes,
-               notes = sprintf("size_ok=%s tldr=%s X=%s Y=%s mistakes=%s",
-                               size_ok, has_tldr, has_x, has_y, has_mistakes))
+               "Correlations help page rendered with both worked examples + EF section + pitfalls",
+               size_ok && has_x && has_y && has_pitfalls && has_ef,
+               notes = sprintf("size_ok=%s X=%s Y=%s pitfalls=%s EF=%s",
+                               size_ok, has_x, has_y, has_pitfalls, has_ef))
   } else {
     record("F23", "F", "Correlations help page",
            "rendered HTML", "missing", "SKIP",
