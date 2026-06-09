@@ -374,37 +374,37 @@ You should review whether the IPCC defaults are appropriate for your country con
 The QA/QC tab runs automated checks on your parameter values and flags any that are potentially problematic. Five statuses are possible:
 
 \begin{center}
-\begin{tabular}{lll}
+\begin{tabular}{lp{2.0cm}p{9.5cm}}
 \toprule
 \textbf{Status} & \textbf{Colour} & \textbf{Meaning} \\
 \midrule
-\textbf{Pass} & \textcolor{cgiargreen}{Green} & Value is within ±50\% of the IPCC default (Vol.4 Ch.10 / Ch.11) \\
-\textbf{Warn} & \textcolor{amber}{Amber} & Value deviates 50--200\% from the IPCC default — check and document \\
-\textbf{Fail} & \textcolor{red}{Red} & Value deviates >200\% from the IPCC default — likely a data entry error \\
-\textbf{Missing} & \textit{Grey} & Parameter not found in upload; auto-filled with the IPCC default (Vol.4 Ch.10 / Ch.11) \\
+\textbf{Pass} & \textcolor{cgiargreen}{Green} & All structural checks pass; for \texttt{BW}, the mean is also within ±50\% of the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3). \\
+\textbf{Warn} & \textcolor{amber}{Amber} & For \texttt{BW}: the value deviates 50--200\% from the continental IPCC default — check and document. For any parameter: a non-fatal structural condition fired (e.g.\ implausible bounds $BW > 1500$ kg or $Y_m > 12\%$, fractional parameter with an unbounded distribution, asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match). \\
+\textbf{Fail} & \textcolor{red}{Red} & For \texttt{BW}: the value deviates more than 200\% from the continental IPCC default — likely a data-entry error. For any parameter: $DE_\% \leq 0$ or $\geq 100$; $lower > upper$; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. \\
+\textbf{Missing} & \textit{Grey} & Parameter not found in upload; auto-filled with the IPCC default from PARAM\_CATALOGUE (Vol.4 Ch.10 / Ch.11). Applies to every parameter. \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textit{Scope of the benchmark-deviation check.} The deviation check is applied \textbf{only to BW (body weight)} — the one parameter for which the tool keeps a defensible continental IPCC table lookup (Annex Tables 10A.1 dairy / 10A.2 non-dairy / 10A.3 buffalo). Milk, MW, DE, Ym, Bo no longer fire benchmark warnings — the 2019 Refinement publishes these by production system rather than continent, so any single mid-point comparison was misleading. They are still pre-filled with IPCC defaults when missing (flagged \textit{Missing}), they just no longer raise \textit{Warn} purely for differing from a heuristic mid-point.
+\textit{Scope of the benchmark-deviation check.} The deviation check (Pass / Warn / Fail thresholds based on ±50\% and ±200\% from the IPCC default) is applied \textbf{only to BW (body weight)} — the one parameter for which the tool keeps a defensible continental IPCC table lookup: Annex Tables 10A.1 (dairy cows), 10A.2 (non-dairy cattle), and 10A.3 (buffalo). Earlier versions of the tool also flagged deviations on Milk, MW, DE, Ym, and Bo, but those benchmarks were heuristic mid-points derived from the same Annex 10A tables rather than direct IPCC defaults — a reviewer auditing the QA tab could not locate the cited values in the guidelines, so they were removed (Andreas Wilkes review, May 2026). The remaining parameters are still auto-filled with the catalogue IPCC default when missing (flagged \textit{Missing}); they just no longer raise a \textit{Warn} purely for differing from a mid-point that was not citable to a published IPCC table. Reinstating per-parameter benchmarks properly would require a multi-dimensional lookup (parameter × continent × IPCC version × production system × animal sub-category) and is deferred to a future release.
 
 \textit{Cross-sheet sub-category-key check.} If a Parameters-sheet \texttt{sub\_category} (e.g.\ \texttt{DINT\_heif}) has no exact match in the Manure\_Management sheet but \textit{is} close to exactly one Manure\_Management sub-category (e.g.\ \texttt{DINT\_heifer}, edit distance $\le 2$), the tool auto-matches them and emits a \textit{Warn} row labelled \texttt{sub\_category\_auto\_match} so you can verify the substitution. If multiple candidates match, the run is blocked with a clear error.
 
 ## What to do for each status
 
-\textbf{Pass}: No action needed. The value is within ±50\% of the IPCC default for the parameter (Vol.4 Ch.10 / Ch.11).
+\textbf{Pass}: No action needed. All structural checks passed; for \texttt{BW} the mean is also within ±50\% of the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3).
 
-\textbf{Warn}: The value deviates 50--200\% from the IPCC default \textbf{(BW only)}, or another non-fatal QA condition fired (e.g.\ asymmetric-bounds reminder for EF\textsubscript{3,PRP}/Frac_GASM_PRP/Frac_LEACH_PRP, sub-category auto-match). Possible actions:
+\textbf{Warn}: Either the \texttt{BW} mean deviates 50--200\% from the continental IPCC default, or a non-fatal structural condition fired (asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match, implausible bounds, fractional parameter on an unbounded distribution). Possible actions:
 \begin{itemize}
-  \item Confirm the value matches your country context
-  \item If it is country-specific and well-justified, document the source in your inventory report
-  \item If you intended to use a climate-disaggregated default, check IPCC Vol.4 Ch.11 Tables 11.1 / 11.3 for the wet/dry value
-  \item If it is an error, correct it in your Excel file and re-upload
+  \item Confirm the value matches your country context.
+  \item If it is country-specific and well-justified, document the source in your inventory report.
+  \item If you intended to use a climate-disaggregated default, check IPCC Vol.4 Ch.11 Tables 11.1 / 11.3 for the wet/dry value.
+  \item If it is an error, correct it in your Excel file and re-upload.
 \end{itemize}
 
-\textbf{Fail}: The value deviates more than 200\% from the IPCC default. Most often this means a data-entry error (e.g. a live weight of 50,000 kg, a DE\% of 150\%). Correct the value before proceeding.
+\textbf{Fail}: Either the \texttt{BW} mean deviates more than 200\% from the continental IPCC default (likely a data-entry error such as a live weight of 50,000 kg), or another structural validation failed: $DE_\% \leq 0$ or $\geq 100$; $lower > upper$; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. Correct the value before proceeding.
 
-\textbf{Missing}: A required parameter was not found in the upload. The tool has auto-filled it with the IPCC default value from PARAM\_CATALOGUE (the value and the IPCC equation/table source are shown in the Tab 1 notification). Review whether the default is appropriate for your country context and, where possible, replace it with country-specific data.
+\textbf{Missing}: A required parameter was not found in the upload. The tool auto-filled it with the IPCC default value from PARAM\_CATALOGUE; the value and the IPCC equation / table source are shown in the Tab 1 notification. Applies to every parameter, not just \texttt{BW}. Review whether the default is appropriate for your country context and, where possible, replace it with country-specific data.
 
 ## Documenting deviations
 
@@ -732,7 +732,7 @@ To illustrate the workflow, the following example uses the Country X built-in da
 
 **Step 1 — Load data**: Select "Country X (hypothetical dairy)" from the dropdown on Tab 1. The data loads automatically (12 parameters, dairy smallholder system).
 
-**Step 2 — QA/QC**: Go to Tab 2. All parameters should pass; any Warn flags would compare against the IPCC 2019 Refinement defaults (Vol.4 Ch.10 / Ch.11), and a deliberate country-specific value can be documented in the inventory report rather than corrected.
+**Step 2 — QA/QC**: Go to Tab 2. All parameters should pass; any Warn flags on \texttt{BW} would compare against the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3), and Warn flags on other parameters reflect non-fatal structural conditions (asymmetric-bounds reminder, sub-category auto-match, etc.) — a deliberate country-specific value can be documented in the inventory report rather than corrected.
 
 **Step 3 — Uncertainty**: Go to Tab 3. Note that activity data (N, BW, Milk, WG, Fat) use Normal distributions and coefficients (Ym, DE, Bo, etc.) use PERT or lognormal distributions.
 
