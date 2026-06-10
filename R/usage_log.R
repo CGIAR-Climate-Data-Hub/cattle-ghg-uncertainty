@@ -39,7 +39,8 @@
 .usage_log_columns <- c(
   "timestamp", "user_email", "model",
   "prompt_tokens", "completion_tokens", "total_tokens",
-  "cached_tokens",  # 2026-06: GPT-4.1 implicit-cache hit count (~50% off)
+  "cached_tokens",       # cache READ hits — Anthropic: 90% off / GPT-4.1: ~50% off
+  "cache_write_tokens",  # cache WRITE on first turn — Anthropic only, +25% on input
   "cost_usd"
 )
 
@@ -55,10 +56,11 @@
 }
 
 # Append one row.  Caller passes the OPenAI response shape from
-# openai_chat() ($usage, $model, $cost_usd) plus the user_email.
+# anthropic_chat() ($usage, $model, $cost_usd) plus the user_email.
 usage_log_append <- function(user_email, model,
                               prompt_tokens, completion_tokens, cost_usd,
                               cached_tokens = 0L,
+                              cache_write_tokens = 0L,
                               ts = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ",
                                            tz = "UTC")) {
   path <- .usage_log_ensure()
@@ -71,6 +73,7 @@ usage_log_append <- function(user_email, model,
     total_tokens      = as.integer((prompt_tokens %||% 0L) +
                                     (completion_tokens %||% 0L)),
     cached_tokens     = as.integer(cached_tokens %||% 0L),
+    cache_write_tokens = as.integer(cache_write_tokens %||% 0L),
     cost_usd          = as.numeric(cost_usd %||% 0),
     stringsAsFactors  = FALSE
   )

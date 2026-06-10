@@ -4,7 +4,7 @@
 #   (a) Logged out  -> magic-link login panel.
 #   (b) Logged in   -> chat panel (file upload + message history + input box).
 #
-# Wires up the OpenAI client (R/openai_client.R), the spend ledger
+# Wires up the Anthropic client (R/anthropic_client.R), the spend ledger
 # (R/usage_log.R), and the magic-link auth (R/auth_magic_link.R).
 
 # ============================================================================
@@ -782,14 +782,14 @@ translator_chat_server <- function(input, output, session) {
     })
   if (is.null(system_prompt)) return()
 
-  msgs <- openai_build_messages(system_prompt, history = state$messages)
+  msgs <- anthropic_build_messages(system_prompt, history = state$messages)
 
   # Create an empty bubble client-side, then stream tokens into it. The
   # final assistant message gets written into state$messages at the end so
   # the renderUI for the message history catches up.
   session$sendCustomMessage("translatorStreamStart", "")
 
-  resp <- openai_chat_stream(
+  resp <- anthropic_chat_stream(
     msgs,
     on_chunk = function(text) {
       session$sendCustomMessage("translatorStreamChunk", text)
@@ -806,15 +806,17 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  # Log the spend (now including cached_tokens — 50% discount on the
-  # cache-hit portion; see openai_client.R::openai_cost_usd).
+  # Log the spend — Anthropic prompt caching has 90% off on cache reads
+  # and a 25% surcharge on cache writes (first turn only).
+  # See R/anthropic_client.R::anthropic_cost_usd.
   usage_log_append(
-    user_email        = state$user_email,
-    model             = resp$model,
-    prompt_tokens     = resp$usage$prompt_tokens,
-    completion_tokens = resp$usage$completion_tokens,
-    cached_tokens     = resp$usage$cached_tokens %||% 0L,
-    cost_usd          = resp$cost_usd
+    user_email         = state$user_email,
+    model              = resp$model,
+    prompt_tokens      = resp$usage$prompt_tokens,
+    completion_tokens  = resp$usage$completion_tokens,
+    cached_tokens      = resp$usage$cached_tokens %||% 0L,
+    cache_write_tokens = resp$usage$cache_write_tokens %||% 0L,
+    cost_usd           = resp$cost_usd
   )
 
   # Extract any `template-ready` fenced block from the reply, and only
@@ -835,7 +837,7 @@ translator_chat_server <- function(input, output, session) {
         "The AI tried to emit a template but the format wasn't valid JSON ",
         "(usually because of JS-style comments, math expressions, or ",
         "'for brevity' placeholders inside the block). Click 'Produce ",
-        "template now' below — that uses OpenAI's strict-schema mode and ",
+        "template now' below — that uses Anthropic's tool-input-schema mode and ",
         "is guaranteed to produce a downloadable .xlsx.")
     }
   }
@@ -1044,7 +1046,7 @@ translator_chat_server <- function(input, output, session) {
     "Do not ask any more questions. Just emit the complete",
     "template-ready JSON matching the schema.",
     sep = "\n")
-  msgs <- openai_build_messages(system_prompt, history = state$messages,
+  msgs <- anthropic_build_messages(system_prompt, history = state$messages,
                                   new_user_message = hard_requirements)
 
   # Try once; if the JSON parses, use it. If not (truncation, schema
@@ -1066,7 +1068,7 @@ translator_chat_server <- function(input, output, session) {
   }
   resp <- NULL
   for (attempt in seq_len(2)) {
-    resp <- openai_chat_template_force(msgs, on_chunk = on_chunk_cb)
+    resp <- anthropic_chat_template_force(msgs, on_chunk = on_chunk_cb)
     if (!is.null(resp$error)) break  # hard error — don't retry
     if (.translator_template_is_well_formed(resp$reply)) break
     if (attempt == 1L)
@@ -1105,7 +1107,7 @@ translator_chat_server <- function(input, output, session) {
              "beef ones (or vice versa). The two .xlsx files can be merged ",
              "by hand afterwards.")
     else
-      " Type 'go ahead' again — this is sometimes a transient OpenAI hiccup."
+      " Type 'go ahead' again — this is sometimes a transient AI-service hiccup."
     state$last_error <- paste0(
       "Couldn't produce a complete template from the AI's response.",
       hint)
@@ -1165,7 +1167,7 @@ translator_chat_server <- function(input, output, session) {
         "IPCC catalogue defaults ONLY for parameters the file does not ",
         "supply (data_source = 'ipcc_default' on those rows). ",
         "Strict JSON, no comments, no shortcuts. List every row."))))
-    resp2 <- openai_chat_template_force(msgs_retry)
+    resp2 <- anthropic_chat_template_force(msgs_retry)
     if (is.null(resp2$error) && .translator_template_is_well_formed(resp2$reply)) {
       # Re-log the spend for the retry call.
       usage_log_append(
@@ -1229,7 +1231,7 @@ translator_chat_server <- function(input, output, session) {
         "    non-oxen, etc.): data_source = 'biological_zero', ",
         "    distribution = 'constant'. ",
         "Strict JSON. No shortcuts. Every row must have data_source set."))))
-    resp_v <- openai_chat_template_force(msgs_retry_vals)
+    resp_v <- anthropic_chat_template_force(msgs_retry_vals)
     if (is.null(resp_v$error) &&
           .translator_template_is_well_formed(resp_v$reply)) {
       usage_log_append(
