@@ -101,8 +101,16 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
 # Map a status code to a user-friendly message. Used by both the
 # blocking and streaming variants.
 .anthropic_status_msg <- function(status, error_body_msg = NULL) {
+  # For 400 responses surface Anthropic's own error text — these are
+  # usually actionable (e.g. "temperature is deprecated for this model",
+  # "max_tokens is greater than the maximum allowed (8192)"). Other
+  # statuses get a friendly fixed message; the actual API message is
+  # logged via message() for the server log.
   msg <- switch(as.character(status),
-    "400" = "AI translator request was rejected by Anthropic. Please try again or contact the administrator.",
+    "400" = if (!is.null(error_body_msg) && nzchar(error_body_msg))
+              paste0("AI translator request was rejected by Anthropic: ",
+                      error_body_msg, ". Please contact the administrator.")
+            else "AI translator request was rejected by Anthropic. Please try again or contact the administrator.",
     "401" = "AI translator authentication failed. The server's ANTHROPIC_API_KEY is missing or invalid — please contact the administrator.",
     "403" = "AI translator is blocked by Anthropic. The administrator may need to add billing or remove a usage cap.",
     "404" = "AI translator endpoint or model is unavailable. Please contact the administrator.",
@@ -118,6 +126,13 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
     message("Anthropic error body: ", error_body_msg)
   msg
 }
+
+# Models that reject the `temperature` parameter. Claude Opus 4.8 (and
+# likely later Opus releases) only accept the default; sending temperature
+# at all returns 400 "temperature is deprecated for this model". Older
+# models still accept it. Keep this list explicit so we don't silently
+# strip temperature from models that expect it.
+.ANTHROPIC_NO_TEMPERATURE_MODELS <- c("claude-opus-4-8")
 
 # --- Main entry point: blocking ---------------------------------------------
 #
@@ -137,9 +152,10 @@ anthropic_chat <- function(messages,
   body <- list(
     model       = model,
     max_tokens  = max_tokens,
-    temperature = temperature,
     messages    = split$messages
   )
+  if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
+    body$temperature <- temperature
   sys_payload <- .anthropic_system_payload(split$system)
   if (!is.null(sys_payload)) body$system <- sys_payload
 
@@ -241,10 +257,11 @@ anthropic_chat_stream <- function(messages,
   body <- list(
     model       = model,
     max_tokens  = max_tokens,
-    temperature = temperature,
     messages    = split$messages,
     stream      = TRUE
   )
+  if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
+    body$temperature <- temperature
   sys_payload <- .anthropic_system_payload(split$system)
   if (!is.null(sys_payload)) body$system <- sys_payload
   if (!is.null(tools)) body$tools <- tools
