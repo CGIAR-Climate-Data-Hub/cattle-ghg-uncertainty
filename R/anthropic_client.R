@@ -455,8 +455,18 @@ anthropic_chat_stream <- function(messages,
 anthropic_chat_template_force <- function(messages,
                                             on_chunk = function(text) {},
                                             model = .ANTHROPIC_DEFAULT_MODEL,
-                                            max_tokens = 32000,
-                                            timeout_sec = 600) {
+                                            # 2026-06-10: 64K (probed up
+                                            # to 128K on Opus 4.8). 32K was
+                                            # tight for ~26-sub-cat inventories
+                                            # where parameters+manure_management
+                                            # +parameter_timeseries can hit
+                                            # ~30K tokens. 64K gives 2x
+                                            # headroom; truncation here
+                                            # produces a non-parseable JSON
+                                            # blob and the user gets no
+                                            # download with no obvious cause.
+                                            max_tokens = 64000,
+                                            timeout_sec = 900) {
   # Same schema as the OpenAI version, surfaced as an Anthropic tool with
   # input_schema. Anthropic uses JSON Schema for tool inputs; the structure
   # is the same as OpenAI's json_schema mode minus the strict envelope.

@@ -185,8 +185,19 @@ Run these checks (the app will re-run them; failing them means the user can't lo
    - `growing_males.C` MUST be 1.0 (not the 0.8 default)
    - `oxen.Cfi` and `growing_males.Cfi` use 0.322 (non-lactating), not 0.386 (lactating-female)
    - `bulls.Cfi` uses 0.370
-   
+
    If any of these are still at the female-lactating default, fix them before emission. Tag the overridden rows with `data_source = "ipcc_table_10.6"` so the audit trail shows the override was deliberate.
+
+10. **HARD ROW-COUNT ASSERTION (do this LAST, immediately before emitting).** Count the rows in your `parameters` array and verify the count is exactly `(number of confirmed sub-categories) × 25`. Always 25 — the catalogue has 25 entries: `N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw`. Examples of the required row count:
+
+    - 7 confirmed sub-categories → exactly 175 rows
+    - 11 confirmed sub-categories → exactly 275 rows
+    - **26 confirmed sub-categories → exactly 650 rows**
+    - 5 confirmed sub-categories × 5 production systems collapsed into 5 aggregation_level groups → that's still 5 sub_category × 25 rows for THIS template (the production-system axis lives on `aggregation_level`, NOT on the row count)
+
+    If your `parameters.length` does not match this product, you have skipped sub-categories or skipped parameters. **DO NOT EMIT.** Walk back through your section B inventory, identify which (sub_category, parameter) pairs are missing, add them with the correct `data_source` tag (`user_file` / `ipcc_default` / `biological_zero`), and only THEN call the tool. There is no "for brevity" exception — 26 × 25 = 650 means literally 650 JSON objects in the array, not 100 with a trailing comment. The user gets nothing if the count is wrong.
+
+    The token budget for this emission has been set to 64,000 — comfortably more than enough for 650+ rows. Do not truncate to fit a phantom limit.
 
 If any check fails, tell the user clearly what's wrong, propose a fix, and only proceed after confirmation.
 
