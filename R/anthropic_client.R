@@ -528,6 +528,36 @@ anthropic_chat_template_force <- function(messages,
                         "MCF_pct", "EF3",
                         "Frac_GasMS_pct", "Frac_LeachMS_pct")
         )
+      ),
+      # 2026-06-10: Parameter_TimeSeries. Optional. One row per
+      # (group, year). The 10 correlated parameters from
+      # param_catalogue.md "Sex-and-physiology" section. Emit only when
+      # the user's source file has multi-year activity data (≥ 5 years
+      # ideally; the app's correlation step needs at least 4 with first-
+      # difference detrending). Leave the array empty when no multi-year
+      # data exists — emitting fabricated time series is a hallucination.
+      parameter_timeseries = list(
+        type  = "array",
+        items = list(
+          type = "object",
+          properties = list(
+            cattle_type       = list(type = c("string", "null")),
+            aggregation_level = list(type = c("string", "null")),
+            sub_category      = list(type = c("string", "null")),
+            year              = list(type = "integer"),
+            N                 = list(type = c("number", "null")),
+            BW                = list(type = c("number", "null")),
+            MW                = list(type = c("number", "null")),
+            WG                = list(type = c("number", "null")),
+            Milk              = list(type = c("number", "null")),
+            Fat               = list(type = c("number", "null")),
+            pct_pregnant      = list(type = c("number", "null")),
+            DE                = list(type = c("number", "null")),
+            CP                = list(type = c("number", "null")),
+            MilkPR            = list(type = c("number", "null"))
+          ),
+          required = c("year")
+        )
       )
     ),
     # I() preserves the single-element vector as a JSON array — same

@@ -202,6 +202,8 @@ The translation rule, applied row-by-row:
 
 Total row count = |B| + |C| + |biological_zeros| per sub-category, summed across the sub-categories your section B identified. Do NOT skip rows. Do NOT substitute defaults for B-list entries. This is the single hardest rule in the whole prompt to get right; failing it produces an all-defaults output that wastes the user's time.
 
+**Parameter_TimeSeries (optional fourth output array).** If the user's source file contains multi-year activity data — five or more years of N / BW / Milk / DE / CP / etc. — emit one row per (group, year) into the JSON's `parameter_timeseries` array. Columns: `cattle_type`, `aggregation_level`, `sub_category` (all three may be blank to apply the row to every group), `year` (required integer), and any of `N`, `BW`, `MW`, `WG`, `Milk`, `Fat`, `pct_pregnant`, `DE`, `CP`, `MilkPR` (leave blank for parameters not in the user's time series). The app uses this sheet to compute the Activity-Data correlation matrix automatically — without it, the user has to fall back to "No correlations" or the structural-defaults preset. **Do NOT fabricate a time series if the source file has only a single year.** Emit an empty `parameter_timeseries` array (or omit the field entirely) when no multi-year data exists. Hallucinating year-over-year values would produce false correlations and inflate the simulation's uncertainty estimate.
+
 The `species` field follows the sub-categories you mapped in B — never guess:
 
 - B contains `dairy_cows` only → `cattle_dairy`

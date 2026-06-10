@@ -1560,6 +1560,42 @@ translator_chat_server <- function(input, output, session) {
     }
   }
 
+  # ---------- Parameter_TimeSeries -----------------------------------------
+  # Optional multi-year activity-data table. The blank template puts
+  # banner @ row 1, headers @ 2, desc @ 3, units @ 4 — so data rows
+  # start at row 5. Columns:
+  #   1 cattle_type    2 aggregation_level    3 sub_category    4 year
+  #   5 N    6 BW    7 MW    8 WG    9 Milk   10 Fat
+  #  11 pct_pregnant   12 DE   13 CP   14 MilkPR
+  ts <- parsed$parameter_timeseries
+  if (is.data.frame(ts) && nrow(ts) > 0) {
+    TS_DATA_START <- 5L
+    for (i in seq_len(nrow(ts))) {
+      r <- TS_DATA_START + i - 1L
+      .put_ts <- function(col_idx, v) {
+        if (is.null(v) || length(v) == 0) return()
+        if (is.na(v[1]) || (is.character(v[1]) && !nzchar(v[1]))) return()
+        openxlsx::writeData(wb, "Parameter_TimeSeries", v[1],
+                            startRow = r, startCol = col_idx,
+                            colNames = FALSE)
+      }
+      .put_ts(1,  ts$cattle_type[i])
+      .put_ts(2,  ts$aggregation_level[i])
+      .put_ts(3,  ts$sub_category[i])
+      .put_ts(4,  ts$year[i])
+      .put_ts(5,  ts$N[i])
+      .put_ts(6,  ts$BW[i])
+      .put_ts(7,  ts$MW[i])
+      .put_ts(8,  ts$WG[i])
+      .put_ts(9,  ts$Milk[i])
+      .put_ts(10, ts$Fat[i])
+      .put_ts(11, ts$pct_pregnant[i])
+      .put_ts(12, ts$DE[i])
+      .put_ts(13, ts$CP[i])
+      .put_ts(14, ts$MilkPR[i])
+    }
+  }
+
   openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
 }
 
@@ -1590,6 +1626,10 @@ translator_chat_server <- function(input, output, session) {
       nrow(parsed$manure_management) > 0)
     sheets[["Manure_Management"]] <- as.data.frame(parsed$manure_management,
                                                     stringsAsFactors = FALSE)
+  if (is.data.frame(parsed$parameter_timeseries) &&
+      nrow(parsed$parameter_timeseries) > 0)
+    sheets[["Parameter_TimeSeries"]] <- as.data.frame(
+      parsed$parameter_timeseries, stringsAsFactors = FALSE)
   if (length(sheets) == 0)
     sheets[["RawOutput"]] <- data.frame(
       content = jsonlite::toJSON(parsed, auto_unbox = TRUE, pretty = TRUE),
