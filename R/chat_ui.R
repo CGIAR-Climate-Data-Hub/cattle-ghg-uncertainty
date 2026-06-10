@@ -121,7 +121,13 @@ translator_chat_server <- function(input, output, session) {
   # ---- Login form: "send me a magic link" ----------------------------------
   observeEvent(input$translator_submit, {
     email <- tolower(trimws(input$translator_email %||% ""))
-    if (!grepl("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email)) {
+    # perl = TRUE is required so `\s` inside the character class is parsed
+    # as the whitespace shortcut. R's default TRE engine treats `\s` in
+    # `[^@\s]` as the literal characters `\` and `s`, which rejected every
+    # email containing the letter "s" — CGIAR addresses (.../@cgiar.org)
+    # happen to have no 's' before the @, so the bug only surfaced on
+    # external addresses.
+    if (!grepl("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email, perl = TRUE)) {
       state$login_status <- "Please enter a valid email address."
       return()
     }
