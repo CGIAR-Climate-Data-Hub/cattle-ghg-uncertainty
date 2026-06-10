@@ -644,6 +644,17 @@ translator_chat_server <- function(input, output, session) {
 # the actual cattle data on the floor. The AI then had nothing to map.
 # Now every non-trivial sheet is summarised and forwarded to the AI.
 .translator_read_upload <- function(path, name) {
+  # 2026-06-10 (Andy's 26-sub-cat Zambia case): bumped 200 → 1000.
+  # A full Zambian inventory has 282+ rows in one sheet (26 sub-categories
+  # × several production-system blocks). The 200-row cap silently cut off
+  # the last 6+ sub-categories, and the AI confessed it could not see
+  # row 282 when asked about an extensive-system heifer value. 1000 rows
+  # comfortably fits the biggest realistic spreadsheets we expect; if a
+  # file is genuinely bigger, the AI now says "I only see the first 1000"
+  # rather than silently producing an incomplete template. Cost: ~5x more
+  # prompt tokens on the first upload turn; subsequent turns hit the
+  # 5-minute prompt-cache discount (~10x cheaper than fresh input).
+  ROW_CAP <- 1000L
   ext <- tolower(tools::file_ext(name))
   if (ext == "csv") {
     df <- utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE)
@@ -651,14 +662,14 @@ translator_chat_server <- function(input, output, session) {
       kind   = "csv",
       sheets = list(list(name = NA_character_,
                          n_rows = nrow(df), n_cols = ncol(df),
-                         preview = utils::head(df, 200))),
+                         preview = utils::head(df, ROW_CAP))),
       n_total_sheets = 1L
     ))
   }
   sheet_names <- readxl::excel_sheets(path)
   out <- list()
   for (s in sheet_names) {
-    df <- tryCatch(readxl::read_excel(path, sheet = s, n_max = 300),
+    df <- tryCatch(readxl::read_excel(path, sheet = s, n_max = ROW_CAP + 100L),
                     error = function(e) NULL)
     if (is.null(df) || nrow(df) == 0 || ncol(df) == 0) next
     # Drop sheets that have zero non-NA cells — pure empty placeholders.
@@ -667,13 +678,7 @@ translator_chat_server <- function(input, output, session) {
       name    = s,
       n_rows  = nrow(df),
       n_cols  = ncol(df),
-      # 2026-06-08 (Zambia case): bumped from 40 → 200 because a real
-      # survey-data file had parameters (DE, CP, Fat, Hours, MMS%)
-      # spread across rows 5-45, and the 40-row cap silently dropped
-      # everything past the LW/WG/MW/% preg blocks. Sending more rows
-      # costs a few hundred extra prompt tokens — negligible vs. the
-      # cost of producing a template that's missing key parameters.
-      preview = utils::head(df, 200)
+      preview = utils::head(df, ROW_CAP)
     )
   }
   if (length(out) == 0)
@@ -735,10 +740,10 @@ translator_chat_server <- function(input, output, session) {
   if (is.null(df) || nrow(df) == 0) return("(empty data)")
   hdr <- paste("|", paste(names(df), collapse = " | "), "|")
   sep <- paste("|", paste(rep("---", ncol(df)), collapse = " | "), "|")
-  # 2026-06-08: bumped row cap 30 → 200 to match the preview cap. A
-  # 30-row table dropped DE / CP / Fat / Hours / MMS rows that sit
-  # further down typical survey spreadsheets.
-  rows <- vapply(seq_len(min(nrow(df), 200)), function(i) {
+  # 2026-06-10: matches the 1000-row preview cap in .translator_read_upload.
+  # Truncating here below the read cap would silently drop rows the AI was
+  # meant to see — defeats the point of the higher preview limit.
+  rows <- vapply(seq_len(min(nrow(df), 1000L)), function(i) {
     paste("|", paste(sapply(df[i, ], function(x) {
       v <- if (is.na(x)) "" else as.character(x)
       gsub("\\|", "/", v)

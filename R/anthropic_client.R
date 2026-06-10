@@ -566,7 +566,13 @@ anthropic_chat_template_force <- function(messages,
             CP                = list(type = c("number", "null")),
             MilkPR            = list(type = c("number", "null"))
           ),
-          required = c("year")
+          # I() preserves the length-1 character vector as a JSON array.
+          # Without it jsonlite auto-unboxes to "required":"year" which
+          # Anthropic rejects with "JSON schema is invalid (must match
+          # JSON Schema draft 2020-12)". Same bug pattern as the top-level
+          # required = I(c("parameters")) below — applies to every `required`
+          # whose value is a length-1 character vector.
+          required = I(c("year"))
         )
       )
     ),
