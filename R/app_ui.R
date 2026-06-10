@@ -61,35 +61,41 @@ app_ui <- function(request = NULL) {
          //                            bubble (next round starts fresh).
          var _translatorActiveBubble = null;
          Shiny.addCustomMessageHandler('translatorStreamStart', function(_unused) {
-           // NOTE: do NOT hide the spinner here. translatorStreamStart fires
-           // BEFORE the API call returns the first token, so hiding now
-           // leaves the user staring at an empty bubble for 3-5 seconds.
-           // The spinner is hidden by translatorStreamChunk on the very
-           // first chunk (see handler below) — that's the moment the user
-           // actually has something to look at.
-           var container = document.getElementById('translator_stream_target');
-           if (!container) return;
-           // Wipe any leftover bubble from the previous round before we
-           // start streaming the new one (defense in depth — translatorStreamEnd
-           // also clears on completion).
-           container.innerHTML = '';
-           var bubble = document.createElement('div');
-           // Style MUST match the AI bubble style in R/chat_ui.R's renderUI
-           // so the streamed-live bubble looks identical to the rendered-
-           // history bubble that replaces it once streaming ends.
-           bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
-             'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
-             'font-size:0.92rem; line-height:1.45;' +
-             'background:#E8F5E9; color:#1B4332; align-self:flex-start;' +
-             'border:1px solid #C8E6C9;';
-           container.appendChild(bubble);
-           _translatorActiveBubble = bubble;
+           // 2026-06-10: with Claude Opus 4.8 + prompt-cache-write, the
+           // gap between StreamStart and the first chunk is now 5-15s
+           // (vs 1-3s on GPT-4.1). Wiping stream_target here would leave
+           // the user staring at an empty bubble for that whole window
+           // and the AI-is-working signal disappears.
+           //
+           // New rule: StreamStart only sets a flag. The first chunk does
+           // the wipe + bubble creation. That way the dots typing-bubble
+           // (painted by translatorAppendTypingBubble) animates the whole
+           // way until real text is about to appear.
+           _translatorActiveBubble = null;
          });
          Shiny.addCustomMessageHandler('translatorStreamChunk', function(text) {
            // First real token arrived — hide the pre-stream spinner now
            // (cheap no-op if it was already hidden).
            if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
-           if (!_translatorActiveBubble) return;
+           // Lazy bubble creation on first chunk: wipes the typing-dots
+           // bubble at the exact moment real text is ready to replace it,
+           // not at StreamStart (which fires too early).
+           if (!_translatorActiveBubble) {
+             var container = document.getElementById('translator_stream_target');
+             if (!container) return;
+             container.innerHTML = '';
+             var bubble = document.createElement('div');
+             // Style MUST match the AI bubble style in chat_ui.R::output$translator_messages
+             // so the streamed-live bubble looks identical to the rendered-
+             // history bubble that replaces it once streaming ends.
+             bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+               'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
+               'font-size:0.92rem; line-height:1.45;' +
+               'background:#E8F5E9; color:#1B4332; align-self:flex-start;' +
+               'border:1px solid #C8E6C9;';
+             container.appendChild(bubble);
+             _translatorActiveBubble = bubble;
+           }
            _translatorActiveBubble.textContent += text;
            // auto-scroll the surrounding message-history div
            var scroller = _translatorActiveBubble.closest('[data-translator-scroller]');

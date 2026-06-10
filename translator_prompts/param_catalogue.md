@@ -44,6 +44,26 @@ These parameters use absolute IPCC-derived lower/upper bounds rather than a symm
 | `Frac_GASM_PRP` | 0.05 | 0.21 | 0.5 |
 | `Frac_LEACH_PRP` | 0.05 | 0.24 | 0.8 |
 
+## Sex- and physiology-specific coefficient overrides
+
+The `ipcc_default` column above lists the **lactating-female** value because that's the most common case. For other sub-categories you MUST override these three coefficients (`Cfi`, `Ca`, `C`) according to IPCC Vol.4 Ch.10 Tables 10.4 / 10.5 / Eq 10.6. Do NOT use 0.8 for every C, do NOT use 0.386 for every Cfi.
+
+| sub-category | Cfi (Table 10.4) | Ca (Table 10.5) | C (Eq 10.6) |
+|---|---|---|---|
+| `dairy_cows` (lactating) | 0.386 | 0.17 (grazing, hilly) / 0.17 (large area) / 0.36 (stall-fed) | n/a (adult, WG≈0) |
+| `other_cows` (non-dairy, lactating) | 0.386 | as above | 0.8 |
+| `other_cows` (non-dairy, non-lactating) | 0.322 | as above | 0.8 |
+| `bulls` (intact adult male) | 0.370 | as above | **1.2** |
+| `oxen` (castrate adult male) | 0.322 | 0.17 (light work) / 0.36 (moderate) / 0.50 (heavy) | **1.0** |
+| `heifers` (replacement female) | 0.322 | as above | 0.8 |
+| `growing_males` / `steers` (castrate, growing) | 0.322 | as above | **1.0** |
+| `calves_female` | 0.322 | as above | 0.8 |
+| `calves_male` (uncastrated, pre-pubertal) | 0.322 | as above | 0.8 (use 1.2 only after castration decision is made) |
+
+**The C-coefficient (growth coefficient) is the one most commonly missed.** When applying a sub-category-specific value (`bulls` → 1.2, `oxen`/`growing_males` → 1.0), tag the `data_source` as `ipcc_table_10.6` rather than the generic `ipcc_default`, so the audit trail makes the override visible.
+
+For `Ca` specifically: pick the row based on the feeding situation the user describes — stall-fed (intensive) sits around 0.0–0.17, grazing on flat pasture around 0.17, grazing on hilly pasture around 0.36, working oxen up to 0.50. If the user doesn't specify, use 0.17 (grazing) for smallholder/extensive systems and 0.36 (stall-fed) for confined dairy systems.
+
 ## Tier meaning
 
 - **core** = user must provide a value (or accept the IPCC default). These are the activity-data parameters and a handful of high-impact coefficients (DE, CP, MilkPR).

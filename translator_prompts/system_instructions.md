@@ -173,6 +173,21 @@ Run these checks (the app will re-run them; failing them means the user can't lo
 5. Every `distribution` is in the allowed list.
 6. Every `param_type` is `activity_data` (only for `N`) or `coefficient`.
 
+**Three additional self-checks introduced after the 2026-06 Zambia review surfaced real failures:**
+
+7. **Per-row bounds provenance.** For EVERY row where `data_source` is `user_file` or `user_chat`, the `lower` and `upper` values MUST come from the SAME source row as the mean — never from an adjacent parameter's row. A common failure mode caught on the Zambia upload: the `Milk` row's mean was 3.49 kg/d but the lower/upper were 2.31/4.49, which are exactly the bounds from the `Fat` row directly above it (Fat: mean=3.4%, lower=2.31, upper=4.49). Before emitting, walk every user-supplied row and confirm: do these bounds appear ANYWHERE in the source data attached to THIS parameter? If they only appear on a neighbouring parameter, you copied from the wrong row — fix it.
+
+8. **Source-data CI inconsistency flagging.** If the user's file gives a mean and a CI where `upper < mean` or `lower > mean` (the CI doesn't bracket the mean — usually because mean and CI came from different aggregation passes with different weights), DO NOT silently preserve the inconsistency. Instead: surface it to the user before emitting. Phrasing: "For `pct_pregnant`/`other_cows` your file has mean=0.585 but upper CI=0.581 (upper < mean, which the app's QA tab will fail). The likely cause is a weighted-average mean paired with an unweighted CI. Want me to use the CI midpoint as the mean, the W-av as the mean with an inferred symmetric CI, or your call?" Wait for the user's answer; do not just emit.
+
+9. **Sex-specific coefficient application.** Before emitting, sweep the Parameters output and verify the sex-specific overrides from `param_catalogue.md` § "Sex- and physiology-specific coefficient overrides" were applied:
+   - `bulls.C` MUST be 1.2 (not the 0.8 default)
+   - `oxen.C` MUST be 1.0 (not the 0.8 default)
+   - `growing_males.C` MUST be 1.0 (not the 0.8 default)
+   - `oxen.Cfi` and `growing_males.Cfi` use 0.322 (non-lactating), not 0.386 (lactating-female)
+   - `bulls.Cfi` uses 0.370
+   
+   If any of these are still at the female-lactating default, fix them before emission. Tag the overridden rows with `data_source = "ipcc_table_10.6"` so the audit trail shows the override was deliberate.
+
 If any check fails, tell the user clearly what's wrong, propose a fix, and only proceed after confirmation.
 
 ### Step 8 — EMISSION (Step 3 of 3: produce the output workbook)
