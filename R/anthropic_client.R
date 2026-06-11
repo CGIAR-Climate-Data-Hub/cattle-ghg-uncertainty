@@ -101,17 +101,34 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
 # Map a status code to a user-friendly message. Used by both the
 # blocking and streaming variants.
 .anthropic_status_msg <- function(status, error_body_msg = NULL) {
-  # For 400 responses surface Anthropic's own error text — these are
-  # usually actionable (e.g. "temperature is deprecated for this model",
-  # "max_tokens is greater than the maximum allowed (8192)"). Other
-  # statuses get a friendly fixed message; the actual API message is
-  # logged via message() for the server log.
-  msg <- switch(as.character(status),
+  # Log the raw API message regardless of how we choose to surface it.
+  if (!is.null(error_body_msg) && nzchar(error_body_msg))
+    message("Anthropic error body: ", error_body_msg)
+
+  # "Out of credits" detection. Anthropic returns either 400 or 402 with
+  # body wording like "Your credit balance is too low" / "billing" /
+  # "credits exhausted". Show a friendly user-facing message that does
+  # NOT reveal the dollar amount or that there's a per-app cap — the
+  # user just needs to know the AI service is temporarily unavailable
+  # and the admin will deal with it.
+  is_billing <- !is.null(error_body_msg) && nzchar(error_body_msg) &&
+    grepl("credit\\s*balance|insufficient\\s*credit|billing|credits\\s*exhausted|out\\s*of\\s*credit",
+          error_body_msg, ignore.case = TRUE, perl = TRUE)
+  if (is_billing) {
+    return(paste0(
+      "The AI translator is temporarily unavailable. ",
+      "We've been notified and will restore service shortly — ",
+      "please try again in a few hours, or contact the administrator ",
+      "if it persists."))
+  }
+
+  switch(as.character(status),
     "400" = if (!is.null(error_body_msg) && nzchar(error_body_msg))
               paste0("AI translator request was rejected by Anthropic: ",
                       error_body_msg, ". Please contact the administrator.")
             else "AI translator request was rejected by Anthropic. Please try again or contact the administrator.",
     "401" = "AI translator authentication failed. The server's ANTHROPIC_API_KEY is missing or invalid — please contact the administrator.",
+    "402" = "The AI translator is temporarily unavailable. We've been notified and will restore service shortly.",
     "403" = "AI translator is blocked by Anthropic. The administrator may need to add billing or remove a usage cap.",
     "404" = "AI translator endpoint or model is unavailable. Please contact the administrator.",
     "413" = "Your message is too large for the AI to process. Try splitting the file or removing very large sheets.",
@@ -122,9 +139,6 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
     "503" = "Anthropic is having trouble. Try again later.",
     "504" = "Anthropic is having trouble. Try again later.",
     sprintf("Anthropic returned HTTP %d. Try again later.", status))
-  if (!is.null(error_body_msg) && nzchar(error_body_msg))
-    message("Anthropic error body: ", error_body_msg)
-  msg
 }
 
 # Models that reject the `temperature` parameter. Claude Opus 4.8 (and

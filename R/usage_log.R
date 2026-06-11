@@ -114,13 +114,19 @@ month_to_date_spend <- function() {
   sum(as.numeric(df$cost_usd[current]), na.rm = TRUE)
 }
 
-# Read the monthly cap from the env var (set on shinyapps.io). Default
-# $10 if missing or malformed. The env-var path means Lolita can change
-# the cap without redeploying.
+# Read the monthly cap from the env var (set on shinyapps.io).
+# Sentinels for "no cap" (added 2026-06-10 after Andy hit the $30 cap
+# mid-conversation and we decided to let the Anthropic billing console be
+# the only ceiling): if the env var is unset, empty, "0", "none", "off",
+# or "unlimited", the in-app cap is treated as infinite — every call goes
+# through and the only "out of credits" surface is Anthropic's own 400
+# (handled in .anthropic_status_msg).
 monthly_budget_cap_usd <- function() {
-  raw <- Sys.getenv("MONTHLY_BUDGET_CAP_USD", unset = "10")
+  raw <- tolower(trimws(Sys.getenv("MONTHLY_BUDGET_CAP_USD", unset = "")))
+  if (!nzchar(raw) || raw %in% c("0", "none", "off", "unlimited", "inf"))
+    return(Inf)
   cap <- suppressWarnings(as.numeric(raw))
-  if (!is.finite(cap) || cap <= 0) cap <- 10
+  if (!is.finite(cap) || cap <= 0) return(Inf)
   cap
 }
 
@@ -128,9 +134,11 @@ monthly_budget_cap_usd <- function() {
 # Conservative: assumes the next call costs as much as the LARGEST call
 # we've seen this month (so the very first call of the month always goes
 # through). The actual per-call estimate from the chat UI takes
-# precedence if it's supplied.
+# precedence if it's supplied. Always returns FALSE when the cap is Inf
+# (i.e. the env var sentinel "no cap" is in effect).
 budget_would_exceed <- function(estimated_next_cost = NULL) {
   cap <- monthly_budget_cap_usd()
+  if (!is.finite(cap)) return(FALSE)
   spent <- month_to_date_spend()
   if (is.null(estimated_next_cost)) {
     df <- usage_log_read()
@@ -144,8 +152,13 @@ budget_would_exceed <- function(estimated_next_cost = NULL) {
 # ("Pilot budget: $1.42 / $10.00 used this month"). This is the GLOBAL
 # spend across all users — shown to the admin only.
 budget_status_line <- function() {
-  sprintf("Pilot budget (all users): $%.2f / $%.2f used this month",
-          month_to_date_spend(), monthly_budget_cap_usd())
+  cap <- monthly_budget_cap_usd()
+  if (!is.finite(cap))
+    sprintf("Pilot spend (all users): $%.2f this month — no in-app cap (Anthropic billing console controls the ceiling)",
+            month_to_date_spend())
+  else
+    sprintf("Pilot budget (all users): $%.2f / $%.2f used this month",
+            month_to_date_spend(), cap)
 }
 
 # Per-user spend — month-to-date and lifetime. Case-insensitive email

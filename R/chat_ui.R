@@ -770,11 +770,14 @@ translator_chat_server <- function(input, output, session) {
 
   # Cap check.
   if (budget_would_exceed()) {
+    # With MONTHLY_BUDGET_CAP_USD set to a sentinel "no cap" value
+    # (0/none/unlimited/unset), this branch never fires. Kept as a
+    # safety net for the case where an administrator explicitly sets
+    # a numeric cap and wants the in-app gate.
     state$last_error <- paste0(
-      "The monthly budget cap for the AI translator has been reached ",
-      "($", sprintf("%.2f", monthly_budget_cap_usd()), "). ",
-      "Please contact the administrator to raise it or wait until the ",
-      "1st of next month.")
+      "The AI translator is temporarily unavailable. ",
+      "We've been notified and will restore service shortly — ",
+      "please try again later or contact the administrator.")
     return()
   }
 
@@ -911,11 +914,14 @@ translator_chat_server <- function(input, output, session) {
   })
 
   if (budget_would_exceed()) {
+    # With MONTHLY_BUDGET_CAP_USD set to a sentinel "no cap" value
+    # (0/none/unlimited/unset), this branch never fires. Kept as a
+    # safety net for the case where an administrator explicitly sets
+    # a numeric cap and wants the in-app gate.
     state$last_error <- paste0(
-      "The monthly budget cap for the AI translator has been reached ",
-      "($", sprintf("%.2f", monthly_budget_cap_usd()), "). ",
-      "Please contact the administrator to raise it or wait until the ",
-      "1st of next month.")
+      "The AI translator is temporarily unavailable. ",
+      "We've been notified and will restore service shortly — ",
+      "please try again later or contact the administrator.")
     return()
   }
 
