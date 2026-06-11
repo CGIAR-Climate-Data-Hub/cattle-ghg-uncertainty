@@ -1761,6 +1761,13 @@ translator_chat_server <- function(input, output, session) {
   if (!exists("generate_template_openxlsx") || !exists("PARAM_CATALOGUE"))
     stop("template-generation helpers not available")
 
+  # Defense-in-depth: if the merge produced list-of-records (heterogeneous
+  # schema across batches), coerce to data.frames here too — the writer's
+  # is.data.frame() gates would otherwise drop those sheets silently.
+  parsed$parameters           <- .translator_records_to_df(parsed$parameters)
+  parsed$manure_management    <- .translator_records_to_df(parsed$manure_management)
+  parsed$parameter_timeseries <- .translator_records_to_df(parsed$parameter_timeseries)
+
   ipcc_version <- parsed$inventory_metadata$ipcc_version %||% "2019_refinement"
   ipcc_short <- if (grepl("2019|refinement", ipcc_version, ignore.case = TRUE))
     "2019_refinement" else "2006"
@@ -1984,6 +1991,12 @@ translator_chat_server <- function(input, output, session) {
 # (missing helper, dependency problem, etc.). Produces a 3-sheet xlsx
 # with the AI's data but no styling. Better than nothing.
 .translator_write_simple_xlsx <- function(parsed, file_path) {
+  # Same list-of-records → data.frame coercion as the official writer,
+  # so the simple fallback also writes Parameters / Manure_Management /
+  # Parameter_TimeSeries sheets when the merge degraded their shape.
+  parsed$parameters           <- .translator_records_to_df(parsed$parameters)
+  parsed$manure_management    <- .translator_records_to_df(parsed$manure_management)
+  parsed$parameter_timeseries <- .translator_records_to_df(parsed$parameter_timeseries)
   sheets <- list()
   if (!is.null(parsed$inventory_metadata)) {
     md <- parsed$inventory_metadata
@@ -2175,9 +2188,19 @@ translator_chat_server <- function(input, output, session) {
                                        agg_levels = NULL) {
   # Pull a single field (e.g. "parameters") out of every batch part,
   # filter each batch's rows to its requested aggregation_level, then
-  # concatenate. Handles both data.frame and list-of-list representations
-  # because jsonlite::fromJSON(simplifyVector = TRUE) may produce either
-  # depending on the JSON shape.
+  # concatenate into a single data.frame.
+  #
+  # Robust to schema heterogeneity across batches: each batch may emit a
+  # data.frame or a list-of-records, and the column sets may differ
+  # (e.g. one batch's MMS rows have lower_mcf, another's don't). The
+  # normalize-then-rbind-fill path guarantees the merged field comes
+  # back as a single data.frame with NA-filled missing columns, so the
+  # downstream writer's is.data.frame() gate always passes.
+  #
+  # Earlier this returned list-of-records on schema mismatch and the
+  # writer silently skipped those sheets in the .xlsx (Zambia, 5 batches
+  # x 27 sub-cats, 2026-06-11 — downloaded file had only the metadata
+  # sheet).
   collect_field <- function(field) {
     pieces <- lapply(parts, function(p) {
       rows <- p[[field]]
@@ -2211,18 +2234,12 @@ translator_chat_server <- function(input, output, session) {
         (is.list(x) && !is.data.frame(x) && length(x) == 0),
       logical(1))]
     if (length(pieces) == 0) return(NULL)
-    # If every piece is a data.frame, rbind. Otherwise concat as list.
-    if (all(vapply(pieces, is.data.frame, logical(1)))) {
-      tryCatch(do.call(rbind, c(pieces, list(make.row.names = FALSE))),
-                error = function(e) {
-                  # Schema mismatch between batches — fall back to
-                  # list-of-records.
-                  do.call(c, lapply(pieces, function(df)
-                    split(df, seq_len(nrow(df)))))
-                })
-    } else {
-      do.call(c, pieces)
-    }
+    # Normalize every piece to a data.frame, then rbind with NA-fills
+    # for any column missing in a given piece.
+    dfs <- lapply(pieces, .translator_records_to_df)
+    dfs <- dfs[!vapply(dfs, is.null, logical(1))]
+    if (length(dfs) == 0) return(NULL)
+    .translator_rbind_fill(dfs)
   }
 
   list(
@@ -2231,6 +2248,53 @@ translator_chat_server <- function(input, output, session) {
     manure_management     = collect_field("manure_management"),
     parameter_timeseries  = collect_field("parameter_timeseries")
   )
+}
+
+# Convert a list-of-records (named lists, one per row) into a data.frame
+# with NA-filled missing fields. Pass-through if already a data.frame.
+# Returns NULL on empty / unrecognized input.
+#
+# Why: jsonlite::fromJSON(simplifyVector = TRUE) does not always simplify
+# a JSON array-of-objects into a data.frame — if the objects have a
+# heterogeneous key set (one batch has lower_mcf, another doesn't), the
+# result stays a list-of-named-lists. Downstream writers gate sheet
+# emission on is.data.frame() so list-of-records meant the sheet was
+# silently dropped. This helper guarantees a data.frame.
+.translator_records_to_df <- function(x) {
+  if (is.null(x)) return(NULL)
+  if (is.data.frame(x)) {
+    if (nrow(x) == 0) return(NULL)
+    return(x)
+  }
+  if (!is.list(x) || length(x) == 0) return(NULL)
+  all_names <- unique(unlist(lapply(x, function(r) {
+    if (is.list(r) && !is.null(names(r))) names(r) else character(0)
+  })))
+  if (length(all_names) == 0) return(NULL)
+  rows <- lapply(x, function(r) {
+    if (!is.list(r) || is.null(names(r))) return(NULL)
+    vals <- setNames(vector("list", length(all_names)), all_names)
+    for (nm in all_names) {
+      v <- r[[nm]]
+      vals[[nm]] <- if (is.null(v) || length(v) == 0) NA else v[[1]]
+    }
+    as.data.frame(vals, stringsAsFactors = FALSE)
+  })
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (length(rows) == 0) return(NULL)
+  do.call(rbind, c(rows, list(make.row.names = FALSE)))
+}
+
+# rbind a list of data.frames with NA-fill for missing columns. base R's
+# rbind throws on column-name mismatch; this aligns columns first.
+.translator_rbind_fill <- function(dfs) {
+  if (length(dfs) == 0) return(NULL)
+  all_cols <- unique(unlist(lapply(dfs, names)))
+  do.call(rbind, c(lapply(dfs, function(df) {
+    miss <- setdiff(all_cols, names(df))
+    for (col in miss) df[[col]] <- NA
+    df[, all_cols, drop = FALSE]
+  }), list(make.row.names = FALSE)))
 }
 
 # Look for ```template-ready ... ``` and return the inner JSON; NULL if
