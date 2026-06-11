@@ -58,7 +58,15 @@ translator_chat_ui <- function() {
     pending    = FALSE,       # TRUE while an API call is in flight
     last_template_json = NULL,  # most recent `template-ready` payload
     last_error = NULL,
-    login_status = NULL       # one-line message under the login form
+    login_status = NULL,      # one-line message under the login form
+    # 2026-06-11: resumable batches. The batched emission path in
+    # .translator_force_template() caches each per-aggregation-level
+    # batch's parsed JSON here keyed by aggregation_level. On a retry
+    # after a failed batch, successful batches are reused without firing
+    # a fresh API call (saves the output-token cost — Anthropic only
+    # caches inputs, not outputs). Cleared on successful merge / Reset
+    # conversation / new file upload.
+    batch_parts = list()
   )
 }
 
@@ -173,6 +181,9 @@ translator_chat_server <- function(input, output, session) {
     req(state$user_email)
     fi <- input$translator_file
     if (is.null(fi)) return()
+    # New file = fresh emission. Drop any cached per-batch parts so we
+    # don't reuse rows from a previous file's conversation.
+    state$batch_parts <- list()
     # Inline typing-indicator in the conversation while we read the
     # uploaded file + wait for the AI's first reply. Visible alongside
     # the conversation regardless of scroll position; cleared by
@@ -362,6 +373,9 @@ translator_chat_server <- function(input, output, session) {
     state$messages           <- list()
     state$last_template_json <- NULL
     state$last_error         <- NULL
+    # Drop any cached per-batch parts so a fresh conversation starts
+    # with no resume state.
+    state$batch_parts        <- list()
     conversation_delete(state$user_email)
     # If the user clicked Reset while a request was mid-flight (or the
     # spinner got stuck for any other reason), drop it. translatorStreamEnd
@@ -1111,11 +1125,38 @@ translator_chat_server <- function(input, output, session) {
   }
 
   # ---- Stage 2: per-aggregation-level batch emission ---------------------
-  message(sprintf("translator: dispatching %d batched force-template calls (%s)",
-                   length(agg_levels), paste(agg_levels, collapse = ", ")))
+  # Resumable batches: state$batch_parts[[level]] caches each successful
+  # batch's parsed JSON (keyed by aggregation_level). On a retry after a
+  # failed batch, the previously-successful ones are reused without
+  # firing a fresh API call — saves the per-batch output cost (~$0.15
+  # each, since Anthropic only caches inputs not outputs). The cache is
+  # cleared on successful merge, on Reset conversation, and on new file
+  # upload.
+  cached_levels <- intersect(agg_levels, names(state$batch_parts))
+  fresh_levels  <- setdiff(agg_levels, cached_levels)
+  if (length(cached_levels) > 0) {
+    message(sprintf("translator: reusing %d cached batch(es): %s",
+                     length(cached_levels),
+                     paste(cached_levels, collapse = ", ")))
+  }
+  message(sprintf("translator: dispatching %d fresh force-template call(s): %s",
+                   length(fresh_levels),
+                   paste(fresh_levels, collapse = ", ")))
+
   parts <- list()
   for (i in seq_along(agg_levels)) {
     level <- agg_levels[i]
+
+    # Reuse cached part if this level already succeeded on a previous
+    # attempt — no API call, no cost.
+    if (!is.null(state$batch_parts[[level]])) {
+      session$sendCustomMessage("translatorAppendInfoBubble",
+        sprintf("Reusing %d of %d: %s (from previous attempt)...",
+                i, length(agg_levels), level))
+      parts[[i]] <- state$batch_parts[[level]]
+      next
+    }
+
     session$sendCustomMessage("translatorAppendInfoBubble",
       sprintf("Processing %d of %d: %s...",
               i, length(agg_levels), level))
@@ -1150,8 +1191,9 @@ translator_chat_server <- function(input, output, session) {
 
     if (!is.null(batch_resp$error)) {
       state$last_error <- sprintf(
-        "Batch %d of %d (%s) failed: %s. The previous %d batch(es) are not saved; click 'Produce template now' to retry the whole emission.",
-        i, length(agg_levels), level, batch_resp$error, i - 1L)
+        "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry — the %d batch(es) that already succeeded this session are cached and won't be re-billed.",
+        i, length(agg_levels), level, batch_resp$error,
+        length(state$batch_parts))
       return()
     }
     usage_log_append(
@@ -1168,14 +1210,16 @@ translator_chat_server <- function(input, output, session) {
       error = function(e) NULL)
     if (is.null(batch_parsed)) {
       state$last_error <- sprintf(
-        "Batch %d (%s) returned unparseable JSON. Click 'Produce template now' to retry.",
-        i, level)
+        "Batch %d (%s) returned unparseable JSON. Click 'Produce template now' to retry — the %d batch(es) that already succeeded this session are cached and won't be re-billed.",
+        i, level, length(state$batch_parts))
       return()
     }
     # Tag the requested aggregation_level on the part so the merge step
     # can verify the model emitted rows for the right level.
     batch_parsed$.requested_aggregation_level <- level
     parts[[i]] <- batch_parsed
+    # Cache the successful batch so a retry doesn't re-pay for it.
+    state$batch_parts[[level]] <- batch_parsed
   }
 
   # ---- Stage 3: merge + validate + store --------------------------------
@@ -1195,6 +1239,10 @@ translator_chat_server <- function(input, output, session) {
 
   state$last_template_json <- merged_json
   state$last_error <- NULL
+  # Successful merge — clear the per-batch cache. The next emission
+  # (e.g. a follow-up clarification + re-run) should be fresh, not
+  # reuse parts that were keyed against a now-stale conversation state.
+  state$batch_parts <- list()
 
   # Append a short summary message to the chat history so the user sees
   # progress + the Download button. Mirrors the legacy single-call path.
