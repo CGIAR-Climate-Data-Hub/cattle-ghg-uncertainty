@@ -858,8 +858,26 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
 anthropic_chat_batch_template_force <- function(messages,
                                                   on_chunk = function(text) {},
                                                   model = .ANTHROPIC_DEFAULT_MODEL,
-                                                  max_tokens = 24000,
-                                                  timeout_sec = 300) {
+                                                  # 2026-06-11 bump: was 24000.
+                                                  # Lolita's extensive_trad batch
+                                                  # (6 sub-cats x 25 params + 48
+                                                  # MMS + 33-year x 6 sub-cat x
+                                                  # ~5 TS params = ~40K output
+                                                  # tokens) truncated at 24K and
+                                                  # produced unparseable JSON.
+                                                  # 48K covers the largest
+                                                  # realistic single-aggregation
+                                                  # level emission with 2x
+                                                  # headroom.
+                                                  max_tokens = 48000,
+                                                  # 2026-06-11 bump: was 300s.
+                                                  # extensive_trad's ~40K output
+                                                  # at Sonnet's ~35 tok/sec is
+                                                  # ~1000s. 900s allowed the
+                                                  # other 4 batches to finish
+                                                  # but starved extensive_trad
+                                                  # if it got close to its cap.
+                                                  timeout_sec = 900) {
   input_schema <- list(
     type = "object",
     properties = list(
