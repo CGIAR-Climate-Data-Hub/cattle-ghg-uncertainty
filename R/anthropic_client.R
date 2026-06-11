@@ -76,6 +76,46 @@
   ))
 }
 
+# Add cache_control: ephemeral to the LAST entry of the messages array
+# so the conversation prefix is cached too. Without this, each new turn
+# re-pays the full input cost for every prior user + assistant message
+# (15 USD/M for Opus 4.8). With this, every subsequent turn within 5
+# minutes reads the prior history at 10% of input price — typical 90%
+# saving on multi-turn conversations.
+#
+# Anthropic accepts up to 4 cache breakpoints per request. We're using
+# one on the system prompt and one here on the last message — leaves
+# two spare for future use.
+#
+# IMPORTANT: the cache_control marker MUST be present on every request
+# that wants to read the cache. Anthropic only consults the cache at a
+# block flagged with cache_control. The 1024-token minimum applies to
+# the CUMULATIVE prefix (system + messages up to the marked block), NOT
+# to the marked block alone — so we mark the last message regardless of
+# its size. Short final messages (a one-word reply like "go") still let
+# the cache for all prior turns hit. Skipping the marker on short
+# messages was the bug in the first attempt — turn 2 missed the cache
+# entirely.
+#
+# The content of the marked message must be a content-block array
+# {type:"text", text:..., cache_control:...}. Anthropic accepts both
+# string and block-array forms for input messages; we convert the
+# marked one.
+.anthropic_cache_last_message <- function(messages) {
+  n <- length(messages)
+  if (n == 0) return(messages)
+  last <- messages[[n]]
+  content <- last$content %||% ""
+  if (!is.character(content)) return(messages)  # already a block array
+  if (!nzchar(content)) return(messages)
+  messages[[n]]$content <- list(list(
+    type = "text",
+    text = content,
+    cache_control = list(type = "ephemeral")
+  ))
+  messages
+}
+
 # Cost in USD for a usage tuple, taking Anthropic's prompt-cache discount
 # into account. Usage shape (from the API response):
 #   $input_tokens                 — non-cached input
@@ -166,7 +206,7 @@ anthropic_chat <- function(messages,
   body <- list(
     model       = model,
     max_tokens  = max_tokens,
-    messages    = split$messages
+    messages    = .anthropic_cache_last_message(split$messages)
   )
   if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
     body$temperature <- temperature
@@ -271,7 +311,7 @@ anthropic_chat_stream <- function(messages,
   body <- list(
     model       = model,
     max_tokens  = max_tokens,
-    messages    = split$messages,
+    messages    = .anthropic_cache_last_message(split$messages),
     stream      = TRUE
   )
   if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
