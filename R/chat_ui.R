@@ -193,16 +193,28 @@ translator_chat_server <- function(input, output, session) {
                error = function(e) NULL)
       return()
     }
-    # Build a single user-message that includes a preview of EVERY
-    # non-empty sheet. For multi-sheet files this is the only way the
-    # AI gets to see all the data on the first round.
-    sheet_blocks <- lapply(parsed$sheets, function(s) {
+    # Build a single user-message containing every non-empty sheet as a
+    # structured JSON object. This replaces the markdown-table dump that
+    # Andy's 26-sub-cat Zambia file was getting lost in: with JSON, the
+    # model can answer "what's at row 282?" by direct lookup against
+    # sheets[<name>].rows["282"] rather than scanning a flat table. The
+    # JSON shape is documented on .translator_table_to_json() above.
+    sheet_json_objs <- lapply(parsed$sheets, function(s) {
+      .translator_table_to_json(s$preview, sheet_name = s$name)
+    })
+    # Assemble into one JSON envelope: {"file": "...", "sheets": [ ... ]}.
+    # We can't just paste raw JSON strings together — they need to be a
+    # proper array — so re-parse each and re-serialise the wrapper. The
+    # rebuild is cheap and avoids hand-assembling brackets/commas.
+    sheets_json <- paste0("[", paste(sheet_json_objs, collapse = ","), "]")
+    # Also keep a compact human-readable per-sheet header block so the
+    # AI sees sheet dimensions up front without parsing the JSON first.
+    sheet_headers <- vapply(parsed$sheets, function(s) {
       sheet_label <- if (is.na(s$name) || !nzchar(s$name %||% ""))
         "(file contents)" else sprintf("Sheet \"%s\"", s$name)
-      sprintf("### %s (%d rows × %d columns, first %d shown)\n\n%s",
-              sheet_label, s$n_rows, s$n_cols, nrow(s$preview),
-              .translator_table_to_md(s$preview))
-    })
+      sprintf("- %s: %d rows × %d columns (first %d shown in JSON)",
+              sheet_label, s$n_rows, s$n_cols, nrow(s$preview))
+    }, character(1))
     # Server-side scan: explicitly tell the AI which canonical parameters
     # appear ANYWHERE in the file. Defense against the previous failure
     # mode where the AI mapped only the first parameter block (LW / WG /
@@ -211,10 +223,11 @@ translator_chat_server <- function(input, output, session) {
     detected <- .translator_scan_param_labels(parsed$sheets)
     detect_block <- if (length(detected) == 0) "" else paste0(
       "## Parameter labels DETECTED IN THIS FILE (server-side scan)\n\n",
-      "These IPCC parameters appear somewhere in the file — search the ",
-      "preview tables below for them and map EVERY one. If you cannot ",
-      "find the row a label refers to, ask before defaulting to IPCC ",
-      "values:\n\n",
+      "These IPCC parameters appear somewhere in the file — find them in ",
+      "the structured-JSON sheet objects below (look up the relevant ",
+      "row by its row-number key under `sheets[<sheet>].rows`) and map ",
+      "EVERY one. If you cannot find the row a label refers to, ask ",
+      "before defaulting to IPCC values:\n\n",
       paste0("- ", detected, collapse = "\n"),
       "\n\nDo NOT substitute IPCC defaults for any parameter on this ",
       "list — the user's file has a value for it.\n\n---\n\n")
@@ -263,14 +276,31 @@ translator_chat_server <- function(input, output, session) {
       "- Per-sub-cat vs herd-wide allocations (MMS rows apply to everyone or per group?)\n\n",
       "End with a one-line prompt to the user: \"Please answer the section D questions, then click **Produce template now** when ready.\"\n\n",
       "---\n\n")
+    # Build the file-content block: short per-sheet header line, then one
+    # fenced ```json``` block containing the array of sheet objects. The
+    # AI can navigate by sheets[i].rows["<row_number>"] for direct cell
+    # lookup — see .translator_table_to_json() above.
+    file_block <- paste0(
+      "## File contents (pre-parsed)\n\n",
+      "Sheets in this file:\n",
+      paste(sheet_headers, collapse = "\n"),
+      "\n\nThe full sheet data is in the JSON object below. Use it as ",
+      "your source of truth: `sheets[i].sheet` is the sheet name, ",
+      "`sheets[i].headers` is the column header row, and ",
+      "`sheets[i].rows[\"<excel_row_number>\"]` gives you each row of ",
+      "data keyed by its actual Excel row number (row 1 = header, ",
+      "data starts at row 2). NA cells are dropped from each row object.\n\n",
+      "```json\n",
+      "{\n  \"file\": \"", fi$name, "\",\n  \"sheets\": ", sheets_json, "\n}\n",
+      "```\n\n---\n\n")
     user_msg <- sprintf(
-      "I have uploaded a file (%s) with %d sheet%s. The contents are below.\n\n%s%s%s",
+      "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s",
       fi$name,
       parsed$n_total_sheets,
       if (parsed$n_total_sheets == 1L) "" else "s",
       exploration_block,
       detect_block,
-      paste(sheet_blocks, collapse = "\n\n---\n\n"))
+      file_block)
     # The on-screen "display" stays terse — the user doesn't want a wall
     # of markdown tables in their own bubble; only the AI needs that.
     # We also tell the user what's coming next so the AI's exploration
@@ -736,6 +766,8 @@ translator_chat_server <- function(input, output, session) {
 }
 
 # Render a small data.frame as a markdown table the LLM can read.
+# DEPRECATED 2026-06-11: superseded by .translator_table_to_json() below.
+# Kept for reference / fallback; no longer called from the upload handler.
 .translator_table_to_md <- function(df) {
   if (is.null(df) || nrow(df) == 0) return("(empty data)")
   hdr <- paste("|", paste(names(df), collapse = " | "), "|")
@@ -750,6 +782,69 @@ translator_chat_server <- function(input, output, session) {
     }), collapse = " | "), "|")
   }, character(1))
   paste(c(hdr, sep, rows), collapse = "\n")
+}
+
+# Render a sheet as a structured JSON object the LLM can navigate by
+# (sheet, row, column). Replaces the markdown table because Andy's Zambia
+# inventory (26 sub-categories) was losing rows in the flat markdown
+# representation — the model couldn't reliably look up a specific row by
+# number once the sheet exceeded ~30 rows.
+#
+# Output shape (one sheet):
+#
+#   {
+#     "sheet": "Sheet1",
+#     "n_rows": 45,
+#     "n_cols": 38,
+#     "headers": ["Parameter", "Sub-category", ...],
+#     "rows": {
+#       "2": {"Parameter": "BW", "Sub-category": "Cows", "Cows Mean": 312.78, ...},
+#       "3": {...}
+#     }
+#   }
+#
+# Row keys are the Excel row numbers (starting at 2 because row 1 is the
+# header that became `headers`). NA cells are dropped from each row object
+# to keep the JSON compact and the meaningful values visible. The
+# upload-handler call (around chat_ui.R:200) wraps the per-sheet JSON in a
+# single ```json``` fenced block under the EXPLORATION instruction.
+#
+# 2026-06-11: 1000-row cap matches .translator_read_upload's ROW_CAP so we
+# never silently truncate below what the reader produced.
+.translator_table_to_json <- function(df, sheet_name = NA_character_) {
+  if (is.null(df) || nrow(df) == 0) {
+    return(jsonlite::toJSON(list(
+      sheet = sheet_name,
+      n_rows = 0L, n_cols = 0L,
+      headers = character(0),
+      rows = setNames(list(), character(0))
+    ), auto_unbox = TRUE, na = "null", pretty = FALSE))
+  }
+  headers <- names(df)
+  n <- min(nrow(df), 1000L)
+  # Row keys = Excel row numbers (header is row 1, data starts at row 2).
+  # Drop NA cells so the JSON stays compact and only the meaningful values
+  # are in front of the model.
+  rows <- setNames(
+    lapply(seq_len(n), function(i) {
+      cells <- as.list(df[i, , drop = FALSE])
+      # Convert each cell to a scalar (jsonlite would otherwise wrap
+      # length-1 atomic vectors as JSON arrays).
+      cells <- lapply(cells, function(x) if (length(x) == 1) unname(x) else x)
+      keep <- vapply(cells, function(x)
+        !(length(x) == 0 || (length(x) == 1 && (is.na(x) ||
+          (is.character(x) && !nzchar(x))))), logical(1))
+      cells[keep]
+    }),
+    as.character(seq_len(n) + 1L)  # +1 because row 1 = headers
+  )
+  jsonlite::toJSON(list(
+    sheet = sheet_name,
+    n_rows = nrow(df),
+    n_cols = ncol(df),
+    headers = headers,
+    rows = rows
+  ), auto_unbox = TRUE, na = "null", pretty = FALSE)
 }
 
 # Make the API call from the current message stack, stream the reply

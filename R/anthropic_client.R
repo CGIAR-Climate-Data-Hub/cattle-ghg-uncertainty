@@ -31,7 +31,14 @@
   "claude-haiku-4-5-20251001" = list(input = 1.00, output = 5.00,
                                          cache_read = 0.10, cache_write = 1.25)
 )
-.ANTHROPIC_DEFAULT_MODEL <- "claude-opus-4-8"
+# 2026-06-11: switched from Opus 4.8 to Sonnet 4.6 after Andy's 26-sub-cat
+# Zambia file timed out at 900s on Opus and a 10-sub-cat fallback returned
+# only 2 of 10 sub-categories. Same task ran fine on claude.ai web (Sonnet).
+# Sonnet 4.6 is ~2x faster, 5x cheaper, and at least as disciplined as Opus
+# on schema-bound emission. Chat reasoning quality is slightly less than
+# Opus but acceptable for this protocol-following workflow. Flip back to
+# Opus 4.8 if real-world quality drops noticeably.
+.ANTHROPIC_DEFAULT_MODEL <- "claude-sonnet-4-6"
 .ANTHROPIC_ENDPOINT      <- "https://api.anthropic.com/v1/messages"
 .ANTHROPIC_VERSION       <- "2023-06-01"
 
