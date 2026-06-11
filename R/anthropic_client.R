@@ -301,6 +301,16 @@ anthropic_chat <- function(messages,
 #   event: message_stop
 anthropic_chat_stream <- function(messages,
                                    on_chunk = function(text) {},
+                                   # Optional keep-alive callback fired on
+                                   # every input_json_delta event during a
+                                   # tool_use stream. Text streams call
+                                   # on_chunk for every token (which is
+                                   # already a heartbeat). Tool_use streams
+                                   # accumulate JSON silently — without
+                                   # on_tick the user sees a frozen UI for
+                                   # the entire 5-15 min force-template
+                                   # emission. Default: no-op.
+                                   on_tick = function() {},
                                    model = .ANTHROPIC_DEFAULT_MODEL,
                                    max_tokens = 16000,
                                    temperature = 0.2,
@@ -417,6 +427,12 @@ anthropic_chat_stream <- function(messages,
           } else if (identical(d$type, "input_json_delta") &&
                       !is.null(d$partial_json)) {
             tool_json_acc <<- paste0(tool_json_acc, d$partial_json)
+            # Keep-alive: tool_use streams produce no on_chunk callback,
+            # so without this the UI freezes for the entire emission.
+            tryCatch(on_tick(), error = function(e) {
+              message("translator stream on_tick error: ",
+                      conditionMessage(e))
+            })
           }
         }
         # message_delta carries final output_tokens (+ stop_reason).
@@ -792,6 +808,7 @@ anthropic_chat_template_force <- function(messages,
 # only once (the per-batch calls don't emit it).
 anthropic_chat_enumerate_aggregation_levels <- function(messages,
                                                           on_chunk = function(text) {},
+                                                          on_tick  = function() {},
                                                           model = .ANTHROPIC_DEFAULT_MODEL,
                                                           max_tokens = 4000,
                                                           timeout_sec = 120) {
@@ -829,6 +846,7 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
   anthropic_chat_stream(
     messages    = messages,
     on_chunk    = on_chunk,
+    on_tick     = on_tick,
     model       = model,
     max_tokens  = max_tokens,
     temperature = 0,
@@ -857,6 +875,7 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
 # the batch path and the user should split the file further upstream.
 anthropic_chat_batch_template_force <- function(messages,
                                                   on_chunk = function(text) {},
+                                                  on_tick  = function() {},
                                                   model = .ANTHROPIC_DEFAULT_MODEL,
                                                   # 2026-06-11 bump: was 24000.
                                                   # Lolita's extensive_trad batch
@@ -893,9 +912,30 @@ anthropic_chat_batch_template_force <- function(messages,
       manure_management = list(type = "array",
                                 items = .ANTHROPIC_MANURE_ITEM_SCHEMA),
       parameter_timeseries = list(type = "array",
-                                    items = .ANTHROPIC_TIMESERIES_ITEM_SCHEMA)
+                                    items = .ANTHROPIC_TIMESERIES_ITEM_SCHEMA,
+                                    description = paste(
+                                      "Activity-data time series for THIS",
+                                      "aggregation_level. If the source",
+                                      "file has multi-year data (column or",
+                                      "rows spanning multiple years), emit",
+                                      "one row per (sub_category, year).",
+                                      "If the file is a single-year",
+                                      "snapshot, emit one row per",
+                                      "sub_category for the inventory",
+                                      "year. Empty array [] only when the",
+                                      "file genuinely has no activity-data",
+                                      "fields at all (extremely rare).",
+                                      "Server warns when this comes back",
+                                      "empty for an inventory the",
+                                      "discovery call flagged as",
+                                      "multi-year."))
     ),
-    required = I(c("aggregation_level", "parameters"))
+    # parameter_timeseries is required (even an empty [] forces the
+    # model to make an explicit decision instead of silently dropping
+    # the field — the Zambia 2026-06-11 run produced 0 TS rows because
+    # the field was optional and Sonnet skipped it entirely).
+    required = I(c("aggregation_level", "parameters",
+                    "parameter_timeseries"))
   )
 
   tool_def <- list(list(
@@ -913,6 +953,7 @@ anthropic_chat_batch_template_force <- function(messages,
   anthropic_chat_stream(
     messages    = messages,
     on_chunk    = on_chunk,
+    on_tick     = on_tick,
     model       = model,
     max_tokens  = max_tokens,
     temperature = 0,

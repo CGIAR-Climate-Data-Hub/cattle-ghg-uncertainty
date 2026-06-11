@@ -438,10 +438,12 @@ translator_chat_server <- function(input, output, session) {
       # technical detail goes behind a collapsible <details> element.
       visible <- m$display %||% m$content
       hidden  <- NULL
+      summary_label <- "Show structure / details"
       if (identical(m$role, "assistant")) {
         split <- .translator_split_visible_hidden(m$content, m$display)
         visible <- split$visible
         hidden  <- split$hidden
+        summary_label <- split$summary %||% summary_label
       }
       tags$div(
         style = paste("max-width:80%; margin:6px 0; padding:10px 14px;",
@@ -454,7 +456,7 @@ translator_chat_server <- function(input, output, session) {
             style = "margin-top:10px; font-size:0.82rem; color:#2D6A4F;",
             tags$summary(
               style = "cursor:pointer; user-select:none; font-weight:500;",
-              "Show structure / details"),
+              summary_label),
             tags$pre(
               style = "background:#FFFFFF; border:1px solid #C8E6C9;
                        padding:8px 10px; border-radius:6px; margin-top:6px;
@@ -917,8 +919,10 @@ translator_chat_server <- function(input, output, session) {
     state$last_error <- resp$error
     # If we got at least some text before the error, still save it.
     if (!is.null(resp$reply) && nzchar(resp$reply)) {
+      err_display <- .translator_extract_numbered_questions(resp$reply) %||%
+                     resp$reply
       state$messages[[length(state$messages) + 1]] <-
-        list(role = "assistant", content = resp$reply, display = resp$reply)
+        list(role = "assistant", content = resp$reply, display = err_display)
     }
     return()
   }
@@ -962,10 +966,19 @@ translator_chat_server <- function(input, output, session) {
   # Append assistant message to history. The renderUI for translator_messages
   # will redraw and the streaming bubble (still in the DOM from the JS
   # handler) gets replaced by the freshly-rendered history.
+  #
+  # Numbered-question display filter: when the AI's reply is dominated
+  # by a numbered list (e.g. "Section D — Ambiguities" with 4-10
+  # clarification questions wrapped in 200 words of preamble +
+  # postamble), set display to just the numbered items. The full reply
+  # stays in `content` so the chat-bubble expander surfaces it on
+  # demand.
+  display_text <- .translator_extract_numbered_questions(resp$reply) %||%
+                  resp$reply
   state$messages[[length(state$messages) + 1]] <-
     list(role = "assistant",
           content = resp$reply,
-          display = resp$reply)
+          display = display_text)
 
   # If a valid template-ready block came through in this reply, post a
   # separate small AI message pointing the user at the green Download
@@ -1057,6 +1070,16 @@ translator_chat_server <- function(input, output, session) {
                                          list(chars = total_chars)),
               error = function(e) NULL)
   }
+  # Keep-alive callback for tool_use streams (input_json_delta events).
+  # The text-chunk path above never fires during force-template because
+  # the model emits its output via tool_use, not free text. on_tick
+  # fires the JS watchdog reset so the animated dots in the typing
+  # bubble stay alive for the full 5-15 minute emission instead of
+  # looking frozen after the first second.
+  on_tick_cb <- function() {
+    tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
+              error = function(e) NULL)
+  }
 
   # ---- Stage 1: discovery call ------------------------------------------
   # Cheap (~200 output tokens). Asks the model to enumerate the
@@ -1087,7 +1110,7 @@ translator_chat_server <- function(input, output, session) {
     system_prompt, history = state$messages,
     new_user_message = discovery_request)
   enum_resp <- anthropic_chat_enumerate_aggregation_levels(
-    discovery_msgs, on_chunk = on_chunk_cb)
+    discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb)
 
   if (!is.null(enum_resp$error)) {
     # Discovery itself failed — fall back to the monolithic path. The
@@ -1176,18 +1199,28 @@ translator_chat_server <- function(input, output, session) {
       "Set its `aggregation_level` field to '%s' so the server can",
       "verify no cross-contamination at merge time.",
       "",
+      "parameter_timeseries is REQUIRED in this call (the schema",
+      "enforces it). If the source file has multi-year activity data",
+      "for '%s' (e.g. population counts, milk yield, body weight by",
+      "year), you MUST emit one parameter_timeseries row per",
+      "(sub_category, year). If the file is a single-year snapshot,",
+      "emit one row per sub_category for the inventory year. Return",
+      "an empty array [] only if the file genuinely has no",
+      "activity-data fields at all — but Zambia-style inventories",
+      "always have at least N, BW, Milk per year.",
+      "",
       "All other emission rules from the system prompt still apply:",
       "source-of-truth hierarchy (user_file > user_chat >",
       "ipcc_default), data_source tagging on every row, asymmetric",
       "bounds where the file provides them, 25 parameters per",
       "sub-category, biological zeros with distribution='constant'.",
       sep = "\n"),
-      i, length(agg_levels), level, level, level)
+      i, length(agg_levels), level, level, level, level)
     batch_msgs <- anthropic_build_messages(
       system_prompt, history = state$messages,
       new_user_message = batch_nudge)
     batch_resp <- anthropic_chat_batch_template_force(
-      batch_msgs, on_chunk = on_chunk_cb)
+      batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb)
 
     if (!is.null(batch_resp$error)) {
       state$last_error <- sprintf(
@@ -1252,6 +1285,22 @@ translator_chat_server <- function(input, output, session) {
     nrow(merged$manure_management) else length(merged$manure_management)
   n_ts <- if (is.data.frame(merged$parameter_timeseries))
     nrow(merged$parameter_timeseries) else length(merged$parameter_timeseries)
+  # Soft warning: if the AI returned 0 TS rows but we had >=2 aggregation
+  # levels, the inventory is very likely multi-year and the AI just
+  # silently dropped the field. Surface a non-blocking info bubble so the
+  # user notices before download (the download itself proceeds — partial
+  # data is better than no data).
+  if (n_ts == 0L && length(agg_levels) >= 2L) {
+    tryCatch(session$sendCustomMessage(
+      "translatorAppendInfoBubble",
+      paste("Heads up: the AI emitted 0 time-series rows. If your source",
+            "file has multi-year activity data, this means the AI didn't",
+            "extract it. The downloaded template will still work but the",
+            "calculator won't be able to run correlation-based",
+            "uncertainty modes. Click 'Produce template now' to retry —",
+            "the batches that already succeeded won't be re-billed.")),
+      error = function(e) NULL)
+  }
   download_hint <- sprintf(paste(
     "Template ready. Emitted %d parameter rows, %d manure_management",
     "rows, and %d time-series rows across %d aggregation_levels (%s).",
@@ -1745,13 +1794,42 @@ translator_chat_server <- function(input, output, session) {
     writeLines(json_text, file_path); return(invisible(NULL))
   }
 
-  ok <- tryCatch({
-    .translator_write_official_template(parsed, file_path); TRUE
-  }, error = function(e) {
-    message("translator: official-template write failed: ",
-            conditionMessage(e), " — falling back to simple xlsx.")
-    FALSE
-  })
+  # Run the official writer under a calling handler so a thrown error
+  # captures the FULL call stack (R function names + line numbers) into
+  # shinyapps.io logs. The previous tryCatch only logged
+  # conditionMessage(), which on the Zambia run produced just "no such
+  # index at level 1" with no clue where it came from — local repros
+  # of the same input data succeeded. The withCallingHandlers below
+  # snapshots sys.calls() at the throw site BEFORE control unwinds to
+  # the tryCatch's error handler, so the next failure pinpoints the
+  # exact line. Kept in permanently — silent on the happy path,
+  # informative on regression.
+  writer_trace <- NULL
+  ok <- tryCatch(
+    withCallingHandlers(
+      { .translator_write_official_template(parsed, file_path); TRUE },
+      error = function(e) {
+        # Capture the active call stack at the throw site. sys.calls()
+        # returns the deparsed chain; we drop the noisy outermost
+        # frames (tryCatch/withCallingHandlers/this handler) and keep
+        # the innermost ~25 frames where the actual failure lives.
+        cs <- sys.calls()
+        depth <- length(cs)
+        keep <- max(1L, depth - 25L):depth
+        writer_trace <<- paste(vapply(cs[keep], function(call)
+          paste(deparse(call, nlines = 2L), collapse = " "),
+          character(1)), collapse = "\n  > ")
+      }
+    ),
+    error = function(e) {
+      message("translator: official-template write failed: ",
+              conditionMessage(e),
+              " — falling back to simple xlsx.\n",
+              "Writer call stack (innermost last):\n  > ",
+              writer_trace %||% "(no stack captured)")
+      FALSE
+    }
+  )
   if (!ok) .translator_write_simple_xlsx(parsed, file_path)
   invisible(NULL)
 }
@@ -1785,7 +1863,8 @@ translator_chat_server <- function(input, output, session) {
   #   row 2 Country / row 3 Region / row 4 Year / row 5 Species /
   #   row 6 IPCC version / row 7 Prepared by / row 8 Notes
   .put_meta <- function(row, val) {
-    if (is.null(val) || (is.character(val) && !nzchar(val))) return()
+    val <- .translator_scalar(val)
+    if (is.na(val) || (is.character(val) && !nzchar(val))) return()
     openxlsx::writeData(wb, "Inventory_Metadata", val,
                         startRow = row, startCol = 3, colNames = FALSE)
   }
@@ -1878,9 +1957,9 @@ translator_chat_server <- function(input, output, session) {
         # values that the blank template pre-fills.
         if (!is.null(ai)) {
           .put_param <- function(col_idx, v) {
-            if (is.null(v) || length(v) == 0) return()
-            if (is.na(v[1]) || (is.character(v[1]) && !nzchar(v[1]))) return()
-            openxlsx::writeData(wb, "Parameters", v[1],
+            v <- .translator_scalar(v)
+            if (is.na(v) || (is.character(v) && !nzchar(v))) return()
+            openxlsx::writeData(wb, "Parameters", v,
                                 startRow = r, startCol = col_idx,
                                 colNames = FALSE)
           }
@@ -1902,9 +1981,9 @@ translator_chat_server <- function(input, output, session) {
     for (i in seq_len(nrow(mm))) {
       r <- MM_DATA_START + i - 1L
       .put_mm <- function(col_idx, v) {
-        if (is.null(v) || length(v) == 0) return()
-        if (is.na(v[1]) || (is.character(v[1]) && !nzchar(v[1]))) return()
-        openxlsx::writeData(wb, "Manure_Management", v[1],
+        v <- .translator_scalar(v)
+        if (is.na(v) || (is.character(v) && !nzchar(v))) return()
+        openxlsx::writeData(wb, "Manure_Management", v,
                             startRow = r, startCol = col_idx,
                             colNames = FALSE)
       }
@@ -1961,9 +2040,9 @@ translator_chat_server <- function(input, output, session) {
     for (i in seq_len(nrow(ts))) {
       r <- TS_DATA_START + i - 1L
       .put_ts <- function(col_idx, v) {
-        if (is.null(v) || length(v) == 0) return()
-        if (is.na(v[1]) || (is.character(v[1]) && !nzchar(v[1]))) return()
-        openxlsx::writeData(wb, "Parameter_TimeSeries", v[1],
+        v <- .translator_scalar(v)
+        if (is.na(v) || (is.character(v) && !nzchar(v))) return()
+        openxlsx::writeData(wb, "Parameter_TimeSeries", v,
                             startRow = r, startCol = col_idx,
                             colNames = FALSE)
       }
@@ -2031,10 +2110,77 @@ translator_chat_server <- function(input, output, session) {
   writexl::write_xlsx(sheets, path = file_path)
 }
 
+# Extract just the numbered clarification items from an AI reply, when
+# the reply is dominated by a numbered list (e.g. "Section D —
+# Ambiguities" with 4-10 questions wrapped in 200 words of preamble and
+# postamble). Returns the extracted block, or NULL when the filter
+# decides the reply is mostly prose and should display as-is.
+#
+# Heuristic gates (all must pass for filtering to engage):
+#   - At least 2 numbered items found (`^\s*\d+\.\s+...`).
+#   - The matched-block character count is >= 30% of the total reply.
+#     Prevents one-off mentions like "see step 1." from triggering.
+#
+# Each numbered block captures the leading "1." line plus any
+# continuation lines (indented, blank, or starting with a "-" / "*"
+# bullet) until the next numbered item or two consecutive blank lines.
+.translator_extract_numbered_questions <- function(content) {
+  if (is.null(content) || !nzchar(content)) return(NULL)
+  total_chars <- nchar(content)
+  if (total_chars < 80L) return(NULL)  # too short to need filtering
+  lines <- strsplit(content, "\n", fixed = TRUE)[[1]]
+  is_numbered <- grepl("^\\s{0,3}\\d+\\.\\s+\\S", lines, perl = TRUE)
+  if (sum(is_numbered) < 2L) return(NULL)
+  # Walk through lines and assemble blocks: each block starts at a
+  # numbered line and extends to (but not including) the next numbered
+  # line OR a run of >=2 blank lines, whichever comes first.
+  blocks <- list()
+  in_block <- FALSE
+  cur <- character(0)
+  blank_streak <- 0L
+  for (i in seq_along(lines)) {
+    ln <- lines[i]
+    if (is_numbered[i]) {
+      if (in_block && length(cur) > 0) {
+        blocks[[length(blocks) + 1L]] <- paste(cur, collapse = "\n")
+      }
+      in_block <- TRUE
+      cur <- ln
+      blank_streak <- 0L
+    } else if (in_block) {
+      if (!nzchar(trimws(ln))) {
+        blank_streak <- blank_streak + 1L
+        if (blank_streak >= 2L) {
+          blocks[[length(blocks) + 1L]] <- paste(cur, collapse = "\n")
+          in_block <- FALSE
+          cur <- character(0)
+          blank_streak <- 0L
+        } else {
+          cur <- c(cur, ln)
+        }
+      } else {
+        blank_streak <- 0L
+        cur <- c(cur, ln)
+      }
+    }
+  }
+  if (in_block && length(cur) > 0L) {
+    blocks[[length(blocks) + 1L]] <- paste(cur, collapse = "\n")
+  }
+  if (length(blocks) < 2L) return(NULL)
+  joined <- paste(vapply(blocks, function(b) trimws(b), character(1)),
+                  collapse = "\n\n")
+  # 30% gate: extracted block must be substantial relative to the full
+  # reply. Otherwise the AI is mostly explaining and the numbered list
+  # is incidental — show the full prose instead.
+  if (nchar(joined) < 0.30 * total_chars) return(NULL)
+  joined
+}
+
 # Split an assistant message into a clean "visible" part and a hidden
 # "details/structure" part.
 #
-# Three cases the message bubble UI cares about:
+# Four cases the message bubble UI cares about:
 #
 #   1. Force-template path  : m$content is pure JSON (json_schema mode),
 #                              m$display is "Template ready..." text.
@@ -2044,14 +2190,21 @@ translator_chat_server <- function(input, output, session) {
 #                              -> visible = the prose with the fence
 #                                 stripped out, hidden = the JSON.
 #
-#   3. Normal reply, no fence:
+#   3. Numbered-question filter (added 2026-06-11): m$display is the
+#                              extracted numbered items, m$content is
+#                              the full prose+questions reply.
+#                              -> visible = m$display,
+#                                 hidden  = m$content (full reply
+#                                           surfaced via expander).
+#
+#   4. Normal reply, no fence:
 #                              -> visible = m$content (or m$display),
 #                                 hidden = NULL (no expander shown).
 #
 # Returns a list with $visible (character) and $hidden (character or NULL).
 .translator_split_visible_hidden <- function(content, display = NULL) {
   fallback <- list(visible = display %||% content %||% "",
-                   hidden  = NULL)
+                   hidden  = NULL, summary = "Show structure / details")
   if (is.null(content) || !nzchar(content)) return(fallback)
 
   # Case 1: pure-JSON body + a separate display message. Detected when
@@ -2059,7 +2212,8 @@ translator_chat_server <- function(input, output, session) {
   if (!is.null(display) && nzchar(display) && !identical(display, content)) {
     trimmed <- trimws(content)
     if (startsWith(trimmed, "{") && endsWith(trimmed, "}")) {
-      return(list(visible = display, hidden = trimmed))
+      return(list(visible = display, hidden = trimmed,
+                   summary = "Show structure / details"))
     }
   }
 
@@ -2078,7 +2232,16 @@ translator_chat_server <- function(input, output, session) {
     visible <- gsub("\\n{3,}", "\n\n", trimws(visible))
     return(list(visible = if (nzchar(visible)) visible
                             else "Template ready — click the green download button below to get the .xlsx.",
-                hidden = trimws(inner)))
+                hidden = trimws(inner),
+                summary = "Show structure / details"))
+  }
+
+  # Case 3: display is the numbered-question extract, content is the
+  # full prose reply. Surface the full reply in the expander so the
+  # user can read the preamble / postamble on demand.
+  if (!is.null(display) && nzchar(display) && !identical(display, content)) {
+    return(list(visible = display, hidden = trimws(content),
+                 summary = "Show full reply"))
   }
 
   fallback
@@ -2250,6 +2413,22 @@ translator_chat_server <- function(input, output, session) {
   )
 }
 
+# Coerce any JSON-roundtripped value to a length-1 atomic safe to hand
+# to openxlsx::writeData. Handles every shape we've seen from
+# jsonlite::fromJSON(simplifyVector=TRUE): NULL, NA, length-0 vector,
+# scalar, length>N vector (we keep the first element), list-of-1,
+# nested list, even a 1-row data.frame fragment. The writeData call
+# below used to throw "no such index at level 1" when a cell value
+# was a list-column (production-only — local repros couldn't trigger
+# it because the local data came from a flattened simple_xlsx).
+.translator_scalar <- function(v) {
+  if (is.null(v))           return(NA)
+  if (length(v) == 0L)      return(NA)
+  if (is.data.frame(v))     return(.translator_scalar(v[1, 1]))
+  if (is.list(v))           return(.translator_scalar(v[[1]]))
+  v[[1]]
+}
+
 # Convert a list-of-records (named lists, one per row) into a data.frame
 # with NA-filled missing fields. Pass-through if already a data.frame.
 # Returns NULL on empty / unrecognized input.
@@ -2274,10 +2453,7 @@ translator_chat_server <- function(input, output, session) {
   rows <- lapply(x, function(r) {
     if (!is.list(r) || is.null(names(r))) return(NULL)
     vals <- setNames(vector("list", length(all_names)), all_names)
-    for (nm in all_names) {
-      v <- r[[nm]]
-      vals[[nm]] <- if (is.null(v) || length(v) == 0) NA else v[[1]]
-    }
+    for (nm in all_names) vals[[nm]] <- .translator_scalar(r[[nm]])
     as.data.frame(vals, stringsAsFactors = FALSE)
   })
   rows <- rows[!vapply(rows, is.null, logical(1))]

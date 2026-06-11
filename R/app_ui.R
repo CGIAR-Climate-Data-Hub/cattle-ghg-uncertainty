@@ -60,6 +60,69 @@ app_ui <- function(request = NULL) {
          //   translatorStreamEnd   : drop the reference to the active
          //                            bubble (next round starts fresh).
          var _translatorActiveBubble = null;
+         // 2026-06-11: persistent thinking-indicator watchdog. The dots
+         // bubble painted by translatorAppendTypingBubble vanishes once
+         // the first text chunk arrives, and the AI then often pauses
+         // mid-message (Opus cache-write, network jitter, or tool_use
+         // input_json_delta events that do not trigger the text-chunk
+         // callback at all). If the user sees a static bubble for
+         // >1.5s the work looks dead even when it is not.
+         //
+         // Solution: arm a timer on every chunk arrival. If no chunk in
+         // 1.5s, append an inline animated 3-dot span at the end of
+         // the current bubble. Remove the dots when the next chunk
+         // arrives. The server also fires translatorStreamTick on
+         // every tool_use input_json_delta event, which feeds this
+         // same watchdog without exposing the JSON content.
+         var _translatorWatchdogTimer = null;
+         var _translatorWatchdogDots  = null;
+         function _translatorMakeDotsSpan() {
+           var span = document.createElement('span');
+           span.setAttribute('data-translator-thinking-dots', '1');
+           span.style.cssText = 'display:inline-flex; align-items:center;' +
+             ' gap:4px; margin-left:6px; vertical-align:middle;';
+           [0, 0.2, 0.4].forEach(function(delay) {
+             var d = document.createElement('span');
+             d.style.cssText = 'display:inline-block; width:5px; height:5px;' +
+               ' background:#2D6A4F; border-radius:50%;' +
+               ' animation: translatorDot 1.2s ease-in-out ' + delay + 's infinite;';
+             span.appendChild(d);
+           });
+           return span;
+         }
+         function _translatorClearWatchdog() {
+           if (_translatorWatchdogTimer) {
+             clearTimeout(_translatorWatchdogTimer);
+             _translatorWatchdogTimer = null;
+           }
+           if (_translatorWatchdogDots && _translatorWatchdogDots.parentNode) {
+             _translatorWatchdogDots.parentNode.removeChild(_translatorWatchdogDots);
+           }
+           _translatorWatchdogDots = null;
+         }
+         function _translatorArmWatchdog() {
+           _translatorClearWatchdog();
+           _translatorWatchdogTimer = setTimeout(function() {
+             if (!_translatorActiveBubble) return;
+             _translatorWatchdogDots = _translatorMakeDotsSpan();
+             _translatorActiveBubble.appendChild(_translatorWatchdogDots);
+             var scroller = _translatorActiveBubble.closest('[data-translator-scroller]');
+             if (scroller) scroller.scrollTop = scroller.scrollHeight;
+           }, 1500);
+         }
+         // Server keep-alive ping. Fired on every Anthropic
+         // input_json_delta event during tool_use streaming (the
+         // force-template path is otherwise text-callback-silent for
+         // its entire 5-15 min duration). No payload, just resets
+         // the watchdog so the dots stay animated.
+         Shiny.addCustomMessageHandler('translatorStreamTick', function(_unused) {
+           // If the user is on the force-template path, there's no
+           // _translatorActiveBubble yet (text chunks never arrive).
+           // The dots ARE in the upstream typing-bubble in
+           // #translator_stream_target — those animate on their own,
+           // so we just rearm the watchdog so the bubble stays alive.
+           _translatorArmWatchdog();
+         });
          Shiny.addCustomMessageHandler('translatorStreamStart', function(_unused) {
            // 2026-06-10: with Claude Opus 4.8 + prompt-cache-write, the
            // gap between StreamStart and the first chunk is now 5-15s
@@ -96,12 +159,20 @@ app_ui <- function(request = NULL) {
              container.appendChild(bubble);
              _translatorActiveBubble = bubble;
            }
+           // Clear any inline thinking-dots before appending the new
+           // text so they don't interleave with characters.
+           _translatorClearWatchdog();
            _translatorActiveBubble.textContent += text;
            // auto-scroll the surrounding message-history div
            var scroller = _translatorActiveBubble.closest('[data-translator-scroller]');
            if (scroller) scroller.scrollTop = scroller.scrollHeight;
+           // Rearm: if the next chunk takes >1.5s, dots reappear.
+           _translatorArmWatchdog();
          });
          Shiny.addCustomMessageHandler('translatorStreamEnd', function(_unused) {
+           // Streaming is done. Cancel the watchdog so no spurious dots
+           // appear after the bubble is replaced by the rendered history.
+           _translatorClearWatchdog();
            // Streaming is done. The canonical AI message is in state$messages
            // now and translator_messages has already re-rendered with it,
            // so the bubble we built up in #translator_stream_target is a
