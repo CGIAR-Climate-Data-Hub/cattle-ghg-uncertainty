@@ -304,7 +304,18 @@ anthropic_chat_stream <- function(messages,
                                    model = .ANTHROPIC_DEFAULT_MODEL,
                                    max_tokens = 16000,
                                    temperature = 0.2,
-                                   timeout_sec = 180,
+                                   # 2026-06-11: raised from 180s to 900s
+                                   # after Andy's 26-sub-cat Zambia file
+                                   # produced an exploration response that
+                                   # legitimately needed 5-8 minutes of
+                                   # streaming output (5 production systems
+                                   # x 7 sub-categories x 15 parameters =
+                                   # ~600 rows in section B alone). The
+                                   # low_speed_time=45 stall detector below
+                                   # is still the safety net — wall-clock
+                                   # only kills calls that are genuinely
+                                   # making progress for over 15 minutes.
+                                   timeout_sec = 900,
                                    max_retries = 2,
                                    tools = NULL,
                                    tool_choice = NULL) {
