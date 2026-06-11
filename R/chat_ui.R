@@ -991,11 +991,238 @@ translator_chat_server <- function(input, output, session) {
 }
 
 # Force the AI to emit the final filled-template JSON now, regardless of
-# whether it thinks it has enough info. Uses OpenAI's response_format
-# json_schema mode so the output is GUARANTEED to be valid JSON matching
-# .translator_write_template_xlsx()'s expected schema. Called only by
-# the "Produce template now" button.
+# whether it thinks it has enough info.
+#
+# 2026-06-11 (Lolita's full Zambia run): this is now a DISPATCHER. It
+# does a small Stage 1 discovery call to enumerate the aggregation_level
+# labels in the conversation; for ≤2 aggregation_levels it hands off to
+# .translator_force_template_single() (the previous monolithic path,
+# unchanged); for >2 it fires one tool_use call per aggregation_level,
+# merges the per-batch JSON pieces, and writes one .xlsx. The
+# monolithic path stays in place because its three retry loops
+# (parse / coverage / defaults-only) are correct on small inventories
+# and would add unnecessary complexity to split per-batch.
+#
+# Why: Sonnet 4.6's tool_use input_json_delta streaming runs at ~30-40
+# tokens/sec via the Anthropic API. A 27-sub-cat × 25-param emission =
+# ~34K output tokens = >900s wall-clock, which exceeds the Shiny
+# WebSocket heartbeat tolerance and breaks the session. Splitting into
+# 5 per-aggregation-level calls of ~6K tokens each (~60-90s each)
+# keeps every individual call well inside any timeout.
 .translator_force_template <- function(state, session) {
+  state$pending <- TRUE
+  state$last_error <- NULL
+  on.exit({
+    state$pending <- FALSE
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+              error = function(e) NULL)
+  })
+
+  if (budget_would_exceed()) {
+    state$last_error <- paste0(
+      "The AI translator is temporarily unavailable. ",
+      "We've been notified and will restore service shortly — ",
+      "please try again later or contact the administrator.")
+    return()
+  }
+
+  system_prompt <- tryCatch(assemble_translator_system_prompt(),
+                             error = function(e) NULL)
+  if (is.null(system_prompt)) {
+    state$last_error <- "Couldn't load the translator instructions."
+    return()
+  }
+
+  # Stream-aware progress callback shared across discovery + batch calls.
+  # Forwards each JSON chunk size to the client so the orange progress
+  # bubble shows live progress.
+  total_chars <- 0L
+  on_chunk_cb <- function(text) {
+    total_chars <<- total_chars + nchar(text)
+    tryCatch(session$sendCustomMessage("translatorProgressTick",
+                                         list(chars = total_chars)),
+              error = function(e) NULL)
+  }
+
+  # ---- Stage 1: discovery call ------------------------------------------
+  # Cheap (~200 output tokens). Asks the model to enumerate the
+  # aggregation_level labels it sees in the conversation, plus the
+  # inventory_metadata block.
+  session$sendCustomMessage("translatorAppendInfoBubble",
+    "Analysing your inventory structure...")
+  discovery_request <- paste(
+    "STEP 3 OF 3 — EMISSION SETUP. Before producing the filled template,",
+    "the in-app handler needs you to enumerate two things from this",
+    "conversation:",
+    "",
+    "  1. The distinct aggregation_level labels for this inventory, in",
+    "     snake_case, lowercase (e.g. \"commercial_dairy\",",
+    "     \"emergent_dairy\", \"commercial_beef\", \"emergent_beef\",",
+    "     \"extensive_trad\"). One entry per production system the user",
+    "     has confirmed.",
+    "  2. The inventory_metadata object: country, year (integer),",
+    "     species (cattle_dairy / cattle_non_dairy / cattle_mixed),",
+    "     ipcc_version (2006 / 2019_refinement), prepared_by (string),",
+    "     notes (string — include any caveats from the conversation).",
+    "",
+    "Call the enumerate_aggregation_levels tool exactly once. Do NOT",
+    "emit any parameters, manure_management, or time-series rows here —",
+    "those come in per-aggregation-level follow-up calls.",
+    sep = "\n")
+  discovery_msgs <- anthropic_build_messages(
+    system_prompt, history = state$messages,
+    new_user_message = discovery_request)
+  enum_resp <- anthropic_chat_enumerate_aggregation_levels(
+    discovery_msgs, on_chunk = on_chunk_cb)
+
+  if (!is.null(enum_resp$error)) {
+    # Discovery itself failed — fall back to the monolithic path. The
+    # legacy single-call body still handles small / medium inventories
+    # fine and has its own retry logic.
+    message("translator: discovery call failed (", enum_resp$error,
+            "), falling back to monolithic emission")
+    .translator_force_template_single(state, session)
+    return()
+  }
+  usage_log_append(
+    user_email         = state$user_email,
+    model              = enum_resp$model,
+    prompt_tokens      = enum_resp$usage$prompt_tokens,
+    completion_tokens  = enum_resp$usage$completion_tokens,
+    cached_tokens      = enum_resp$usage$cached_tokens %||% 0L,
+    cache_write_tokens = enum_resp$usage$cache_write_tokens %||% 0L,
+    cost_usd           = enum_resp$cost_usd)
+
+  enum_parsed <- tryCatch(
+    jsonlite::fromJSON(enum_resp$reply, simplifyVector = TRUE),
+    error = function(e) NULL)
+  agg_levels <- if (!is.null(enum_parsed))
+    as.character(enum_parsed$aggregation_levels) else character(0)
+  inventory_metadata <- if (!is.null(enum_parsed))
+    enum_parsed$inventory_metadata else NULL
+
+  # Decision: fall back to the monolithic path when batching wouldn't
+  # buy us anything (small inventories, or empty enumeration).
+  if (length(agg_levels) <= 2L) {
+    message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
+                     length(agg_levels)))
+    .translator_force_template_single(state, session)
+    return()
+  }
+
+  # ---- Stage 2: per-aggregation-level batch emission ---------------------
+  message(sprintf("translator: dispatching %d batched force-template calls (%s)",
+                   length(agg_levels), paste(agg_levels, collapse = ", ")))
+  parts <- list()
+  for (i in seq_along(agg_levels)) {
+    level <- agg_levels[i]
+    session$sendCustomMessage("translatorAppendInfoBubble",
+      sprintf("Processing %d of %d: %s...",
+              i, length(agg_levels), level))
+    # Reset per-batch char counter so the live "chars received" badge
+    # shows progress within this batch, not cumulative across batches.
+    total_chars <- 0L
+
+    batch_nudge <- sprintf(paste(
+      "STEP 3 OF 3 — BATCH %d OF %d (aggregation_level = '%s').",
+      "",
+      "Emit ONLY the parameters, manure_management, and",
+      "parameter_timeseries rows for aggregation_level = '%s'. Do NOT",
+      "include rows for any other aggregation_level. Do NOT emit",
+      "inventory_metadata (the server has it from the discovery call).",
+      "",
+      "Call the produce_aggregation_level_template tool exactly once.",
+      "Set its `aggregation_level` field to '%s' so the server can",
+      "verify no cross-contamination at merge time.",
+      "",
+      "All other emission rules from the system prompt still apply:",
+      "source-of-truth hierarchy (user_file > user_chat >",
+      "ipcc_default), data_source tagging on every row, asymmetric",
+      "bounds where the file provides them, 25 parameters per",
+      "sub-category, biological zeros with distribution='constant'.",
+      sep = "\n"),
+      i, length(agg_levels), level, level, level)
+    batch_msgs <- anthropic_build_messages(
+      system_prompt, history = state$messages,
+      new_user_message = batch_nudge)
+    batch_resp <- anthropic_chat_batch_template_force(
+      batch_msgs, on_chunk = on_chunk_cb)
+
+    if (!is.null(batch_resp$error)) {
+      state$last_error <- sprintf(
+        "Batch %d of %d (%s) failed: %s. The previous %d batch(es) are not saved; click 'Produce template now' to retry the whole emission.",
+        i, length(agg_levels), level, batch_resp$error, i - 1L)
+      return()
+    }
+    usage_log_append(
+      user_email         = state$user_email,
+      model              = batch_resp$model,
+      prompt_tokens      = batch_resp$usage$prompt_tokens,
+      completion_tokens  = batch_resp$usage$completion_tokens,
+      cached_tokens      = batch_resp$usage$cached_tokens %||% 0L,
+      cache_write_tokens = batch_resp$usage$cache_write_tokens %||% 0L,
+      cost_usd           = batch_resp$cost_usd)
+
+    batch_parsed <- tryCatch(
+      jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
+      error = function(e) NULL)
+    if (is.null(batch_parsed)) {
+      state$last_error <- sprintf(
+        "Batch %d (%s) returned unparseable JSON. Click 'Produce template now' to retry.",
+        i, level)
+      return()
+    }
+    # Tag the requested aggregation_level on the part so the merge step
+    # can verify the model emitted rows for the right level.
+    batch_parsed$.requested_aggregation_level <- level
+    parts[[i]] <- batch_parsed
+  }
+
+  # ---- Stage 3: merge + validate + store --------------------------------
+  session$sendCustomMessage("translatorAppendInfoBubble",
+    "Assembling final template...")
+  merged <- .translator_merge_batches(inventory_metadata, parts, agg_levels)
+  merged_json <- jsonlite::toJSON(merged, auto_unbox = TRUE, na = "null")
+
+  if (!.translator_template_is_well_formed(merged_json)) {
+    state$last_error <- paste(
+      "Merged template failed the well-formedness check. The individual",
+      "batches each returned valid JSON but the merge produced an empty",
+      "or malformed parameters array. Click 'Produce template now' to",
+      "retry.")
+    return()
+  }
+
+  state$last_template_json <- merged_json
+  state$last_error <- NULL
+
+  # Append a short summary message to the chat history so the user sees
+  # progress + the Download button. Mirrors the legacy single-call path.
+  n_params <- if (is.data.frame(merged$parameters))
+    nrow(merged$parameters) else length(merged$parameters)
+  n_mms <- if (is.data.frame(merged$manure_management))
+    nrow(merged$manure_management) else length(merged$manure_management)
+  n_ts <- if (is.data.frame(merged$parameter_timeseries))
+    nrow(merged$parameter_timeseries) else length(merged$parameter_timeseries)
+  download_hint <- sprintf(paste(
+    "Template ready. Emitted %d parameter rows, %d manure_management",
+    "rows, and %d time-series rows across %d aggregation_levels (%s).",
+    "Click the green Download button below to save the .xlsx, then",
+    "upload it on the 1. Data Input tab."),
+    n_params, n_mms, n_ts, length(agg_levels),
+    paste(agg_levels, collapse = ", "))
+  state$messages[[length(state$messages) + 1L]] <-
+    list(role = "assistant", content = download_hint, display = download_hint)
+  tryCatch(conversation_save(state$user_email, state$messages),
+            error = function(e) NULL)
+}
+
+# Legacy single-call force-template path. Used by .translator_force_template()
+# above when the discovery stage returns ≤2 aggregation_levels (or fails).
+# The three retry loops (parse / coverage / defaults-only) and the sub-
+# category strip post-processing are correct on small inventories — kept
+# unchanged here.
+.translator_force_template_single <- function(state, session) {
   state$pending <- TRUE
   state$last_error <- NULL
   on.exit({
@@ -1880,6 +2107,82 @@ translator_chat_server <- function(input, output, session) {
       length(parsed$parameters) == 0)
     return(FALSE)
   TRUE
+}
+
+# Concatenate per-aggregation-level batch outputs into one filled-template
+# JSON envelope. Used by .translator_force_template()'s batch path.
+#
+# parts is a list of parsed JSON objects (one per batch call), each
+# containing some subset of parameters / manure_management /
+# parameter_timeseries plus a .requested_aggregation_level tag injected
+# by the dispatcher. inventory_metadata comes from the discovery call
+# and is used as-is.
+#
+# Each batch's rows are filtered to keep only those whose
+# aggregation_level matches the requested one. This guards against
+# Sonnet drift (the per-batch nudge asks for one level only, but if the
+# model returns rows for other levels too they'd duplicate across
+# batches and the merged output would be wrong).
+.translator_merge_batches <- function(inventory_metadata, parts,
+                                       agg_levels = NULL) {
+  # Pull a single field (e.g. "parameters") out of every batch part,
+  # filter each batch's rows to its requested aggregation_level, then
+  # concatenate. Handles both data.frame and list-of-list representations
+  # because jsonlite::fromJSON(simplifyVector = TRUE) may produce either
+  # depending on the JSON shape.
+  collect_field <- function(field) {
+    pieces <- lapply(parts, function(p) {
+      rows <- p[[field]]
+      if (is.null(rows)) return(NULL)
+      requested <- p$.requested_aggregation_level
+      if (!is.null(requested) && nzchar(requested)) {
+        if (is.data.frame(rows) && "aggregation_level" %in% names(rows)) {
+          keep <- rows$aggregation_level == requested |
+            is.na(rows$aggregation_level)
+          n_drop <- sum(!keep, na.rm = TRUE)
+          if (n_drop > 0)
+            message(sprintf("translator: dropped %d cross-contaminated %s row(s) from batch '%s'",
+                             n_drop, field, requested))
+          rows <- rows[keep, , drop = FALSE]
+        } else if (is.list(rows) && !is.data.frame(rows)) {
+          keep <- vapply(rows, function(r) {
+            ag <- r$aggregation_level %||% NA
+            is.na(ag) || identical(ag, requested)
+          }, logical(1))
+          n_drop <- sum(!keep)
+          if (n_drop > 0)
+            message(sprintf("translator: dropped %d cross-contaminated %s row(s) from batch '%s'",
+                             n_drop, field, requested))
+          rows <- rows[keep]
+        }
+      }
+      rows
+    })
+    pieces <- pieces[!vapply(pieces, function(x)
+      is.null(x) || (is.data.frame(x) && nrow(x) == 0) ||
+        (is.list(x) && !is.data.frame(x) && length(x) == 0),
+      logical(1))]
+    if (length(pieces) == 0) return(NULL)
+    # If every piece is a data.frame, rbind. Otherwise concat as list.
+    if (all(vapply(pieces, is.data.frame, logical(1)))) {
+      tryCatch(do.call(rbind, c(pieces, list(make.row.names = FALSE))),
+                error = function(e) {
+                  # Schema mismatch between batches — fall back to
+                  # list-of-records.
+                  do.call(c, lapply(pieces, function(df)
+                    split(df, seq_len(nrow(df)))))
+                })
+    } else {
+      do.call(c, pieces)
+    }
+  }
+
+  list(
+    inventory_metadata    = inventory_metadata,
+    parameters            = collect_field("parameters"),
+    manure_management     = collect_field("manure_management"),
+    parameter_timeseries  = collect_field("parameter_timeseries")
+  )
 }
 
 # Look for ```template-ready ... ``` and return the inner JSON; NULL if

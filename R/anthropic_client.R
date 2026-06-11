@@ -538,7 +538,21 @@ anthropic_chat_template_force <- function(messages,
                                             # blob and the user gets no
                                             # download with no obvious cause.
                                             max_tokens = 64000,
-                                            timeout_sec = 900) {
+                                            # 2026-06-11: bumped 900 -> 1800
+                                            # after Lolita's full Zambia run
+                                            # (27 sub-categories x 25 params =
+                                            # 675 rows) was still streaming
+                                            # past the 900s ceiling. tool_use
+                                            # input_json_delta is empirically
+                                            # slower than text streaming
+                                            # (~8000 individual JSON fragments
+                                            # for this output). 1800s gives
+                                            # headroom up to roughly the
+                                            # shinyapps.io WebSocket-tolerance
+                                            # ceiling; beyond this, the real
+                                            # fix is server-side batch
+                                            # emission across aggregation_level.
+                                            timeout_sec = 1800) {
   # Same schema as the OpenAI version, surfaced as an Anthropic tool with
   # input_schema. Anthropic uses JSON Schema for tool inputs; the structure
   # is the same as OpenAI's json_schema mode minus the strict envelope.
@@ -661,6 +675,222 @@ anthropic_chat_template_force <- function(messages,
   ))
   tool_choice <- list(type = "tool",
                        name = "produce_filled_inventory_template")
+
+  anthropic_chat_stream(
+    messages    = messages,
+    on_chunk    = on_chunk,
+    model       = model,
+    max_tokens  = max_tokens,
+    temperature = 0,
+    timeout_sec = timeout_sec,
+    tools       = tool_def,
+    tool_choice = tool_choice
+  )
+}
+
+# --- Batch-emission helpers (Lolita's 2026-06-11 Zambia stress-test fix) ----
+#
+# Reusable item-schemas for the batch-emission tool. Same shapes as the
+# monolithic anthropic_chat_template_force() above; factored out so the
+# Stage-2 per-aggregation-level tool can reuse them verbatim without
+# diverging. Touch these in ONE place when the template schema evolves.
+.ANTHROPIC_PARAMETER_ITEM_SCHEMA <- list(
+  type = "object",
+  properties = list(
+    cattle_type       = list(type = "string"),
+    aggregation_level = list(type = "string"),
+    sub_category      = list(type = "string"),
+    parameter         = list(type = "string"),
+    mean              = list(type = "number"),
+    uncertainty_pct   = list(type = c("number", "null")),
+    lower             = list(type = c("number", "null")),
+    upper             = list(type = c("number", "null")),
+    distribution      = list(type = "string"),
+    param_type        = list(type = "string")
+  ),
+  required = c("sub_category", "parameter", "mean",
+                "distribution", "param_type")
+)
+
+.ANTHROPIC_MANURE_ITEM_SCHEMA <- list(
+  type = "object",
+  properties = list(
+    cattle_type       = list(type = "string"),
+    aggregation_level = list(type = "string"),
+    sub_category      = list(type = "string"),
+    mms_type          = list(type = "string"),
+    fraction_pct      = list(type = "number"),
+    lower_fraction    = list(type = c("number", "null")),
+    upper_fraction    = list(type = c("number", "null")),
+    distribution_fraction = list(type = c("string", "null")),
+    MCF_pct           = list(type = c("number", "null")),
+    lower_mcf         = list(type = c("number", "null")),
+    upper_mcf         = list(type = c("number", "null")),
+    distribution_mcf  = list(type = c("string", "null")),
+    EF3               = list(type = c("number", "null")),
+    lower_ef3         = list(type = c("number", "null")),
+    upper_ef3         = list(type = c("number", "null")),
+    distribution_ef3  = list(type = c("string", "null")),
+    Frac_GasMS_pct    = list(type = c("number", "null")),
+    lower_frac_gas    = list(type = c("number", "null")),
+    upper_frac_gas    = list(type = c("number", "null")),
+    distribution_frac_gas = list(type = c("string", "null")),
+    Frac_LeachMS_pct  = list(type = c("number", "null")),
+    lower_frac_leach  = list(type = c("number", "null")),
+    upper_frac_leach  = list(type = c("number", "null")),
+    distribution_frac_leach = list(type = c("string", "null"))
+  ),
+  required = c("sub_category", "mms_type", "fraction_pct",
+                "MCF_pct", "EF3",
+                "Frac_GasMS_pct", "Frac_LeachMS_pct")
+)
+
+.ANTHROPIC_TIMESERIES_ITEM_SCHEMA <- list(
+  type = "object",
+  properties = list(
+    cattle_type       = list(type = c("string", "null")),
+    aggregation_level = list(type = c("string", "null")),
+    sub_category      = list(type = c("string", "null")),
+    year              = list(type = "integer"),
+    N                 = list(type = c("number", "null")),
+    BW                = list(type = c("number", "null")),
+    MW                = list(type = c("number", "null")),
+    WG                = list(type = c("number", "null")),
+    Milk              = list(type = c("number", "null")),
+    Fat               = list(type = c("number", "null")),
+    pct_pregnant      = list(type = c("number", "null")),
+    DE                = list(type = c("number", "null")),
+    CP                = list(type = c("number", "null")),
+    MilkPR            = list(type = c("number", "null"))
+  ),
+  required = I(c("year"))
+)
+
+.ANTHROPIC_METADATA_SCHEMA <- list(
+  type = "object",
+  properties = list(
+    country      = list(type = "string"),
+    year         = list(type = c("integer", "string")),
+    species      = list(type = "string"),
+    ipcc_version = list(type = "string"),
+    prepared_by  = list(type = "string"),
+    notes        = list(type = "string")
+  )
+)
+
+# Stage 1 of the batched emission flow.
+#
+# Asks the model to enumerate the `aggregation_level` strings it has
+# identified in the conversation AND populate the inventory_metadata
+# object. Cheap (~200 output tokens, 5-10s). Output shape:
+#
+#   { aggregation_levels: ["commercial_dairy", ...],
+#     inventory_metadata: { country, year, species, ... } }
+#
+# The caller passes this list to anthropic_chat_batch_template_force()
+# below, once per aggregation_level. inventory_metadata is consumed
+# only once (the per-batch calls don't emit it).
+anthropic_chat_enumerate_aggregation_levels <- function(messages,
+                                                          on_chunk = function(text) {},
+                                                          model = .ANTHROPIC_DEFAULT_MODEL,
+                                                          max_tokens = 4000,
+                                                          timeout_sec = 120) {
+  input_schema <- list(
+    type = "object",
+    properties = list(
+      aggregation_levels = list(
+        type  = "array",
+        items = list(type = "string"),
+        description = paste(
+          "The distinct production-system / aggregation_level labels you",
+          "have identified from this conversation, in the order they",
+          "appear (e.g. ['commercial_dairy', 'emergent_dairy',",
+          "'commercial_beef', 'emergent_beef', 'extensive_trad']). One",
+          "entry per production system the user wants in the final",
+          "template. Snake-case, lowercase.")
+      ),
+      inventory_metadata = .ANTHROPIC_METADATA_SCHEMA
+    ),
+    required = I(c("aggregation_levels"))
+  )
+
+  tool_def <- list(list(
+    name        = "enumerate_aggregation_levels",
+    description = paste(
+      "Emit (a) the distinct aggregation_level labels for this inventory",
+      "and (b) the inventory_metadata block (country, year, species, etc.).",
+      "Do NOT emit any parameters, manure_management, or time-series rows",
+      "here — those come in per-aggregation-level follow-up calls."),
+    input_schema = input_schema
+  ))
+  tool_choice <- list(type = "tool",
+                       name = "enumerate_aggregation_levels")
+
+  anthropic_chat_stream(
+    messages    = messages,
+    on_chunk    = on_chunk,
+    model       = model,
+    max_tokens  = max_tokens,
+    temperature = 0,
+    timeout_sec = timeout_sec,
+    tools       = tool_def,
+    tool_choice = tool_choice
+  )
+}
+
+# Stage 2 of the batched emission flow.
+#
+# Asks the model to emit ONLY the parameters / manure_management /
+# parameter_timeseries rows for ONE aggregation_level. The caller is
+# responsible for injecting "emit ONLY <aggregation_level>" into the
+# user message (we don't do it here so the caller can attach extra
+# context like the row-count assertion). The schema requires the
+# returned `aggregation_level` field to match the request — used for
+# server-side drift detection at merge time.
+#
+# max_tokens = 24000 is enough for ~5-6 sub-categories x 25 params + ~30
+# MMS rows + ~33 time-series rows = ~6-8K output tokens, with 3x
+# headroom for verbose descriptions / data_source tags.
+#
+# timeout_sec = 300 is enough for ~5 minutes per batch. If a batch
+# legitimately takes longer than that, the inventory is too dense for
+# the batch path and the user should split the file further upstream.
+anthropic_chat_batch_template_force <- function(messages,
+                                                  on_chunk = function(text) {},
+                                                  model = .ANTHROPIC_DEFAULT_MODEL,
+                                                  max_tokens = 24000,
+                                                  timeout_sec = 300) {
+  input_schema <- list(
+    type = "object",
+    properties = list(
+      aggregation_level = list(
+        type        = "string",
+        description = paste(
+          "The aggregation_level you are emitting in this call. MUST",
+          "match the aggregation_level the user message asked you to",
+          "produce. The server validates this at merge time and drops",
+          "rows that don't match.")),
+      parameters        = list(type = "array",
+                                items = .ANTHROPIC_PARAMETER_ITEM_SCHEMA),
+      manure_management = list(type = "array",
+                                items = .ANTHROPIC_MANURE_ITEM_SCHEMA),
+      parameter_timeseries = list(type = "array",
+                                    items = .ANTHROPIC_TIMESERIES_ITEM_SCHEMA)
+    ),
+    required = I(c("aggregation_level", "parameters"))
+  )
+
+  tool_def <- list(list(
+    name        = "produce_aggregation_level_template",
+    description = paste(
+      "Emit ONLY the parameters / manure_management / parameter_timeseries",
+      "rows for the aggregation_level named in the user message. Do NOT",
+      "emit inventory_metadata (the server already has it from the",
+      "discovery call). Do NOT emit rows for any other aggregation_level."),
+    input_schema = input_schema
+  ))
+  tool_choice <- list(type = "tool",
+                       name = "produce_aggregation_level_template")
 
   anthropic_chat_stream(
     messages    = messages,

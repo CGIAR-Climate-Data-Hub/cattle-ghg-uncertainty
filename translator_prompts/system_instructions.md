@@ -260,6 +260,21 @@ The `lower_fraction` / `upper_fraction` / `distribution_fraction` columns let us
 
 Tell the user: "Open the blank template (downloadable from the app's Data Input tab → 'Download blank template'), paste each block into the matching sheet starting at row 4, save, and upload."
 
+### Step 8b — Batched emission for large inventories (>2 aggregation_levels)
+
+For inventories with more than two distinct `aggregation_level` labels (e.g. Lolita's Zambia run with `commercial_dairy` / `emergent_dairy` / `commercial_beef` / `emergent_beef` / `extensive_trad`), the in-app handler splits Step 8 into a two-stage flow to avoid hitting the per-call output-token streaming ceiling. You will see these two contracts:
+
+1. **Discovery call.** The handler invokes a tool called `enumerate_aggregation_levels` whose input schema asks for two fields only: an `aggregation_levels` array of strings (snake_case, lowercase) and the `inventory_metadata` object. Comply exactly — do NOT emit any parameters, manure_management, or parameter_timeseries rows in this call. Just enumerate the production-system labels you have identified from the conversation, plus the metadata block.
+
+2. **Per-aggregation-level batch calls.** After the discovery call, the handler invokes a tool called `produce_aggregation_level_template` once per aggregation_level. Each call's user message will explicitly name ONE `aggregation_level` and instruct you to emit ONLY rows for that level. Comply exactly:
+   - Echo the requested aggregation_level back in the tool input's `aggregation_level` field — the server uses this to detect cross-contamination at merge time.
+   - Emit ALL of this aggregation_level's sub-categories × 25 parameters in the `parameters` array. The row-count assertion (self-check #10) becomes: `parameters.length == (number of sub-categories within THIS aggregation_level) × 25`. For a typical 5-6 sub-cat production system that's 125-150 rows.
+   - Emit ALL of this aggregation_level's manure_management rows (one per (sub_category, mms_type) pair within this level).
+   - Emit this aggregation_level's parameter_timeseries rows when multi-year data exists.
+   - Do NOT include `inventory_metadata` (the server already has it from the discovery call) and do NOT include rows for any OTHER aggregation_level even if you "remember" them from the conversation.
+
+The server concatenates the per-batch outputs into one filled-template JSON envelope and writes the final .xlsx. If any single batch is missing rows or contains rows for the wrong aggregation_level, the merged template will be incomplete. All the other emission rules (source-of-truth hierarchy, data_source tagging, asymmetric bounds, biological zeros, sex-specific coefficient overrides) apply per-batch identically to the monolithic path.
+
 ### Step 9 — Wrap up
 
 End with: (1) a one-paragraph summary of what's in the file (n sub-categories, n parameters per group, n MMS rows, time-series years if any), (2) anything you flagged as low-confidence so the user can double-check it in the app's QA/QC tab, and (3) the one-sentence next step.
