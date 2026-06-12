@@ -83,6 +83,16 @@ usage_log_append <- function(user_email, model,
                      row.names = FALSE,
                      col.names = FALSE,
                      quote     = c(2, 3))    # quote user_email + model
+  # 2026-06-12: also log every API call's token + cost breakdown to
+  # stderr so the production log captures it. The CSV on shinyapps.io
+  # is ephemeral and not externally readable; the rsconnect logs API
+  # is. This lets us audit "where does the $X per-run cost actually
+  # go?" without bouncing through Anthropic's billing console.
+  message(sprintf(
+    "translator usage: model=%s prompt=%d (cache_read=%d cache_write=%d) output=%d total=%d cost=$%.4f",
+    row$model, row$prompt_tokens, row$cached_tokens,
+    row$cache_write_tokens, row$completion_tokens,
+    row$total_tokens, row$cost_usd))
   invisible(row)
 }
 
