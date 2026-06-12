@@ -351,20 +351,20 @@ translator_chat_server <- function(input, output, session) {
     # mid-call, this ensures their typed message survives the reload.
     tryCatch(conversation_save(state$user_email, state$messages),
               error = function(e) NULL)
-    if (.translator_is_generate_trigger(txt) && length(state$messages) >= 2) {
-      # Paint an inline 'working…' bubble with a fake-determinate
-      # progress bar for the non-streaming force-template call (30-
-      # 120s). Cleared by translatorStreamEnd when work completes.
-      session$sendCustomMessage("translatorAppendInfoBubble",
-        "Generating the full template now — please wait, this can take 30 to 120 seconds for an inventory with many sub-categories. The Download button will appear right after.")
-      .translator_force_template(state, session)
-    } else {
-      # Three-dot typing indicator inline in the conversation while we
-      # wait for the AI's first chunk. Cleared by translatorStreamStart
-      # which wipes stream_target before painting the live AI bubble.
-      session$sendCustomMessage("translatorAppendTypingBubble", "")
-      .translator_send(state, session)
-    }
+    # 2026-06-12: text-trigger emission removed. Previously, phrases like
+    # "produce the template" or "go ahead" routed directly to
+    # .translator_force_template, which was firing emission on its own
+    # mid-conversation and confusing the user. New rule: ONLY the green
+    # "Produce template now" button starts emission. Every typed message
+    # goes through the normal chat path, and the system prompt instructs
+    # the AI to explicitly tell the user to click the button when it
+    # thinks it has enough information.
+    #
+    # Three-dot typing indicator inline in the conversation while we
+    # wait for the AI's first chunk. Cleared by translatorStreamStart
+    # which wipes stream_target before painting the live AI bubble.
+    session$sendCustomMessage("translatorAppendTypingBubble", "")
+    .translator_send(state, session)
   })
 
   # ---- Reset conversation: wipe history + saved file -----------------------

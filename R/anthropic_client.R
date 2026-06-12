@@ -123,6 +123,45 @@
   messages
 }
 
+# Add TWO cache breakpoints to the messages array:
+#  (1) on the last message (same as anthropic_cache_last_message)
+#  (2) on the SECOND-TO-LAST message (i.e. the last message that's
+#      identical across a batched-emission loop)
+#
+# Why: in the batched-emission flow, the per-batch user message
+# (batch_nudge) differs on every batch — so a cache_control marker
+# placed only on the last message creates a fresh cache key each
+# batch and re-writes the entire ~170K conversation history every
+# time. Production logs from the 2026-06-12 Zambia run showed all
+# 5 batches paying $1.0-1.2 each, with $4.78 of the $7.73 total
+# being cache-write surcharges (171K × $3.75/M × 5 batches).
+#
+# By ALSO marking the second-to-last message — which IS identical
+# across all batches (it's the last item of state$messages, the
+# user's prior confirmation) — the prefix UP TO that point gets
+# cached once on batch 1 and re-read at 10% cost on batches 2-5.
+# Anthropic supports up to 4 cache breakpoints per request; we use
+# 3 (system prompt + 2 here), leaving 1 spare.
+#
+# Falls back to single-breakpoint behaviour when messages has < 2
+# entries.
+.anthropic_cache_stable_and_last <- function(messages) {
+  n <- length(messages)
+  if (n < 2L) return(.anthropic_cache_last_message(messages))
+  # Mark message n-1 first (the stable, batch-invariant prefix).
+  prev <- messages[[n - 1L]]
+  prev_content <- prev$content %||% ""
+  if (is.character(prev_content) && nzchar(prev_content)) {
+    messages[[n - 1L]]$content <- list(list(
+      type = "text",
+      text = prev_content,
+      cache_control = list(type = "ephemeral")
+    ))
+  }
+  # Then mark message n (the batch-specific nudge).
+  .anthropic_cache_last_message(messages)
+}
+
 # Cost in USD for a usage tuple, taking Anthropic's prompt-cache discount
 # into account. Usage shape (from the API response):
 #   $input_tokens                 — non-cached input
@@ -336,10 +375,20 @@ anthropic_chat_stream <- function(messages,
   }
 
   split <- .anthropic_split_system(messages)
+  # When tools are present, this is a batched / discovery / force-template
+  # call — the LAST message varies per batch (different aggregation_level
+  # nudge) while the SECOND-TO-LAST message is the stable, batch-invariant
+  # conversation history. Use the two-breakpoint cache helper so the long
+  # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
+  # cost on batches 2-5. Production cost driver per 2026-06-12 logs.
+  cache_msgs <- if (is.null(tools))
+    .anthropic_cache_last_message(split$messages)
+  else
+    .anthropic_cache_stable_and_last(split$messages)
   body <- list(
     model       = model,
     max_tokens  = max_tokens,
-    messages    = .anthropic_cache_last_message(split$messages),
+    messages    = cache_msgs,
     stream      = TRUE
   )
   if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
