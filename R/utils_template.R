@@ -292,7 +292,7 @@ PARAM_CATALOGUE <- data.frame(
   suggested_uncertainty_pct = c(
     10, 15, 10, 30, 20, 10, 20, 15,   # N..DE
     30, 30, 30, 10, 20, 15,            # Cfi, Ca, C, Cp, hours, CP
-    8, 20, 25, 25,                     # Ym, Bo, ASH, UE
+    20, 20, 25, 25,                    # Ym, Bo, ASH, UE  (Ym 8->20 2026-06-15: Penman 2000 / 2019R Tier 2 guidance — Ym is highly uncertain; aligned with translator catalogue)
     NA, NA, NA,                        # EF3_PRP, EF4, EF5 (asymmetric — use IPCC bounds)
     NA, NA,                            # Frac_GASM_PRP, Frac_LEACH_PRP (IPCC 2019 Table 11.3 — asymmetric bounds)
     10, 25),                           # MilkPR, Tw

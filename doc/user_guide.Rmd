@@ -208,8 +208,8 @@ N & Number of animals in this sub-category & head & \textit{n/a} & ±10\% & Norm
 BW & Average live body weight (also TAM = Typical Animal Mass) & kg & 275 & ±15\% & Normal & Eq. 10.3 / 10.6 \\
 MW & Mature (adult) body weight — used in NEg growth equation & kg & 300 & ±10\% & Normal & Eq. 10.6 \\
 WG & Average daily weight gain — set 0 for non-growing adults & kg/day & 0 & ±30\% & PERT & Eq. 10.6 \\
-Milk & Daily milk yield per \textit{lactating} animal (not sub-category average; tool multiplies by pct\_pregnant internally). Set 0 for non-dairy sub-categories. & kg/head/day & 4.0 & ±20\% & Normal & Eq. 10.8 \\
-Fat & Fat content of milk & \% & 4.0 & ±10\% & Normal & Eq. 10.8 \\
+Milk & Daily milk yield per \textit{lactating} animal (not sub-category average; tool multiplies by pct\_pregnant internally). Set 0 for non-dairy sub-categories. & kg/head/day & 3.5 & ±20\% & Normal & Eq. 10.8 \\
+Fat & Fat content of milk & \% & 4.3 & ±10\% & Normal & Eq. 10.8 \\
 pct\_pregnant & Fraction of females in this sub-category pregnant during the year, 0--1 — includes pregnant heifers that have not yet calved. Aliases \texttt{pct\_calving} and \texttt{pct\_lactating} are accepted on upload. & fraction & 0.60 & ±20\% & Beta & 2019 Refinement Vol.4 Ch.10 §10.5; Eq. 10.13 \\
 MilkPR & Protein content of milk — feeds the milk-N term in Eq. 10.33 (N retention rates for cattle, where the 6.38 milk-protein-to-N conversion is defined). The 2019 Refinement gives the relation \%MilkPR $= 1.9 + 0.4\times$\%Fat (so 4\% fat $\to$ 3.5\% protein); illustrative values are tabulated in Annex 10A.1 / 10A.2 / 10A.3. & \% & 3.3 & ±10\% & Normal & Eq. 10.33; Annex 10A.1–10A.3 \\
 \addlinespace[4pt]
@@ -225,7 +225,7 @@ Tw & Mean daily temperature in winter ($^\circ$C) — Cfi cold-climate adjustmen
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Enteric fermentation}}} \\
 \addlinespace[2pt]
-Ym & Methane conversion factor (\% of gross energy in feed converted to CH\textsubscript{4}) & \% & 6.5 & ±8\% & PERT & Table 10.12 \\
+Ym & Methane conversion factor (\% of gross energy in feed converted to CH\textsubscript{4}) & \% & 6.5 & ±20\% & PERT & Table 10.12 \\
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Manure management — CH\textsubscript{4}}}} \\
 \addlinespace[2pt]
@@ -583,7 +583,7 @@ Before clicking Run, configure:
   \item \textbf{25,000–30,000}: Recommended for final reporting, especially when correlations are enabled or you have many sub-categories.
 \end{itemize}
 
-\textbf{GWP version}: Choose between AR5 (CH\textsubscript{4} GWP = 28, N\textsubscript{2}O = 265) and AR6 (CH\textsubscript{4} GWP = 27.9, N\textsubscript{2}O = 273). Select the version required by your national inventory reporting guidelines.
+\textbf{GWP version}: Choose between AR4 (CH\textsubscript{4} GWP = 25, N\textsubscript{2}O = 298), AR5 (CH\textsubscript{4} GWP = 28, N\textsubscript{2}O = 265) and AR6 (CH\textsubscript{4} GWP = 27, N\textsubscript{2}O = 273; the 27 is the non-fossil/biogenic methane value, appropriate for cattle). The default is AR5. Select the version required by your national inventory reporting guidelines.
 
 \textbf{Random seed}: Fixing the seed ensures results are exactly reproducible. Change the seed to verify convergence: if the 95\% CI changes substantially between runs, increase the number of iterations.
 
