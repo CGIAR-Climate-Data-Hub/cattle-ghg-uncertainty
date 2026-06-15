@@ -640,6 +640,51 @@ The Pass / Warn / Fail thresholds for benchmark deviation apply \textbf{only to 
 
 \newpage
 
+# Verification of Calculation Accuracy
+
+The previous section describes the checks the tool applies to the user's \emph{inputs}. This section describes how the tool's \emph{calculation engine} — the implementation of the IPCC equation chain and the Monte Carlo sampler — has itself been verified to produce correct numbers. Input validation and calculation verification are complementary: the former guards against bad data going in, the latter guarantees the equations are implemented correctly.
+
+## Equation-chain verification against manual calculation
+
+The core of the verification is a fixed, fully worked test case. For a single representative animal with a complete set of fixed parameters, every intermediate quantity in the IPCC Tier 2 chain was computed independently by hand and in a spreadsheet, directly from the published equations: the net-energy terms ($NE_m$, $NE_a$, $NE_g$, $NE_l$, $NE_w$, $NE_p$), the energy ratios ($REM$, $REG$), gross energy intake ($GE$), the enteric emission factor ($EF_1$), volatile-solid excretion ($VS$), nitrogen excretion ($N_{\text{ex}}$), and all four manure- and pasture-N$_2$O pathways, through to the inventory totals (total CH$_4$, total N$_2$O, and total CO$_2$eq under each GWP basis).
+
+The tool's computed value for each of these quantities must match the independently calculated reference to a relative tolerance of $1 \times 10^{-4}$. These comparisons are encoded as automated assertions that run on every build, so any future change to the calculation code that altered a result — even slightly — would be caught immediately. This is the primary guarantee that the equations in Section "IPCC Tier 2 Emission Equations" are implemented exactly as written.
+
+## Cross-comparison with an independent Monte Carlo package
+
+Beyond the single worked case, the tool has been exercised on real Tier 2 national cattle inventories and its results compared against two independent references: (i) manual re-calculation of the per-head emission factors and inventory totals, and (ii) an independent commercial Monte Carlo package configured with the same parameters, distributions and iteration count.
+
+On these real inventories the tool reproduced the deterministic emission totals from the manual calculation, and produced a 95\% uncertainty interval consistent with the independent Monte Carlo package to within the sampling variability expected between two stochastic runs.
+%% OPTIONAL: if you wish to quote a specific figure, insert it here, e.g.
+%% "(agreement within X\% on the 95\% margin of error for the manure-N2O pathway)".
+A regression guard retained in the automated test suite keeps the manure-N$_2$O pathway within the range established by this cross-comparison, so a future code change cannot silently introduce a large (e.g. order-of-magnitude) error in that pathway.
+
+## Automated regression test suite
+
+The two verification activities above are part of a broader automated test suite (91 checks at the time of writing) that is run before each release and deployment. The checks are organised into seven groups:
+
+\begin{itemize}
+  \item \textbf{A — IPCC equation chain:} every intermediate and total against the hand-calculated reference case (Section "Equation-chain verification" above).
+  \item \textbf{B — Monte Carlo sampler:} empirical means of the sampled marginals match their analytical means; realised Spearman rank correlations match the requested targets; the AR(1) year-to-year correlation structure behaves as specified.
+  \item \textbf{C — Application routes:} emission-source filtering (all sources, enteric only, manure CH$_4$ only, N$_2$O only), the three GWP bases (AR4 / AR5 / AR6), the correlation modes, and the AD / EF / combined uncertainty decomposition.
+  \item \textbf{D — Trend (multi-year) pipeline:} the full / partial / independent year-to-year coefficient-correlation modes produce valid multi-year results.
+  \item \textbf{E — Multi-sub-category aggregation:} per-sub-category emissions sum correctly to national totals and scale as expected with population.
+  \item \textbf{F — Edge cases and validators:} missing-value handling, manure-management fraction bounds, lower/upper-bound consistency, zero-population handling, and the multi-system N$_2$O calculations.
+  \item \textbf{G — Outputs:} the Excel and Word/CSV downloads and the correlation-matrix round-trip produce well-formed, internally consistent files.
+\end{itemize}
+
+The full multi-sub-category inventory chain must pass all checks before the tool is published.
+
+## Verification of IPCC default values and uncertainty ranges
+
+Every IPCC default value and uncertainty range pre-loaded in the tool — the energy-equation coefficients, the methane conversion factor $Y_m$, the maximum methane producing capacity $B_o$, the manure-system MCF values, and the N$_2$O emission factors and volatilisation / leaching fractions ($EF_3$, $EF_4$, $EF_5$, FracGASM, FracLEACH) — has been checked line-by-line against the IPCC 2019 Refinement source text (Volume 4, Chapter 10 and Chapter 11). This review confirmed the central values and corrected two pre-loaded uncertainty ranges ($B_o$ and the pasture direct-N$_2$O factor $EF_{3,\text{PRP}}$) to match the climate-specific ranges in Tables 10.16a and 11.1.
+
+## Reproducibility
+
+Each simulation is driven by an explicit random seed, so any run can be reproduced exactly by re-supplying the same inputs and seed. The convergence guidance in Section "Recommended Iteration Count and Convergence" — re-running with a second seed and checking that the 95\% margin of error is stable — lets a user confirm that a reported result is converged rather than an artefact of a particular random draw.
+
+\newpage
+
 # Reporting
 
 The results calculated by the tool are designed to align with IPCC uncertainty reporting guidelines (IPCC 2006 Vol 1 Ch 3). The outputs reported by the tool can be used in a hybrid Approach 1 / Approach 2 uncertainty analysis for the whole inventory (IPCC 2006 §3.2.3.3) by entering into Table 3.3 the results reported by the tool for cattle emission sources alongside Approach 1 results for other emission categories. The outputs produced by the tool can also be used as inputs to a full Approach 2 analysis of uncertainty for the whole inventory.
