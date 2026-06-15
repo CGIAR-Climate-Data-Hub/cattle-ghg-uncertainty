@@ -133,7 +133,8 @@ sensitivity_analysis <- function(inputs, output, method = c("src", "prcc", "both
 #
 # `output` must have length = n_iter (the row count of each system's samples
 # frame).
-aggregate_sensitivity <- function(by_system, output, method = "both") {
+aggregate_sensitivity <- function(by_system, output, method = "both",
+                                  max_rows = 4000L) {
   if (is.null(by_system) || length(by_system) == 0) return(NULL)
   if (is.null(output) || length(output) == 0) return(NULL)
 
@@ -157,7 +158,33 @@ aggregate_sensitivity <- function(by_system, output, method = "both") {
   blocks <- Filter(Negate(is.null), lapply(names(by_system), label_samples))
   if (length(blocks) == 0) return(NULL)
   combined <- if (length(blocks) == 1) blocks[[1]] else do.call(cbind, blocks)
-  sensitivity_analysis(combined, output, method = method)
+
+  # Row subsample for the sensitivity regression ONLY. On a large multi-system
+  # inventory the combined design matrix is ~n_iter x (15 x n_systems) columns;
+  # the SRC lm() on a full 10,000-row x ~685-column matrix peaks several hundred
+  # MB and runs twice (main + no-correlation comparison) on top of the 3x
+  # decomposition — enough to exhaust a small instance and force a reload during
+  # the sensitivity step (the "server needed to reload" failure on the heaviest
+  # all-sources + correlations + decomposition run). SRC/PRCC *rankings* are
+  # stable far below the iteration count the headline percentiles need, so we
+  # rank on a capped subsample. Each Monte Carlo row is an independent draw, so
+  # the first `max_rows` rows are a valid random subsample. The headline 95% MoE
+  # is unaffected — it is computed elsewhere from the full iteration set.
+  n_full <- nrow(combined)
+  if (is.finite(max_rows) && n_full > max_rows) {
+    idx <- seq_len(max_rows)
+    combined <- combined[idx, , drop = FALSE]
+    output   <- output[idx]
+  }
+  res <- sensitivity_analysis(combined, output, method = method)
+  if (is.finite(max_rows) && n_full > max_rows && is.list(res)) {
+    attr(res, "subsampled_note") <- sprintf(
+      paste0("Sensitivity ranking computed on the first %s of %s iterations ",
+             "(the ranking is stable; the headline uncertainty uses all ",
+             "iterations)."),
+      format(max_rows, big.mark = ","), format(n_full, big.mark = ","))
+  }
+  res
 }
 
 # Parse a sensitivity parameter name produced by aggregate_sensitivity() and

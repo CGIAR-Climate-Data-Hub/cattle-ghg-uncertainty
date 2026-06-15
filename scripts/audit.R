@@ -1855,6 +1855,32 @@ section_F <- function() {
              sens_ok,
              notes = if (sens_ok) "2 varying columns kept; NaN + constant dropped"
                      else paste("error:", attr(sens_res, "err")))
+
+  # F26 — aggregate_sensitivity row subsample: on a run with more iterations
+  # than max_rows, the SRC regression must run on the capped subsample (memory
+  # guard that prevents the "server needed to reload" OOM during sensitivity on
+  # the heaviest all-sources + correlations + decomposition run), while still
+  # returning a ranking. Build a tiny 2-system by_system with 60 iterations and
+  # cap at 25.
+  set.seed(2)
+  mk_block <- function() {
+    s <- data.frame(N = rnorm(60, 100, 5), BW = rnorm(60, 400, 20),
+                    Ym = rnorm(60, 6.5, 0.5), check.names = FALSE)
+    list(samples = s)
+  }
+  bys <- list(`dairy||sys1||cows` = mk_block(), `dairy||sys1||heifers` = mk_block())
+  out_vec <- rnorm(60, 1000, 50)
+  agg_full <- aggregate_sensitivity(bys, out_vec, method = "src", max_rows = 1e9)
+  agg_cap  <- aggregate_sensitivity(bys, out_vec, method = "src", max_rows = 25L)
+  cap_ok <- !is.null(agg_cap) && !is.null(agg_cap$src) &&
+            nrow(agg_cap$src) == nrow(agg_full$src) &&    # same parameters ranked
+            !is.null(attr(agg_cap, "subsampled_note")) &&  # note attached
+            is.null(attr(agg_full, "subsampled_note"))     # not attached when under cap
+  check_bool("F26", "F",
+             "aggregate_sensitivity caps regression rows at max_rows (memory guard) while keeping the ranking",
+             cap_ok,
+             notes = if (cap_ok) "capped run ranks same params + flags subsample"
+                     else "row cap not applied as expected")
 }
 
 # =============================================================================

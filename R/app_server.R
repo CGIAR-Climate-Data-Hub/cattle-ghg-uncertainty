@@ -1866,6 +1866,9 @@ app_server <- function(input, output, session) {
               rv$sim_log <- paste0(rv$sim_log,
                 sprintf("Sensitivity analysis complete (%d group(s)).\n",
                         length(sim_result$by_system)))
+            # Release the transient regression memory before any comparison
+            # run / sensitivity below (keeps peak RAM down on large runs).
+            invisible(gc(FALSE))
           }
 
           # ---- Stage 6: comparison run (no correlations) ----
@@ -1892,10 +1895,18 @@ app_server <- function(input, output, session) {
             )
             rv$comparison_result <- nocorr_result
             if (length(nocorr_result$by_system) > 0) {
-              rv$comparison_sensitivity <- aggregate_sensitivity(
-                nocorr_result$by_system, nocorr_result$inventory$total_co2e)
+              rv$comparison_sensitivity <- tryCatch(
+                aggregate_sensitivity(
+                  nocorr_result$by_system, nocorr_result$inventory$total_co2e),
+                error = function(e) {
+                  rv$sim_log <- paste0(rv$sim_log,
+                    "WARNING: comparison sensitivity could not be computed: ",
+                    conditionMessage(e), "\n")
+                  NULL
+                })
             }
             rv$sim_log <- paste0(rv$sim_log, "Comparison (no correlations) complete.\n")
+            invisible(gc(FALSE))
             setProgress(0.99, detail = "Comparison complete.")
           }
 
