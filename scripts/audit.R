@@ -1817,6 +1817,44 @@ section_F <- function() {
              notes = sprintf("results: %s; expected: %s",
                              paste(reducible, collapse = ", "),
                              paste(expected, collapse = ", ")))
+
+  # F24 — regression guard for Andy's Zambia crash (2026-06-15):
+  # an inconsistent CI where the central value sits OUTSIDE [lower, upper]
+  # must not make the sampler return NaN. Before the fix, mc2d::rpert emitted
+  # "mode < min or mode > max" + NaN, which later made sd() return NA and
+  # crashed the sensitivity analysis with "undefined columns selected".
+  draws_hi <- sample_distribution(500, "pert", mean_val = 0.9,
+                                   lower = 0.0, upper = 0.5)   # mode > max
+  draws_lo <- sample_distribution(500, "pert", mean_val = 0.01,
+                                   lower = 0.1, upper = 0.5)   # mode < min
+  draws_inv <- sample_distribution(500, "triangular", mean_val = 0.3,
+                                    lower = 0.5, upper = 0.2)  # inverted bounds
+  no_nan <- all(is.finite(draws_hi)) && all(is.finite(draws_lo)) &&
+            all(is.finite(draws_inv))
+  check_bool("F24", "F",
+             "sample_distribution: out-of-range / inverted bounds yield finite draws (no PERT NaN)",
+             no_nan,
+             notes = if (no_nan) "mode clamped into [lower,upper]; non-finite scrubbed"
+                     else "NaN/Inf leaked from a degenerate parameterisation")
+
+  # F25 — sensitivity must survive a NaN/constant input column instead of
+  # throwing "undefined columns selected". Build inputs with one all-NaN
+  # column and one constant column alongside two varying columns.
+  set.seed(1)
+  sens_inputs <- data.frame(
+    good1 = rnorm(200), good2 = rnorm(200),
+    bad_nan = rep(NaN, 200), bad_const = rep(5, 200),
+    check.names = FALSE)
+  sens_out <- rnorm(200)
+  sens_res <- tryCatch(sensitivity_analysis(sens_inputs, sens_out, method = "src"),
+                        error = function(e) structure(list(), err = conditionMessage(e)))
+  sens_ok <- is.null(attr(sens_res, "err")) && !is.null(sens_res$src) &&
+             nrow(sens_res$src) == 2L   # only the two good columns survive
+  check_bool("F25", "F",
+             "sensitivity_analysis drops NaN/constant columns instead of crashing",
+             sens_ok,
+             notes = if (sens_ok) "2 varying columns kept; NaN + constant dropped"
+                     else paste("error:", attr(sens_res, "err")))
 }
 
 # =============================================================================

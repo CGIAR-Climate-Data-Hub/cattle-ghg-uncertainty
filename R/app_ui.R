@@ -1578,6 +1578,13 @@ app_ui <- function(request = NULL) {
               condition = "input.analysis_mode != 'trend'",
               checkboxInput("run_decomposition", t("sim_run_decomp"),
                             value = TRUE),
+              # Set expectations: the AD/EF split runs two extra full
+              # simulations on top of the main one. On a large inventory this
+              # roughly triples the run time. Users who only need the headline
+              # result + sensitivity can untick it for a much faster run.
+              tags$small(
+                style = "display:block; margin:-6px 0 8px 24px; color:#6B6B6B;",
+                t("sim_run_decomp_hint")),
               # Round 6a #5: rendered server-side so we can grey it out when no
               # correlations are selected on Tab 4 (the comparison would be
               # identical, so the toggle is meaningless).

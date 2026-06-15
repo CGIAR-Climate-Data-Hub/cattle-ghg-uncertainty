@@ -41,12 +41,34 @@ sample_distribution <- function(n, type, mean_val, lower, upper) {
     return(rep(NA_real_, n))
   }
 
-  switch(type,
+  # Andreas 2026-06-15 follow-up: guard against inconsistent bounds that make
+  # the bounded samplers (PERT / triangular) return NaN. Real translated
+  # inventories sometimes carry a central value that sits outside its own
+  # [lower, upper] CI (the same class of inconsistency seen in the emergent-
+  # beef DE case). mc2d::rpert / rtriang then emit "mode < min or mode > max"
+  # warnings and NaN samples; the NaN column later makes sd() return NA and
+  # crashes the sensitivity analysis with "undefined columns selected"
+  # (Andy's Zambia run, Tab 6 blank / Tab 7 distributions wrong). We repair
+  # the bounds here rather than propagate NaN:
+  #   - swap inverted bounds (lower > upper);
+  #   - for bounded distributions, clamp the mode/mean into [lower, upper];
+  #   - if the range is degenerate (lower == upper), return the constant;
+  #   - a final non-finite scrub below replaces any residual NaN/Inf.
+  if (is.finite(lower) && is.finite(upper) && lower > upper) {
+    tmp <- lower; lower <- upper; upper <- tmp
+  }
+  if (type %in% c("pert", "triangular")) {
+    if (!is.finite(lower) || !is.finite(upper) || lower >= upper)
+      return(rep(mean_val, n))                 # no usable spread → constant
+    mean_val <- min(max(mean_val, lower), upper)  # clamp mode into range
+  }
+
+  samples <- switch(type,
     "normal" = , "posnorm" = {
       sd_est <- (upper - lower) / (2 * 1.96)
-      samples <- rnorm(n, mean = mean_val, sd = sd_est)
-      if (type == "posnorm") samples <- pmax(samples, 0)
-      samples
+      s <- rnorm(n, mean = mean_val, sd = sd_est)
+      if (type == "posnorm") s <- pmax(s, 0)
+      s
     },
     "lognormal" = {
       mu_log <- log(mean_val)
@@ -75,11 +97,18 @@ sample_distribution <- function(n, type, mean_val, lower, upper) {
     },
     "tnorm_0_1" = {
       sd_est <- (upper - lower) / (2 * 1.96)
-      samples <- rnorm(n, mean = mean_val, sd = sd_est)
-      pmin(pmax(samples, 0), 1)
+      s <- rnorm(n, mean = mean_val, sd = sd_est)
+      pmin(pmax(s, 0), 1)
     },
     stop(paste("Unknown distribution type:", type))
   )
+
+  # Final guard: replace any non-finite draw (NaN/Inf from a degenerate
+  # parameterisation) with the central value so a single bad row can never
+  # poison the downstream sd()/sensitivity/report steps.
+  if (anyNA(samples) || any(!is.finite(samples)))
+    samples[!is.finite(samples)] <- mean_val
+  samples
 }
 
 # Compute lower/upper from mean and uncertainty percentage

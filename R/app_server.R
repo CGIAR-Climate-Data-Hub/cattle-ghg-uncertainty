@@ -1591,10 +1591,40 @@ app_server <- function(input, output, session) {
 
           # ---- Stage 2: Monte Carlo sampling ----
           n_sys <- length(sys_groups)
+
+          # Duration heads-up for large runs. A big inventory (many sub-
+          # categories) at high iteration counts — especially with the 3x
+          # decomposition — can take several minutes. Tell the user to be
+          # patient and keep the tab open, so a slow-but-working run isn't
+          # mistaken for a hang. Framed around patience only — NO mention of
+          # iteration counts to reduce or of hosting/server limits.
+          decomp_mult <- if (isTRUE(input$run_decomposition)) 3L else 1L
+          run_cost <- as.numeric(n_iter_val) * n_sys * decomp_mult
+          if (run_cost >= 1.5e6) {
+            showNotification(
+              paste0("Large run in progress — this may take a few minutes. ",
+                     "Please keep this browser tab open; the progress bar ",
+                     "will keep updating until it finishes."),
+              type = "message", duration = 12)
+          }
+
           setProgress(0.08,
             detail = sprintf("Sampling %s iterations across %d system(s)...",
                              n_iter_fmt, n_sys))
 
+          # Keep-alive: report progress once per system so the websocket keeps
+          # receiving traffic during a long run on a large inventory (prevents
+          # the shinyapps idle-disconnect Andy saw). The Combined run spans the
+          # 0.48–0.88 progress band.
+          keepalive_cb <- function(span_lo, span_hi) {
+            force(span_lo); force(span_hi)
+            function(done, total) {
+              frac <- if (total > 0) done / total else 1
+              setProgress(span_lo + (span_hi - span_lo) * frac,
+                          detail = sprintf("Simulating system %d of %d…",
+                                           done, total))
+            }
+          }
           sim_result <- run_inventory_simulation(
             systems_data, n_iter = n_iter_val,
             gwp = input$gwp_version, seed = input$seed,
@@ -1605,7 +1635,8 @@ app_server <- function(input, output, session) {
             pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
             # All correlated paths use the rank-correlation-preserving
             # restricted-pairing procedure (IPCC Vol.1 Ch.3 §3.2.3.2).
-            sampler = "iman_conover"
+            sampler = "iman_conover",
+            progress_cb = keepalive_cb(0.48, 0.88)
           )
 
           # T1.12: zero out per-source contributions the user has unchecked.
@@ -1755,8 +1786,15 @@ app_server <- function(input, output, session) {
             ad_result  <- run_inventory_simulation(
               systems_ad, n_iter = n_iter_val,
               gwp = input$gwp_version, seed = input$seed,
-              pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1
+              pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
+              progress_cb = keepalive_cb(0.48, 0.68)
             )
+            # Keep only the summary metrics; free the AD-only sample/result
+            # matrices before the EF-only pass so the three full simulations
+            # don't sit in memory simultaneously (free tier is ~1 GB RAM —
+            # holding all three risks an out-of-memory abort on a large run).
+            ad_unc <- calc_all_uncertainty(ad_result$inventory)
+            rm(systems_ad, ad_result); invisible(gc(FALSE))
 
             setProgress(0.70, detail = sprintf("Running EF-only simulation (%d group(s))...",
                                                length(systems_data)))
@@ -1764,13 +1802,16 @@ app_server <- function(input, output, session) {
             ef_result  <- run_inventory_simulation(
               systems_ef, n_iter = n_iter_val,
               gwp = input$gwp_version, seed = input$seed,
-              pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1
+              pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
+              progress_cb = keepalive_cb(0.70, 0.88)
             )
+            ef_unc <- calc_all_uncertainty(ef_result$inventory)
+            rm(systems_ef, ef_result); invisible(gc(FALSE))
 
             rv$decomposition <- list(
               combined = rv$uncertainty,
-              ad_only  = calc_all_uncertainty(ad_result$inventory),
-              ef_only  = calc_all_uncertainty(ef_result$inventory)
+              ad_only  = ad_unc,
+              ef_only  = ef_unc
             )
             rv$ipcc_table <- format_ipcc_table(rv$decomposition)
             rv$sim_log <- paste0(rv$sim_log,
@@ -1798,12 +1839,33 @@ app_server <- function(input, output, session) {
           # system only.
 
           setProgress(0.92, detail = "Running sensitivity analysis...")
+          # Sensitivity is a SECONDARY analysis — isolate it so a failure here
+          # leaves the main results (Tab 5) and the IPCC report (Tab 7) intact.
+          # Before this guard, an error inside aggregate_sensitivity (e.g. the
+          # "undefined columns selected" crash from a NaN/degenerate sample
+          # column) propagated to the top-level handler and flagged the whole
+          # run as failed even though the emissions had computed fine.
           if (length(sim_result$by_system) > 0) {
-            rv$sensitivity <- aggregate_sensitivity(
-              sim_result$by_system, sim_result$inventory$total_co2e)
-            rv$sim_log <- paste0(rv$sim_log,
-              sprintf("Sensitivity analysis complete (%d group(s)).\n",
-                      length(sim_result$by_system)))
+            rv$sensitivity <- tryCatch(
+              aggregate_sensitivity(
+                sim_result$by_system, sim_result$inventory$total_co2e),
+              error = function(e) {
+                rv$sim_log <- paste0(rv$sim_log,
+                  "WARNING: sensitivity analysis could not be computed: ",
+                  conditionMessage(e),
+                  "\n  (Main results and the IPCC report are unaffected.)\n")
+                out <- list()
+                attr(out, "message") <- paste0(
+                  "Sensitivity analysis is unavailable for this run (",
+                  conditionMessage(e),
+                  "). The emission results and uncertainty figures on the ",
+                  "other tabs are unaffected.")
+                out
+              })
+            if (length(rv$sensitivity) > 0)
+              rv$sim_log <- paste0(rv$sim_log,
+                sprintf("Sensitivity analysis complete (%d group(s)).\n",
+                        length(sim_result$by_system)))
           }
 
           # ---- Stage 6: comparison run (no correlations) ----

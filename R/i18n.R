@@ -734,6 +734,9 @@ t <- function(id, lang = NULL) {
   ),
   sim_run_decomp = list(en = "Run uncertainty decomposition (AD/EF/Combined)",
                           fr = "Lancer la décomposition d'incertitude (AD/EF/Combinée)"),
+  sim_run_decomp_hint = list(
+    en = "Runs two extra full simulations (~3× the run time on a large inventory). Untick for a faster run if you only need the headline result and sensitivity.",
+    fr = "Lance deux simulations complètes supplémentaires (~3× le temps de calcul sur un grand inventaire). Décochez pour un calcul plus rapide si vous n'avez besoin que du résultat principal et de la sensibilité."),
   btn_run_sim = list(en = "Run Monte Carlo Simulation",
                        fr = "Lancer la simulation Monte Carlo"),
   btn_run_trend = list(en = "Run Trend Analysis",

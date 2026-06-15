@@ -158,9 +158,22 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
                                       # for back-compat with callers that still
                                       # pass it; the only accepted value is
                                       # "iman_conover".
-                                      sampler = "iman_conover") {
+                                      sampler = "iman_conover",
+                                      # Optional progress callback, invoked once
+                                      # per system as progress_cb(done, total).
+                                      # Default NULL = no-op (audit / headless
+                                      # callers). The Shiny observer wires this
+                                      # to incProgress() so the websocket keeps
+                                      # receiving traffic during a multi-minute
+                                      # run on a large inventory — without it the
+                                      # blocking loop goes silent and shinyapps.io
+                                      # drops the connection (~180 s idle), which
+                                      # is the "timed out after a few minutes"
+                                      # failure on the 32-sub-category Zambia run.
+                                      progress_cb = NULL) {
   sampler <- match.arg(sampler, choices = "iman_conover")
   by_system <- list()
+  n_sys <- length(systems_data)
 
   for (sys_name in names(systems_data)) {
     sys <- systems_data[[sys_name]]
@@ -188,6 +201,10 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
       sampler                  = sampler
     )
     by_system[[sys_name]] <- sim
+    # Keep-alive heartbeat (no-op when progress_cb is NULL).
+    if (is.function(progress_cb)) {
+      tryCatch(progress_cb(length(by_system), n_sys), error = function(e) NULL)
+    }
   }
 
   # Andreas 2026-05 #33: harden against an empty by_system (or one whose
