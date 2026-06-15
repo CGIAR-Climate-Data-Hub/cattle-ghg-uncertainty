@@ -448,6 +448,20 @@ generate_template <- function(filepath, include_example = FALSE,
 generate_template_openxlsx <- function(filepath, include_example,
                                          ipcc_version = "2006") {
 
+  # Helper — turn a character vector into a 1-row data.frame for
+  # writeData. Previously we used as.data.frame(t(vec)). Production
+  # logs (2026-06-12 traceback inside .translator_write_official_template
+  # → generate_template_openxlsx) showed t(legend_labels) throwing
+  # "no such index at level 1" intermittently — most likely from
+  # Matrix's S4 t() generic interfering with base's t.default on
+  # plain character vectors when the deploy stack loads Matrix,
+  # plotly, mc2d, officer, flextable, etc. in that order. The
+  # matrix-first construction below sidesteps the t() dispatch
+  # entirely.
+  .row_df <- function(vec) {
+    as.data.frame(matrix(vec, nrow = 1L), stringsAsFactors = FALSE)
+  }
+
   wb <- openxlsx::createWorkbook()
   openxlsx::modifyBaseFont(wb, fontName = "Calibri", fontSize = 10)
 
@@ -813,7 +827,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     "REQUIRED","REQUIRED","OPT.OVERRIDE","OPT.OVERRIDE","DROPDOWN","AUTO","AUTO",
     "INFO","INFO","OPTIONAL")
   openxlsx::writeData(wb, "Parameters",
-    as.data.frame(t(legend_labels)), startRow=2, startCol=1, colNames=FALSE)
+    .row_df(legend_labels), startRow=2, startCol=1, colNames=FALSE)
   apply_style("Parameters",
     mk(fontSize=7, textDecoration="italic", halign="center",
        fontColour=C_GREY_TXT, fgFill="#FAFAFA"), rows=2, cols=1:16)
@@ -821,7 +835,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
   # Row 3: column headers
   openxlsx::writeData(wb, "Parameters",
-    as.data.frame(t(P_COLS)), startRow=3, startCol=1, colNames=FALSE)
+    .row_df(P_COLS), startRow=3, startCol=1, colNames=FALSE)
   apply_style("Parameters", s_hdr, rows=3, cols=1:16)
   openxlsx::setRowHeights(wb, "Parameters", rows=3, heights=28)
 
@@ -1058,7 +1072,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   openxlsx::setRowHeights(wb, "Manure_Management", rows=1, heights=44)
 
   openxlsx::writeData(wb, "Manure_Management",
-    as.data.frame(t(MM_COLS)), startRow=2, startCol=1, colNames=FALSE)
+    .row_df(MM_COLS), startRow=2, startCol=1, colNames=FALSE)
   apply_style("Manure_Management", s_hdr, rows=2, cols=1:MM_NCOL)
 
   hints_mm <- data.frame(
@@ -1242,19 +1256,19 @@ generate_template_openxlsx <- function(filepath, include_example,
   openxlsx::setRowHeights(wb, "Parameter_TimeSeries", rows=1, heights=52)
 
   openxlsx::writeData(wb, "Parameter_TimeSeries",
-                      as.data.frame(t(ts_all_cols)), startRow=2, startCol=1,
+                      .row_df(ts_all_cols), startRow=2, startCol=1,
                       colNames=FALSE)
   apply_style("Parameter_TimeSeries", s_ts_hdr, rows=2, cols=1:ts_n_cols)
   openxlsx::setRowHeights(wb, "Parameter_TimeSeries", rows=2, heights=22)
 
   openxlsx::writeData(wb, "Parameter_TimeSeries",
-                      as.data.frame(t(ts_all_desc)), startRow=3, startCol=1,
+                      .row_df(ts_all_desc), startRow=3, startCol=1,
                       colNames=FALSE)
   apply_style("Parameter_TimeSeries", s_ts_sub, rows=3, cols=1:ts_n_cols)
   openxlsx::setRowHeights(wb, "Parameter_TimeSeries", rows=3, heights=28)
 
   openxlsx::writeData(wb, "Parameter_TimeSeries",
-                      as.data.frame(t(ts_all_units)), startRow=4, startCol=1,
+                      .row_df(ts_all_units), startRow=4, startCol=1,
                       colNames=FALSE)
   apply_style("Parameter_TimeSeries", s_ts_sub, rows=4, cols=1:ts_n_cols)
   openxlsx::setRowHeights(wb, "Parameter_TimeSeries", rows=4, heights=18)
@@ -1491,7 +1505,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     cur_row <- cur_row + 1
 
     # Column headers
-    hdr_df <- as.data.frame(t(vt$cols), stringsAsFactors=FALSE)
+    hdr_df <- .row_df(vt$cols)
     openxlsx::writeData(wb, "Vocab", hdr_df, startRow=cur_row, startCol=1,
                         colNames=FALSE)
     apply_style("Vocab", s_hdr, rows=cur_row, cols=seq_along(vt$cols))
