@@ -1902,8 +1902,23 @@ translator_chat_server <- function(input, output, session) {
       for (i in seq_len(n_params)) {
         r      <- block_start + i - 1L
         p_name <- PARAM_CATALOGUE$parameter[i]
-        # Find AI's row matching this sub_cat + parameter (may be missing).
-        mask <- params$sub_category == sub_cat & params$parameter == p_name
+        # Find AI's row matching this (cattle_type, agg_level, sub_cat,
+        # parameter). Earlier this mask only filtered on
+        # (sub_category, parameter) — which silently contaminated rows
+        # whenever the same sub_category code appeared in multiple
+        # aggregation_levels (e.g. `dairy_cows` in both commercial_dairy
+        # and emergent_dairy; `other_cows` in all three beef systems).
+        # The first-match-wins behaviour wrote commercial_dairy values
+        # into emergent_dairy's rows and commercial_beef values into
+        # both emergent_beef and extensive_trad. Identified 2026-06-15
+        # in QA against the Zambia source file: 9/56 spot-checked
+        # values were contaminated.
+        mask <- params$sub_category == sub_cat &
+                params$parameter    == p_name &
+                (is.na(params$aggregation_level) |
+                  params$aggregation_level == agg_level) &
+                (is.na(params$cattle_type) |
+                  params$cattle_type == cattle_type)
         mask[is.na(mask)] <- FALSE
         ai   <- if (any(mask)) params[which(mask)[1], , drop = FALSE] else NULL
 
