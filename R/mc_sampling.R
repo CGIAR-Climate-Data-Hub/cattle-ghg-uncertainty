@@ -113,6 +113,42 @@ make_block_corr <- function(param_names, rho_by_block) {
   samp
 }
 
+# Physically/empirically valid domains for sampled parameters whose governing
+# IPCC equations break down outside a documented range. Draws are clamped to
+# these bounds AFTER sampling, so the per-iteration calc never evaluates an
+# equation outside the domain it was fitted on.
+#
+# DE (feed digestibility, %): the net-energy-ratio equations REM/REG (2019
+# Refinement Vol.4 Ch.10, Eq 10.14/10.15) are empirical fits to ruminant data
+# with DE in 45-85% (Ch.10 p.20: 45-55% crop by-products / rangelands; 55-80%
+# managed pasture; 72-85% grain-fed feedlot). REG crosses zero near DE = 37.6%,
+# so an untruncated normal draw in the low tail (e.g. DE = 38%) sends gross
+# energy GE = [.../REM + NEg/REG] / (DE/100) toward +/-infinity and produces
+# impossible — even negative — emissions, which stretch the output histogram
+# and pull the mean above the 97.5th percentile. Clamping DE to the documented
+# range keeps every iteration inside the equations' valid domain. Both the IPCC
+# ("DE") and legacy ("DE_pct") column spellings are covered.
+.PHYSICAL_BOUNDS <- list(
+  DE     = c(45, 85),
+  DE_pct = c(45, 85)
+)
+
+# Clamp any sampled column that has a registered physical domain into that
+# domain. A no-op for columns not in .PHYSICAL_BOUNDS, so it is safe to call on
+# every sample frame regardless of which parameters are present. Non-finite
+# entries are left untouched (the final scrub in sample_distribution() handles
+# those). Returns the same data frame with the offending columns clamped.
+.clamp_physical_bounds <- function(df) {
+  for (nm in intersect(names(df), names(.PHYSICAL_BOUNDS))) {
+    b  <- .PHYSICAL_BOUNDS[[nm]]
+    v  <- df[[nm]]
+    ok <- is.finite(v)
+    v[ok] <- pmin(pmax(v[ok], b[1L]), b[2L])
+    df[[nm]] <- v
+  }
+  df
+}
+
 # Generate MC samples.
 #   corr_matrix    – optional correlation matrix for activity data (n_AD x n_AD)
 #   ef_corr_matrix – optional correlation matrix for emission factors (n_EF x n_EF).
@@ -164,7 +200,7 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
           out[[cn]] <- pre_sampled_coefficients[, cn]
         }
       }
-      return(out)
+      return(.clamp_physical_bounds(out))
     }
     # If unified matrix has < 2 overlapping params, fall through to two-pass
   }
@@ -203,7 +239,7 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
     ef_samples <- matrix(nrow = n_iter, ncol = 0)
   }
 
-  as.data.frame(cbind(ad_samples, ef_samples))
+  .clamp_physical_bounds(as.data.frame(cbind(ad_samples, ef_samples)))
 }
 
 # Compute a named correlation matrix from a time series data frame.

@@ -2126,13 +2126,30 @@ app_server <- function(input, output, session) {
   output$results_histogram <- plotly::renderPlotly({
     req(rv$mc_results)
     co2e <- rv$mc_results$inventory$total_co2e
+    co2e <- co2e[is.finite(co2e)]
     ci <- quantile(co2e, c(0.025, 0.975))
 
-    plotly::plot_ly(x = co2e, type = "histogram", nbinsx = 50,
+    # Robust display window. A few extreme draws from heavy-tailed emission
+    # factors (e.g. lognormal EF4 / EF5) can otherwise stretch the x-axis and
+    # collapse the whole distribution into a single bar at the left. Bin and
+    # display over the 0.5-99.5 percentile window so the bulk of the
+    # distribution is legible; note how many iterations fall outside the view.
+    # (The DE-domain clamp in generate_mc_samples() removes the impossible
+    # blow-ups at source; this is a display safeguard for any residual tail.)
+    disp     <- as.numeric(quantile(co2e, c(0.005, 0.995)))
+    bin_size <- (disp[2] - disp[1]) / 50
+    n_out    <- sum(co2e < disp[1] | co2e > disp[2])
+
+    xbins <- if (is.finite(bin_size) && bin_size > 0)
+      list(start = disp[1], end = disp[2], size = bin_size) else NULL
+    xaxis <- list(title = t("res_hist_xaxis"))
+    if (!is.null(xbins)) xaxis$range <- c(disp[1], disp[2])
+
+    p <- plotly::plot_ly(x = co2e, type = "histogram", nbinsx = 50, xbins = xbins,
                     marker = list(color = "#2D6A4F", line = list(color = "#1B4332", width = 1))) %>%
       plotly::layout(
         title = t("res_hist_chart_title"),
-        xaxis = list(title = t("res_hist_xaxis")),
+        xaxis = xaxis,
         yaxis = list(title = t("res_hist_yaxis")),
         shapes = list(
           list(type = "line", x0 = ci[1], x1 = ci[1], y0 = 0, y1 = 1,
@@ -2141,6 +2158,14 @@ app_server <- function(input, output, session) {
                yref = "paper", line = list(color = "#C1121F", dash = "dash"))
         )
       )
+    if (n_out > 0) {
+      p <- p %>% plotly::layout(annotations = list(list(
+        x = 1, y = 1, xref = "paper", yref = "paper",
+        xanchor = "right", yanchor = "bottom", showarrow = FALSE,
+        font = list(size = 10, color = "#777777"),
+        text = sprintf(t("res_hist_outlier_note"), n_out, length(co2e)))))
+    }
+    p
   })
 
   # Andreas 28/5/26 #6: the AD / EF / Combined decomposition chart now

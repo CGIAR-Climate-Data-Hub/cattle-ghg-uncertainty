@@ -1881,6 +1881,36 @@ section_F <- function() {
              cap_ok,
              notes = if (cap_ok) "capped run ranks same params + flags subsample"
                      else "row cap not applied as expected")
+
+  # F27 — DE-domain clamp (2026-06-15): the IPCC net-energy-ratio equations
+  # REM/REG (Eq 10.14/10.15) are empirical fits valid for ruminant DE in 45-85%
+  # and REG crosses zero near DE = 37.6%. An UNtruncated normal draw on DE
+  # (lower/upper only set the SD) wanders into the low tail and sends gross
+  # energy to +/-infinity, producing impossible negative / exploded total_co2e
+  # (Andy's Zambia histogram: x-axis to ~50B t, mean above the 97.5th pctl).
+  # generate_mc_samples() must clamp DE into [45, 85] so REM/REG stay positive.
+  set.seed(7)
+  de_specs <- data.frame(
+    parameter    = c("N", "DE"),
+    param_type   = c("activity_data", "coefficient"),
+    distribution = c("normal", "normal"),
+    mean         = c(1000, 52.6),
+    # DE bounds give SD ~ 6.1; the untruncated tail reaches well below 38%.
+    lower        = c(900, 40.66),
+    upper        = c(1100, 64.61),
+    stringsAsFactors = FALSE, check.names = FALSE)
+  de_samp <- generate_mc_samples(de_specs, n_iter = 5000, seed = 7)
+  de_col  <- de_samp[["DE"]]
+  reg_ok  <- all(is.finite(calc_reg(de_col))) && all(calc_reg(de_col) > 0) &&
+             all(is.finite(calc_rem(de_col))) && all(calc_rem(de_col) > 0)
+  de_ok   <- all(de_col >= 45 - 1e-9) && all(de_col <= 85 + 1e-9) && reg_ok
+  check_bool("F27", "F",
+             "generate_mc_samples clamps DE into the IPCC valid domain [45,85] so REM/REG stay positive",
+             de_ok,
+             notes = if (de_ok)
+               sprintf("DE in [%.1f, %.1f]; REM/REG > 0", min(de_col), max(de_col))
+             else sprintf("DE range [%.1f, %.1f] left REM/REG domain",
+                          min(de_col), max(de_col)))
 }
 
 # =============================================================================

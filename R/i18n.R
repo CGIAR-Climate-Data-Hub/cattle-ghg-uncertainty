@@ -1461,6 +1461,9 @@ t <- function(id, lang = NULL) {
                                 fr = "Distribution des émissions totales CO₂éq"),
   res_hist_xaxis = list(en = "Total CO2eq (tonnes)", fr = "CO₂éq total (tonnes)"),
   res_hist_yaxis = list(en = "Frequency", fr = "Fréquence"),
+  res_hist_outlier_note = list(
+    en = "%d of %d iterations beyond chart range",
+    fr = "%d itérations sur %d au-delà de la plage du graphique"),
   res_decomp_chart_title = list(
     en = "Uncertainty Decomposition (95% MoE, total CO2eq)",
     fr = "Décomposition de l'incertitude (MoE 95 %, CO₂éq total)"

@@ -225,7 +225,9 @@ The ratio of net energy for growth to digestible energy consumed ($REG$) is give
 
 $$REG = 1.164 - (5.160 \times 10^{-3} \times DE) + (1.308 \times 10^{-5} \times DE^2) - \frac{37.4}{DE}$$
 
-where $DE$ is the digestible energy expressed as a percentage of gross energy. Both equations are undefined at $DE = 0$ (division by zero) — the tool validates $DE > 0$ before running any simulation.
+where $DE$ is the digestible energy expressed as a percentage of gross energy. Both equations are empirical fits derived from ruminant data and are only valid over the digestibility range observed for ruminant diets. The 2019 Refinement (Vol.4 Ch.10, §10.2) documents that range as **45--85\%** (45--55\% for crop by-products and rangelands; 55--80\% for managed pasture and forage-based diets; 72--85\% for grain-based feedlot diets). Outside this range the fits extrapolate poorly: $REG$ passes through zero near $DE \approx 37.6\%$, and below that the $-37.4/DE$ term dominates and drives $REG$ negative. Because the gross-energy equation (below) divides by $REM$ and $REG$, an unconstrained low-$DE$ draw makes gross energy — and hence emissions — diverge or even turn negative.
+
+To keep every Monte Carlo iteration inside the equations' valid domain, sampled $DE$ values are **clamped to $[45, 85]\%$** at the sampling stage (`generate_mc_samples`). This prevents non-physical iterations (the extreme positive and negative emission totals that would otherwise stretch the output histogram and pull the simulated mean above the 97.5\textsuperscript{th} percentile) without materially shifting the central estimate, since the clamp only trims the small fraction of the $DE$ distribution that falls outside the documented ruminant range. The earlier $DE > 0$ check is retained as defence-in-depth.
 
 ## Gross Energy Intake
 
