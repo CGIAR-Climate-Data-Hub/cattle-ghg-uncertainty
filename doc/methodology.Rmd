@@ -140,6 +140,8 @@ Table \ref{tab:params} lists all parameters used in the calculation chain, their
 \texttt{Cp} & Pregnancy coefficient & — & 0.10 (cattle) & Eq.~10.13; Table 10.7 (Updated) & Constant \\
 \texttt{DE\_pct} & Digestible energy (\% of GE) & \% & 55.0 (Africa) & Eq.~10.14--16; Annex 10A & Normal \\
 \texttt{Ym} & Methane conversion factor & \% & 6.5 (cattle on forage) & Eq.~10.21; Table 10.12 & Normal/PERT \\
+\texttt{UE} & Urinary energy (fraction of GE) & — & 0.04 (cattle) & Eq.~10.24 (footnote) & Constant \\
+\texttt{ASH} & Ash content of manure (fraction of DMI) & — & 0.08 (cattle; IPCC example 0.06 is pig-specific) & Eq.~10.24 & Constant \\
 \texttt{MMS\_fractions} & Fraction of manure in each MMS (deterministic; constrained to sum to 1 per sub-category). Optional per-row \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns on the Manure\_Management sheet enable per-iteration sampling within the user's bounds, renormalised to preserve the simplex; sampled fractions surface as \texttt{fraction\_<mms>} in the sensitivity tornado. & — & country-specific (Worksheet 10.A-9) & Eq.~10.23 & Deterministic (default) or per-MMS PERT/Normal/etc.\ with renormalisation \\
 \texttt{Bo} & Maximum CH$_4$ producing capacity & m$^3$ CH$_4$/kg VS & 0.13 (2019R ``Other regions, low productivity'' cattle); 2006 Africa = 0.10 & Eq.~10.23; Table 10.16(a) (Updated) & Normal \\
 \texttt{MCF} & Methane conversion factor (MMS) & — & per-MMS \& climate (e.g.\ 80\% lagoon tropical) & Eq.~10.23; Table 10.17 (Updated) & Normal/PERT \\
@@ -217,11 +219,11 @@ where $C_p$ is a coefficient for the energy cost of pregnancy (0.10 for cattle).
 
 The ratio of net energy for maintenance to digestible energy consumed ($REM$) is given by IPCC Eq. 10.14:
 
-$$REM = 1.123 - \frac{4.092 \times 10^{-3} \times DE}{1} + \frac{1.126 \times 10^{-5} \times DE^2}{1} - \frac{25.4}{DE}$$
+$$REM = 1.123 - (4.092 \times 10^{-3} \times DE) + (1.126 \times 10^{-5} \times DE^2) - \frac{25.4}{DE}$$
 
 The ratio of net energy for growth to digestible energy consumed ($REG$) is given by IPCC Eq. 10.15:
 
-$$REG = 1.164 - \frac{5.160 \times 10^{-3} \times DE}{1} + \frac{1.308 \times 10^{-5} \times DE^2}{1} - \frac{37.4}{DE}$$
+$$REG = 1.164 - (5.160 \times 10^{-3} \times DE) + (1.308 \times 10^{-5} \times DE^2) - \frac{37.4}{DE}$$
 
 where $DE$ is the digestible energy expressed as a percentage of gross energy. Both equations are undefined at $DE = 0$ (division by zero) — the tool validates $DE > 0$ before running any simulation.
 
@@ -577,7 +579,7 @@ Milk $\leftrightarrow$ Fat    & $-0.30$ & Milk dilution effect, dairy genetics l
 Milk $\leftrightarrow$ BW     & $+0.30$ & High-producing dairy breeds are physically larger: Holstein $\sim$650 kg, $\sim$30 kg milk/day vs Jersey $\sim$450 kg, $\sim$20 kg milk/day. NRC Dairy (2001); Stallings \& Knowlton (2013). Captures a real cross-group biological linkage. \\
 Milk $\leftrightarrow$ DE     & $+0.30$ & Higher feed digestibility $\Rightarrow$ more nutrient availability $\Rightarrow$ higher milk yield, especially in concentrate-fed dairy systems. NRC Dairy (2001) Ch.2. \\
 DE $\leftrightarrow$ CP       & $+0.50$ & Forage-quality co-variation across feed types (NRC 2001; INRA; Feedipedia). High-quality forages have both high DE and high CP; cross-feedstuff correlations range $0.4$--$0.7$. \\
-DE $\leftrightarrow$ Ym       & $-0.50$ & IPCC 2019 Refinement Eq 10.21 makes Ym an explicit decreasing function of DE (with NDF, EE). Meta-analyses (Niu et al. 2018 \emph{Global Change Biology}; Hristov et al. 2013) show a cross-diet negative correlation close to the equation slope. The single cross-block (activity-data $\leftrightarrow$ coefficient) pair in the preset and the one most likely to move headline emissions. \\
+DE $\leftrightarrow$ Ym       & $-0.50$ & The IPCC 2019 Refinement treats Ym as a decreasing function of diet digestibility (the updated Ym guidance in Table 10.12 and the Ym-prediction approach in Annex 10B.2 give lower Ym for higher-quality, more-digestible diets). Meta-analyses (Niu et al. 2018 \emph{Global Change Biology}; Hristov et al. 2013) show a cross-diet negative correlation of this order. The single cross-block (activity-data $\leftrightarrow$ coefficient) pair in the preset and the one most likely to move headline emissions. \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -738,15 +740,11 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 
 \vspace{4pt}
 \hangindent=1.5em
-\noindent Pouillot, R., and Delignette-Muller, M.-L. (2010). \emph{Evaluating variability and uncertainty separately in microbial quantitative risk assessment: a primer using R and a freely-available package, mc2d.} International Journal of Food Microbiology, 142(3), 330--340. (\texttt{mc2d::cornode} --- restricted-pairing reordering used to reproduce the target rank correlation matrix per IPCC Vol.1 Ch.3 §3.2.3.2.)
+\noindent Pouillot, R., and Delignette-Muller, M.-L. (2010). \emph{Evaluating variability and uncertainty separately in microbial quantitative risk assessment: a primer using R and a freely-available package, mc2d.} International Journal of Food Microbiology, 142(3), 330--340. (\texttt{mc2d} provides \texttt{cornode} for the Iman--Conover restricted-pairing reordering used to reproduce the target rank correlation matrix per IPCC Vol.1 Ch.3 §3.2.3.2, and \texttt{rtriang} / \texttt{rpert} for the triangular and PERT marginals.)
 
 \vspace{6pt}
 \hangindent=1.5em
 \noindent Bates, D., and Maechler, M. (2024). \emph{Matrix}: Sparse and Dense Matrix Classes and Methods. R package. (\texttt{Matrix::nearPD} — projection to the nearest positive-definite correlation matrix when a user-supplied $\boldsymbol{\Sigma}$ is not positive-definite.)
-
-\vspace{6pt}
-\hangindent=1.5em
-\noindent Pouillot, R., and Delignette-Muller, M.L. (2010). Evaluating variability and uncertainty separately in microbial quantitative risk assessment using two R packages. \emph{International Journal of Food Microbiology}, 142(3), 330--340. (\texttt{mc2d} — provides \texttt{cornode} for Iman--Conover restricted pairing, and \texttt{rtriang} / \texttt{rpert} for triangular and PERT marginals.)
 
 ---
 
