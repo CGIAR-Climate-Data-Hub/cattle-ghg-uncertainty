@@ -1891,7 +1891,12 @@ app_server <- function(input, output, session) {
             })
             nocorr_result <- run_inventory_simulation(
               systems_nocorr, n_iter = n_iter_val,
-              gwp = input$gwp_version, seed = input$seed
+              gwp = input$gwp_version, seed = input$seed,
+              # Keep-alive: this 4th full simulation was the one stage with no
+              # progress ticks, so the connection went silent during it and was
+              # dropped ("Disconnected from the server" during "Running
+              # comparison"). Wire the heartbeat here too.
+              progress_cb = keepalive_cb(0.94, 0.99)
             )
             rv$comparison_result <- nocorr_result
             if (length(nocorr_result$by_system) > 0) {
