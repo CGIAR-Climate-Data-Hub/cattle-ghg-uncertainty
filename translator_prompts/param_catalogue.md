@@ -24,8 +24,8 @@ All parameter codes are case-sensitive.
 | `Bo` | advanced | coefficient | m3 CH₄/kg VS | 0.13 | 20% | pert | Table 10.16 | (none) | Maximum CH₄ producing capacity of manure (IPCC Table 10.16) |
 | `ASH` | advanced | coefficient | fraction | 0.08 | 25% | pert | Eq 10.24 | ash | Ash content of manure — IPCC default 0.08 (Eq 10.24 footnote) |
 | `UE` | advanced | coefficient | fraction | 0.04 | 25% | pert | Eq 10.24 | (none) | Urinary energy as fraction of gross energy — IPCC default 0.04 (Eq 10.24 footnote) |
-| `EF3_PRP` | advanced | coefficient | kg N2O-N/kg N | 0.004 | (asymmetric — use bounds) | pert | Ch.11 Table 11.1 | (none) | N₂O emission factor for dung/urine on pasture (IPCC Vol.4 Ch.11 Table 11.1). 2019R EF3_PRP,CPP for cattle/poultry/pigs: aggregated 0.004; wet climate 0.006; dry climate 0.002. 2006 = 0.02. |
-| `EF4` | advanced | coefficient | kg N2O-N/kg N | 0.01 | (asymmetric — use bounds) | lognormal | Ch.11 Table 11.3 | (none) | N₂O EF for atmospheric N deposition (IPCC Vol.4 Ch.11 Table 11.3). 2019R aggregated EF4 = 0.010 (range 0.002-0.018); wet climate 0.014; dry climate 0.005. 2006 = 0.010. |
+| `EF3_PRP` | advanced | coefficient | kg N2O-N/kg N | 0.006 | (asymmetric — use bounds) | pert | Ch.11 Table 11.1 | (none) | N₂O emission factor for dung/urine on pasture (IPCC Vol.4 Ch.11 Table 11.1, 2019R, **wet climate, cattle**: 0.006, range 0.003-0.012). For dry climate use 0.002 (range 0.0007-0.004). For aggregated-across-climates use 0.004. 2006 = 0.02. |
+| `EF4` | advanced | coefficient | kg N2O-N/kg N | 0.014 | (asymmetric — use bounds) | lognormal | Ch.11 Table 11.3 | (none) | N₂O EF for atmospheric N deposition (IPCC Vol.4 Ch.11 Table 11.3, 2019R, **wet climate**: 0.014, range 0.011-0.017). For dry climate use 0.005. For aggregated use 0.010 (range 0.002-0.018). 2006 = 0.010. |
 | `EF5` | advanced | coefficient | kg N2O-N/kg N | 0.011 | (asymmetric — use bounds) | lognormal | Ch.11 Table 11.3 | (none) | N₂O EF for N leaching/runoff (IPCC Vol.4 Ch.11 Table 11.3). 2019R EF5 = 0.011 (range 0.000-0.020), no climate disaggregation. 2006 = 0.0075. |
 | `Frac_GASM_PRP` | advanced | coefficient | fraction | 0.21 | (asymmetric — use bounds) | pert | Ch.11 Table 11.3 | Frac_GasPRP | Fraction of N volatilised from dung/urine on pasture (IPCC Vol.4 Ch.11 Table 11.3, FracGASM). 2019R = 0.21 (range 0.00-0.31); 2006 = 0.20. |
 | `Frac_LEACH_PRP` | advanced | coefficient | fraction | 0.24 | (asymmetric — use bounds) | pert | Ch.11 Table 11.3 | Frac_LeachPRP | Fraction of N leached from pasture deposition (IPCC Vol.4 Ch.11 Table 11.3, FracLEACH-(H), wet climates only). 2019R = 0.24 (range 0.01-0.73); 2006 = 0.30; in dry climates = 0. |
@@ -36,13 +36,17 @@ All parameter codes are case-sensitive.
 
 These parameters use absolute IPCC-derived lower/upper bounds rather than a symmetric ±% around the central value.
 
+Values below are the **IPCC 2019 Refinement Vol.4 Ch.11 Tables 11.1 (EF3_PRP) and 11.3 (EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP)** for the **wet climate** classification, since most users of this tool (SSA, South/Southeast Asia, Latin America smallholder + commercial systems) operate in wet climates. Dry-climate values (lower EF3_PRP ≈ 0.002, Frac_LEACH_PRP ≈ 0) are documented in the description column above. For an arid-country inventory the user can edit these five bounds in the Parameters sheet before uploading.
+
+Two lower bounds (`EF5`, `Frac_GASM_PRP`) are bumped from the strict-IPCC 0 to a small positive number (0.0005, 0.005) because PERT and lognormal distributions break or produce extreme samples when the lower bound is exactly 0. The bumped values are tiny enough that the IPCC sense is preserved.
+
 | code | lower | central | upper |
 |------|-------|---------|-------|
-| `EF3_PRP` | 0.0007 | 0.004 | 0.06 |
-| `EF4` | 0.002 | 0.01 | 0.02 |
-| `EF5` | 0.0005 | 0.011 | 0.025 |
-| `Frac_GASM_PRP` | 0.05 | 0.21 | 0.5 |
-| `Frac_LEACH_PRP` | 0.05 | 0.24 | 0.8 |
+| `EF3_PRP` | 0.003 | 0.006 | 0.012 |
+| `EF4` | 0.011 | 0.014 | 0.017 |
+| `EF5` | 0.0005 | 0.011 | 0.020 |
+| `Frac_GASM_PRP` | 0.005 | 0.21 | 0.31 |
+| `Frac_LEACH_PRP` | 0.01 | 0.24 | 0.73 |
 
 ## Sex- and physiology-specific coefficient overrides
 
