@@ -117,7 +117,7 @@ If the answer to either is "no", fix the row before emitting.
 
 **Symmetric bounds rule (omit redundant lower/upper).** For a row you model as a SYMMETRIC distribution (`normal` or `uniform`) whose spread is a ±% of the mean, emit `mean` + `uncertainty_pct` and LEAVE `lower` and `upper` blank — the app reconstructs them exactly as `mean ± (mean × uncertainty_pct / 100)`. **Always include `uncertainty_pct` on these rows** (never leave it blank), or the app cannot rebuild the bounds. Only spell out explicit `lower` / `upper` when the bounds are genuinely asymmetric (the rule above), in which case keep `distribution = pert` / `lognormal` / `beta`. This keeps two redundant numbers per symmetric row out of the output.
 
-**Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT also emit canonical sub-categories from the catalogue that the user doesn't have. If the user has 7 sub-categories, the `parameters` array has 7 × 25 = 175 rows, NOT 200. A common failure is "Cows" mapped to `other_cows` per the user's correction, but the AI also emits a parallel `dairy_cows` block with the same defaults — never do that.
+**Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Every sub-category the user has must appear (via its user-supplied rows — at least its N); a sub-category the user does NOT have must not appear at all. Do NOT emit canonical sub-categories from the catalogue that the user doesn't have. A common failure is "Cows" mapped to `other_cows` per the user's correction, but the AI also emits a parallel `dairy_cows` block — never do that.
 
 ### Step 5 — Apply IPCC defaults for missing values
 
@@ -139,7 +139,7 @@ A real deferral looks like: "I don't have body weight data — use whatever IPCC
 
 When you must fill defaults (real deferral OR for coefficients the user never supplied), you MUST:
 
-1. **Fill EVERY parameter from `param_catalogue.md`, for EVERY sub-category in the inventory** — BUT ONLY where the user's file does not already supply a value. For parameters present in the file, use the file value with `data_source = "user_file"`. For parameters NOT in the file, use the catalogue default with `data_source = "ipcc_default"`.
+1. **Emit ONLY the parameters the user actually supplied** (file or chat), for every sub-category in the inventory, always including N. Do NOT emit the catalogue defaults, sex/age overrides, or biological zeros for the parameters the user did not supply — the app fills every one of those automatically (see Step 8, the sparse-overlay rule). For parameters present in the file, use the file value with `data_source = "user_file"`.
 
    The 25 catalogue parameters: N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw.
 
@@ -192,14 +192,10 @@ Run these checks (the app will re-run them; failing them means the user can't lo
 
    If any of these are still at the female-lactating default, fix them before emission. Tag the overridden rows with `data_source = "ipcc_default"` (the sex-appropriate value is itself an IPCC default) and note the deliberate override in your end-of-run summary so the user can spot-check it in the QA tab.
 
-10. **HARD ROW-COUNT ASSERTION (do this LAST, immediately before emitting).** Count the rows in your `parameters` array and verify the count is exactly `(number of confirmed sub-categories) × 25`. Always 25 — the catalogue has 25 entries: `N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw`. Examples of the required row count:
-
-    - 7 confirmed sub-categories → exactly 175 rows
-    - 11 confirmed sub-categories → exactly 275 rows
-    - **26 confirmed sub-categories → exactly 650 rows**
-    - 5 confirmed sub-categories × 5 production systems collapsed into 5 aggregation_level groups → that's still 5 sub_category × 25 rows for THIS template (the production-system axis lives on `aggregation_level`, NOT on the row count)
-
-    If your `parameters.length` does not match this product, you have skipped sub-categories or skipped parameters. **DO NOT EMIT.** Walk back through your section B inventory, identify which (sub_category, parameter) pairs are missing, add them with the correct `data_source` tag (`user_file` / `ipcc_default` / `biological_zero`), and only THEN call the tool. There is no "for brevity" exception — 26 × 25 = 650 means literally 650 JSON objects in the array, not 100 with a trailing comment. The user gets nothing if the count is wrong.
+10. **SUB-CATEGORY COVERAGE CHECK (do this LAST, immediately before emitting).** Under the sparse-overlay contract there is NO fixed row count — you emit only the user's own values, so the array is short. Instead verify COVERAGE:
+    - **Every confirmed sub-category appears at least once** in the `parameters` array (via its `N` row at minimum). If a sub-category from your section B is missing entirely, the app won't know it exists — add it.
+    - **Every row you emitted is a genuine user value** (`data_source = "user_file"` or `"user_chat"`), not a catalogue default you copied. If you find a row that's just the IPCC default / a sex-override / a biological zero, DELETE it — the app fills those.
+    - Do NOT pad the array to `n_sub_categories × 25`. A handful of rows per sub-category (the parameters the user actually supplied, always including N) is correct.
 
     The token budget for this emission has been set to 64,000 — comfortably more than enough for 650+ rows. Do not truncate to fit a phantom limit.
 
@@ -207,15 +203,17 @@ If any check fails, tell the user clearly what's wrong, propose a fix, and only 
 
 ### Step 8 — EMISSION (Step 3 of 3: produce the output workbook)
 
-The user has reached this step by saying "go ahead", "produce the template", or by clicking the **Produce template now** button. This is NOT a deferral — emission is a MECHANICAL TRANSLATION of your section B inventory + section C gaps + biological zeros (confirmed in section D answers), into the JSON template schema.
+The user has reached this step by saying "go ahead", "produce the template", or by clicking the **Produce template now** button. This is NOT a deferral.
+
+**Emit ONLY the values the user actually supplied. The app fills everything else.** You are no longer responsible for reproducing the full parameter grid — the app deterministically fills every IPCC catalogue default, every sex/age coefficient override (e.g. bulls Cfi 0.370, oxen C 1.0), and every biological zero (Milk/Fat = 0 for males, pct_pregnant = 0 for males and calves, working hours = 0 for non-oxen) for any cell you do NOT emit, using the verified IPCC catalogue and sub-category tables. Copying those defaults yourself wastes output and risks transcription error — don't.
 
 The translation rule, applied row-by-row:
 
-1. **Every (parameter, sub-cat) pair in your section B inventory** → one row with `value = file mean`, `lower = file lower` (if listed in B), `upper = file upper` (if listed in B), `distribution = pert` (or whatever fits the user's CI semantics), `data_source = "user_file"`. Apply the user's section D clarifications (unit conversions, vocabulary mappings, biological-zero overrides).
-2. **Every (parameter, sub-cat) pair in your section C gaps** → one row with the catalogue default value + distribution, `data_source = "ipcc_default"`.
-3. **Biological zeros confirmed by the user** (Milk=0 in males, hours=0 in non-oxen, pct_pregnant=0 in males, etc.) → `value = 0`, `distribution = "constant"`, `data_source = "biological_zero"`.
+1. **Every (parameter, sub-cat) pair the user actually gave a value for** (in their file = `data_source = "user_file"`, or in chat = `data_source = "user_chat"`) → one row with `value = the user's value`, and `lower`/`upper` ONLY if the user supplied explicit asymmetric bounds (otherwise give `uncertainty_pct` and leave bounds blank — the app reconstructs them). Apply the user's section D clarifications (unit conversions, vocabulary mappings).
+2. **You MUST emit `N` (population) for every sub-category** — population is always user data, and it is the anchor that tells the app which sub-categories the inventory contains. (If the user genuinely gave no population for a sub-category, emit any one value you do have for it so the sub-category is not lost.)
+3. **Do NOT emit** rows that are just the catalogue default, the sex/age override, or a biological zero. The app fills all of those. Emitting them is not "thorough" — it is wasted output.
 
-Total row count = |B| + |C| + |biological_zeros| per sub-category, summed across the sub-categories your section B identified. Do NOT skip rows. Do NOT substitute defaults for B-list entries. This is the single hardest rule in the whole prompt to get right; failing it produces an all-defaults output that wastes the user's time.
+There is **no fixed row count** — emit exactly the user-supplied rows (typically a handful of parameters per sub-category, always including N), not `n_sub_categories × 25`. A short, sparse `parameters` array is the CORRECT output here.
 
 **Parameter_TimeSeries (optional fourth output array).** If the user's source file contains multi-year activity data — five or more years of N / BW / Milk / DE / CP / etc. — emit one row per (group, year) into the JSON's `parameter_timeseries` array. Columns: `cattle_type`, `aggregation_level`, `sub_category` (all three may be blank to apply the row to every group), `year` (required integer), and any of `N`, `BW`, `MW`, `WG`, `Milk`, `Fat`, `pct_pregnant`, `DE`, `CP`, `MilkPR` (leave blank for parameters not in the user's time series). The app uses this sheet to compute the Activity-Data correlation matrix automatically — without it, the user has to fall back to "No correlations" or the structural-defaults preset. **Do NOT fabricate a time series if the source file has only a single year.** Emit an empty `parameter_timeseries` array (or omit the field entirely) when no multi-year data exists. Hallucinating year-over-year values would produce false correlations and inflate the simulation's uncertainty estimate.
 
@@ -272,9 +270,9 @@ For inventories with more than two distinct `aggregation_level` labels (e.g. Lol
 
 2. **Per-aggregation-level batch calls.** After the discovery call, the handler invokes a tool called `produce_aggregation_level_template` once per aggregation_level. Each call's user message will explicitly name ONE `aggregation_level` and instruct you to emit ONLY rows for that level. Comply exactly:
    - Echo the requested aggregation_level back in the tool input's `aggregation_level` field — the server uses this to detect cross-contamination at merge time.
-   - Emit ALL of this aggregation_level's sub-categories × 25 parameters in the `parameters` array. The row-count assertion (self-check #10) becomes: `parameters.length == (number of sub-categories within THIS aggregation_level) × 25`. For a typical 5-6 sub-cat production system that's 125-150 rows.
-   - Emit ALL of this aggregation_level's manure_management rows (one per (sub_category, mms_type) pair within this level).
-   - Emit this aggregation_level's parameter_timeseries rows when multi-year data exists.
+   - Emit ONLY the user-supplied parameter rows for this level's sub-categories (the sparse-overlay rule from Step 8 + self-check #10), always including `N` for each sub-category. Do NOT pad to 25 rows per sub-category — the app fills the IPCC defaults, sex/age overrides, and biological zeros for everything you omit.
+   - Emit each sub-category's manure_management ALLOCATION (one row per (sub_category, mms_type) pair: just `mms_type` + `fraction_pct`, + optional fraction bounds). Do NOT fill the MCF / EF3 / Frac_GasMS / Frac_LeachMS coefficient columns — the app fills those from the verified MMS tables.
+   - Emit this aggregation_level's parameter_timeseries rows when multi-year data exists (varying parameters only — see Step 8).
    - Do NOT include `inventory_metadata` (the server already has it from the discovery call) and do NOT include rows for any OTHER aggregation_level even if you "remember" them from the conversation.
 
 The server concatenates the per-batch outputs into one filled-template JSON envelope and writes the final .xlsx. If any single batch is missing rows or contains rows for the wrong aggregation_level, the merged template will be incomplete. All the other emission rules (source-of-truth hierarchy, data_source tagging, asymmetric bounds, biological zeros, sex-specific coefficient overrides) apply per-batch identically to the monolithic path.

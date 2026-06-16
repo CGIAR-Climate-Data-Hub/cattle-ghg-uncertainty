@@ -1,16 +1,18 @@
-# Worked example — complete template-ready JSON for a small inventory
+# Worked example — template-ready JSON SHAPE reference
 
-Below is one full reference output you can pattern-match against when emitting the `template-ready` JSON. It is INTENTIONALLY different from the user's data (Country Z = Asian smallholder dairy with one heifer group; not African, not multi-sub-category beef) so you cannot copy values blindly — only the SHAPE.
+Below is one reference output you can pattern-match against for the `template-ready` JSON **SHAPE** (field names, nesting, strict-JSON formatting). It is INTENTIONALLY different from the user's data (Country Z = Asian smallholder dairy with one heifer group) so you cannot copy values blindly — only the shape.
 
-Key things the example demonstrates:
+> ⚠️ **SPARSE-OVERLAY CONTRACT (read first).** This example shows a *fully populated* grid only to illustrate every field. **You do NOT emit the full grid.** Per Step 8 of the system instructions, emit ONLY the rows the user actually supplied (always including `N` per sub-category) and, for manure, only `mms_type` + `fraction_pct`. The app fills every catalogue default, sex/age override, biological zero, and MMS coefficient you omit. Treat the arrays below as a field dictionary, not a row-count target.
+
+Key things the example demonstrates (shape only):
 
 - `inventory_metadata` filled completely with realistic values.
-- `parameters` array contains EVERY one of the 25 catalogue parameters, repeated for EVERY sub-category. Two sub-categories here → 2 × 25 = 50 parameter rows. For an inventory with 8 sub-categories you would emit 8 × 25 = 200 rows. List them all. Never use placeholder comments like `// repeat for X` or `// for brevity not shown`.
-- `manure_management` has one row per (sub_category, mms_type) combination, with `MCF_pct`, `EF3`, `Frac_GasMS_pct`, AND `Frac_LeachMS_pct` filled on every row (the last two are commonly forgotten — they MUST be present, with IPCC 2019 Refinement defaults if the user had no country-specific value).
+- `parameters` — the field names and value/uncertainty/distribution/data_source shape of a row. (The example repeats all 25 per sub-category for illustration; you emit only the user-supplied ones.)
+- `manure_management` — the field names. (The example fills MCF/EF3/Frac for illustration; you emit only `mms_type` + `fraction_pct`.)
 - Strict JSON: no comments, no expressions, no trailing commas, no unquoted keys.
 - Every value is a literal — never write `4.5*1.032`; compute `4.644` yourself before emitting.
 
-When the user defers to your judgement, your job is to emit this full shape for THEIR sub-categories. Use IPCC defaults from `param_catalogue.md` for values you don't have. Use IPCC 2019R Table 10.17 / 11.1 / 11.3 defaults for MMS coefficient columns. Mark every IPCC-defaulted Parameters row with `data_source = "ipcc_default"` (the field is optional in the schema but useful for the user's QA review).
+When the user defers to your judgement, emit their user-supplied values in this shape; the app supplies the IPCC defaults for everything else. Mark user values `data_source = "user_file"` / `"user_chat"`.
 
 ## Reference output
 
@@ -92,13 +94,13 @@ When the user defers to your judgement, your job is to emit this full shape for 
 
 ## What this shows (read carefully)
 
-1. **Every sub-category gets ALL 25 parameter rows.** Even the ones that are zero for that animal type (Milk = 0 for heifers, WG = 0 for adult dairy_cows, hours = 0 for non-draught animals). The Monte Carlo needs the row present; a `constant` distribution with `mean = 0` keeps the calculation correct.
+1. **You emit only the user-supplied rows; the app completes the grid.** The Monte Carlo does need every parameter present, but the APP fills the omitted ones — every catalogue default plus the biological zeros (Milk = 0 for males, WG = 0 for adults, hours = 0 for non-draught) as `constant`/`mean = 0` rows. Do not emit those yourself.
 
 2. **Manure_Management has rows for EVERY sub-category in `parameters`.** This inventory has 2 sub-categories, so both appear. If your user's inventory has 8 sub-categories, you would emit 8 × N MMS rows where N is the number of MMS types in use. Never leave a sub-category with no MMS rows — manure-CH4 and -N2O collapse to zero for that animal type.
 
 3. **`fraction_pct` sums to 100 within each sub-category.** Verify before emitting.
 
-4. **`MCF_pct`, `EF3`, `Frac_GasMS_pct`, `Frac_LeachMS_pct` are all filled** on every MMS row. The last two are the ones most often skipped — they're easy to forget because they're optional in the schema. Fill them anyway with IPCC 2019R defaults; the schema accepts numeric zero where the IPCC value is zero (e.g. `Frac_GasMS_pct = 0` for pasture).
+4. **Do NOT fill `MCF_pct`, `EF3`, `Frac_GasMS_pct`, `Frac_LeachMS_pct`.** Emit only `mms_type` + `fraction_pct` on each MMS row; the app fills the four coefficient columns from the verified IPCC 2019R MMS tables (Other-Cattle column). A user-supplied coefficient still passes through if present.
 
 5. **`param_type` is "activity_data" or "coefficient"** — the catalogue tells you which. As a rule of thumb: anything the user could measure on their farm (N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, CP, hours, MilkPR) is `activity_data`; anything that comes from an IPCC table (Cfi, Ca, C, Cp, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_*, Tw) is `coefficient`.
 
