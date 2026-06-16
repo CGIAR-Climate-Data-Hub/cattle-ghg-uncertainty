@@ -1636,7 +1636,11 @@ app_server <- function(input, output, session) {
             # All correlated paths use the rank-correlation-preserving
             # restricted-pairing procedure (IPCC Vol.1 Ch.3 §3.2.3.2).
             sampler = "iman_conover",
-            progress_cb = keepalive_cb(0.48, 0.88, "Main run")
+            progress_cb = keepalive_cb(0.48, 0.88, "Main run"),
+            # Cap retained input draws (memory): the full-n_iter results behind
+            # every reported figure are unaffected — only the samples used for
+            # the sensitivity ranking / density plots are thinned.
+            keep_sample_rows = 4000L
           )
 
           # T1.12: zero out per-source contributions the user has unchecked.
@@ -1787,7 +1791,10 @@ app_server <- function(input, output, session) {
               systems_ad, n_iter = n_iter_val,
               gwp = input$gwp_version, seed = input$seed,
               pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
-              progress_cb = keepalive_cb(0.48, 0.68, "AD-only run")
+              progress_cb = keepalive_cb(0.48, 0.68, "AD-only run"),
+              # Cap retained samples to lower the transient peak; this run's
+              # samples are never read (decomposition uses only its inventory).
+              keep_sample_rows = 4000L
             )
             # Keep only the summary metrics; free the AD-only sample/result
             # matrices before the EF-only pass so the three full simulations
@@ -1803,7 +1810,10 @@ app_server <- function(input, output, session) {
               systems_ef, n_iter = n_iter_val,
               gwp = input$gwp_version, seed = input$seed,
               pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
-              progress_cb = keepalive_cb(0.70, 0.88, "EF-only run")
+              progress_cb = keepalive_cb(0.70, 0.88, "EF-only run"),
+              # Cap retained samples to lower the transient peak; this run's
+              # samples are never read (decomposition uses only its inventory).
+              keep_sample_rows = 4000L
             )
             ef_unc <- calc_all_uncertainty(ef_result$inventory)
             rm(systems_ef, ef_result); invisible(gc(FALSE))
@@ -1896,7 +1906,12 @@ app_server <- function(input, output, session) {
               # progress ticks, so the connection went silent during it and was
               # dropped ("Disconnected from the server" during "Running
               # comparison"). Wire the heartbeat here too.
-              progress_cb = keepalive_cb(0.94, 0.99, "Comparison (no correlations)")
+              progress_cb = keepalive_cb(0.94, 0.99, "Comparison (no correlations)"),
+              # Cap retained input draws: this second full result set persists in
+              # rv$comparison_result for the session. Its inventory (full n_iter)
+              # still drives the with/without-correlation CV comparison; only the
+              # samples feeding the "without correlations" tornado are thinned.
+              keep_sample_rows = 4000L
             )
             rv$comparison_result <- nocorr_result
             if (length(nocorr_result$by_system) > 0) {

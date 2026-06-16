@@ -170,7 +170,24 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
                                       # drops the connection (~180 s idle), which
                                       # is the "timed out after a few minutes"
                                       # failure on the 32-sub-category Zambia run.
-                                      progress_cb = NULL) {
+                                      progress_cb = NULL,
+                                      # Memory cap: thin each system's RETAINED
+                                      # `samples` frame to at most this many rows
+                                      # before it is stored in `by_system`. NULL =
+                                      # keep all rows (audit / headless / trend
+                                      # callers). The Shiny app passes 4000L so the
+                                      # heaviest Zambia run (32 sub-categories ×
+                                      # main + AD-only + EF-only + no-correlation
+                                      # comparison) stays under the ~1 GB free tier.
+                                      # `results` and `inventory` are ALWAYS kept at
+                                      # full n_iter — only `samples` is thinned, and
+                                      # it is used solely for the SRC/PRCC ranking
+                                      # (already subsampled to 4000 in
+                                      # aggregate_sensitivity) and the first-system
+                                      # input-density histograms, both stable far
+                                      # below n_iter. Each MC row is an i.i.d. draw,
+                                      # so the first k rows are a valid subsample.
+                                      keep_sample_rows = NULL) {
   sampler <- match.arg(sampler, choices = "iman_conover")
   by_system <- list()
   n_sys <- length(systems_data)
@@ -200,6 +217,14 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
       mms_fraction_samples     = sys$mms_fraction_samples,
       sampler                  = sampler
     )
+    # Memory cap: thin the retained input draws to keep_sample_rows so the
+    # accumulator never holds full-n_iter samples for all systems at once
+    # (the OOM driver on the heavy Zambia run). results/inventory untouched —
+    # they keep the full iteration count behind every reported figure.
+    if (!is.null(keep_sample_rows) && !is.null(sim$samples) &&
+        nrow(sim$samples) > keep_sample_rows) {
+      sim$samples <- sim$samples[seq_len(keep_sample_rows), , drop = FALSE]
+    }
     by_system[[sys_name]] <- sim
     # Keep-alive heartbeat (no-op when progress_cb is NULL).
     if (is.function(progress_cb)) {

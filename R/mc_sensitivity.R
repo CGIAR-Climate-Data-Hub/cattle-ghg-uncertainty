@@ -170,19 +170,31 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   # rank on a capped subsample. Each Monte Carlo row is an independent draw, so
   # the first `max_rows` rows are a valid random subsample. The headline 95% MoE
   # is unaffected — it is computed elsewhere from the full iteration set.
+  # Reconcile the design matrix and the output vector to a common row count
+  # before regressing. Two reasons:
+  #   1. the subsample cap (rankings are stable far below the iteration count
+  #      the headline percentiles need — see the note above), and
+  #   2. `combined` may now be SHORTER than `output`: the Shiny app thins the
+  #      retained per-system `samples` to ~4000 rows for memory, while the
+  #      per-source `output` (e.g. rowSums of the full-n_iter `results`) is
+  #      still full length. Aligning to the minimum keeps lm() inputs matched
+  #      and avoids a "differing number of rows" error. The first k MC rows
+  #      are an i.i.d. subsample, so rows line up across both.
   n_full <- nrow(combined)
-  if (is.finite(max_rows) && n_full > max_rows) {
-    idx <- seq_len(max_rows)
+  m <- min(n_full, length(output))
+  if (is.finite(max_rows)) m <- min(m, max_rows)
+  if (m < n_full || m < length(output)) {
+    idx      <- seq_len(m)
     combined <- combined[idx, , drop = FALSE]
     output   <- output[idx]
   }
   res <- sensitivity_analysis(combined, output, method = method)
-  if (is.finite(max_rows) && n_full > max_rows && is.list(res)) {
+  if (m < n_full && is.list(res)) {
     attr(res, "subsampled_note") <- sprintf(
       paste0("Sensitivity ranking computed on the first %s of %s iterations ",
              "(the ranking is stable; the headline uncertainty uses all ",
              "iterations)."),
-      format(max_rows, big.mark = ","), format(n_full, big.mark = ","))
+      format(m, big.mark = ","), format(n_full, big.mark = ","))
   }
   res
 }
