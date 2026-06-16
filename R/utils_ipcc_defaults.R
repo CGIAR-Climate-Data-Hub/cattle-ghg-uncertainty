@@ -90,11 +90,20 @@ MMS_DEFAULTS <- data.frame(
   versions = c("2006,2019", "2006,2019", "2006,2019", "2019",
                "2006,2019", "2006,2019", "2006,2019", "2006,2019", "2006,2019",
                "2019", "2019", "2019"),
+  # MCF retained on the 2006-convention climate-zone values (a coherent set).
+  # Deliberately NOT switched to the 2019R Table 10.17 values: the 2019R
+  # Pasture/Range/Paddock MCF (0.47%) must, per Table 10.17 footnote 2, be paired
+  # with Bo = 0.19 m3/kg VS, and the engine uses a single per-animal Bo — so
+  # adopting 2019R MCF correctly would require a per-MMS Bo (deferred engine
+  # change). Verified line-by-line vs Table 10.17 on 2026-06-16.
   mcf_tropical     = c(1.5, 1.0, 5.0, 4.0, 5.0, 30.0, 80.0, 1.5, 80.0,  3.5, 0.0,  10.0),
   mcf_tropical_dry = c(1.5, 1.0, 5.0, 4.0, 5.0, 30.0, 80.0, 1.5, 80.0,  3.5, 0.0,  10.0),
   mcf_temperate    = c(1.0, 0.5, 4.0, 2.0, 1.5, 17.0, 35.0, 1.0, 66.0,  1.0, 0.0,  10.0),
   mcf_boreal       = c(1.0, 0.1, 3.0, 1.0, 1.0,  3.0, 10.0, 0.5, 66.0,  1.0, 0.0,  10.0),
-  ef3 = c(0.02, 0.0, 0.005, 0.005, 0.02, 0.01, 0.005, 0.006, 0.0, 0.0006, 0.005, 0.0),
+  # EF3 = direct N2O EF by managed system, IPCC 2019R Table 10.21 (verified
+  # 2026-06-16): solid_storage + solid_storage_covered corrected 0.005 -> 0.010.
+  # pasture 0.02 is the PRP/Ch.11 pathway value (not a Table 10.21 MS), left as-is.
+  ef3 = c(0.02, 0.0, 0.010, 0.010, 0.02, 0.01, 0.005, 0.006, 0.0, 0.0006, 0.005, 0.0),
   stringsAsFactors = FALSE
 )
 
@@ -150,27 +159,37 @@ get_mms_for_version <- function(version = "2006") {
 }
 
 ## Round 7 R1.12 / R1.13: per-MMS Frac_GasMS and Frac_LeachMS defaults from
-## IPCC 2019 Refinement Vol 4 Ch 10 Tables 10.22 (volatilization) and 10.23
-## (leaching). Returns a list with mean / lower / upper for the two fractions.
-## Uncertainty bounds set at +-50% per Penman et al. (2000) / Monni et al.
-## (2007) for asymmetric N-fraction parameters.
+## IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22 — BOTH volatilisation (Frac_GasMS)
+## and leaching (Frac_LeachMS). (Corrected citation: leaching is Table 10.22, not
+## 10.23; Table 10.23 is the N2:N2O loss ratio.) Values are the "Other Cattle"
+## column of Table 10.22; bounds use the IPCC ranges where the table gives them,
+## else +-50% (Penman 2000 / Monni 2007).
+## Verified + corrected line-by-line on 2026-06-16 against Table 10.22:
+##   solid_storage_covered gas 0.10->0.22, leach 0.02->0.00
+##   dry_lot      leach 0.00->0.035 (rainfall-dependent, range 0-0.07)
+##   deep_bedding gas 0.30->0.25, leach 0.02->0.035
+##   composting   leach 0.02->0.06 (static-pile/windrow row, matches gas 0.65)
+##   aerobic_treatment gas 0.40->0.85 (forced-aeration Other Cattle)
+##   lagoon       gas 0.78->0.35 (0.78 matched no cattle column — clear error)
+## (pasture stays 0/0: PRP volatilisation/leaching is the Frac_*_PRP catalogue
+##  pathway, not a managed-storage fraction.)
 MMS_FRAC_DEFAULTS_2019 <- data.frame(
   mms_type = c("pasture", "daily_spread", "solid_storage",
                "solid_storage_covered", "dry_lot", "deep_bedding",
                "liquid_slurry", "anaerobic_digester", "composting",
                "aerobic_treatment", "lagoon", "burned_for_fuel"),
-  frac_gas       = c(0.00, 0.07, 0.45, 0.10, 0.30, 0.30,
-                     0.48, 0.05, 0.65, 0.40, 0.78, 0.00),
-  frac_gas_low   = c(0.00, 0.04, 0.23, 0.05, 0.15, 0.15,
-                     0.24, 0.02, 0.33, 0.20, 0.39, 0.00),
-  frac_gas_high  = c(0.00, 0.10, 0.68, 0.15, 0.45, 0.45,
-                     0.72, 0.08, 0.98, 0.60, 1.00, 0.00),
-  frac_leach     = c(0.00, 0.00, 0.02, 0.02, 0.00, 0.02,
-                     0.00, 0.00, 0.02, 0.00, 0.00, 0.00),
-  frac_leach_low = c(0.00, 0.00, 0.01, 0.01, 0.00, 0.01,
-                     0.00, 0.00, 0.01, 0.00, 0.00, 0.00),
-  frac_leach_high = c(0.00, 0.00, 0.03, 0.03, 0.00, 0.03,
-                      0.00, 0.00, 0.03, 0.00, 0.00, 0.00),
+  frac_gas       = c(0.00, 0.07, 0.45, 0.22, 0.30, 0.25,
+                     0.48, 0.05, 0.65, 0.85, 0.35, 0.00),
+  frac_gas_low   = c(0.00, 0.04, 0.23, 0.03, 0.15, 0.10,
+                     0.24, 0.02, 0.33, 0.27, 0.20, 0.00),
+  frac_gas_high  = c(0.00, 0.10, 0.68, 0.26, 0.45, 0.30,
+                     0.72, 0.08, 0.98, 1.00, 0.80, 0.00),
+  frac_leach     = c(0.00, 0.00, 0.02, 0.00, 0.035, 0.035,
+                     0.00, 0.00, 0.06, 0.00, 0.00, 0.00),
+  frac_leach_low = c(0.00, 0.00, 0.01, 0.00, 0.00, 0.00,
+                     0.00, 0.00, 0.03, 0.00, 0.00, 0.00),
+  frac_leach_high = c(0.00, 0.00, 0.03, 0.00, 0.07, 0.07,
+                      0.00, 0.00, 0.09, 0.00, 0.00, 0.00),
   stringsAsFactors = FALSE
 )
 

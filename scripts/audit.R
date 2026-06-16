@@ -1936,6 +1936,29 @@ section_F <- function() {
              cat_ok,
              notes = if (cat_ok) "EF3_PRP=0.006, EF4=0.014, EF5=0.011 + wet bounds"
                      else "catalogue N2O defaults drifted from the agreed wet-climate values")
+
+  # F29 — per-MMS coefficient guard (2026-06-16). MMS_DEFAULTS$ef3 and
+  # MMS_FRAC_DEFAULTS_2019 were corrected line-by-line against IPCC 2019R
+  # Tables 10.21 / 10.22 ("Other Cattle" column). Lock the corrected values so
+  # they can't regress — these feed the blank-template examples now and the
+  # app's per-MMS default-fill under the sparse-overlay change. (MCF stays on the
+  # 2006 convention by design — see the MMS_DEFAULTS comment.)
+  mms_ef3 <- function(id) MMS_DEFAULTS$ef3[MMS_DEFAULTS$id == id]
+  fr <- function(id) mms_frac_defaults_2019(id)
+  mms_ok <-
+    eq(mms_ef3("solid_storage"), 0.010) && eq(mms_ef3("solid_storage_covered"), 0.010) &&
+    eq(mms_ef3("dry_lot"), 0.02) && eq(mms_ef3("liquid_slurry"), 0.005) &&
+    eq(fr("lagoon")$frac_gas, 0.35) && eq(fr("aerobic_treatment")$frac_gas, 0.85) &&
+    eq(fr("solid_storage_covered")$frac_gas, 0.22) &&
+    eq(fr("solid_storage_covered")$frac_leach, 0.00) &&
+    eq(fr("deep_bedding")$frac_gas, 0.25) && eq(fr("deep_bedding")$frac_leach, 0.035) &&
+    eq(fr("dry_lot")$frac_leach, 0.035) && eq(fr("composting")$frac_leach, 0.06) &&
+    eq(fr("solid_storage")$frac_gas, 0.45) && eq(fr("liquid_slurry")$frac_gas, 0.48)
+  check_bool("F29", "F",
+             "MMS_DEFAULTS EF3 + MMS_FRAC_DEFAULTS_2019 match IPCC 2019R Tables 10.21/10.22 (Other Cattle)",
+             mms_ok,
+             notes = if (mms_ok) "EF3 solid_storage=0.010; lagoon Frac_Gas=0.35; aerobic=0.85; dry_lot leach=0.035"
+                     else "a corrected MMS coefficient drifted from the IPCC Other-Cattle value")
 }
 
 # =============================================================================
