@@ -529,9 +529,9 @@ app_ui <- function(request = NULL) {
            var txtEl = document.getElementById('docx_download_banner_text');
            if (txtEl) txtEl.innerHTML =
              '<strong>' + (label || 'Generating Word summary') + '</strong><br>' +
-             'This can take 30 to 120 seconds for a 10 000-iteration run. ' +
-             'Your browser will start the download automatically when the ' +
-             'file is ready. (Click this banner to dismiss.)';
+             'This usually takes 10 to 30 seconds. The file saves automatically ' +
+             'when it is ready and this message closes on its own. ' +
+             '(Click this banner to dismiss.)';
            el.style.display = 'flex';
            if (_docxBannerTimer) clearTimeout(_docxBannerTimer);
            _docxBannerTimer = setTimeout(_docxHideBanner, 180000);
@@ -542,15 +542,73 @@ app_ui <- function(request = NULL) {
            if (_docxBannerTimer) { clearTimeout(_docxBannerTimer);
                                     _docxBannerTimer = null; }
          }
+         // 2026-06: native downloads give no 'finished' signal, so the banner
+         // used to linger until its 180s timeout. Fetch the file via JS instead
+         // — the promise resolves exactly when the build + transfer completes —
+         // then save it as a blob, hide the banner and show a 'saved' toast. If
+         // anything fails we fall back to the native navigation so the download
+         // still happens.
+         function _docxDoneToast() {
+           _docxHideBanner();
+           var t = document.createElement('div');
+           t.innerHTML = '&#10003; Word report saved &mdash; check your browser ' +
+             'download bar or your Downloads folder.';
+           t.style.cssText = 'position:fixed; top:14px; left:50%;' +
+             'transform:translateX(-50%); z-index:9999;' +
+             'background:#D8F3DC; color:#1B4332;' +
+             'border:1px solid #95D5B2; border-left:4px solid #2D6A4F;' +
+             'border-radius:8px; padding:12px 16px;' +
+             'box-shadow:0 4px 16px rgba(0,0,0,0.18);' +
+             'font-size:0.92rem; max-width:540px; cursor:pointer;';
+           t.title = 'Click to dismiss';
+           t.addEventListener('click', function(){ if (t.parentNode) t.parentNode.removeChild(t); });
+           document.body.appendChild(t);
+           setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 8000);
+         }
+         function _docxFetchDownload(href, label, fallbackName) {
+           _docxShowBanner(label);
+           fetch(href, { credentials: 'same-origin' }).then(function(resp) {
+             if (!resp.ok) throw new Error('HTTP ' + resp.status);
+             var cd = resp.headers.get('Content-Disposition') || '';
+             var fname = '';
+             var marker = 'filename=';
+             var i = cd.indexOf(marker);
+             if (i >= 0) {
+               fname = cd.substring(i + marker.length).split(';')[0].trim();
+               while (fname.length > 1 && (fname.charCodeAt(0) === 34 || fname.charCodeAt(0) === 39))
+                 fname = fname.substring(1);
+               while (fname.length > 1 && (fname.charCodeAt(fname.length - 1) === 34 ||
+                       fname.charCodeAt(fname.length - 1) === 39))
+                 fname = fname.substring(0, fname.length - 1);
+             }
+             if (!fname) fname = fallbackName;
+             return resp.blob().then(function(b) { return { b: b, f: fname }; });
+           }).then(function(o) {
+             var u = URL.createObjectURL(o.b);
+             var a = document.createElement('a');
+             a.href = u; a.download = o.f;
+             document.body.appendChild(a); a.click(); document.body.removeChild(a);
+             setTimeout(function(){ URL.revokeObjectURL(u); }, 5000);
+             _docxDoneToast();
+           }).catch(function(err) {
+             _docxHideBanner();
+             window.location.assign(href);
+           });
+         }
          document.addEventListener('click', function(ev) {
            var t = ev.target;
            while (t && t !== document.body) {
-             if (t.id === 'download_docx') {
-               _docxShowBanner('Generating Word summary');
-               return;
-             }
-             if (t.id === 'download_trend_docx') {
-               _docxShowBanner('Generating trend Word report');
+             if (t.id === 'download_docx' || t.id === 'download_trend_docx') {
+               var isTrend = (t.id === 'download_trend_docx');
+               var label = isTrend ? 'Generating trend Word report' : 'Generating Word summary';
+               var fallbackName = isTrend ? 'trend_report.docx' : 'uncertainty_summary.docx';
+               var href = (t.tagName === 'A') ? t.getAttribute('href') : null;
+               if (href && href !== '#' && href.length > 1) {
+                 ev.preventDefault();
+                 _docxFetchDownload(href, label, fallbackName);
+               } else {
+                 _docxShowBanner(label);
+               }
                return;
              }
              t = t.parentElement;

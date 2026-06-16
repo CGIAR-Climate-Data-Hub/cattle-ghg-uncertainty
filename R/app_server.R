@@ -2832,33 +2832,16 @@ app_server <- function(input, output, session) {
   # visible even when the server is busy running a simulation.
   outputOptions(output, "definitions_table", suspendWhenHidden = FALSE)
 
-  # Perf (2026-06): pre-bin histograms server-side and send only the bar
-  # heights, instead of shipping every Monte Carlo draw to the browser as a
-  # plotly `type="histogram"` (which bins client-side). On the IPCC Report tab
-  # this turned ~150k-200k raw points per render into a few hundred bars, so the
-  # tab opens near-instantly even on a 32-sub-category x 30k run. Bars are drawn
-  # contiguous (width = bin width, bargap = 0) so they look like a histogram.
-  .hist_bar <- function(x, nbins, color, density = FALSE, title = "") {
-    x <- x[is.finite(x)]
-    if (length(x) == 0) return(plotly::plot_ly())
-    rng <- range(x)
-    if (diff(rng) <= .Machine$double.eps) {
-      # Degenerate (constant) input — a single spike, as a raw histogram drew it.
-      p <- plotly::plot_ly(x = rng[1], y = if (density) 1 else length(x),
-                           type = "bar", marker = list(color = color),
-                           showlegend = FALSE)
-    } else {
-      h  <- hist(x, breaks = nbins, plot = FALSE)
-      yv <- if (density) h$density else h$counts
-      p  <- plotly::plot_ly(x = h$mids, y = yv, type = "bar",
-                            width = h$breaks[2] - h$breaks[1],
-                            marker = list(color = color, line = list(width = 0)),
-                            showlegend = FALSE,
-                            hovertemplate = "%{x:.3g}: %{y:.3g}<extra></extra>")
-    }
-    p |> plotly::layout(xaxis = list(title = title), yaxis = list(title = ""),
-                        bargap = 0)
-  }
+  # Perf (2026-06): the IPCC Report histograms ship their data to the browser as
+  # plotly `type="histogram"` (binned client-side). Sending every Monte Carlo
+  # draw (up to ~150k points across the source panels) made the tab slow to
+  # open, so we DOWNSAMPLE each panel to .HIST_MAX_PTS points first — the
+  # distribution shape is identical at a few thousand i.i.d. draws, and the data
+  # transferred drops ~5-10x. (An earlier attempt to pre-bin server-side as bar
+  # traces broke the plotly::subplot grid layout, so we keep the native
+  # histogram trace and just thin the input.)
+  .HIST_MAX_PTS <- 2500L
+  .downsample <- function(x) if (length(x) > .HIST_MAX_PTS) x[seq_len(.HIST_MAX_PTS)] else x
 
   # T8.4 / Round 6a #8: per-source histograms embedded in IPCC Report.
   # Bug fix: previous version referenced `inv$enteric_ch4_total` etc., but the
@@ -2919,8 +2902,11 @@ app_server <- function(input, output, session) {
     sources <- sources[keep]
 
     plots <- lapply(seq_along(sources), function(i) {
-      .hist_bar(sources[[i]], nbins = 40, color = "#2D6A4F",
-                title = names(sources)[i])
+      plotly::plot_ly(x = .downsample(sources[[i]]), type = "histogram", nbinsx = 40,
+                      marker = list(color = "#2D6A4F"),
+                      name = names(sources)[i], showlegend = FALSE) |>
+        plotly::layout(xaxis = list(title = names(sources)[i]),
+                       yaxis = list(title = ""))
     })
     plotly::subplot(plots,
                     nrows  = max(1, ceiling(length(plots) / 3)),
@@ -2988,8 +2974,11 @@ app_server <- function(input, output, session) {
     # Take up to 12 parameters to keep the panel readable
     keep <- head(colnames(samples), 12)
     plots <- lapply(keep, function(p) {
-      .hist_bar(samples[[p]], nbins = 30, color = "#40916C",
-                density = TRUE, title = p)
+      plotly::plot_ly(x = .downsample(samples[[p]]), type = "histogram",
+                      histnorm = "probability density",
+                      nbinsx = 30, marker = list(color = "#40916C"),
+                      name = p, showlegend = FALSE) |>
+        plotly::layout(xaxis = list(title = p), yaxis = list(title = ""))
     })
     plotly::subplot(plots, nrows = 4, margin = 0.04,
                     titleX = TRUE, titleY = FALSE)
