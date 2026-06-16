@@ -142,83 +142,174 @@ ghg_emissions_vec <- function(
   # deterministic vector across iterations (pre-fix behaviour).
   mms_fraction_samples = NULL
 ) {
+  # Round 11 (2026-06): fully vectorised over all n iterations. Previously this
+  # looped i = 1..n calling the scalar ghg_emissions() once per iteration, which
+  # dominated runtime on large inventories (the 32-sub-category Zambia run at
+  # 30k iterations × 4 simulations took minutes). Every IPCC equation here is
+  # element-wise, so the loop is replaced by whole-vector arithmetic; the only
+  # remaining loop is over the handful of MMS *types* (not iterations).
+  #
+  # The scalar ghg_emissions() and all calc_*() helpers are intentionally left
+  # untouched — they remain the reference the audit (deterministic golden case)
+  # and the equivalence test check against. This function reproduces their
+  # output bit-for-bit, including operation order and the historical broadcast
+  # defaults (e.g. Frac_LEACH_PRP -> 0.30 when the caller passes NULL; the app
+  # always supplies it via get_param() so that path is never hit in practice).
   n <- length(cattle_pop)
-  results <- data.frame(
-    enteric_ch4_total = numeric(n),
-    manure_ch4_total = numeric(n),
-    direct_n2o_mm_total = numeric(n),
-    indirect_n2o_mm_total = numeric(n),
-    direct_n2o_prp_total = numeric(n),
-    indirect_n2o_prp_total = numeric(n),
-    total_ch4 = numeric(n),
-    total_n2o = numeric(n),
-    total_co2e = numeric(n)
-  )
 
-  # Andreas 2026-05 follow-up: removed Dirichlet `mms_fractions_matrix` path —
-  # MMS% is now deterministic across iterations (matches IPCC Inventory Software).
+  # Broadcast scalar / NULL arguments to length n (behaviour preserved exactly).
+  .bcast <- function(x, default) {
+    if (is.null(x)) rep(default, n)
+    else if (length(x) == 1L) rep(x, n)
+    else x
+  }
+  prp_fg_vec <- .bcast(Frac_GASM_PRP,  0.21)
+  prp_fl_vec <- .bcast(Frac_LEACH_PRP, 0.30)
+  milkpr_vec <- .bcast(MilkPR, 3.3)
+  tw_vec     <- .bcast(Tw, 20)
 
-  # Broadcast PRP fractions / MilkPR / Tw to length n if scalar / NULL.
-  prp_fg_vec <- if (is.null(Frac_GASM_PRP))  rep(0.21, n) else
-                if (length(Frac_GASM_PRP)  == 1) rep(Frac_GASM_PRP,  n) else Frac_GASM_PRP
-  prp_fl_vec <- if (is.null(Frac_LEACH_PRP)) rep(0.30, n) else
-                if (length(Frac_LEACH_PRP) == 1) rep(Frac_LEACH_PRP, n) else Frac_LEACH_PRP
-  milkpr_vec <- if (is.null(MilkPR)) rep(3.3, n) else
-                if (length(MilkPR) == 1) rep(MilkPR, n) else MilkPR
-  # Andreas 2026-05 follow-up: Tw is now sourced from samples (catalogue row
-  # added per #23). Broadcast a scalar default if the caller hasn't supplied
-  # a per-iteration vector.
-  tw_vec <- if (is.null(Tw)) rep(20, n) else
-            if (length(Tw) == 1) rep(Tw, n) else Tw
-
-  # Andreas 2026-05 follow-up (C4 / C6): per-iteration MMS uncertainty.
-  # When a sample matrix is supplied, row i replaces the corresponding
-  # named scalar vector for iteration i. Caller must order the matrix
-  # columns to match the MMS keys in `mms_fractions`. NA entries fall
-  # back to the scalar value for that MMS.
-  .row_or_scalar <- function(mat, scalar_vec, i) {
-    if (is.null(mat)) return(scalar_vec)
-    out <- setNames(as.numeric(mat[i, ]), colnames(mat))
-    bad <- is.na(out)
-    if (any(bad) && !is.null(scalar_vec)) {
-      sc <- scalar_vec[colnames(mat)]
-      out[bad] <- sc[bad]
+  # Per-MMS lookup -> length-n vector for MMS `key`, matching the scalar engine's
+  # .row_or_scalar(mat, scalar_vec, i)[key] semantics exactly: sample column when
+  # present (NA entries fall back to the named scalar), the named scalar when no
+  # matrix is supplied, and NA when the key is absent from the matrix columns.
+  .mms_vec <- function(mat, scalar_vec, key) {
+    if (is.null(mat)) {
+      v <- if (!is.null(scalar_vec) && key %in% names(scalar_vec))
+             as.numeric(scalar_vec[[key]]) else NA_real_
+      return(rep(v, n))
     }
-    out
+    if (!(key %in% colnames(mat))) return(rep(NA_real_, n))
+    col <- as.numeric(mat[, key])
+    bad <- is.na(col)
+    if (any(bad)) {
+      fb <- if (!is.null(scalar_vec) && key %in% names(scalar_vec))
+              as.numeric(scalar_vec[[key]]) else NA_real_
+      col[bad] <- fb
+    }
+    col
   }
 
-  for (i in seq_len(n)) {
-    mcf_i <- .row_or_scalar(mcf_samples, mcf_values, i)
-    ef3_i <- .row_or_scalar(ef3_samples, ef3_values, i)
-    fg_i  <- .row_or_scalar(frac_gas_samples,   frac_gas_values,   i)
-    fl_i  <- .row_or_scalar(frac_leach_samples, frac_leach_values, i)
-    # Andreas 28/5/26 #4: row i of the renormalised allocation matrix
-    # replaces the deterministic mms_fractions vector when supplied.
-    mms_i <- .row_or_scalar(mms_fraction_samples, mms_fractions, i)
-    r <- ghg_emissions(
-      cattle_pop[i], live_weight[i], weight_gain[i], mature_weight[i],
-      milk_yield[i], milk_fat[i], pct_pregnant[i],
-      hours[i], DE[i], Cfi[i], Ca[i], C_growth[i], Cp[i],
-      Ym[i], Bo[i], ASH[i], UE[i], CP[i],
-      mms_i, mcf_i, ef3_i,
-      EF3_PRP[i], Frac_GASMS[i], EF4[i], EF5[i], Frac_LEACH_H[i],
-      gwp,
-      Tw = tw_vec[i],
-      frac_gas_values   = fg_i,
-      frac_leach_values = fl_i,
-      Frac_GASM_PRP  = prp_fg_vec[i],
-      Frac_LEACH_PRP = prp_fl_vec[i],
-      MilkPR         = milkpr_vec[i]
-    )
-    results$enteric_ch4_total[i] <- r$enteric_ch4_total
-    results$manure_ch4_total[i] <- r$manure_ch4_total
-    results$direct_n2o_mm_total[i] <- r$direct_n2o_mm_total
-    results$indirect_n2o_mm_total[i] <- r$indirect_n2o_mm_total
-    results$direct_n2o_prp_total[i] <- r$direct_n2o_prp_total
-    results$indirect_n2o_prp_total[i] <- r$indirect_n2o_prp_total
-    results$total_ch4[i] <- r$total_ch4
-    results$total_n2o[i] <- r$total_n2o
-    results$total_co2e[i] <- r$total_co2e
+  # Indirect-MM Frac_GasMS / Frac_LeachMS with the scalar engine's 3-level
+  # fallback (calc_indirect_n2o_mm): per-iteration sample (NA -> named scalar)
+  # -> IPCC 2019 per-MMS default -> broadcast scalar. `field` is the
+  # mms_frac_defaults_2019() list element ("frac_gas" or "frac_leach").
+  .frac_gl_vec <- function(samp_mat, named_vec, key, field, broadcast_vec) {
+    if (is.null(samp_mat)) {
+      cand <- if (is.null(named_vec) || !(key %in% names(named_vec)))
+                rep(NA_real_, n) else rep(as.numeric(named_vec[[key]]), n)
+    } else if (!(key %in% colnames(samp_mat))) {
+      cand <- rep(NA_real_, n)
+    } else {
+      cand <- as.numeric(samp_mat[, key])
+      bad <- is.na(cand)
+      if (any(bad)) {
+        fb <- if (!is.null(named_vec) && key %in% names(named_vec))
+                as.numeric(named_vec[[key]]) else NA_real_
+        cand[bad] <- fb
+      }
+    }
+    avail    <- !is.na(cand)
+    def      <- mms_frac_defaults_2019(key)[[field]]
+    fallback <- if (!is.na(def)) rep(def, n) else broadcast_vec
+    ifelse(avail, cand, fallback)
   }
-  results
+
+  # ---- Energy requirements (IPCC Vol.4 Ch.10) ----
+  # nem (Eq 10.3) with vectorised cold-climate Cfi adjustment (Eq 10.2):
+  Cfi_adj <- ifelse(!is.na(tw_vec) & tw_vec < 20, Cfi + 0.0048 * (20 - tw_vec), Cfi)
+  nem <- Cfi_adj * (live_weight ^ 0.75)
+  nea <- calc_nea(nem, Ca)
+  # neg (Eq 10.6): 0 when weight_gain<=0 or mature_weight<=0 (matches the scalar
+  # isTRUE() guards, including NA fall-through). An NA power base for non-positive
+  # weight_gain keeps the discarded ifelse branch from raising a NaN warning.
+  neg_zero <- (!is.na(weight_gain) & weight_gain <= 0) |
+              (!is.na(mature_weight) & mature_weight <= 0)
+  wg_pos   <- ifelse(!is.na(weight_gain) & weight_gain > 0, weight_gain, NA_real_)
+  neg_full <- 22.02 * ((live_weight / (C_growth * mature_weight)) ^ 0.75) *
+              (wg_pos ^ 1.097)
+  neg <- ifelse(neg_zero, 0, neg_full)
+  nel <- calc_nel(milk_yield, milk_fat, pct_pregnant)
+  new_energy <- calc_new(nem, hours)
+  nep <- calc_nep(nem, Cp, pct_pregnant = pct_pregnant)
+  rem <- calc_rem(DE)
+  reg <- calc_reg(DE)
+  ge  <- calc_ge(nem, nea, nel, nep, new_energy, neg, rem, reg, DE)
+
+  # ---- Enteric CH4 (Eq 10.21) ----
+  enteric_ch4_head  <- calc_enteric_ch4(ge, Ym)
+  enteric_ch4_total <- enteric_ch4_head * cattle_pop / 1000
+
+  # ---- Volatile solids (Eq 10.24), inlined (scalar per-element QA warnings
+  #      in calc_volatile_solids() are intentionally not raised in the MC path) ----
+  VS <- (ge * (1 - DE / 100) + UE * ge) * ((1 - ASH) / 18.45)
+
+  # ---- N excretion (Eq 10.32-10.34), inlined & vectorised ----
+  DMI      <- ge / 18.45
+  N_intake <- DMI * (CP / 100) / 6.25
+  N_ret_milk <- ifelse(!is.na(milk_yield) & !is.na(pct_pregnant) &
+                         milk_yield > 0 & pct_pregnant > 0,
+                       milk_yield * pct_pregnant * milkpr_vec / 100 / 6.38, 0)
+  N_ret_wg   <- ifelse(!is.na(weight_gain) & weight_gain > 0,
+                       weight_gain * 0.032, 0)
+  Nex <- pmax(0, (N_intake - (N_ret_milk + N_ret_wg)) * 365)
+
+  # ---- Manure CH4 + manure-management N2O: sum over MMS TYPES ----
+  # The iterated MMS set mirrors the scalar engine, which loops names(mms_i):
+  # the allocation's names when there is no per-iteration allocation matrix,
+  # else that matrix's columns.
+  mms_keys <- if (is.null(mms_fraction_samples)) names(mms_fractions)
+              else colnames(mms_fraction_samples)
+  manure_ch4_head      <- numeric(n)
+  direct_n2o_mm_head   <- numeric(n)
+  indirect_n2o_mm_head <- numeric(n)
+  for (key in mms_keys) {
+    frac_k <- .mms_vec(mms_fraction_samples, mms_fractions, key)
+    mcf_k  <- .mms_vec(mcf_samples,          mcf_values,    key)
+    manure_ch4_head <- manure_ch4_head + VS * 365 * Bo * 0.67 * mcf_k * frac_k
+    if (identical(as.character(key), "pasture")) next  # PRP handled separately
+    ef3_k <- .mms_vec(ef3_samples, ef3_values, key)
+    fg_k  <- .frac_gl_vec(frac_gas_samples,   frac_gas_values,   key, "frac_gas",   Frac_GASMS)
+    fl_k  <- .frac_gl_vec(frac_leach_samples, frac_leach_values, key, "frac_leach", Frac_LEACH_H)
+    direct_n2o_mm_head   <- direct_n2o_mm_head + Nex * frac_k * ef3_k * (44 / 28)
+    indirect_n2o_mm_head <- indirect_n2o_mm_head +
+      Nex * frac_k * fg_k * EF4 * (44 / 28) +
+      Nex * frac_k * fl_k * EF5 * (44 / 28)
+  }
+
+  # ---- Pasture / range / paddock (PRP) N2O (Vol.4 Ch.11) ----
+  # pct_pasture = per-iteration "pasture" allocation fraction (0 when absent),
+  # matching the scalar ifelse("pasture" %in% names(mms_i), mms_i["pasture"], 0).
+  pct_pasture_vec <- if ("pasture" %in% mms_keys)
+    .mms_vec(mms_fraction_samples, mms_fractions, "pasture") else numeric(n)
+  direct_n2o_prp_head   <- calc_direct_n2o_prp(Nex, pct_pasture_vec, EF3_PRP)
+  indirect_n2o_prp_head <- calc_indirect_n2o_prp(
+    Nex, pct_pasture_vec,
+    Frac_GASM_PRP  = prp_fg_vec, EF4 = EF4,
+    Frac_LEACH_PRP = prp_fl_vec, EF5 = EF5)
+
+  # ---- Totals (t/yr) and CO2e ----
+  manure_ch4_total       <- manure_ch4_head * cattle_pop / 1000
+  direct_n2o_mm_total    <- direct_n2o_mm_head * cattle_pop / 1000
+  indirect_n2o_mm_total  <- indirect_n2o_mm_head * cattle_pop / 1000
+  direct_n2o_prp_total   <- direct_n2o_prp_head * cattle_pop / 1000
+  indirect_n2o_prp_total <- indirect_n2o_prp_head * cattle_pop / 1000
+
+  total_ch4 <- enteric_ch4_total + manure_ch4_total
+  total_n2o <- direct_n2o_mm_total + indirect_n2o_mm_total +
+               direct_n2o_prp_total + indirect_n2o_prp_total
+
+  gwp_vals   <- GWP_VALUES[[gwp]]
+  total_co2e <- total_ch4 * gwp_vals$CH4 + total_n2o * gwp_vals$N2O
+
+  data.frame(
+    enteric_ch4_total      = enteric_ch4_total,
+    manure_ch4_total       = manure_ch4_total,
+    direct_n2o_mm_total    = direct_n2o_mm_total,
+    indirect_n2o_mm_total  = indirect_n2o_mm_total,
+    direct_n2o_prp_total   = direct_n2o_prp_total,
+    indirect_n2o_prp_total = indirect_n2o_prp_total,
+    total_ch4              = total_ch4,
+    total_n2o              = total_n2o,
+    total_co2e             = total_co2e
+  )
 }
