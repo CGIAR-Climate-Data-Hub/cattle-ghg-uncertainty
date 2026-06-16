@@ -33,7 +33,7 @@ Country X    2022   dairy_cows     500000       275              300            
 
 **Missing core parameters** (per catalogue, tier = core): `Fat` (yes, present), `pct_pregnant`, `CP`, `MilkPR` — fill with IPCC defaults: 0.60, 10.0, 3.3.
 
-**Advanced parameters not in user file:** `Cfi`, `Ca`, `C`, `Cp`, `hours`, `ASH`, `UE`, `EF3_PRP`, `EF4`, `EF5`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`, `Tw` — fill from catalogue defaults; mark `data_source = "IPCC default — to be reviewed"`. (The managed-storage manure-N₂O quantities — direct EF3, Frac_GasMS, Frac_LeachMS — are NOT Parameters rows; they go per-MMS in Manure_Management.)
+**Advanced parameters not in user file:** `Cfi`, `Ca`, `C`, `Cp`, `hours`, `ASH`, `UE`, `EF3_PRP`, `EF4`, `EF5`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`, `Tw` — fill from catalogue defaults; mark `data_source = "ipcc_default"`. (The managed-storage manure-N₂O quantities — direct EF3, Frac_GasMS, Frac_LeachMS — are NOT Parameters rows; they go per-MMS in Manure_Management.)
 
 **Manure_Management:** ask the user. Default-ish setup for smallholder dairy might be {pasture: 60%, solid_storage: 30%, daily_spread: 10%} — but **never default the allocation silently**; this is country-specific. Always confirm.
 
@@ -99,7 +99,7 @@ This is common — small-inventory teams who know their animal numbers but nothi
 
 **User says:** "Country X, 2022, IPCC 2019 Refinement, 500,000 dairy cows in one sub-category, 100% pasture, use IPCC defaults for everything else."
 
-**You do:** Build a Parameters block with `N = 500000` (user-provided) and every other parameter set to its `ipcc_default` from `param_catalogue.md`, distribution = `suggested_distribution`, uncertainty = `suggested_uncertainty_pct`, `data_source = "IPCC default (Tier 2 fallback)"`. Build one Manure_Management row: `mms_type=pasture, fraction_pct=100`, plus the MCF/EF3/Frac defaults for pasture. Done in two minutes.
+**You do:** Build a Parameters block with `N = 500000` (`data_source = "user_file"`) and every other parameter set to its `ipcc_default` from `param_catalogue.md`, distribution = `suggested_distribution`, uncertainty = `suggested_uncertainty_pct`, `data_source = "ipcc_default"`. Build one Manure_Management row: `mms_type=pasture, fraction_pct=100`, plus the MCF/EF3/Frac defaults for pasture. Done in two minutes.
 
 **Important caveat to tell the user:** "I used Africa-region IPCC defaults uniformly. The Cattle Uncertainty App's QA/QC tab will flag any of these as 'IPCC default' so you can replace them with country-specific values later. The simulation will run, but the resulting uncertainty bands will be wide because they reflect IPCC's Tier 1 ranges, not your country's actual measurement quality."
 
@@ -153,7 +153,7 @@ dairy_cows      120000    1320             0
 
 **User says:** "Our crude protein in feed is 11% — that's the only number I have."
 
-**You do:** `parameter = CP, value = 11, distribution = normal, uncertainty_pct = 15` (from catalogue), `lower = 11 × 0.85 = 9.35`, `upper = 11 × 1.15 = 12.65`, `data_source = "Country measurement; uncertainty from IPCC suggested ±15%"`.
+**You do:** `parameter = CP, value = 11, distribution = normal, uncertainty_pct = 15` (from catalogue), `data_source = "user_chat"`. Leave `lower` / `upper` blank — for a symmetric Normal the app reconstructs them from the mean ± uncertainty_pct (here 9.35–12.65), so emitting them is redundant.
 
 **Tell the user:** "I used a ±15% Normal distribution around 11% — IPCC's suggested uncertainty for CP. If you have a measured range or a different distribution shape in mind, let me know and I'll update it."
 

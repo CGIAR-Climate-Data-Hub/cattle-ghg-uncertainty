@@ -939,11 +939,10 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
     temperature = 0,
     timeout_sec = timeout_sec,
     tools       = tool_def,
-    tool_choice = tool_choice,
-    # Prime the 1-hour cache: this Stage-1 call writes the system prompt at the
-    # 1h TTL so the Stage-2 batches that follow within the hour re-read it
-    # instead of each re-writing the ~27K prompt.
-    cache_ttl   = "1h"
+    tool_choice = tool_choice
+    # cache_ttl left at the 5-minute default (see anthropic_chat_batch_template_force
+    # for the rationale: production logs show the batch chain already hits the
+    # 5-minute cache, so the extended 1h TTL only inflated the cold-write price).
   )
 }
 
@@ -1050,12 +1049,19 @@ anthropic_chat_batch_template_force <- function(messages,
     temperature = 0,
     timeout_sec = timeout_sec,
     tools       = tool_def,
-    tool_choice = tool_choice,
-    # 1-hour cache: each batch streams for 5-17 min, so the default 5-minute
-    # cache expires between batches and every batch re-writes the ~170K
-    # stable prefix. The 1h TTL writes it once and re-reads it at 10% on the
-    # remaining batches — the main per-run cost saving.
-    cache_ttl   = "1h"
+    tool_choice = tool_choice
+    # cache_ttl left at the 5-minute default. We tried the extended 1-hour TTL
+    # (commit c0dac3f), but the production logs (2026-06-15 Zambia runs) showed
+    # batches 2-5 ALREADY hit the 5-minute cache: each batch streams in ~4-5 min
+    # and every cache read refreshes the TTL, so the chain stays warm. The only
+    # cold writes are discovery / enumerate / batch-1, and those are cold
+    # REGARDLESS of TTL because each stage sends a different `tools` config
+    # (Anthropic's cache key includes tools). The 1h TTL therefore saved nothing
+    # on reads but billed those unavoidable cold writes at 2x instead of 1.25x
+    # (~+$0.77/run) and made the cost log under-report (.ANTHROPIC_PRICING only
+    # carries the 1.25x rate). If 1h is ever re-enabled, add a cache_write_1h
+    # rate and branch anthropic_cost_usd first. The plumbing (cache_ttl arg,
+    # .anthropic_cache_ctl, beta header) is kept — harmless and reusable.
   )
 }
 

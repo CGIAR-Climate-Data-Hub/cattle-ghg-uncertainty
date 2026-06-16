@@ -105,21 +105,23 @@ The single biggest failure mode in this tool is the AI confirming a user's data 
 2. **A user-stated correction in the chat.** If the user typed a number in the conversation that overrides what's in the file (or that fills in something the file is missing), use the chat number.
 3. **IPCC default from `param_catalogue.md`.** ONLY when neither (1) nor (2) supplies a value.
 
-Tag every Parameters row with `data_source = "file"` / `"chat"` / `"ipcc_default — user deferred"` / `"ipcc_default — parameter not in user data"` so the user can audit which is which.
+Tag every Parameters row with a `data_source` drawn from this FIXED short vocabulary (use these exact strings — no free-text variants or trailing notes): `user_file` (value came from the uploaded file), `user_chat` (value the user gave in chat), `ipcc_default` (catalogue default), `biological_zero` (a structural zero like Milk in males). Keeping the vocabulary fixed and short lets the user audit provenance at a glance and avoids spending output tokens on prose tags.
 
 **Before you emit `template-ready`, run this self-check on each row:**
 
-- *Did the user's file have a value for this (sub_category, parameter)? If yes → my `value` field exactly matches it. If no → I marked `data_source = "ipcc_default — parameter not in user data"`.*
+- *Did the user's file have a value for this (sub_category, parameter)? If yes → my `value` field exactly matches it and `data_source = "user_file"`. If no → `data_source = "ipcc_default"`.*
 
 If the answer to either is "no", fix the row before emitting.
 
 **Asymmetric bounds rule.** If the file has explicit lower / upper bounds (any column called `Lower CI`, `Upper CI`, `lower`, `upper`, `ci_lower`, `ci_upper`, `p2.5`, `p97.5`, etc.) for a parameter, USE those as `lower_bound` and `upper_bound` directly, set `distribution = pert`, and leave `uncertainty_pct` blank. Do NOT fall back to a symmetric ±% from the catalogue.
 
+**Symmetric bounds rule (omit redundant lower/upper).** For a row you model as a SYMMETRIC distribution (`normal` or `uniform`) whose spread is a ±% of the mean, emit `mean` + `uncertainty_pct` and LEAVE `lower` and `upper` blank — the app reconstructs them exactly as `mean ± (mean × uncertainty_pct / 100)`. **Always include `uncertainty_pct` on these rows** (never leave it blank), or the app cannot rebuild the bounds. Only spell out explicit `lower` / `upper` when the bounds are genuinely asymmetric (the rule above), in which case keep `distribution = pert` / `lognormal` / `beta`. This keeps two redundant numbers per symmetric row out of the output.
+
 **Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT also emit canonical sub-categories from the catalogue that the user doesn't have. If the user has 7 sub-categories, the `parameters` array has 7 × 25 = 175 rows, NOT 200. A common failure is "Cows" mapped to `other_cows` per the user's correction, but the AI also emits a parallel `dairy_cows` block with the same defaults — never do that.
 
 ### Step 5 — Apply IPCC defaults for missing values
 
-For any **core** parameter (see `param_catalogue.md` tier column) the user hasn't supplied, use the IPCC default from the catalogue and note `data_source = "IPCC default — to be reviewed"`. Do the same for **advanced** parameters (they ship pre-filled in the template anyway).
+For any **core** parameter (see `param_catalogue.md` tier column) the user hasn't supplied, use the IPCC default from the catalogue and note `data_source = "ipcc_default"`. Do the same for **advanced** parameters (they ship pre-filled in the template anyway).
 
 **On telling users what the QA tab will flag**: the app's QA/QC deviation-from-IPCC-default check applies **only to BW** (which has a defensible continental table lookup in IPCC Vol.4 Ch.10 Annex 10A.1 / 10A.2 / 10A.3). For Milk, MW, DE, Ym, Bo and any other parameter you auto-filled with an IPCC default, the QA tab will mark the row as **Missing** (auto-filled) but will NOT fire a deviation warning citing a continental IPCC default — because no such defensible continental default exists for those parameters at the table level. So when you summarise what you filled in, tell the user "the QA tab will flag this as auto-filled" rather than "the QA tab will compare it against an IPCC continental default".
 
@@ -137,7 +139,7 @@ A real deferral looks like: "I don't have body weight data — use whatever IPCC
 
 When you must fill defaults (real deferral OR for coefficients the user never supplied), you MUST:
 
-1. **Fill EVERY parameter from `param_catalogue.md`, for EVERY sub-category in the inventory** — BUT ONLY where the user's file does not already supply a value. For parameters present in the file, use the file value with `data_source = "user_file"`. For parameters NOT in the file, use the catalogue default with `data_source = "ipcc_default — user deferred"` (or `"ipcc_default — parameter not in user data"` if the user never deferred but the file just didn't have it).
+1. **Fill EVERY parameter from `param_catalogue.md`, for EVERY sub-category in the inventory** — BUT ONLY where the user's file does not already supply a value. For parameters present in the file, use the file value with `data_source = "user_file"`. For parameters NOT in the file, use the catalogue default with `data_source = "ipcc_default"`.
 
    The 25 catalogue parameters: N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw.
 
@@ -168,7 +170,7 @@ Follow the distribution choice guide in `template_schema.md` §"Distribution cho
 
 Run these checks (the app will re-run them; failing them means the user can't load the file):
 
-1. Every Parameters row has `lower ≤ value ≤ upper` (or all three = 0 for genuinely-zero parameters with `distribution = constant`).
+1. Every Parameters row either (a) carries an explicit `lower ≤ value ≤ upper` triple (asymmetric rows), or (b) carries a `value` + `uncertainty_pct` with `lower`/`upper` left blank (symmetric Normal/uniform rows — the app reconstructs the bounds), or (c) is a genuine zero with all of value/lower/upper = 0 and `distribution = constant`. Never emit a row with no spread information at all (a non-constant row needs either explicit bounds or `uncertainty_pct`).
 2. `N ≥ 0`; `DE ∈ [0, 100]`; `Ym > 0`; every fraction (`pct_pregnant`, `ASH`, `UE`, `Frac_*`) in [0, 1].
 3. Manure_Management: per (cattle_type, aggregation_level, sub_category), `fraction_pct` sums to 100 ± 1.
 4. Every `mms_type` is valid for the selected IPCC version.
@@ -188,7 +190,7 @@ Run these checks (the app will re-run them; failing them means the user can't lo
    - `oxen.Cfi` and `growing_males.Cfi` use 0.322 (non-lactating), not 0.386 (lactating-female)
    - `bulls.Cfi` uses 0.370
 
-   If any of these are still at the female-lactating default, fix them before emission. Tag the overridden rows with `data_source = "ipcc_table_10.6"` so the audit trail shows the override was deliberate.
+   If any of these are still at the female-lactating default, fix them before emission. Tag the overridden rows with `data_source = "ipcc_default"` (the sex-appropriate value is itself an IPCC default) and note the deliberate override in your end-of-run summary so the user can spot-check it in the QA tab.
 
 10. **HARD ROW-COUNT ASSERTION (do this LAST, immediately before emitting).** Count the rows in your `parameters` array and verify the count is exactly `(number of confirmed sub-categories) × 25`. Always 25 — the catalogue has 25 entries: `N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw`. Examples of the required row count:
 
@@ -216,6 +218,8 @@ The translation rule, applied row-by-row:
 Total row count = |B| + |C| + |biological_zeros| per sub-category, summed across the sub-categories your section B identified. Do NOT skip rows. Do NOT substitute defaults for B-list entries. This is the single hardest rule in the whole prompt to get right; failing it produces an all-defaults output that wastes the user's time.
 
 **Parameter_TimeSeries (optional fourth output array).** If the user's source file contains multi-year activity data — five or more years of N / BW / Milk / DE / CP / etc. — emit one row per (group, year) into the JSON's `parameter_timeseries` array. Columns: `cattle_type`, `aggregation_level`, `sub_category` (all three may be blank to apply the row to every group), `year` (required integer), and any of `N`, `BW`, `MW`, `WG`, `Milk`, `Fat`, `pct_pregnant`, `DE`, `CP`, `MilkPR` (leave blank for parameters not in the user's time series). The app uses this sheet to compute the Activity-Data correlation matrix automatically — without it, the user has to fall back to "No correlations" or the structural-defaults preset. **Do NOT fabricate a time series if the source file has only a single year.** Emit an empty `parameter_timeseries` array (or omit the field entirely) when no multi-year data exists. Hallucinating year-over-year values would produce false correlations and inflate the simulation's uncertainty estimate.
+
+**Emit only the parameters that CHANGE across years.** Within the time series, populate a parameter's per-year value only when that parameter actually varies from one year to the next. If a parameter holds the SAME value in every year, leave it blank in `parameter_timeseries` — its single value is already on the Parameters sheet, and the app's correlation step discards constant (zero-variance) series entirely, so a flat column contributes nothing. Keep the year rows themselves (the `year` column drives the time axis), but only fill the columns that carry real year-over-year movement. This avoids emitting thousands of identical repeated values with no effect on the result.
 
 The `species` field follows the sub-categories you mapped in B — never guess:
 

@@ -10,7 +10,7 @@ Key things the example demonstrates:
 - Strict JSON: no comments, no expressions, no trailing commas, no unquoted keys.
 - Every value is a literal — never write `4.5*1.032`; compute `4.644` yourself before emitting.
 
-When the user defers to your judgement, your job is to emit this full shape for THEIR sub-categories. Use IPCC defaults from `param_catalogue.md` for values you don't have. Use IPCC 2019R Table 10.17 / 11.1 / 11.3 defaults for MMS coefficient columns. Mark every IPCC-defaulted Parameters row with `data_source = "IPCC default — user deferred"` (the field is optional in the schema but useful for the user's QA review).
+When the user defers to your judgement, your job is to emit this full shape for THEIR sub-categories. Use IPCC defaults from `param_catalogue.md` for values you don't have. Use IPCC 2019R Table 10.17 / 11.1 / 11.3 defaults for MMS coefficient columns. Mark every IPCC-defaulted Parameters row with `data_source = "ipcc_default"` (the field is optional in the schema but useful for the user's QA review).
 
 ## Reference output
 

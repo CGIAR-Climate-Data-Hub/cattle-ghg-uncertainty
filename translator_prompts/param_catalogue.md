@@ -66,7 +66,7 @@ The `ipcc_default` column above lists the **lactating-female** value because tha
 | `calves_female` | 0.322 | as above | 1.0 (= pooled-calves IPCC default; only drop to 0.8 if the file genuinely sex-disaggregates post-weaning female-calf growth as heifer-track) |
 | `calves_male` (uncastrated, pre-pubertal) | 0.322 | as above | 1.0 (= pooled-calves IPCC default; rises to 1.2 only on the intact-bull development path post-puberty, and DROPS to 1.0 / steer if castrated — castration LOWERS C, it does not raise it) |
 
-**The C-coefficient (growth coefficient) is the one most commonly missed.** When applying a sub-category-specific value (`bulls` → 1.2, `oxen`/`growing_males` → 1.0), tag the `data_source` as `ipcc_table_10.6` rather than the generic `ipcc_default`, so the audit trail makes the override visible.
+**The C-coefficient (growth coefficient) is the one most commonly missed.** When applying a sub-category-specific value (`bulls` → 1.2, `oxen`/`growing_males` → 1.0), keep `data_source = "ipcc_default"` (the sex-specific value is itself an IPCC default) and call out the deliberate override in your end-of-run summary so the user can spot-check it in the QA tab.
 
 For `Ca` specifically: pick the row based on the feeding situation the user describes — stall-fed (intensive) sits around 0.0–0.17, grazing on flat pasture around 0.17, grazing on hilly pasture around 0.36, working oxen up to 0.50. If the user doesn't specify, use 0.17 (grazing) for smallholder/extensive systems and 0.36 (stall-fed) for confined dairy systems.
 

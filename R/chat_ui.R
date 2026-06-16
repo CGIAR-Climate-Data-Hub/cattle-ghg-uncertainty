@@ -841,19 +841,24 @@ translator_chat_server <- function(input, output, session) {
   # Row keys = Excel row numbers (header is row 1, data starts at row 2).
   # Drop NA cells so the JSON stays compact and only the meaningful values
   # are in front of the model.
-  rows <- setNames(
-    lapply(seq_len(n), function(i) {
-      cells <- as.list(df[i, , drop = FALSE])
-      # Convert each cell to a scalar (jsonlite would otherwise wrap
-      # length-1 atomic vectors as JSON arrays).
-      cells <- lapply(cells, function(x) if (length(x) == 1) unname(x) else x)
-      keep <- vapply(cells, function(x)
-        !(length(x) == 0 || (length(x) == 1 && (is.na(x) ||
-          (is.character(x) && !nzchar(x))))), logical(1))
-      cells[keep]
-    }),
-    as.character(seq_len(n) + 1L)  # +1 because row 1 = headers
-  )
+  row_keys <- as.character(seq_len(n) + 1L)  # +1 because row 1 = headers
+  row_vals <- lapply(seq_len(n), function(i) {
+    cells <- as.list(df[i, , drop = FALSE])
+    # Convert each cell to a scalar (jsonlite would otherwise wrap
+    # length-1 atomic vectors as JSON arrays).
+    cells <- lapply(cells, function(x) if (length(x) == 1) unname(x) else x)
+    keep <- vapply(cells, function(x)
+      !(length(x) == 0 || (length(x) == 1 && (is.na(x) ||
+        (is.character(x) && !nzchar(x))))), logical(1))
+    cells[keep]
+  })
+  # Drop fully-empty rows (every cell NA/blank): they would serialise as
+  # "<row>": {} and carry zero information, yet this prefix is paid on every
+  # cold cache-write. Keep the Excel row-number keys for the surviving rows
+  # (sparse keys are already the design — the model looks rows up by number
+  # rather than iterating, so omitting blanks changes nothing it relies on).
+  nonempty <- vapply(row_vals, function(x) length(x) > 0L, logical(1))
+  rows <- setNames(row_vals[nonempty], row_keys[nonempty])
   jsonlite::toJSON(list(
     sheet = sheet_name,
     n_rows = nrow(df),
@@ -1208,6 +1213,14 @@ translator_chat_server <- function(input, output, session) {
       "an empty array [] only if the file genuinely has no",
       "activity-data fields at all — but Zambia-style inventories",
       "always have at least N, BW, Milk per year.",
+      "",
+      "Within those year rows, fill ONLY the parameter columns that",
+      "CHANGE across years. Leave a column blank wherever its value",
+      "is the same in every year — that constant value is already on",
+      "the Parameters sheet, and the app's correlation step discards",
+      "flat (zero-variance) series, so repeating it adds cost with no",
+      "effect. Keep the year rows; carry only the columns with real",
+      "year-over-year movement.",
       "",
       "All other emission rules from the system prompt still apply:",
       "source-of-truth hierarchy (user_file > user_chat >",

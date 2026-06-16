@@ -50,7 +50,7 @@ Header row in row 3. Data starts at row 4. One row per (cattle_type × aggregati
 | M | upper | no | auto-computed from H or J; safe to leave blank |
 | N | param_type | yes | `activity_data` (only for `N`) or `coefficient` |
 | O | ipcc_ref | no | citation, e.g. `Table 10.4` |
-| P | data_source | no | free text: where the value came from |
+| P | data_source | no | one of: `user_file`, `user_chat`, `ipcc_default`, `biological_zero` |
 
 ### Sub-category codes (ANIMAL_SUBCATEGORIES)
 
