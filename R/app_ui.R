@@ -2029,7 +2029,9 @@ app_ui <- function(request = NULL) {
           col_widths = c(6, 6),
           bslib::card(
             bslib::card_header(t("card_tornado_h")),
-            bslib::card_body(plotly::plotlyOutput("tornado_chart"))
+            bslib::card_body(
+              uiOutput("tornado_note"),
+              plotly::plotlyOutput("tornado_chart"))
           ),
           bslib::card(
             bslib::card_header(t("card_sens_rankings")),
@@ -2188,7 +2190,7 @@ app_ui <- function(request = NULL) {
           bslib::card_header(t("card_input_dists")),
           bslib::card_body(
             p(t("body_input_dists")),
-            plotly::plotlyOutput("report_input_densities", height = "520px")
+            plotly::plotlyOutput("report_input_densities", height = "780px")
           )
         ),
         bslib::card(

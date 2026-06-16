@@ -2742,8 +2742,9 @@ app_server <- function(input, output, session) {
           font = list(size = 13, color = "#555")))))
     }
     # When PRCC was skipped (too many parameters — multi-group inventory),
-    # fall back to SRC and surface the reason as a chart annotation.
-    prcc_note <- attr(sens_data, "prcc_note")
+    # fall back to SRC. The reason is shown as a caption above the chart
+    # (output$tornado_note), not as an in-plot annotation — the old top
+    # annotation collided with the chart title and the plotly toolbar.
     sens <- if (input$sens_method == "prcc" && is.null(sens_data$prcc) &&
                 !is.null(sens_data$src)) {
       sens_data$src   # fallback: show SRC with note below
@@ -2777,24 +2778,34 @@ app_server <- function(input, output, session) {
     plotly::plot_ly(y = factor(top10$parameter, levels = top10$parameter),
                     x = top10[[val_col]], type = "bar", orientation = "h",
                     marker = list(color = bar_colours),
-                    text = ifelse(top10$reducible, "User-reducible", "IPCC coefficient"),
+                    # hovertext (not text) so the label shows only on hover,
+                    # instead of being printed on top of every bar.
+                    hovertext = ifelse(top10$reducible, "User-reducible", "IPCC coefficient"),
                     hoverinfo = "x+y+text") %>%
       plotly::layout(
         title = paste0("Top Parameters — ", toupper(val_col), view_label),
+        margin = list(t = 48),  # room so the title clears the plotly toolbar
         xaxis = list(title = val_col), yaxis = list(title = ""),
-        annotations = c(
-          list(list(
-            x = 0.99, y = 0.01, xref = "paper", yref = "paper", showarrow = FALSE, align = "right",
-            text = "<span style='color:#2D6A4F'>■</span> User-reducible &nbsp; <span style='color:#78909C'>■</span> IPCC coefficient",
-            font = list(size = 10)
-          )),
-          if (!is.null(prcc_note)) list(list(
-            x = 0.5, y = 1.08, xref = "paper", yref = "paper", showarrow = FALSE, align = "center",
-            text = paste0("<i>", prcc_note, "</i>"),
-            font = list(size = 10, color = "#92400E")
-          )) else list()
-        )
+        annotations = list(list(
+          x = 0.99, y = 0.01, xref = "paper", yref = "paper", showarrow = FALSE, align = "right",
+          text = "<span style='color:#2D6A4F'>■</span> User-reducible &nbsp; <span style='color:#78909C'>■</span> IPCC coefficient",
+          font = list(size = 10)
+        ))
       )
+  })
+
+  # Caption above the tornado: PRCC-skipped / subsample notes, rendered as HTML
+  # so they never collide with the chart title or the plotly toolbar.
+  output$tornado_note <- renderUI({
+    sd <- active_sensitivity()
+    if (is.null(sd)) return(NULL)
+    notes <- c(attr(sd, "prcc_note"), attr(sd, "subsampled_note"))
+    notes <- Filter(function(x) !is.null(x) && nzchar(x), as.list(notes))
+    if (length(notes) == 0) return(NULL)
+    tags$div(
+      style = "font-size:0.8rem; color:#92400E; font-style:italic; margin:2px 4px 10px;",
+      lapply(notes, function(n) tags$div(n))
+    )
   })
 
   output$sensitivity_table <- DT::renderDT({
@@ -3016,7 +3027,10 @@ app_server <- function(input, output, session) {
                       name = p, showlegend = FALSE) |>
         plotly::layout(xaxis = list(title = p), yaxis = list(title = ""))
     })
-    plotly::subplot(plots, nrows = 4, margin = 0.04,
+    # Wider inter-panel margin so each panel's x-axis title (the parameter name)
+    # sits clearly in the gap below its histogram instead of overlapping the row
+    # beneath it. Pair with a taller plot height in the UI (report tab).
+    plotly::subplot(plots, nrows = 4, margin = 0.055,
                     titleX = TRUE, titleY = FALSE)
   })
 
