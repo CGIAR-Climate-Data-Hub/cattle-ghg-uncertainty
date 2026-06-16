@@ -1983,20 +1983,37 @@ translator_chat_server <- function(input, output, session) {
         # for every row, eventually crashing the quantile() convergence
         # check on total_co2e. Cols 9/10 keep the catalogue default
         # values that the blank template pre-fills.
+        .put_param <- function(col_idx, v) {
+          v <- .translator_scalar(v)
+          if (is.na(v) || (is.character(v) && !nzchar(v))) return()
+          openxlsx::writeData(wb, "Parameters", v,
+                              startRow = r, startCol = col_idx,
+                              colNames = FALSE)
+        }
         if (!is.null(ai)) {
-          .put_param <- function(col_idx, v) {
-            v <- .translator_scalar(v)
-            if (is.na(v) || (is.character(v) && !nzchar(v))) return()
-            openxlsx::writeData(wb, "Parameters", v,
-                                startRow = r, startCol = col_idx,
-                                colNames = FALSE)
-          }
           .put_param(7,  ai$mean %||% ai$value)
           .put_param(8,  ai$uncertainty_pct)
           .put_param(12, ai$lower_bound %||% ai$lower)
           .put_param(13, ai$upper_bound %||% ai$upper)
           .put_param(11, ai$distribution)
           .put_param(16, ai$data_source %||% "AI translator")
+        } else {
+          # Sparse-overlay fill: the model didn't emit this (sub_category,
+          # parameter), so fill the IPCC default from the single-source resolver
+          # (sex/age overrides + biological zeros + verified catalogue) and tag
+          # provenance. This guarantees a complete template even though the
+          # translator only emits the user's own values. `N` resolves to NA (no
+          # IPCC default — core activity data); .put_param skips NA so the cell
+          # stays blank for the user/QA to flag.
+          d <- resolve_subcat_default(sub_cat, p_name)
+          if (!is.null(d)) {
+            .put_param(7,  d$value)
+            .put_param(8,  d$uncertainty_pct)
+            .put_param(11, d$distribution)
+            .put_param(12, d$lower)
+            .put_param(13, d$upper)
+            .put_param(16, d$data_source)
+          }
         }
       }
     }
@@ -2034,23 +2051,43 @@ translator_chat_server <- function(input, output, session) {
       #   Frac_GasMS_pct @ 17  (18 lower, 19 upper, 20 distribution)
       #   Frac_LeachMS_pct@ 21 (22 lower, 23 upper, 24 distribution)
       # The AI can be inconsistent on key case; tolerate both.
-      .put_mm(9,  mm$mcf[i]              %||% mm$MCF_pct[i])
+      #
+      # Sparse-overlay fill: under the new contract the model emits only
+      # mms_type + fraction_pct, so the app fills the per-MMS coefficients from
+      # the verified MMS tables (IPCC 2019R Tables 10.21/10.22, Other-Cattle).
+      # MCF uses the 2006-convention tropical value (Africa/wet user base — see
+      # MMS_DEFAULTS); Frac_GasMS/LeachMS carry the table's ranges as bounds.
+      # A user-supplied value always wins. `.or_def` falls back on NA *or* NULL
+      # (the model may emit the column but leave the cell empty).
+      mtype <- .translator_scalar(mm$mms_type[i])
+      mdef  <- MMS_DEFAULTS[MMS_DEFAULTS$id == mtype, , drop = FALSE]
+      fdef  <- mms_frac_defaults_2019(mtype)
+      .or_def <- function(model_v, def_v) {
+        if (is.null(model_v)) return(def_v)
+        sv <- .translator_scalar(model_v)
+        if (length(sv) == 0L || is.na(sv) ||
+            (is.character(sv) && !nzchar(sv))) return(def_v)
+        model_v
+      }
+      mcf_def <- if (nrow(mdef) == 1L) mdef$mcf_tropical else NA_real_
+      ef3_def <- if (nrow(mdef) == 1L) mdef$ef3 else NA_real_
+      .put_mm(9,  .or_def(mm$mcf[i] %||% mm$MCF_pct[i], mcf_def))
       .put_mm(10, mm$lower_mcf[i])
       .put_mm(11, mm$upper_mcf[i])
       .put_mm(12, mm$distribution_mcf[i])
-      .put_mm(13, mm$ef3[i]              %||% mm$EF3[i])
+      .put_mm(13, .or_def(mm$ef3[i] %||% mm$EF3[i], ef3_def))
       .put_mm(14, mm$lower_ef3[i])
       .put_mm(15, mm$upper_ef3[i])
       .put_mm(16, mm$distribution_ef3[i])
-      .put_mm(17, mm$Frac_GasMS_pct[i]   %||% mm$frac_gasms_pct[i] %||%
-                   mm$Frac_GasMS[i])
-      .put_mm(18, mm$lower_frac_gas[i])
-      .put_mm(19, mm$upper_frac_gas[i])
+      .put_mm(17, .or_def(mm$Frac_GasMS_pct[i] %||% mm$frac_gasms_pct[i] %||%
+                   mm$Frac_GasMS[i], fdef$frac_gas * 100))
+      .put_mm(18, .or_def(mm$lower_frac_gas[i], fdef$frac_gas_low * 100))
+      .put_mm(19, .or_def(mm$upper_frac_gas[i], fdef$frac_gas_high * 100))
       .put_mm(20, mm$distribution_frac_gas[i])
-      .put_mm(21, mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
-                   mm$Frac_LeachMS[i])
-      .put_mm(22, mm$lower_frac_leach[i])
-      .put_mm(23, mm$upper_frac_leach[i])
+      .put_mm(21, .or_def(mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
+                   mm$Frac_LeachMS[i], fdef$frac_leach * 100))
+      .put_mm(22, .or_def(mm$lower_frac_leach[i], fdef$frac_leach_low * 100))
+      .put_mm(23, .or_def(mm$upper_frac_leach[i], fdef$frac_leach_high * 100))
       .put_mm(24, mm$distribution_frac_leach[i])
     }
   }

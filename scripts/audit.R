@@ -1989,6 +1989,68 @@ section_F <- function() {
              res_ok,
              notes = if (res_ok) "bulls.Cfi=0.370, growing_males.Cfi=0.322, bulls.Milk=0/constant, dairy.pct_preg=0.85"
                      else "resolver returned an unexpected default for a (sub_category, parameter)")
+
+  # F31 — sparse-overlay writer integration (the safety net). Writing a SPARSE
+  # input (only the user's own rows + the MMS allocation) through
+  # .translator_write_official_template must yield a COMPLETE template (every
+  # sub-category x 25 parameters), with user values preserved and every omitted
+  # cell filled from the resolver / MMS tables — proving the gap-fill is correct
+  # end-to-end (write -> parse round-trip).
+  if (requireNamespace("openxlsx", quietly = TRUE) &&
+      exists(".translator_write_official_template") &&
+      exists("parse_uploaded_template")) {
+    user_params <- data.frame(
+      cattle_type       = c("dairy","non_dairy","non_dairy","dairy","dairy"),
+      aggregation_level = rep("all", 5),
+      sub_category      = c("dairy_cows","bulls","oxen","dairy_cows","dairy_cows"),
+      parameter         = c("N","N","N","BW","Milk"),
+      value             = c(100, 10, 20, 420, 14),
+      uncertainty_pct   = c(10, 10, 10, 15, 20),
+      distribution      = rep("normal", 5),
+      data_source       = rep("user_file", 5),
+      stringsAsFactors  = FALSE)
+    mm_sparse <- data.frame(
+      cattle_type = c("dairy","non_dairy","non_dairy"),
+      aggregation_level = rep("all", 3),
+      sub_category = c("dairy_cows","bulls","oxen"),
+      mms_type = c("solid_storage","dry_lot","pasture"),
+      fraction_pct = c(100, 100, 100),
+      stringsAsFactors = FALSE)
+    md <- list(country = "Test", region = "africa", year = 2024,
+               species = "cattle_mixed", ipcc_version = "2019_refinement")
+    f <- tempfile(fileext = ".xlsx")
+    sp_ok <- tryCatch({
+      .translator_write_official_template(
+        list(inventory_metadata = md, parameters = user_params,
+             manure_management = mm_sparse,
+             parameter_timeseries = data.frame()), f)
+      pu <- parse_uploaded_template(f)
+      ps <- pu$param_specs; mn <- pu$manure
+      pick <- function(sc, p) ps$mean[ps$sub_category == sc & ps$parameter == p][1]
+      mmv  <- function(sc, col) mn[[col]][mn$sub_category == sc][1]
+      # a) completeness: 3 sub-categories x 25 params
+      cnt_ok <- nrow(ps) == 3L * nrow(PARAM_CATALOGUE)
+      # b) user values preserved
+      usr_ok <- eq(pick("dairy_cows","N"), 100) && eq(pick("dairy_cows","BW"), 420) &&
+                eq(pick("dairy_cows","Milk"), 14) && eq(pick("bulls","N"), 10)
+      # c) parameter gap-fill matches the resolver (sex overrides + zeros + default)
+      gap_ok <- eq(pick("bulls","Cfi"), 0.370) && eq(pick("oxen","Cfi"), 0.322) &&
+                eq(pick("bulls","C"), 1.2) && eq(pick("bulls","Milk"), 0) &&
+                eq(pick("dairy_cows","DE"), 55) && eq(pick("dairy_cows","pct_pregnant"), 0.85) &&
+                eq(pick("bulls","Bo"), 0.13)
+      # d) MMS coefficient gap-fill from the tables
+      mms_fill_ok <- eq(mmv("dairy_cows","EF3"), 0.010) &&
+                     eq(mmv("dairy_cows","MCF_pct"), 5.0) &&   # solid_storage tropical
+                     eq(mmv("bulls","EF3"), 0.02)              # dry_lot
+      cnt_ok && usr_ok && gap_ok && mms_fill_ok
+    }, error = function(e) { message("F31 error: ", conditionMessage(e)); FALSE })
+    unlink(f)
+    check_bool("F31", "F",
+               "sparse-overlay writer fills every omitted cell (complete template; user values + IPCC defaults)",
+               isTRUE(sp_ok),
+               notes = if (isTRUE(sp_ok)) "75 param rows; user values kept; bulls.Cfi=0.370, bulls.Milk=0, EF3 solid_storage=0.010"
+                       else "sparse write/parse round-trip did not reproduce the expected complete template")
+  }
 }
 
 # =============================================================================
