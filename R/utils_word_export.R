@@ -344,12 +344,26 @@ build_run_summary_docx <- function(path,
   }
 
   # ---- Full sensitivity rankings -----------------------------------------
-  # Round 9b §9: every parameter, SRC and PRCC side-by-side.
-  full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = Inf)
+  # Round 9b §9: SRC and PRCC side-by-side. Perf (2026-06): capped to the top
+  # WORD_SENS_MAX drivers so the Word doc stays small (officer print.rdocx cost
+  # scales with table size). The complete ranking for every parameter is in the
+  # Sensitivity_SRC / Sensitivity_PRCC sheets of the Excel download.
+  n_sens <- if (!is.null(sensitivity$src)) nrow(sensitivity$src)
+            else if (!is.null(sensitivity$prcc)) nrow(sensitivity$prcc) else 0L
+  full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = WORD_SENS_MAX)
   if (!is.null(full_sens_ft)) {
-    doc <- .add_h2(doc, "9. Full sensitivity rankings (all parameters)")
-    doc <- .add_p(doc,
-      "Complete SRC and PRCC values for every input parameter, sorted by decreasing absolute SRC. Useful for QA and for documenting which parameters were considered in the run.")
+    if (is.finite(n_sens) && n_sens > WORD_SENS_MAX) {
+      doc <- .add_h2(doc, sprintf("9. Sensitivity rankings — top %d drivers", WORD_SENS_MAX))
+      doc <- .add_p(doc, sprintf(
+        paste0("SRC and PRCC for the %d most influential parameters (of %d), sorted ",
+               "by decreasing absolute SRC. The complete ranking for every parameter ",
+               "is in the Sensitivity_SRC / Sensitivity_PRCC sheets of the Excel download."),
+        WORD_SENS_MAX, n_sens))
+    } else {
+      doc <- .add_h2(doc, "9. Full sensitivity rankings (all parameters)")
+      doc <- .add_p(doc,
+        "Complete SRC and PRCC values for every input parameter, sorted by decreasing absolute SRC. Useful for QA and for documenting which parameters were considered in the run.")
+    }
     doc <- .add_flextable_safe(doc, .styled_flextable(full_sens_ft))
     doc <- .add_landscape_break(doc)
   }
@@ -406,8 +420,19 @@ build_run_summary_docx <- function(path,
   inputs_ft <- .inputs_doc_flextable(param_specs)
   if (!is.null(inputs_ft)) {
     doc <- .add_h2(doc, "13. Input parameter documentation")
-    doc <- .add_p(doc,
-      "Every parameter used in this run: distribution, central value, bounds and IPCC reference. This table is the input audit trail for the IPCC inventory submission.")
+    total_params <- nrow(param_specs)
+    if (is.data.frame(param_specs) && total_params > WORD_INPUTS_MAX) {
+      doc <- .add_p(doc, sprintf(
+        paste0("Showing the first %d of %s parameter rows (distribution, central ",
+               "value, bounds and IPCC reference). The COMPLETE per-parameter ",
+               "audit trail for every sub-category is in the 'Input_Parameters' ",
+               "sheet of the Excel download — the Word table is capped so the ",
+               "report renders quickly."),
+        WORD_INPUTS_MAX, format(total_params, big.mark = ",")))
+    } else {
+      doc <- .add_p(doc,
+        "Every parameter used in this run: distribution, central value, bounds and IPCC reference. This table is the input audit trail for the IPCC inventory submission.")
+    }
     doc <- .add_flextable_safe(doc, .styled_flextable(inputs_ft))
     doc <- .add_landscape_break(doc)
   }
@@ -434,6 +459,10 @@ build_run_summary_docx <- function(path,
   )
   doc <- .add_p(doc, paste(footer_bits, collapse = " "))
 
+  # Release transient chart/flextable objects before officer serialises the
+  # document (print.rdocx is the most expensive step and runs alongside the
+  # resident simulation data on the ~1 GB worker).
+  invisible(gc(FALSE))
   print(doc, target = path)
   invisible(path)
 }
@@ -636,6 +665,10 @@ build_trend_summary_docx <- function(path,
   )
   doc <- .add_p(doc, paste(footer_bits, collapse = " "))
 
+  # Release transient chart/flextable objects before officer serialises the
+  # document (print.rdocx is the most expensive step and runs alongside the
+  # resident simulation data on the ~1 GB worker).
+  invisible(gc(FALSE))
   print(doc, target = path)
   invisible(path)
 }
@@ -1037,7 +1070,20 @@ build_trend_summary_docx <- function(path,
 }
 
 # Round 9b §13 — Input parameter documentation. Mirrors inputs_doc_table.
-.inputs_doc_flextable <- function(param_specs) {
+# Perf (2026-06): the input-documentation table is the single biggest driver of
+# Word build time on large inventories — for the 32-sub-category Zambia run it is
+# 576 rows, and officer's print.rdocx runs several whole-document regex passes
+# whose cost scales with the table's WML size (~25 s of the ~33 s build). Cap the
+# rows shown in the Word doc; the COMPLETE per-parameter listing ships in the
+# "Input_Parameters" sheet of the Excel download (export_results_xlsx), which
+# handles hundreds of rows instantly. WORD_INPUTS_MAX is shared with the
+# truncation note in build_run_summary_docx().
+WORD_INPUTS_MAX <- 80L
+# Same idea for the section-9 sensitivity ranking (complete SRC/PRCC are in the
+# Excel download's Sensitivity_SRC / Sensitivity_PRCC sheets).
+WORD_SENS_MAX <- 50L
+
+.inputs_doc_flextable <- function(param_specs, max_rows = WORD_INPUTS_MAX) {
   if (is.null(param_specs) || !is.data.frame(param_specs) || nrow(param_specs) == 0)
     return(NULL)
   keep <- intersect(c("cattle_type", "aggregation_level", "sub_category",
@@ -1047,6 +1093,8 @@ build_trend_summary_docx <- function(path,
                     names(param_specs))
   if (length(keep) == 0) return(NULL)
   df <- param_specs[, keep, drop = FALSE]
+  if (is.finite(max_rows) && nrow(df) > max_rows)
+    df <- utils::head(df, max_rows)
   # Round numeric columns for readability
   for (col in c("mean", "uncertainty_pct", "lower", "upper")) {
     if (col %in% names(df)) df[[col]] <- formatC(df[[col]], digits = 4, format = "g")
@@ -1098,14 +1146,19 @@ build_trend_summary_docx <- function(path,
   if (!"total_co2e" %in% names(inv)) return(NULL)
   x <- inv$total_co2e
   if (length(x) == 0 || all(is.na(x))) return(NULL)
+  # Stats from ALL iterations; histogram shape from a subsample (each MC draw is
+  # i.i.d., so the first N rows are a valid subsample). Keeps the ggplot data
+  # frame small so the Word render stays fast and light.
   q025 <- stats::quantile(x, 0.025, names = FALSE)
   q975 <- stats::quantile(x, 0.975, names = FALSE)
+  mu   <- mean(x)
+  xs   <- if (length(x) > 4000L) x[seq_len(4000L)] else x
 
-  ggplot2::ggplot(data.frame(value = x), ggplot2::aes(x = value)) +
+  ggplot2::ggplot(data.frame(value = xs), ggplot2::aes(x = value)) +
     ggplot2::geom_histogram(bins = 40, fill = .GREEN_MID, colour = "white") +
     ggplot2::geom_vline(xintercept = c(q025, q975),
                         linetype = "dashed", colour = "#C1121F") +
-    ggplot2::geom_vline(xintercept = mean(x), colour = "black") +
+    ggplot2::geom_vline(xintercept = mu, colour = "black") +
     ggplot2::labs(x = "Total CO2eq (t CO2eq)", y = "Frequency") +
     ggplot2::theme_minimal(base_size = 10)
 }
@@ -1169,7 +1222,10 @@ build_trend_summary_docx <- function(path,
     if (col %in% names(inv)) {
       v <- inv[[col]]
       if (length(v) > 0 && stats::sd(v, na.rm = TRUE) > 0) {
-        parts[[length(parts) + 1L]] <- data.frame(value = v, source = lab)
+        # Subsample for the histogram (shape is stable; keeps the combined
+        # long data frame small — up to 7 sources x n_iter otherwise).
+        vs <- if (length(v) > 4000L) v[seq_len(4000L)] else v
+        parts[[length(parts) + 1L]] <- data.frame(value = vs, source = lab)
       }
     }
   }

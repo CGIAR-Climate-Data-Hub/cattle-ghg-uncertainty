@@ -3016,6 +3016,7 @@ app_server <- function(input, output, session) {
       export_results_xlsx(
         rv$mc_results$inventory, rv$uncertainty,
         rv$sensitivity, rv$ipcc_table, file,
+        param_specs = rv$param_specs,
         settings = list(
           n_iter           = as.integer(input$n_iter),
           corr_mode        = input$corr_mode,

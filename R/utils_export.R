@@ -86,7 +86,7 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
 }
 
 export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, filepath,
-                                settings = NULL) {
+                                settings = NULL, param_specs = NULL) {
   # Andreas 2026-05 #38: previously crashed when ipcc_table was NULL (which
   # happens whenever AD/EF decomposition didn't run, e.g. for custom uploads
   # — see app_server.R line 982). Replace NULL/empty inputs with placeholder
@@ -143,12 +143,21 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
                stringsAsFactors = FALSE)
   }
 
+  # Full per-parameter input audit trail. This is the complete listing that the
+  # Word report's section 13 table is capped against (officer print.rdocx is too
+  # slow on the full 500+ row table for a large inventory) — Excel handles it
+  # instantly, so the exhaustive audit lives here.
+  inputs_df <- if (!is.null(param_specs) && is.data.frame(param_specs) && nrow(param_specs) > 0)
+    param_specs
+  else placeholder("Input parameters unavailable. Run a Monte Carlo simulation on Tab 5 first.")
+
   sheets <- list(
     Run_Settings        = run_settings_df,
     Summary             = summary_df,
     Uncertainty_Metrics = uncertainty_df,
     Sensitivity_SRC     = src_df,
     Sensitivity_PRCC    = prcc_df,
+    Input_Parameters    = inputs_df,
     Metadata = data.frame(
       Field = c("Generated", "Tool", "Iterations"),
       Value = c(as.character(Sys.time()),
