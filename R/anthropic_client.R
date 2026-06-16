@@ -67,11 +67,28 @@
   list(system = system_text, messages = out)
 }
 
+# Build a cache_control block. ttl = NULL uses Anthropic's default 5-minute
+# ephemeral cache; ttl = "1h" requests the extended 1-hour cache (which needs
+# the `anthropic-beta: extended-cache-ttl-2025-04-11` request header, added in
+# anthropic_chat_stream when cache_ttl is set).
+#
+# Why the 1-hour option exists: in the batched-emission flow a single batch can
+# take 5-17 min to stream, so the 5-minute cache expires BETWEEN batches and
+# each batch re-pays the full cache-WRITE surcharge on the ~170K conversation
+# prefix — the dominant cost per the 2026-06-12 Zambia logs ($4.78 of $7.73).
+# A 1-hour TTL writes that prefix once (at 2x input price instead of 1.25x) and
+# re-reads it at 10% for every later batch in the run, roughly halving per-run
+# cost with NO change to the output.
+.anthropic_cache_ctl <- function(ttl = NULL) {
+  if (is.null(ttl)) list(type = "ephemeral")
+  else list(type = "ephemeral", ttl = ttl)
+}
+
 # Build the `system` payload for Anthropic. When the system prompt is
 # non-trivial (>= 1024 chars — Anthropic's cache eligibility threshold),
 # wrap it in a content block with cache_control: ephemeral so the long
 # translator prompt gets cached and re-billed at 10% on subsequent calls.
-.anthropic_system_payload <- function(system_text) {
+.anthropic_system_payload <- function(system_text, ttl = NULL) {
   if (!nzchar(system_text)) return(NULL)
   # Ephemeral cache only kicks in for blocks >= ~1024 tokens. Below that
   # we just send the text and skip the cache_control overhead.
@@ -79,7 +96,7 @@
   list(list(
     type = "text",
     text = system_text,
-    cache_control = list(type = "ephemeral")
+    cache_control = .anthropic_cache_ctl(ttl)
   ))
 }
 
@@ -108,7 +125,7 @@
 # {type:"text", text:..., cache_control:...}. Anthropic accepts both
 # string and block-array forms for input messages; we convert the
 # marked one.
-.anthropic_cache_last_message <- function(messages) {
+.anthropic_cache_last_message <- function(messages, ttl = NULL) {
   n <- length(messages)
   if (n == 0) return(messages)
   last <- messages[[n]]
@@ -118,7 +135,7 @@
   messages[[n]]$content <- list(list(
     type = "text",
     text = content,
-    cache_control = list(type = "ephemeral")
+    cache_control = .anthropic_cache_ctl(ttl)
   ))
   messages
 }
@@ -145,20 +162,25 @@
 #
 # Falls back to single-breakpoint behaviour when messages has < 2
 # entries.
-.anthropic_cache_stable_and_last <- function(messages) {
+.anthropic_cache_stable_and_last <- function(messages, ttl = NULL) {
   n <- length(messages)
-  if (n < 2L) return(.anthropic_cache_last_message(messages))
-  # Mark message n-1 first (the stable, batch-invariant prefix).
+  if (n < 2L) return(.anthropic_cache_last_message(messages, ttl = ttl))
+  # Mark message n-1 first (the stable, batch-invariant prefix). This is the
+  # block that should carry the 1-hour TTL in the batch flow — it is identical
+  # across all batches, so it's written once and re-read on every later batch.
   prev <- messages[[n - 1L]]
   prev_content <- prev$content %||% ""
   if (is.character(prev_content) && nzchar(prev_content)) {
     messages[[n - 1L]]$content <- list(list(
       type = "text",
       text = prev_content,
-      cache_control = list(type = "ephemeral")
+      cache_control = .anthropic_cache_ctl(ttl)
     ))
   }
-  # Then mark message n (the batch-specific nudge).
+  # Then mark message n (the batch-specific nudge). It changes every batch and
+  # is never re-read, so it keeps the cheap default 5-minute ephemeral write
+  # regardless of `ttl` — paying the 2x 1-hour write surcharge on a throwaway
+  # block would be pure waste.
   .anthropic_cache_last_message(messages)
 }
 
@@ -367,7 +389,17 @@ anthropic_chat_stream <- function(messages,
                                    timeout_sec = 900,
                                    max_retries = 2,
                                    tools = NULL,
-                                   tool_choice = NULL) {
+                                   tool_choice = NULL,
+                                   # cache_ttl = "1h" requests Anthropic's
+                                   # extended 1-hour prompt cache for the
+                                   # stable prefix (system prompt + batch-
+                                   # invariant history). Used by the batched-
+                                   # emission wrappers where batches run more
+                                   # than 5 min apart and the default cache
+                                   # would expire between them. NULL = default
+                                   # 5-minute cache (regular chat / single-shot
+                                   # calls, which never benefit from 1h).
+                                   cache_ttl = NULL) {
   api_key <- Sys.getenv("ANTHROPIC_API_KEY", unset = "")
   if (!nzchar(api_key)) {
     return(list(reply = NULL,
@@ -382,9 +414,9 @@ anthropic_chat_stream <- function(messages,
   # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
   # cost on batches 2-5. Production cost driver per 2026-06-12 logs.
   cache_msgs <- if (is.null(tools))
-    .anthropic_cache_last_message(split$messages)
+    .anthropic_cache_last_message(split$messages, ttl = cache_ttl)
   else
-    .anthropic_cache_stable_and_last(split$messages)
+    .anthropic_cache_stable_and_last(split$messages, ttl = cache_ttl)
   body <- list(
     model       = model,
     max_tokens  = max_tokens,
@@ -393,7 +425,7 @@ anthropic_chat_stream <- function(messages,
   )
   if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
     body$temperature <- temperature
-  sys_payload <- .anthropic_system_payload(split$system)
+  sys_payload <- .anthropic_system_payload(split$system, ttl = cache_ttl)
   if (!is.null(sys_payload)) body$system <- sys_payload
   if (!is.null(tools)) body$tools <- tools
   if (!is.null(tool_choice)) body$tool_choice <- tool_choice
@@ -505,6 +537,12 @@ anthropic_chat_stream <- function(messages,
       # Stall detector — same rationale as the OpenAI client.
       httr2::req_options(low_speed_time = 45L, low_speed_limit = 1L) |>
       httr2::req_error(is_error = function(resp) FALSE)
+    # Extended (1-hour) prompt cache requires this beta header. Only sent when
+    # cache_ttl is set, so default 5-minute calls are unchanged. req_headers
+    # merges with the headers already set above.
+    if (!is.null(cache_ttl))
+      req <- httr2::req_headers(req,
+                                `anthropic-beta` = "extended-cache-ttl-2025-04-11")
 
     resp <- tryCatch(
       httr2::req_perform_stream(req, on_data, buffer_kb = 16),
@@ -901,7 +939,11 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
     temperature = 0,
     timeout_sec = timeout_sec,
     tools       = tool_def,
-    tool_choice = tool_choice
+    tool_choice = tool_choice,
+    # Prime the 1-hour cache: this Stage-1 call writes the system prompt at the
+    # 1h TTL so the Stage-2 batches that follow within the hour re-read it
+    # instead of each re-writing the ~27K prompt.
+    cache_ttl   = "1h"
   )
 }
 
@@ -1008,7 +1050,12 @@ anthropic_chat_batch_template_force <- function(messages,
     temperature = 0,
     timeout_sec = timeout_sec,
     tools       = tool_def,
-    tool_choice = tool_choice
+    tool_choice = tool_choice,
+    # 1-hour cache: each batch streams for 5-17 min, so the default 5-minute
+    # cache expires between batches and every batch re-writes the ~170K
+    # stable prefix. The 1h TTL writes it once and re-reads it at 10% on the
+    # remaining batches — the main per-run cost saving.
+    cache_ttl   = "1h"
   )
 }
 
