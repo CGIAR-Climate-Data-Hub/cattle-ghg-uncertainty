@@ -133,3 +133,17 @@ R/_test_*.R
 # Lives only on the deployer's machine; scripts/notify_approved.R uses
 # it to know which approved emails are NEW since last deploy.
 .approved_users_snapshot.csv
+
+# 2026-06: local dev scratch / test data — kept on the machine, never in the
+# repo (consistent with the real-country test-data and one-off-script rules
+# above). claude_old/ is an old docs backup; ZAM/ is the Zambia test inventory;
+# AI_model_prices/ is a pricing side-analysis; the loose analyze_/inspect_/
+# count_ scripts are ad-hoc hand-debugging tools.
+claude_old/
+ZAM/
+AI_model_prices/
+analyze_structure.R
+analyze_zambia.R
+count_prompt.R
+inspect_zambia_tmp.R
+scripts/_inspect_translation.R
