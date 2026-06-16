@@ -684,6 +684,35 @@ app_ui <- function(request = NULL) {
            // Force a frame before fade so the transition runs.
            requestAnimationFrame(function(){ o.style.opacity = '1'; });
          }
+         // 2026-06: preserve loaded data + results across the language switch.
+         // The toggle reloads the page (a fresh Shiny session), so we ask the
+         // server to stash the session state in a process cache keyed by a
+         // per-browser token, then reload; the new session restores it.
+         function _genToken() {
+           if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+           return 'tok-' + Math.random().toString(36).slice(2) +
+                  Date.now().toString(36);
+         }
+         function _ensureStateToken() {
+           var m = document.cookie.match(/(?:^|;)\\s*app_state_token=([^;]+)/);
+           if (m) return decodeURIComponent(m[1]);
+           var tok = _genToken();
+           document.cookie = 'app_state_token=' + tok +
+             '; max-age=' + (7 * 24 * 60 * 60) + '; path=/; SameSite=Lax';
+           return tok;
+         }
+         var _langReloadTimer = null;
+         function _doLangReload() {
+           if (_langReloadTimer) { clearTimeout(_langReloadTimer); _langReloadTimer = null; }
+           window.location.reload();
+         }
+         function _registerLangReload() {
+           if (window.Shiny && Shiny.addCustomMessageHandler)
+             Shiny.addCustomMessageHandler('lang_do_reload', function(m){ _doLangReload(); });
+         }
+         if (window.Shiny && Shiny.addCustomMessageHandler) _registerLangReload();
+         else document.addEventListener('shiny:connected', _registerLangReload);
+
          function _setLang(lang) {
            if (_readLangCookie() === lang) return;
            var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years
@@ -699,7 +728,17 @@ app_ui <- function(request = NULL) {
              history.replaceState(null, '', window.location.pathname +
                window.location.search + hash);
            } catch (e) { window.location.hash = hash; }
-           window.location.reload();
+           // Ask the server to stash data + results, then reload via the
+           // lang_do_reload message. Fall back to an immediate reload if Shiny
+           // is unavailable or slow, so the switch can never hang.
+           if (window.Shiny && Shiny.setInputValue) {
+             _langReloadTimer = setTimeout(_doLangReload, 2500);
+             Shiny.setInputValue('lang_save_request',
+               { token: _ensureStateToken(), lang: lang, nonce: Date.now() },
+               { priority: 'event' });
+           } else {
+             _doLangReload();
+           }
          }
          // Restore the previously-active tab when the page comes back up.
          // Resolves the index against the freshly-rendered nav-links and

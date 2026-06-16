@@ -34,6 +34,37 @@ app_server <- function(input, output, session) {
     sim_view = "settings"   # R1.5: "settings" or "results" — drives Tab 5 panel toggle
   )
 
+  # --- Language-switch state preservation (lang_state_* in i18n.R) ------------
+  # Switching language reloads the page (fresh session). Just before the reload
+  # the client asks us to stash the loaded inventory + results in a process
+  # cache keyed by a per-browser token; this fresh session restores them so the
+  # user keeps their work. Restore runs once, here at session start.
+  local({
+    tok   <- auth_cookie_lookup(session$request$HTTP_COOKIE, "app_state_token")
+    saved <- lang_state_take(tok)
+    if (!is.null(saved)) {
+      for (nm in names(saved)) rv[[nm]] <- saved[[nm]]
+      if (!is.null(rv$mc_results)) rv$sim_view <- "results"
+      rv$sim_running <- FALSE
+      rv$sim_error   <- NULL
+    }
+  })
+
+  # Stash current state, then tell the client to reload (the JS sets the
+  # `app_lang` cookie first, so the reloaded UI comes up in the new language).
+  observeEvent(input$lang_save_request, {
+    info <- input$lang_save_request
+    if (is.null(info) || is.null(info$token)) return()
+    # observeEvent runs its handler inside isolate(), so reading rv here does
+    # not create a dependency. Drop purely-transient flags from the snapshot.
+    snap <- reactiveValuesToList(rv)
+    snap$sim_running   <- NULL
+    snap$sim_error     <- NULL
+    snap$upload_status <- NULL
+    lang_state_save(info$token, snap)
+    session$sendCustomMessage("lang_do_reload", list(lang = info$lang))
+  }, ignoreInit = TRUE)
+
   # B4: Home page Resources link — switch to the Resources tab AND scroll to
   # the Tool-specific resources card (id="downloads-card" in app_ui.R) so the
   # methodology/user-guide download buttons are in view immediately. The JS

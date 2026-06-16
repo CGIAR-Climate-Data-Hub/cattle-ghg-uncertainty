@@ -80,6 +80,39 @@ t <- function(id, lang = NULL) {
 }
 
 # =============================================================================
+# Cross-reload state cache (used by the language switch)
+# =============================================================================
+# Switching language reloads the page, which starts a fresh Shiny session and
+# would otherwise wipe the user's loaded inventory + results. The R *process*
+# survives the reload (it serves every session on the worker), so we stash the
+# session state in a process-level environment keyed by a per-browser token
+# cookie just before the reload, and the fresh session restores it. Entries are
+# one-shot (removed on restore) and age-pruned as a backstop against tabs that
+# never come back. Keyed per browser, so concurrent users never collide.
+.LANG_STATE_CACHE <- new.env(parent = emptyenv())
+
+lang_state_save <- function(token, state, max_age_s = 900) {
+  if (is.null(token) || !nzchar(token)) return(invisible(FALSE))
+  now <- as.numeric(Sys.time())
+  for (k in ls(.LANG_STATE_CACHE, all.names = TRUE)) {
+    e <- get(k, envir = .LANG_STATE_CACHE)
+    if (is.null(e$ts) || (now - e$ts) > max_age_s)
+      rm(list = k, envir = .LANG_STATE_CACHE)
+  }
+  assign(token, list(ts = now, state = state), envir = .LANG_STATE_CACHE)
+  invisible(TRUE)
+}
+
+# One-shot read: returns the saved state list (or NULL) and removes the entry.
+lang_state_take <- function(token) {
+  if (is.null(token) || !nzchar(token)) return(NULL)
+  if (!exists(token, envir = .LANG_STATE_CACHE, inherits = FALSE)) return(NULL)
+  e <- get(token, envir = .LANG_STATE_CACHE)
+  rm(list = token, envir = .LANG_STATE_CACHE)
+  e$state
+}
+
+# =============================================================================
 # String table
 # =============================================================================
 #
