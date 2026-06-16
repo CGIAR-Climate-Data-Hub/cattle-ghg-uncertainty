@@ -384,17 +384,22 @@ params_needed_for_sources <- function(sources) {
 # EXPANDED DEFAULT LOOKUPS BY NEW SUB-CATEGORY
 # ==========================================================================
 
-# Cfi by new subcategory (IPCC Table 10.4, Africa/developing defaults)
+# Cfi by sub-category, IPCC Table 10.4 (verified at source 2026-06-16). Strict
+# category reading adopted: 0.370 applies ONLY to mature breeding "bulls"; the
+# 0.322 category explicitly covers "all non-lactating cows, steers, heifers AND
+# calves" — so young/growing/calf males and feedlot stock take 0.322, not the
+# intact-bull uplift. (Resolves a prior R-table-vs-translator-prompt mismatch;
+# the prompt already used 0.322 for growing_males.)
 CFI_BY_SUBCAT <- list(
   dairy_cows = 0.386,     # lactating dairy cows
   other_cows = 0.322,     # dry/non-dairy cows
-  bulls = 0.370,          # intact mature males
-  oxen = 0.322,           # castrated males
+  bulls = 0.370,          # mature intact males (only category at 0.370)
+  oxen = 0.322,           # castrated males (steers)
   heifers = 0.322,        # young females
-  growing_males = 0.370,  # young intact males
+  growing_males = 0.322,  # young males — not mature bulls
   calves_female = 0.322,
-  calves_male = 0.370,
-  feedlot_cattle = 0.370
+  calves_male = 0.322,    # calves are explicitly in the 0.322 category
+  feedlot_cattle = 0.322  # finishing stock, not breeding bulls
 )
 
 # Live weight defaults by subcategory (kg, IPCC Africa defaults)
