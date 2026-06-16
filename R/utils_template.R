@@ -271,11 +271,17 @@ PARAM_CATALOGUE <- data.frame(
     "fraction","fraction",
     "%","°C"),
   # IPCC alignment audit (2026-05) — verified against Vol.4 Ch.11 Tables 11.1
-  # and 11.3:
-  #   EF3_PRP,CPP : 0.004 aggregated 2019R (wet=0.006, dry=0.002); 2006 = 0.02
-  #   EF4         : 0.010 aggregated 2019R (wet=0.014, dry=0.005); 2006 = 0.010
-  #   EF5         : 0.011 (2019R); 2006 = 0.0075
-  #   FracLEACH_PRP: 0.24 (2019R wet); 2006 = 0.30; dry = 0
+  # and 11.3. 2026-06-16: adopted the WET-CLIMATE defaults as canonical (was
+  # aggregated) so the app's auto-fill matches exactly what the AI translator
+  # emits today for the tool's SSA / South-Asia / LatAm wet-climate user base —
+  # see translator_prompts/param_catalogue.md (values verified 2026-06-15
+  # against the 2019R source text). An arid-country inventory can edit these
+  # five bounds in the Parameters sheet. Climate splits for reference:
+  #   EF3_PRP,CPP : wet=0.006 [0.0005,0.027] (agg 0.004, dry 0.002); 2006 = 0.02
+  #   EF4         : wet=0.014 [0.011,0.017]  (agg 0.010, dry 0.005); 2006 = 0.010
+  #   EF5         : 0.011 [0.0005,0.020] (no climate split); 2006 = 0.0075
+  #   Frac_GASM_PRP : 0.21 [0.005,0.31] (2019R)
+  #   Frac_LEACH_PRP: wet=0.24 [0.01,0.73] (2019R); 2006 = 0.30; dry = 0
   # Bo: 0.13 = 2019R Vol.4 Ch.10 Table 10.16(a) "Other regions, low productivity" cattle (2006 Africa = 0.10).
   # Andreas review round 2 (2026-06): Africa dairy Milk and MilkFat defaults
   # corrected to IPCC 2019R Vol.4 Ch.10 Annex Table 10A.1 — Milk 3.5 kg/d
@@ -284,7 +290,7 @@ PARAM_CATALOGUE <- data.frame(
     NA, 275, 300, 0.0, 3.5, 4.3, 0.60, 55.0,
     0.386, 0.17, 0.8, 0.10, 0.0, 10.0,
     6.5, 0.13, 0.08, 0.04,
-    0.004, 0.010, 0.011,
+    0.006, 0.014, 0.011,   # EF3_PRP, EF4 = wet-climate (2026-06-16, see note above); EF5 0.011
     0.21, 0.24,
     3.3, 20),
   # Uncertainty % per Penman et al. (2000) / Monni et al. (2007).
@@ -315,15 +321,15 @@ PARAM_CATALOGUE <- data.frame(
     NA, NA, NA, NA, NA, NA, NA, NA,
     NA, NA, NA, NA, NA, NA,
     NA, NA, NA, NA,
-    0.0007, 0.002, 0.0005,  # EF3_PRP (Vol.4 Ch.11 Table 11.1: range [0.0007, 0.060]), EF4, EF5
-    0.05, 0.05,            # Frac_GASM_PRP, Frac_LEACH_PRP
+    0.0005, 0.011, 0.0005,  # EF3_PRP, EF4, EF5 wet-climate lower (2026-06-16)
+    0.005, 0.01,            # Frac_GASM_PRP, Frac_LEACH_PRP wet-climate lower
     NA, NA),
   suggested_upper_bound = c(
     NA, NA, NA, NA, NA, NA, NA, NA,
     NA, NA, NA, NA, NA, NA,
     NA, NA, NA, NA,
-    0.060, 0.020, 0.025,  # EF3_PRP, EF4, EF5
-    0.50, 0.80,           # Frac_GASM_PRP, Frac_LEACH_PRP
+    0.027, 0.017, 0.020,  # EF3_PRP, EF4, EF5 wet-climate upper (2026-06-16)
+    0.31, 0.73,           # Frac_GASM_PRP, Frac_LEACH_PRP wet-climate upper
     NA, NA),
   # D1: IPCC convention adopted — only cattle_pop is true Activity Data;
   # everything else is a "coefficient" (combines into the per-head emission factor)

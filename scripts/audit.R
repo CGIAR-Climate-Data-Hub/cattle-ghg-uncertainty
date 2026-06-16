@@ -1911,6 +1911,31 @@ section_F <- function() {
                sprintf("DE in [%.1f, %.1f]; REM/REG > 0", min(de_col), max(de_col))
              else sprintf("DE range [%.1f, %.1f] left REM/REG domain",
                           min(de_col), max(de_col)))
+
+  # F28 — catalogue wet-climate guard (2026-06-16). The app auto-fills IPCC
+  # defaults from PARAM_CATALOGUE for any parameter the AI translator omits, so
+  # the catalogue is the source of truth for ~64% of a typical inventory's
+  # values. Lock the five manure/PRP N2O factors to the WET-CLIMATE defaults
+  # (verified vs 2019R Vol.4 Ch.11 Tables 11.1/11.3) that match what the
+  # translator emits today, so they can't silently drift back to the aggregated
+  # values — which would change every default-filled inventory's N2O result.
+  cat_row <- function(p) PARAM_CATALOGUE[PARAM_CATALOGUE$parameter == p, ]
+  ef3 <- cat_row("EF3_PRP"); ef4 <- cat_row("EF4"); ef5 <- cat_row("EF5")
+  fg  <- cat_row("Frac_GASM_PRP"); fl <- cat_row("Frac_LEACH_PRP")
+  eq <- function(a, b) isTRUE(all.equal(a, b))
+  cat_ok <-
+    eq(ef3$ipcc_default, 0.006) &&
+    eq(c(ef3$suggested_lower_bound, ef3$suggested_upper_bound), c(0.0005, 0.027)) &&
+    eq(ef4$ipcc_default, 0.014) &&
+    eq(c(ef4$suggested_lower_bound, ef4$suggested_upper_bound), c(0.011, 0.017)) &&
+    eq(ef5$ipcc_default, 0.011) && eq(ef5$suggested_upper_bound, 0.020) &&
+    eq(c(fg$suggested_lower_bound, fg$suggested_upper_bound), c(0.005, 0.31)) &&
+    eq(c(fl$suggested_lower_bound, fl$suggested_upper_bound), c(0.01, 0.73))
+  check_bool("F28", "F",
+             "PARAM_CATALOGUE holds the wet-climate manure/PRP N2O defaults (EF3_PRP/EF4/EF5/Frac_*)",
+             cat_ok,
+             notes = if (cat_ok) "EF3_PRP=0.006, EF4=0.014, EF5=0.011 + wet bounds"
+                     else "catalogue N2O defaults drifted from the agreed wet-climate values")
 }
 
 # =============================================================================
