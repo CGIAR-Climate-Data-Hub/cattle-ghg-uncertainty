@@ -1959,6 +1959,36 @@ section_F <- function() {
              mms_ok,
              notes = if (mms_ok) "EF3 solid_storage=0.010; lagoon Frac_Gas=0.35; aerobic=0.85; dry_lot leach=0.035"
                      else "a corrected MMS coefficient drifted from the IPCC Other-Cattle value")
+
+  # F30 — sparse-overlay resolver. resolve_subcat_default() is the single source
+  # of truth for the IPCC defaults the app fills when the AI translator omits a
+  # cell. Verify the sex/age overrides, biological zeros, per-sub-cat pct_pregnant,
+  # and generic catalogue fallback all resolve correctly.
+  rd <- function(s, p) resolve_subcat_default(s, p)
+  res_ok <-
+    eq(rd("bulls","Cfi")$value, 0.370) && eq(rd("growing_males","Cfi")$value, 0.322) &&
+    eq(rd("bulls","C")$value, 1.2) && eq(rd("oxen","C")$value, 1.0) &&
+    eq(rd("bulls","Milk")$value, 0) &&
+    identical(rd("bulls","Milk")$data_source, "biological_zero") &&
+    identical(rd("bulls","Milk")$distribution, "constant") &&
+    identical(rd("bulls","pct_pregnant")$data_source, "biological_zero") &&
+    identical(rd("calves_female","pct_pregnant")$data_source, "biological_zero") &&
+    identical(rd("heifers","hours")$data_source, "biological_zero") &&
+    eq(rd("dairy_cows","pct_pregnant")$value, 0.85) &&
+    eq(rd("heifers","pct_pregnant")$value, 0.5) &&
+    eq(rd("heifers","WG")$value, 0.25) &&
+    eq(rd("bulls","WG")$value, 0) && identical(rd("bulls","WG")$distribution, "constant") &&
+    eq(rd("dairy_cows","DE")$value, 55) &&
+    identical(rd("dairy_cows","DE")$data_source, "ipcc_default") &&
+    eq(rd("dairy_cows","EF3_PRP")$value, 0.006) &&
+    eq(rd("dairy_cows","EF3_PRP")$lower, 0.0005) &&
+    is.na(rd("dairy_cows","N")$value) &&
+    is.null(rd("dairy_cows","NoSuchParam"))
+  check_bool("F30", "F",
+             "resolve_subcat_default fills IPCC sex/age overrides + biological zeros + catalogue defaults",
+             res_ok,
+             notes = if (res_ok) "bulls.Cfi=0.370, growing_males.Cfi=0.322, bulls.Milk=0/constant, dairy.pct_preg=0.85"
+                     else "resolver returned an unexpected default for a (sub_category, parameter)")
 }
 
 # =============================================================================

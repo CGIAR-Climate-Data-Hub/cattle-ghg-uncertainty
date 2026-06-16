@@ -446,6 +446,79 @@ AGE_BY_SUBCAT <- list(
   feedlot_cattle = "young_1-3yr"
 )
 
+# Pregnancy fraction defaults by sub-category, matching the translator prompt
+# (system_instructions.md Step 5b): breeding females 0.85, replacement heifers
+# 0.5. Males and pre-pubertal calves resolve to a biological zero below; any
+# other sub-category falls back to the generic PARAM_CATALOGUE default (0.60).
+PCT_PREGNANT_BY_SUBCAT <- list(
+  dairy_cows = 0.85, other_cows = 0.85, heifers = 0.5
+)
+
+# ==========================================================================
+# SPARSE-OVERLAY RESOLVER
+# ==========================================================================
+# resolve_subcat_default() returns the IPCC default for any (sub_category,
+# parameter) the AI translator did NOT supply. Under the sparse-overlay design
+# the translator emits only user-supplied values; the writer calls this for
+# every remaining cell so the produced template is always complete (every
+# parameter x sub-category populated, exactly as today).
+#
+# It is the SINGLE SOURCE OF TRUTH for "what the app derives", assembling only
+# objects verified against the IPCC source: the generic PARAM_CATALOGUE row plus
+# the per-sub-category overrides above (Cfi/C/BW/MW/WG/pct_pregnant) and the
+# biological-zero rules from the translator self-check #9 (Milk/Fat/MilkPR/
+# pct_pregnant = 0 for males; pct_pregnant = 0 for pre-pubertal calves; working
+# hours = 0 for non-oxen). Returns a list(value, distribution, uncertainty_pct,
+# lower, upper, data_source); NULL for an unknown parameter. `N` has no IPCC
+# default (value = NA) — it is core activity data the user must always supply.
+resolve_subcat_default <- function(sub_category, parameter,
+                                   ipcc_version = "2019_refinement") {
+  cat <- PARAM_CATALOGUE[PARAM_CATALOGUE$parameter == parameter, , drop = FALSE]
+  if (nrow(cat) == 0L) return(NULL)
+  sex <- SEX_BY_SUBCAT[[sub_category]]; if (is.null(sex)) sex <- "mixed"
+  age <- AGE_BY_SUBCAT[[sub_category]]; if (is.null(age)) age <- "adult_>3yr"
+  is_calf <- identical(age, "calf_<1yr")
+
+  bio_zero <- list(value = 0, distribution = "constant",
+                   uncertainty_pct = NA_real_, lower = 0, upper = 0,
+                   data_source = "biological_zero")
+
+  # Biological zeros (match translator self-check #9 / Step 8 rule 3).
+  if (parameter %in% c("Milk", "Fat", "MilkPR") && identical(sex, "male"))
+    return(bio_zero)
+  if (parameter == "pct_pregnant" && (identical(sex, "male") || is_calf))
+    return(bio_zero)
+  if (parameter == "hours" && !identical(sub_category, "oxen"))
+    return(bio_zero)
+
+  # Generic default from the verified catalogue.
+  res <- list(value = cat$ipcc_default[1],
+              distribution = cat$suggested_distribution[1],
+              uncertainty_pct = cat$suggested_uncertainty_pct[1],
+              lower = cat$suggested_lower_bound[1],
+              upper = cat$suggested_upper_bound[1],
+              data_source = "ipcc_default")
+
+  # Per-sub-category overrides (value only; keep the catalogue distribution and
+  # uncertainty, which apply around the sub-category-specific central).
+  ov <- switch(parameter,
+    Cfi = CFI_BY_SUBCAT[[sub_category]],
+    C   = C_GROWTH_BY_SUBCAT[[sub_category]],
+    BW  = LW_BY_SUBCAT[[sub_category]],
+    MW  = MW_BY_SUBCAT[[sub_category]],
+    WG  = WG_BY_SUBCAT[[sub_category]],
+    pct_pregnant = PCT_PREGNANT_BY_SUBCAT[[sub_category]],
+    NULL)
+  if (!is.null(ov)) res$value <- ov
+
+  # A weight gain of exactly 0 (adults) is a no-growth constant, not a spread.
+  if (parameter == "WG" && isTRUE(res$value == 0)) {
+    res$distribution <- "constant"; res$uncertainty_pct <- NA_real_
+    res$lower <- 0; res$upper <- 0
+  }
+  res
+}
+
 # Country X \u2014 hypothetical mid-altitude smallholder dairy system.
 # Visibly distinct from Country Y: dairy cattle, milking, higher live weight.
 generate_country_x_example <- function() {
