@@ -112,22 +112,27 @@
   flextable::body_add_flextable(doc, ft, align = "left")
 }
 
-# Append a centred logo row (Alliance + Global Methane Hub) followed by a one-
-# line institutional caption. Skipped silently if both PNGs are missing from
-# www/, so the Word build never errors when the logos haven't been staged yet.
+# Append a centred logo row matching the app's home-page logo bar:
+# Alliance of Bioversity & CIAT, CGIAR Climate Action Programme, and the Global
+# Methane Hub. Each logo is shown at a common height with its width set from the
+# PNG's true aspect ratio (so none is stretched — the climate-action wordmark is
+# ~3.8:1, much wider than the others). Missing PNGs are skipped silently so the
+# Word build never errors when a logo hasn't been staged in www/.
 .add_logo_footer <- function(doc) {
-  alliance <- "www/alliance_logo.png"
-  gmh      <- "www/gmh_logo.png"
-  if (!file.exists(alliance) && !file.exists(gmh)) return(doc)
+  H <- 0.55  # inches; common logo height, widths derived from each aspect ratio
+  logos <- list(
+    list(src = "www/alliance_logo.png",       w = 0.76),  # 1549x1126 ~ 1.38:1
+    list(src = "www/climate_action_logo.png", w = 2.10),  # 439x115  ~ 3.82:1
+    list(src = "www/gmh_logo.png",            w = 1.07)   # 879x452  ~ 1.94:1
+  )
+  logos <- Filter(function(L) file.exists(L$src), logos)
+  if (length(logos) == 0) return(doc)
   parts <- list()
-  if (file.exists(alliance))
-    parts <- c(parts, list(officer::external_img(src = alliance,
-                                                  width = 1.4, height = 0.55)))
-  if (file.exists(alliance) && file.exists(gmh))
-    parts <- c(parts, list(officer::ftext("      ")))
-  if (file.exists(gmh))
-    parts <- c(parts, list(officer::external_img(src = gmh,
-                                                  width = 1.4, height = 0.55)))
+  for (i in seq_along(logos)) {
+    if (i > 1) parts <- c(parts, list(officer::ftext("     ")))
+    parts <- c(parts, list(officer::external_img(
+      src = logos[[i]]$src, width = logos[[i]]$w, height = H)))
+  }
   doc <- officer::body_add_fpar(doc,
     do.call(officer::fpar, c(parts, list(
       fp_p = officer::fp_par(text.align = "center", padding.top = 8)))))
