@@ -42,12 +42,17 @@ app_server <- function(input, output, session) {
   local({
     tok   <- auth_cookie_lookup(session$request$HTTP_COOKIE, "app_state_token")
     saved <- lang_state_take(tok)
-    if (!is.null(saved)) {
+    # Writing reactiveValues at server-init top level is fine, but READING one
+    # (e.g. rv$mc_results) here throws "can't access reactive value outside of
+    # reactive consumer" and crashes the post-switch session. Use the plain
+    # `saved` list for the conditional, and wrap in isolate() so any rv access
+    # stays safe.
+    if (!is.null(saved)) isolate({
       for (nm in names(saved)) rv[[nm]] <- saved[[nm]]
-      if (!is.null(rv$mc_results)) rv$sim_view <- "results"
+      if (!is.null(saved$mc_results)) rv$sim_view <- "results"
       rv$sim_running <- FALSE
       rv$sim_error   <- NULL
-    }
+    })
   })
 
   # Stash current state, then tell the client to reload (the JS sets the
