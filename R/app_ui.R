@@ -819,8 +819,22 @@ app_ui <- function(request = NULL) {
          // are ready to receive setInputValue.
          $(document).on('shiny:connected', function() {
            setTimeout(_restoreActiveTab, 50);
+           // Feedback widget: hand the browser's user-agent to the server so
+           // it can be recorded in the issue context block.
+           if (Shiny.setInputValue) {
+             Shiny.setInputValue('fb_user_agent', navigator.userAgent);
+           }
          });"
-      )))
+      ))),
+      # Floating "Feedback" button — fixed bottom-right, visible on every tab
+      # AND on the pre-login screen (it lives in the navbar header, outside
+      # every nav_panel). Opens the feedback modal (see R/app_server.R).
+      actionButton(
+        inputId = "fb_open",
+        label   = tagList(icon("comment-dots"),
+                          tags$span(class = "fb-label", t("fb_button"))),
+        class   = "fb-fab"
+      )
     ),
     fillable = FALSE,
 

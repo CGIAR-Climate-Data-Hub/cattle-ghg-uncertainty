@@ -162,3 +162,35 @@ body { background: var(--bg); color: var(--text); }
 .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 
 h4.card-title { color: var(--primary); font-weight: 600; }
+
+/* ---- Floating "Feedback" button ----------------------------------------
+   Fixed bottom-right on every page (incl. pre-login). z-index sits above
+   page content but below the Bootstrap modal backdrop (1055), so the
+   feedback modal overlays the button. The language toggle is top-right,
+   so there's no collision. */
+.fb-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1030;
+  border: none;
+  border-radius: 24px;
+  padding: 10px 16px;
+  background: #2D6A4F;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+.fb-fab:hover,
+.fb-fab:focus {
+  background: #40916C;
+  color: #fff;
+}
+.fb-fab .fb-label { margin-left: 6px; }
+
+/* On narrow screens collapse to a round icon-only button. */
+@media (max-width: 480px) {
+  .fb-fab { padding: 12px; border-radius: 50%; }
+  .fb-fab .fb-label { display: none; }
+}

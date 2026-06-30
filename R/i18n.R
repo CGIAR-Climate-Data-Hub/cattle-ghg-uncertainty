@@ -476,6 +476,31 @@ lang_state_take <- function(token) {
   btn_auth_send_link = list(en = "Send sign-in link",
                               fr = "Envoyer le lien de connexion"),
 
+  # Feedback widget (floating button + modal — every page, incl. pre-login)
+  fb_button = list(en = "Feedback", fr = "Commentaires"),
+  fb_title = list(en = "Send feedback", fr = "Envoyer un commentaire"),
+  fb_category = list(en = "Type", fr = "Type"),
+  fb_cat_bug = list(en = "Bug", fr = "Anomalie"),
+  fb_cat_idea = list(en = "Idea", fr = "Idée"),
+  fb_cat_question = list(en = "Question", fr = "Question"),
+  fb_text_label = list(en = "Your feedback",
+                        fr = "Votre commentaire"),
+  fb_text_placeholder = list(
+    en = "What happened, what you expected, or an idea to improve the tool…",
+    fr = "Ce qui s'est passé, ce que vous attendiez, ou une idée d'amélioration…"),
+  fb_email_label = list(en = "Your email", fr = "Votre e-mail"),
+  fb_email_label_anon = list(en = "Your email (so we can follow up)",
+                              fr = "Votre e-mail (pour le suivi)"),
+  fb_file_label = list(en = "Attach a screenshot or file (optional)",
+                        fr = "Joindre une capture d'écran ou un fichier (facultatif)"),
+  fb_file_hint = list(
+    en = "Max 8 MB. Images appear in the report; other files are linked.",
+    fr = "Max 8 Mo. Les images apparaissent dans le rapport ; les autres fichiers sont liés."),
+  fb_cancel = list(en = "Cancel", fr = "Annuler"),
+  fb_send = list(en = "Send", fr = "Envoyer"),
+  fb_empty_text = list(en = "Please enter some feedback text.",
+                        fr = "Veuillez saisir un commentaire."),
+
   # =====================================================================
   # DATA INPUT TAB
   # =====================================================================

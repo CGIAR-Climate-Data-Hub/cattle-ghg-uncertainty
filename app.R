@@ -27,6 +27,10 @@ library(flextable)
 library(httr2)
 library(jsonlite)
 
+# Upload cap (global). Sized for feedback-widget screenshots; also lifts the
+# .xlsx template-upload limit from Shiny's 5 MB default to 8 MB (benign).
+options(shiny.maxRequestSize = 8 * 1024^2)
+
 # Launch app.
 # IMPORTANT: pass `app_ui` (the function itself), NOT `app_ui()` (a call).
 # Shiny invokes the UI function with the incoming `request` object on every

@@ -80,6 +80,75 @@ app_server <- function(input, output, session) {
     session$sendCustomMessage("scrollTo", "downloads-card")
   })
 
+  # --- FEEDBACK WIDGET ---
+  # Floating button (R/app_ui.R) → modal → feedback_submit() (R/feedback.R),
+  # which files a GitHub issue + emails the admin. Available on every page,
+  # including pre-login.
+
+  # Prefill the email field when the browser already holds a valid sign-in
+  # cookie. app_server can't see the chat module's state$user_email, so we
+  # re-run the same pure-R cookie lookup the translator uses. Blank when the
+  # user isn't signed in. Read inside the reactive consumer, never at init.
+  .fb_known_email <- function() {
+    cookie <- auth_cookie_lookup(session$request$HTTP_COOKIE, "translator_session")
+    em <- if (is.null(cookie)) NULL else auth_session_cookie_verify(cookie)
+    if (is.null(em)) "" else em
+  }
+
+  observeEvent(input$fb_open, {
+    prefill <- tryCatch(.fb_known_email(), error = function(e) "")
+    showModal(modalDialog(
+      title = t("fb_title"),
+      selectInput("fb_category", t("fb_category"),
+                  choices = stats::setNames(
+                    c("Bug", "Idea", "Question"),
+                    c(t("fb_cat_bug"), t("fb_cat_idea"), t("fb_cat_question"))),
+                  selected = "Idea"),
+      textAreaInput("fb_text", t("fb_text_label"),
+                    placeholder = t("fb_text_placeholder"),
+                    height = "140px", width = "100%"),
+      textInput("fb_email",
+                label = if (nzchar(prefill)) t("fb_email_label") else t("fb_email_label_anon"),
+                value = prefill, width = "100%"),
+      fileInput("fb_file", t("fb_file_label"),
+                accept = c("image/png", "image/jpeg", "image/gif", "image/webp",
+                           ".png", ".jpg", ".jpeg", ".gif", ".webp",
+                           ".pdf", ".xlsx", ".csv"),
+                width = "100%"),
+      tags$p(style = "font-size:0.8rem; color:#666;", t("fb_file_hint")),
+      footer = tagList(
+        modalButton(t("fb_cancel")),
+        actionButton("fb_submit", t("fb_send"), class = "btn-success")
+      ),
+      easyClose = TRUE
+    ))
+  })
+
+  observeEvent(input$fb_submit, {
+    txt <- trimws(input$fb_text %||% "")
+    if (!nzchar(txt)) {
+      showNotification(t("fb_empty_text"), type = "warning")
+      return()
+    }
+    f <- input$fb_file   # NULL, or a 1-row df with $datapath, $name, $size
+    res <- feedback_submit(
+      text            = txt,
+      category        = input$fb_category %||% "Question",
+      reporter_email  = trimws(input$fb_email %||% ""),
+      page            = input$nav %||% "",
+      attachment_path = if (!is.null(f)) f$datapath else NULL,
+      attachment_name = if (!is.null(f)) f$name     else NULL,
+      user_agent      = input$fb_user_agent %||% "",
+      app_version     = Sys.getenv("APP_VERSION", unset = "")
+    )
+    # Only close the modal on success, so a failed submission keeps the
+    # user's typed text instead of discarding it.
+    if (isTRUE(res$ok)) removeModal()
+    showNotification(res$user_message,
+                     type     = if (isTRUE(res$ok)) "message" else "error",
+                     duration = if (isTRUE(res$ok)) 6 else NULL)
+  })
+
   # --- DATA INPUT ---
 
   # T1.1 fix: when the user has a custom upload loaded and re-touches the country
