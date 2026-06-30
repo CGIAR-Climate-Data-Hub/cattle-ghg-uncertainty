@@ -41,7 +41,8 @@
   "prompt_tokens", "completion_tokens", "total_tokens",
   "cached_tokens",       # cache READ hits — Anthropic: 90% off / GPT-4.1: ~50% off
   "cache_write_tokens",  # cache WRITE on first turn — Anthropic only, +25% on input
-  "cost_usd"
+  "cost_usd",
+  "latency_sec"          # wall-clock seconds for the API call (model A/B comparison)
 )
 
 # Create the file with a header row if it doesn't already exist.
@@ -61,6 +62,7 @@ usage_log_append <- function(user_email, model,
                               prompt_tokens, completion_tokens, cost_usd,
                               cached_tokens = 0L,
                               cache_write_tokens = 0L,
+                              latency_sec = NA_real_,
                               ts = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ",
                                            tz = "UTC")) {
   path <- .usage_log_ensure()
@@ -75,6 +77,7 @@ usage_log_append <- function(user_email, model,
     cached_tokens     = as.integer(cached_tokens %||% 0L),
     cache_write_tokens = as.integer(cache_write_tokens %||% 0L),
     cost_usd          = as.numeric(cost_usd %||% 0),
+    latency_sec       = as.numeric(latency_sec %||% NA_real_),
     stringsAsFactors  = FALSE
   )
   # Append without re-writing the header.
@@ -89,10 +92,10 @@ usage_log_append <- function(user_email, model,
   # is. This lets us audit "where does the $X per-run cost actually
   # go?" without bouncing through Anthropic's billing console.
   message(sprintf(
-    "translator usage: model=%s prompt=%d (cache_read=%d cache_write=%d) output=%d total=%d cost=$%.4f",
+    "translator usage: model=%s prompt=%d (cache_read=%d cache_write=%d) output=%d total=%d cost=$%.4f latency=%.1fs",
     row$model, row$prompt_tokens, row$cached_tokens,
     row$cache_write_tokens, row$completion_tokens,
-    row$total_tokens, row$cost_usd))
+    row$total_tokens, row$cost_usd, row$latency_sec))
   invisible(row)
 }
 

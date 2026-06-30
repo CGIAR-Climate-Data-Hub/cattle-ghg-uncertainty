@@ -942,7 +942,8 @@ translator_chat_server <- function(input, output, session) {
     completion_tokens  = resp$usage$completion_tokens,
     cached_tokens      = resp$usage$cached_tokens %||% 0L,
     cache_write_tokens = resp$usage$cache_write_tokens %||% 0L,
-    cost_usd           = resp$cost_usd
+    cost_usd           = resp$cost_usd,
+    latency_sec        = resp$latency_sec
   )
 
   # Extract any `template-ready` fenced block from the reply, and only
@@ -1133,7 +1134,8 @@ translator_chat_server <- function(input, output, session) {
     completion_tokens  = enum_resp$usage$completion_tokens,
     cached_tokens      = enum_resp$usage$cached_tokens %||% 0L,
     cache_write_tokens = enum_resp$usage$cache_write_tokens %||% 0L,
-    cost_usd           = enum_resp$cost_usd)
+    cost_usd           = enum_resp$cost_usd,
+    latency_sec        = enum_resp$latency_sec)
 
   enum_parsed <- tryCatch(
     jsonlite::fromJSON(enum_resp$reply, simplifyVector = TRUE),
@@ -1251,7 +1253,8 @@ translator_chat_server <- function(input, output, session) {
       completion_tokens  = batch_resp$usage$completion_tokens,
       cached_tokens      = batch_resp$usage$cached_tokens %||% 0L,
       cache_write_tokens = batch_resp$usage$cache_write_tokens %||% 0L,
-      cost_usd           = batch_resp$cost_usd)
+      cost_usd           = batch_resp$cost_usd,
+      latency_sec        = batch_resp$latency_sec)
 
     batch_parsed <- tryCatch(
       jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
@@ -1535,7 +1538,8 @@ translator_chat_server <- function(input, output, session) {
     prompt_tokens     = resp$usage$prompt_tokens,
     completion_tokens = resp$usage$completion_tokens,
     cached_tokens     = resp$usage$cached_tokens %||% 0L,
-    cost_usd          = resp$cost_usd
+    cost_usd          = resp$cost_usd,
+    latency_sec       = resp$latency_sec
   )
 
   if (!.translator_template_is_well_formed(resp$reply)) {
@@ -1618,7 +1622,8 @@ translator_chat_server <- function(input, output, session) {
         prompt_tokens     = resp2$usage$prompt_tokens,
         completion_tokens = resp2$usage$completion_tokens,
         cached_tokens     = resp2$usage$cached_tokens %||% 0L,
-        cost_usd          = resp2$cost_usd)
+        cost_usd          = resp2$cost_usd,
+        latency_sec       = resp2$latency_sec)
       resp <- resp2  # promote the better attempt
       parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply,
                                                     simplifyVector = TRUE),
@@ -1675,7 +1680,8 @@ translator_chat_server <- function(input, output, session) {
         prompt_tokens     = resp_v$usage$prompt_tokens,
         completion_tokens = resp_v$usage$completion_tokens,
         cached_tokens     = resp_v$usage$cached_tokens %||% 0L,
-        cost_usd          = resp_v$cost_usd)
+        cost_usd          = resp_v$cost_usd,
+        latency_sec       = resp_v$latency_sec)
       pcheck_v <- tryCatch(jsonlite::fromJSON(resp_v$reply,
                                               simplifyVector = TRUE),
                             error = function(e) NULL)

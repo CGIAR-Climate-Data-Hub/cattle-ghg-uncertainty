@@ -29,7 +29,11 @@
   "claude-sonnet-4-6" = list(input = 3.00,  output = 15.00,
                                 cache_read = 0.30, cache_write = 3.75),
   "claude-haiku-4-5-20251001" = list(input = 1.00, output = 5.00,
-                                         cache_read = 0.10, cache_write = 1.25)
+                                         cache_read = 0.10, cache_write = 1.25),
+  # Claude Mythos 5 (Project Glasswing). Same API surface as Fable 5;
+  # $10/$50 per 1M. cache_read = 10% of input; cache_write = 5-min rate (1.25x).
+  "claude-mythos-5"   = list(input = 10.00, output = 50.00,
+                                cache_read = 1.00, cache_write = 12.50)
 )
 # 2026-06-11: switched from Opus 4.8 to Sonnet 4.6 after Andy's 26-sub-cat
 # Zambia file timed out at 900s on Opus and a 10-sub-cat fallback returned
@@ -38,7 +42,10 @@
 # on schema-bound emission. Chat reasoning quality is slightly less than
 # Opus but acceptable for this protocol-following workflow. Flip back to
 # Opus 4.8 if real-world quality drops noticeably.
-.ANTHROPIC_DEFAULT_MODEL <- "claude-sonnet-4-6"
+# Default model is overridable via the TRANSLATOR_MODEL env var (.Renviron) so an
+# A/B run can flip the whole translator to e.g. claude-mythos-5 without code edits
+# — every anthropic_chat* call site uses this default (none passes model=).
+.ANTHROPIC_DEFAULT_MODEL <- Sys.getenv("TRANSLATOR_MODEL", unset = "claude-sonnet-4-6")
 .ANTHROPIC_ENDPOINT      <- "https://api.anthropic.com/v1/messages"
 .ANTHROPIC_VERSION       <- "2023-06-01"
 
@@ -254,7 +261,19 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
 # at all returns 400 "temperature is deprecated for this model". Older
 # models still accept it. Keep this list explicit so we don't silently
 # strip temperature from models that expect it.
-.ANTHROPIC_NO_TEMPERATURE_MODELS <- c("claude-opus-4-8")
+.ANTHROPIC_NO_TEMPERATURE_MODELS <- c("claude-opus-4-8", "claude-mythos-5")
+
+# Resolve the API key for a given model. Claude Mythos 5 is on a separate
+# Project Glasswing account, so it uses MYTHOS_API_KEY when set; everything
+# else uses ANTHROPIC_API_KEY. Falls back to ANTHROPIC_API_KEY if MYTHOS_API_KEY
+# is unset (e.g. the org's main key also has Mythos access).
+.anthropic_api_key_for <- function(model) {
+  if (identical(model, "claude-mythos-5")) {
+    k <- Sys.getenv("MYTHOS_API_KEY", unset = "")
+    if (nzchar(k)) return(k)
+  }
+  Sys.getenv("ANTHROPIC_API_KEY", unset = "")
+}
 
 # --- Main entry point: blocking ---------------------------------------------
 #
@@ -264,7 +283,8 @@ anthropic_chat <- function(messages,
                             max_tokens = 16000,
                             temperature = 0.2,
                             timeout_sec = 90) {
-  api_key <- Sys.getenv("ANTHROPIC_API_KEY", unset = "")
+  t0 <- Sys.time()
+  api_key <- .anthropic_api_key_for(model)
   if (!nzchar(api_key)) {
     return(list(reply = NULL,
                 error = "AI translator is not configured (server is missing the ANTHROPIC_API_KEY). Please contact the administrator."))
@@ -335,7 +355,8 @@ anthropic_chat <- function(messages,
         model              = parsed$model %||% model,
         cache_read_tokens  = usage$cache_read_input_tokens %||% 0L,
         cache_write_tokens = usage$cache_creation_input_tokens %||% 0L),
-      error    = NULL
+      error    = NULL,
+      latency_sec = as.numeric(difftime(Sys.time(), t0, units = "secs"))
     )
   } else {
     body_msg <- tryCatch({
@@ -400,7 +421,8 @@ anthropic_chat_stream <- function(messages,
                                    # 5-minute cache (regular chat / single-shot
                                    # calls, which never benefit from 1h).
                                    cache_ttl = NULL) {
-  api_key <- Sys.getenv("ANTHROPIC_API_KEY", unset = "")
+  t0 <- Sys.time()
+  api_key <- .anthropic_api_key_for(model)
   if (!nzchar(api_key)) {
     return(list(reply = NULL,
                 error = "AI translator is not configured (server is missing the ANTHROPIC_API_KEY). Please contact the administrator."))
@@ -615,7 +637,8 @@ anthropic_chat_stream <- function(messages,
       model              = model,
       cache_read_tokens  = cache_read,
       cache_write_tokens = cache_write),
-    error    = NULL
+    error    = NULL,
+    latency_sec = as.numeric(difftime(Sys.time(), t0, units = "secs"))
   )
 }
 
