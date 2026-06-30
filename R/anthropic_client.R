@@ -283,6 +283,12 @@ anthropic_chat <- function(messages,
                             max_tokens = 16000,
                             temperature = 0.2,
                             timeout_sec = 90) {
+  # Provider switch (throwaway A/B test): a Mistral model id routes to the
+  # Mistral client (R/mistral_client.R). Claude path untouched otherwise.
+  if (.is_mistral_model(model))
+    return(mistral_chat(messages = messages, model = model,
+                        max_tokens = max_tokens, temperature = temperature,
+                        timeout_sec = timeout_sec))
   t0 <- Sys.time()
   api_key <- .anthropic_api_key_for(model)
   if (!nzchar(api_key)) {
@@ -421,6 +427,17 @@ anthropic_chat_stream <- function(messages,
                                    # 5-minute cache (regular chat / single-shot
                                    # calls, which never benefit from 1h).
                                    cache_ttl = NULL) {
+  # Provider switch (throwaway A/B test): a Mistral model id routes the whole
+  # streaming path — including every forced-template call that funnels through
+  # here (template_force / enumerate / batch) — to the Mistral client
+  # (R/mistral_client.R). Claude path untouched otherwise.
+  if (.is_mistral_model(model))
+    return(mistral_chat_stream(messages = messages, on_chunk = on_chunk,
+                               on_tick = on_tick, model = model,
+                               max_tokens = max_tokens, temperature = temperature,
+                               timeout_sec = timeout_sec, max_retries = max_retries,
+                               tools = tools, tool_choice = tool_choice,
+                               cache_ttl = cache_ttl))
   t0 <- Sys.time()
   api_key <- .anthropic_api_key_for(model)
   if (!nzchar(api_key)) {
