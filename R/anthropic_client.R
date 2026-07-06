@@ -763,10 +763,9 @@ anthropic_chat_template_force <- function(messages,
             upper_frac_leach  = list(type = c("number", "null")),
             distribution_frac_leach = list(type = c("string", "null"))
           ),
-          # Sparse overlay: the model emits only the MMS allocation
-          # (mms_type + fraction_pct); the app fills MCF/EF3/Frac from the
-          # verified MMS tables. So only the allocation fields are required.
-          required = c("sub_category", "mms_type", "fraction_pct")
+          required = c("sub_category", "mms_type", "fraction_pct",
+                        "MCF_pct", "EF3",
+                        "Frac_GasMS_pct", "Frac_LeachMS_pct")
         )
       ),
       # 2026-06-10: Parameter_TimeSeries. Optional. One row per
@@ -884,9 +883,9 @@ anthropic_chat_template_force <- function(messages,
     upper_frac_leach  = list(type = c("number", "null")),
     distribution_frac_leach = list(type = c("string", "null"))
   ),
-  # Sparse overlay: model emits only the MMS allocation; the app fills the
-  # per-MMS coefficients (MCF/EF3/Frac) from the verified MMS tables.
-  required = c("sub_category", "mms_type", "fraction_pct")
+  required = c("sub_category", "mms_type", "fraction_pct",
+                "MCF_pct", "EF3",
+                "Frac_GasMS_pct", "Frac_LeachMS_pct")
 )
 
 .ANTHROPIC_TIMESERIES_ITEM_SCHEMA <- list(

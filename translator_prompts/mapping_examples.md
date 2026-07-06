@@ -33,7 +33,7 @@ Country X    2022   dairy_cows     500000       275              300            
 
 **Missing core parameters** (per catalogue, tier = core): `Fat` (yes, present), `pct_pregnant`, `CP`, `MilkPR` — fill with IPCC defaults: 0.60, 10.0, 3.3.
 
-**Advanced parameters not in the user file** (`Cfi`, `Ca`, `C`, `Cp`, `hours`, `ASH`, `UE`, `EF3_PRP`, `EF4`, `EF5`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`, `Tw`) — do NOT emit these; the app fills them from the catalogue defaults. (The managed-storage manure-N₂O quantities — direct EF3, Frac_GasMS, Frac_LeachMS — are NOT Parameters rows; they go per-MMS in Manure_Management.)
+**Advanced parameters not in user file:** `Cfi`, `Ca`, `C`, `Cp`, `hours`, `ASH`, `UE`, `EF3_PRP`, `EF4`, `EF5`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`, `Tw` — fill from catalogue defaults; mark `data_source = "ipcc_default"`. (The managed-storage manure-N₂O quantities — direct EF3, Frac_GasMS, Frac_LeachMS — are NOT Parameters rows; they go per-MMS in Manure_Management.)
 
 **Manure_Management:** ask the user. Default-ish setup for smallholder dairy might be {pasture: 60%, solid_storage: 30%, daily_spread: 10%} — but **never default the allocation silently**; this is country-specific. Always confirm.
 
@@ -85,7 +85,7 @@ other_cows      70            20                  5                   5
 | other_cows row 1 | mms_type=pasture, fraction_pct=70 |
 | ... | ... |
 
-Per row, emit only `mms_type` + `fraction_pct` — the app fills `MCF_pct`, `EF3`, `Frac_GasMS_pct`, and `Frac_LeachMS_pct` from the verified per-MMS tables. (Only spell a coefficient out if the user gave a country-specific value for it.)
+Per row, also fill `MCF_pct` (look up the climate zone from Inventory_Metadata or ask user), `EF3` (from MMS_DEFAULTS in template_schema.md), `Frac_GasMS_pct`, `Frac_LeachMS_pct` from the per-MMS defaults table.
 
 **Optional — MMS allocation uncertainty:** if the user expresses uncertainty about the allocation itself ("about 40 % on pasture, could be 30–55 %"), fill `lower_fraction` / `upper_fraction` / `distribution_fraction` on each row. Leave blank to keep `fraction_pct` deterministic. The app renormalises each Monte Carlo iteration so per-group rows sum to 100 % even with the sampler active. Filled values surface `fraction_<mms>` in the sensitivity tornado so MMS allocation can be identified as an influential driver.
 
@@ -99,7 +99,7 @@ This is common — small-inventory teams who know their animal numbers but nothi
 
 **User says:** "Country X, 2022, IPCC 2019 Refinement, 500,000 dairy cows in one sub-category, 100% pasture, use IPCC defaults for everything else."
 
-**You do:** Emit just `N = 500000` (`data_source = "user_file"`) for the sub-category, plus one Manure_Management row `mms_type=pasture, fraction_pct=100`. That's all — the app fills every other parameter's catalogue default and the pasture MCF/EF3/Frac coefficients. Done in seconds.
+**You do:** Build a Parameters block with `N = 500000` (`data_source = "user_file"`) and every other parameter set to its `ipcc_default` from `param_catalogue.md`, distribution = `suggested_distribution`, uncertainty = `suggested_uncertainty_pct`, `data_source = "ipcc_default"`. Build one Manure_Management row: `mms_type=pasture, fraction_pct=100`, plus the MCF/EF3/Frac defaults for pasture. Done in two minutes.
 
 **Important caveat to tell the user:** "I used Africa-region IPCC defaults uniformly. The Cattle Uncertainty App's QA/QC tab will flag any of these as 'IPCC default' so you can replace them with country-specific values later. The simulation will run, but the resulting uncertainty bands will be wide because they reflect IPCC's Tier 1 ranges, not your country's actual measurement quality."
 

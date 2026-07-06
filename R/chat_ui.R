@@ -1224,13 +1224,11 @@ translator_chat_server <- function(input, output, session) {
       "effect. Keep the year rows; carry only the columns with real",
       "year-over-year movement.",
       "",
-      "SPARSE-OVERLAY RULE (Step 8): emit ONLY the parameter values",
-      "the user actually supplied (data_source user_file/user_chat),",
-      "always including N for every sub-category. Do NOT emit catalogue",
-      "defaults, sex/age overrides, or biological zeros, and do NOT pad",
-      "to 25 rows per sub-category — the app fills all of those. For",
-      "manure, emit only mms_type + fraction_pct (the app fills",
-      "MCF/EF3/Frac). A short parameters array is correct here.",
+      "All other emission rules from the system prompt still apply:",
+      "source-of-truth hierarchy (user_file > user_chat >",
+      "ipcc_default), data_source tagging on every row, asymmetric",
+      "bounds where the file provides them, 25 parameters per",
+      "sub-category, biological zeros with distribution='constant'.",
       sep = "\n"),
       i, length(agg_levels), level, level, level, level)
     batch_msgs <- anthropic_build_messages(
@@ -1456,13 +1454,11 @@ translator_chat_server <- function(input, output, session) {
     "   dairy_cows) the answer is `cattle_non_dairy`. NEVER default to",
     "   `cattle_mixed` as a hedge.",
     "",
-    "4. SPARSE OVERLAY. Emit ONLY the parameters the user actually",
-    "   supplied (file or chat), always including N for every",
-    "   sub-category. Do NOT emit the other catalogue parameters, sex/age",
-    "   overrides, or biological zeros, and do NOT pad to 25 rows per",
-    "   sub-category — the app fills every omitted cell from the verified",
-    "   IPCC catalogue + sub-category tables. A short parameters array is",
-    "   correct. For manure, emit only mms_type + fraction_pct.",
+    "4. For each sub-category, fill ALL 25 parameters from the IPCC",
+    "   catalogue (N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi,",
+    "   Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5,",
+    "   Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw) — but honour rule 1:",
+    "   user-supplied values OVERRIDE defaults.",
     "",
     "5. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
     "   upper bounds (Lower CI / Upper CI / lower / upper / ci_lower",
@@ -1607,12 +1603,17 @@ translator_chat_server <- function(input, output, session) {
         " sub-categories total: ",
         paste(history_subcats, collapse = ", "),
         ". You missed: ", paste(missing_subcats, collapse = ", "),
-        ". Add the missing sub-categories now. For each one emit the values ",
-        "the user actually supplied — at minimum its N / population row ",
-        "(data_source = 'user_file') — plus its manure_management allocation ",
-        "(mms_type + fraction_pct). Do NOT pad to 25 rows per sub-category and ",
-        "do NOT emit catalogue defaults, sex overrides, or biological zeros — ",
-        "the app fills all of those automatically. Strict JSON, no comments."))))
+        ". Emit the COMPLETE template now with all ",
+        length(history_subcats),
+        " sub-categories × 25 parameters = ",
+        25 * length(history_subcats),
+        " parameter rows, plus manure_management for ALL ",
+        length(history_subcats),
+        " sub-categories. Use the user's file values for parameters ",
+        "they supplied (data_source = 'user_file' on those rows); use ",
+        "IPCC catalogue defaults ONLY for parameters the file does not ",
+        "supply (data_source = 'ipcc_default' on those rows). ",
+        "Strict JSON, no comments, no shortcuts. List every row."))))
     resp2 <- anthropic_chat_template_force(msgs_retry)
     if (is.null(resp2$error) && .translator_template_is_well_formed(resp2$reply)) {
       # Re-log the spend for the retry call.
@@ -1663,14 +1664,21 @@ translator_chat_server <- function(input, output, session) {
         "data_source = 'user_file'. The user uploaded a file with ",
         "specific values for parameters like BW / MW / WG / pct_pregnant ",
         "/ DE / CP / Milk / Fat / hours / MMS allocation. You did NOT ",
-        "use any of those values. Re-emit the template-ready JSON now using ",
-        "the SPARSE-OVERLAY rule: emit ONE row for EVERY parameter the user's ",
-        "file actually supplies, with value = the file's value, lower/upper = ",
-        "the file's CI only if asymmetric (else give uncertainty_pct), and ",
-        "data_source = 'user_file'. Always include N for every sub-category. ",
-        "Do NOT emit catalogue-default rows, sex overrides, or biological ",
-        "zeros — the app fills all of those automatically; emitting them was ",
-        "NOT the problem, emitting ZERO user values was. Strict JSON."))))
+        "use any of those values — you emitted catalogue defaults across ",
+        "the board. This is the Step-5b failure mode the system prompt ",
+        "warns about. Re-emit the complete template-ready JSON now and: ",
+        "(1) For EVERY parameter present in the user's uploaded file: ",
+        "    - value = the file's mean value (NOT the catalogue default) ",
+        "    - lower / upper = the file's Lower CI / Upper CI ",
+        "    - distribution = 'pert' ",
+        "    - data_source = 'user_file' ",
+        "(2) For parameters the file does NOT supply: ",
+        "    - use the catalogue default ",
+        "    - data_source = 'ipcc_default' ",
+        "(3) For biological zeros (Milk=0 for males/calves, hours=0 for ",
+        "    non-oxen, etc.): data_source = 'biological_zero', ",
+        "    distribution = 'constant'. ",
+        "Strict JSON. No shortcuts. Every row must have data_source set."))))
     resp_v <- anthropic_chat_template_force(msgs_retry_vals)
     if (is.null(resp_v$error) &&
           .translator_template_is_well_formed(resp_v$reply)) {
@@ -1981,37 +1989,20 @@ translator_chat_server <- function(input, output, session) {
         # for every row, eventually crashing the quantile() convergence
         # check on total_co2e. Cols 9/10 keep the catalogue default
         # values that the blank template pre-fills.
-        .put_param <- function(col_idx, v) {
-          v <- .translator_scalar(v)
-          if (is.na(v) || (is.character(v) && !nzchar(v))) return()
-          openxlsx::writeData(wb, "Parameters", v,
-                              startRow = r, startCol = col_idx,
-                              colNames = FALSE)
-        }
         if (!is.null(ai)) {
+          .put_param <- function(col_idx, v) {
+            v <- .translator_scalar(v)
+            if (is.na(v) || (is.character(v) && !nzchar(v))) return()
+            openxlsx::writeData(wb, "Parameters", v,
+                                startRow = r, startCol = col_idx,
+                                colNames = FALSE)
+          }
           .put_param(7,  ai$mean %||% ai$value)
           .put_param(8,  ai$uncertainty_pct)
           .put_param(12, ai$lower_bound %||% ai$lower)
           .put_param(13, ai$upper_bound %||% ai$upper)
           .put_param(11, ai$distribution)
           .put_param(16, ai$data_source %||% "AI translator")
-        } else {
-          # Sparse-overlay fill: the model didn't emit this (sub_category,
-          # parameter), so fill the IPCC default from the single-source resolver
-          # (sex/age overrides + biological zeros + verified catalogue) and tag
-          # provenance. This guarantees a complete template even though the
-          # translator only emits the user's own values. `N` resolves to NA (no
-          # IPCC default — core activity data); .put_param skips NA so the cell
-          # stays blank for the user/QA to flag.
-          d <- resolve_subcat_default(sub_cat, p_name)
-          if (!is.null(d)) {
-            .put_param(7,  d$value)
-            .put_param(8,  d$uncertainty_pct)
-            .put_param(11, d$distribution)
-            .put_param(12, d$lower)
-            .put_param(13, d$upper)
-            .put_param(16, d$data_source)
-          }
         }
       }
     }
@@ -2049,43 +2040,23 @@ translator_chat_server <- function(input, output, session) {
       #   Frac_GasMS_pct @ 17  (18 lower, 19 upper, 20 distribution)
       #   Frac_LeachMS_pct@ 21 (22 lower, 23 upper, 24 distribution)
       # The AI can be inconsistent on key case; tolerate both.
-      #
-      # Sparse-overlay fill: under the new contract the model emits only
-      # mms_type + fraction_pct, so the app fills the per-MMS coefficients from
-      # the verified MMS tables (IPCC 2019R Tables 10.21/10.22, Other-Cattle).
-      # MCF uses the 2006-convention tropical value (Africa/wet user base — see
-      # MMS_DEFAULTS); Frac_GasMS/LeachMS carry the table's ranges as bounds.
-      # A user-supplied value always wins. `.or_def` falls back on NA *or* NULL
-      # (the model may emit the column but leave the cell empty).
-      mtype <- .translator_scalar(mm$mms_type[i])
-      mdef  <- MMS_DEFAULTS[MMS_DEFAULTS$id == mtype, , drop = FALSE]
-      fdef  <- mms_frac_defaults_2019(mtype)
-      .or_def <- function(model_v, def_v) {
-        if (is.null(model_v)) return(def_v)
-        sv <- .translator_scalar(model_v)
-        if (length(sv) == 0L || is.na(sv) ||
-            (is.character(sv) && !nzchar(sv))) return(def_v)
-        model_v
-      }
-      mcf_def <- if (nrow(mdef) == 1L) mdef$mcf_tropical else NA_real_
-      ef3_def <- if (nrow(mdef) == 1L) mdef$ef3 else NA_real_
-      .put_mm(9,  .or_def(mm$mcf[i] %||% mm$MCF_pct[i], mcf_def))
+      .put_mm(9,  mm$mcf[i]              %||% mm$MCF_pct[i])
       .put_mm(10, mm$lower_mcf[i])
       .put_mm(11, mm$upper_mcf[i])
       .put_mm(12, mm$distribution_mcf[i])
-      .put_mm(13, .or_def(mm$ef3[i] %||% mm$EF3[i], ef3_def))
+      .put_mm(13, mm$ef3[i]              %||% mm$EF3[i])
       .put_mm(14, mm$lower_ef3[i])
       .put_mm(15, mm$upper_ef3[i])
       .put_mm(16, mm$distribution_ef3[i])
-      .put_mm(17, .or_def(mm$Frac_GasMS_pct[i] %||% mm$frac_gasms_pct[i] %||%
-                   mm$Frac_GasMS[i], fdef$frac_gas * 100))
-      .put_mm(18, .or_def(mm$lower_frac_gas[i], fdef$frac_gas_low * 100))
-      .put_mm(19, .or_def(mm$upper_frac_gas[i], fdef$frac_gas_high * 100))
+      .put_mm(17, mm$Frac_GasMS_pct[i]   %||% mm$frac_gasms_pct[i] %||%
+                   mm$Frac_GasMS[i])
+      .put_mm(18, mm$lower_frac_gas[i])
+      .put_mm(19, mm$upper_frac_gas[i])
       .put_mm(20, mm$distribution_frac_gas[i])
-      .put_mm(21, .or_def(mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
-                   mm$Frac_LeachMS[i], fdef$frac_leach * 100))
-      .put_mm(22, .or_def(mm$lower_frac_leach[i], fdef$frac_leach_low * 100))
-      .put_mm(23, .or_def(mm$upper_frac_leach[i], fdef$frac_leach_high * 100))
+      .put_mm(21, mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
+                   mm$Frac_LeachMS[i])
+      .put_mm(22, mm$lower_frac_leach[i])
+      .put_mm(23, mm$upper_frac_leach[i])
       .put_mm(24, mm$distribution_frac_leach[i])
     }
   }
