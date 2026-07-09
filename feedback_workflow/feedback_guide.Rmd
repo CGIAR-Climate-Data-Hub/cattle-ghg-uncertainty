@@ -1,0 +1,124 @@
+---
+title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
+subtitle: "Beta Testing — How to Review the Tool and Send Feedback"
+author: "CIAT / CGIAR Alliance — ClimateActionNetZero"
+output:
+  pdf_document:
+    toc: false
+    number_sections: false
+    latex_engine: pdflatex
+    keep_tex: false
+  word_document:
+    toc: false
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{array}
+  - \usepackage{xcolor}
+  - \usepackage{fancyhdr}
+  - \usepackage{graphicx}
+  - \usepackage{hyperref}
+  - \usepackage{setspace}
+  - \usepackage{caption}
+  - \definecolor{cgiargreen}{RGB}{45,106,79}
+  - \definecolor{lightgreen}{RGB}{216,243,220}
+  - \definecolor{darkgrey}{RGB}{60,60,60}
+  - \setlength{\headheight}{14pt}
+  - \pagestyle{fancy}
+  - \fancyhf{}
+  - \fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Livestock GHG Uncertainty Calculator}}
+  - \fancyhead[R]{\textcolor{darkgrey}{\small Beta Testing — Feedback Guide}}
+  - \fancyfoot[C]{\textcolor{darkgrey}{\small \thepage}}
+  - \renewcommand{\headrulewidth}{0.4pt}
+  - \renewcommand{\footrulewidth}{0pt}
+  - \setlength{\parskip}{6pt}
+  - \captionsetup{font=small,labelfont=bf}
+  - \hypersetup{colorlinks=true, urlcolor=cgiargreen, linkcolor=cgiargreen}
+geometry: "top=3cm, bottom=2.5cm, left=2.5cm, right=2.5cm"
+fontsize: 11pt
+linestretch: 1.15
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+# Help us improve the tool — a 20-minute review
+
+Thank you for agreeing to review the **IPCC Tier 2 Livestock GHG Uncertainty Calculator**. This short guide walks you through a quick hands-on test using a small practice dataset, then shows you how to record and send your feedback. Plan for about **20–30 minutes**. You don't need to be an R user or install anything — the tool runs in your web browser.
+
+## What you'll need
+
+Three files (attached to the invitation email, or downloadable from the app's **Resources** tab):
+
+1. **`beta_sample_inventory.xlsx`** — a small practice dataset to load into the tool.
+2. **`beta_feedback_template.xlsx`** — the form where you write your feedback.
+3. **This guide.**
+
+## Step 1 — Open the tool
+
+Go to **<https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/>**. The calculator opens straight away — **no login is needed**. (Only the optional *AI Translator* on the Resources tab asks for an email; you can ignore it for this review.)
+
+## Step 2 — Load the practice dataset *(about 5 min)*
+
+The practice file is a small, made-up inventory: one anonymised **"Country"** with **two production systems** (Commercial dairy and Extensive beef), each split into **two animal sub-categories**. It's deliberately tiny so you can see how every part of the tool behaves without wading through a real national dataset.
+
+1. Open the **Data Input** tab.
+2. Under **Upload**, select `beta_sample_inventory.xlsx`.
+3. Tick the **emission sources** to include — start with all of them (enteric CH~4~, manure CH~4~, direct and indirect N~2~O).
+
+*(The built-in "Country X / Country Y" examples in the dropdown are also there to play with, but please base your review on the practice file so we're all looking at the same thing.)*
+
+## Step 3 — Walk through the tabs *(about 10 min)*
+
+Go through these in order, and jot down anything that is **confusing, wrong, or missing**:
+
+- **QA/QC** — the automatic data checks and any flags they raise.
+- **Uncertainty** — the ± ranges shown for each parameter.
+- **Correlations** — how parameters move together (the practice file includes multi-year data, so this tab has something to display).
+- **Simulate** — run the Monte Carlo simulation; look at the totals and the distribution chart.
+- **Sensitivity** — which inputs drive most of the uncertainty (the tornado chart).
+- **IPCC Report** — the summary tables and the downloadable Word report.
+
+If you have a real inventory of your own, please try uploading that too and note how it goes.
+
+## Step 4 — Record your feedback *(the main step)*
+
+Open **`beta_feedback_template.xlsx`** and add **one row per observation** in the **Feedback** sheet. Use the drop-down menus in each cell:
+
+- **Tab** — where you saw it (Home, Data Input, QA/QC, …, Contact).
+- **Type** and **Severity** — see the tables below.
+- **Description** — what you observed and what you expected instead.
+- **Suggested fix / comment** — optional; your idea for the right behaviour.
+
+Leave the **Status** column blank — the development team fills that in as items are addressed.
+
+| Type | Use it when… |
+|:--|:--|
+| **Bug** | The tool crashes, produces wrong numbers, or behaves unexpectedly |
+| **Correction** | Something is factually wrong — a method, equation, IPCC reference, or number |
+| **Enhancement** | A feature or change that would make the tool more useful or easier to use |
+| **General** | A general comment, question, or observation |
+
+| Severity | Meaning |
+|:--|:--|
+| **Critical** | Must fix before release — a calculation error or crash |
+| **High** | Should fix before release — a significant accuracy or usability issue |
+| **Medium** | Can fix in the next iteration — a minor issue that doesn't block use |
+| **Low** | Nice to have — cosmetic or very minor |
+
+## Step 5 — Send it back
+
+Save the completed `beta_feedback_template.xlsx` and **email it to `M.Lolita@cgiar.org`**. If several people are reviewing, each can send their own file — the *Reviewer name* column keeps everyone's comments distinct.
+
+## Two things you might notice (and can ignore)
+
+- The green **"Feedback" button** at the bottom-right of the app is for quick, one-off bug reports once the tool is in wider use. For this structured review, please use the **Excel form** above instead.
+- **`questionnaire.md` / `questionnaire.docx`** (in the Resources area) is a data-preparation form for the *AI Translator* — it is **not** this feedback form. You can ignore it for the review.
+
+## What makes feedback most useful
+
+- **Be specific** — name the tab and the exact button, table, chart, or text.
+- **Say what you expected** versus what actually happened.
+- **One observation per row**, so each item can be tracked and resolved individually.
+
+Thank you — your review directly shapes what we fix before the tool is released more widely.

@@ -1,0 +1,2 @@
+Reviewer name,Date,Tab,Screen element / feature,Type,Severity,Description,Suggested fix / comment,Status
+John Smith,2026-06-15,Data Input,Upload button,Bug,Critical,"File upload fails with .xlsx files saved in Excel 365 format","Try re-saving as .xlsx (compatibility mode)",Open

@@ -101,8 +101,10 @@ cattle-ghg-uncertainty/
 │
 ├── www/                         # Web assets — logos, built docs (PDF/DOCX),
 │                                #   Find-out-more topic HTML, custom CSS
-├── docs/                        # Find-out-more topic page sources (Rmd)
-├── doc/                         # Methodology + user guide source documents
+├── doc/                         # ALL R Markdown doc SOURCES (rendered into www/):
+│                                #   user_guide.Rmd, methodology.Rmd  → www/*.pdf/.docx
+│                                #   correlations.Rmd, ai_translator.Rmd (+ _shared.css) → www/docs/*.html
+│                                #   (the served, built HTML lives in www/docs/)
 ├── config/                      # Runtime config (approved_users.csv whitelist)
 ├── translator_prompts/          # AI Translator system-prompt knowledge files (md)
 ├── scripts/                     # Build, test, deploy tooling
@@ -110,11 +112,20 @@ cattle-ghg-uncertainty/
 │   ├── build_methodology.R      #   Render methodology.pdf
 │   ├── build_user_guide.R       #   Render user_guide.pdf / .docx
 │   ├── build_help_docs.R        #   Render in-app Find-out-more HTML pages
-│   ├── build_translator_kit.R   #   Refresh AI Translator knowledge files
+│   ├── build_translator_kit.R   #   Refresh AI Translator knowledge files + kit zip
 │   ├── deploy.R                 #   Deploy to shinyapps.io
 │   ├── example_verify.R         #   End-to-end sanity check on built-in examples
 │   └── make_stress_test_data.R  #   Generate stress-test dataset for the AI Translator
-└── rsconnect/                   # shinyapps.io deploy state (auto-generated)
+├── rsconnect/                   # shinyapps.io deploy state (auto-generated)
+│
+│   # ---- Non-app material (2026-07 reorg; none read by the running app) ----
+├── feedback_workflow/           # Beta-test package (self-contained): sample dataset,
+│                                #   feedback form(s), feedback guide (Rmd source + PDF/DOCX),
+│                                #   and generator/build scripts (_make_*.R, _build_feedback_guide.R)
+├── reference/                   # IPCC source PDFs + extracted text (audit reference)
+├── test_data/                   # Sample inventories & template variants used in testing
+├── reviews/                     # Reviewer correspondence, response drafts, notes
+└── old/                         # Archive: one-off dev scripts, backups, stale duplicates
 ```
 
 ---

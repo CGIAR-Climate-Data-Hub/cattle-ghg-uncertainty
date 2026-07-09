@@ -49,8 +49,6 @@ AW_final_comments_tracker.docx
 Andreas comments on uncertainty calculator*.docx
 GHG UNC tool test runs*.docx
 feedback on partial test of*.docx
-beta_feedback_template*.xlsx
-beta_feedback_template*.csv
 beta_feedback_template_aw.xlsx
 correlation_review_notes.md
 Suggested outline for final section on reporting.docx
@@ -119,7 +117,6 @@ _repro_*.R
 _smoketest*.R
 _verify_*.R
 _make_comments_tracker.R
-_make_feedback_template.R
 _build_aw_response.py
 _build_docs.py
 _extract_ipcc.py

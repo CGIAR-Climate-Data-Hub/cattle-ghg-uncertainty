@@ -2,6 +2,13 @@
 # The app itself only needs R/, www/, app.R, methodology.pdf, user_guide.pdf,
 # the input template, plus runtime config.
 
+# Topical non-app folders (2026-07 reorg) — none are read by the running app
+feedback_workflow/
+reference/
+test_data/
+reviews/
+old/
+
 # Dev / build scripts — entire folder excluded from deploy bundle
 scripts/
 
@@ -23,15 +30,8 @@ V4_11_Ch11_N2O&CO2.pdf
 # Audit text extracts (only used by the dev audit, not the app)
 .ipcc_text/
 
-# Historical review-response docs
-AW_final_comments_tracker.docx
-AW_review_response*.docx
-AW_review_response*.md
-AW_review_response*.pdf
-
-# Internal meeting notes — not part of the deployed app
-docs/meeting_*.md
-docs/AW_review_response*.md
+# Historical review-response docs + internal notes now live in reviews/ and old/
+# (both excluded as whole folders above). The former root/docs copies are gone.
 
 # Source-form drafts (the rendered .pdf is what the app serves)
 user_guide_draft.md

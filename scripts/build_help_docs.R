@@ -22,7 +22,7 @@ if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
 out_dir   <- "www/docs"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 # Copy the shared CSS so it's served alongside the HTML
-file.copy("docs/_shared.css", file.path(out_dir, "_shared.css"), overwrite = TRUE)
+file.copy("doc/_shared.css", file.path(out_dir, "_shared.css"), overwrite = TRUE)
 
 # -----------------------------------------------------------------------------
 # Build a systems_data list mirroring what app_server.R's simulation observer
@@ -219,7 +219,7 @@ topics <- c("correlations", "ai_translator")
 abs_out_dir <- normalizePath(out_dir, mustWork = TRUE)
 abs_cache   <- normalizePath(cache_dir, mustWork = TRUE)
 for (topic in topics) {
-  src <- file.path("docs", paste0(topic, ".Rmd"))
+  src <- file.path("doc", paste0(topic, ".Rmd"))
   if (!file.exists(src)) {
     cat("  SKIP", topic, "- source Rmd missing\n")
     next
