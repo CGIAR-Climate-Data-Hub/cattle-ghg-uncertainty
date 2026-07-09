@@ -165,7 +165,9 @@ sheets <- list(
   `Notes (à ignorer)` = extras
 )
 
-out_path <- "stress_test_cattle_data_burkina.xlsx"
+# 2026-07 reorg: test fixtures now live under test_data/ (run from the repo root).
+if (!dir.exists("test_data")) dir.create("test_data", showWarnings = FALSE)
+out_path <- "test_data/stress_test_cattle_data_burkina.xlsx"
 write_xlsx(sheets, out_path)
 
 cat(sprintf("Wrote %s  (%d KB, %d sheets)\n",

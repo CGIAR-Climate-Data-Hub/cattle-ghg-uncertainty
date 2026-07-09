@@ -1571,9 +1571,13 @@ section_F <- function() {
   # Andreas's Zim file uses the old single-cell convention. Probe via
   # parse_uploaded_template to confirm the parser now produces
   # metadata$country (no trailing underscore) AND region resolves to africa.
-  if (file.exists("uncertainty_template_ipcc2019_ZIM_v2.xlsx")) {
-    parsed <- tryCatch(parse_uploaded_template(
-      "uncertainty_template_ipcc2019_ZIM_v2.xlsx"),
+  # 2026-07 reorg: the (untracked) Zim fixture now lives under test_data/;
+  # keep a repo-root fallback for older working copies.
+  zim_f19 <- if (file.exists("test_data/uncertainty_template_ipcc2019_ZIM_v2.xlsx"))
+               "test_data/uncertainty_template_ipcc2019_ZIM_v2.xlsx"
+             else "uncertainty_template_ipcc2019_ZIM_v2.xlsx"
+  if (file.exists(zim_f19)) {
+    parsed <- tryCatch(parse_uploaded_template(zim_f19),
       error = function(e) NULL)
     md <- parsed$metadata
     country_ok <- !is.null(md) && "country" %in% names(md) &&
@@ -1591,7 +1595,7 @@ section_F <- function() {
   } else {
     record("F19a", "F", "Legacy Zim metadata parse",
            "skip", "missing-file", "SKIP",
-           "uncertainty_template_ipcc2019_ZIM_v2.xlsx not in repo root")
+           "uncertainty_template_ipcc2019_ZIM_v2.xlsx not found (looked in test_data/ and repo root)")
   }
 
   # F20 — End-to-end custom-upload regression on Andreas's canonical Zim
@@ -1601,7 +1605,9 @@ section_F <- function() {
   # sub-category disaggregation in the simulation output. Skipped when the
   # template file isn't on disk (the file is intentionally not committed —
   # it's Andreas's working data).
-  zim_path <- "uncertainty_template_ipcc2019_ZIM_v2.xlsx"
+  zim_path <- if (file.exists("test_data/uncertainty_template_ipcc2019_ZIM_v2.xlsx"))
+                "test_data/uncertainty_template_ipcc2019_ZIM_v2.xlsx"
+              else "uncertainty_template_ipcc2019_ZIM_v2.xlsx"
   if (file.exists(zim_path)) {
     parsed_z <- tryCatch(parse_uploaded_template(zim_path),
                           error = function(e) NULL)
