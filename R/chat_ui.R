@@ -1989,20 +1989,49 @@ translator_chat_server <- function(input, output, session) {
         # for every row, eventually crashing the quantile() convergence
         # check on total_co2e. Cols 9/10 keep the catalogue default
         # values that the blank template pre-fills.
+        .put_param <- function(col_idx, v) {
+          v <- .translator_scalar(v)
+          if (is.na(v) || (is.character(v) && !nzchar(v))) return()
+          openxlsx::writeData(wb, "Parameters", v,
+                              startRow = r, startCol = col_idx,
+                              colNames = FALSE)
+        }
         if (!is.null(ai)) {
-          .put_param <- function(col_idx, v) {
-            v <- .translator_scalar(v)
-            if (is.na(v) || (is.character(v) && !nzchar(v))) return()
-            openxlsx::writeData(wb, "Parameters", v,
-                                startRow = r, startCol = col_idx,
-                                colNames = FALSE)
-          }
           .put_param(7,  ai$mean %||% ai$value)
           .put_param(8,  ai$uncertainty_pct)
           .put_param(12, ai$lower_bound %||% ai$lower)
           .put_param(13, ai$upper_bound %||% ai$upper)
           .put_param(11, ai$distribution)
           .put_param(16, ai$data_source %||% "AI translator")
+        } else {
+          # Gap parameter — the AI/overlay didn't supply this (parameter,
+          # sub-category). Backfill the IPCC catalogue default so the row is a
+          # valid "ipcc_default" entry instead of a blank cell that upload
+          # validation rejects with "Invalid distribution:".
+          #
+          # Why fill EVERY block (not just k>1): the blank-template skeleton
+          # only pre-fills the FIRST sub-category block, and for asymmetric
+          # params it writes an Excel FORMULA into the simulator-read cols
+          # 12/13 that carries no cached value until the file is opened in
+          # Excel — so an unopened file would sample NA bounds. Writing
+          # explicit NUMBERS here (idempotent for block 1) makes all blocks
+          # uniform and simulator-safe: value + uncertainty% + distribution,
+          # plus concrete lower/upper — asymmetric params take the catalogue's
+          # explicit bounds, symmetric params take value ± uncertainty%.
+          dv  <- PARAM_CATALOGUE$ipcc_default[i]
+          unc <- PARAM_CATALOGUE$suggested_uncertainty_pct[i]
+          lb  <- PARAM_CATALOGUE$suggested_lower_bound[i]
+          ub  <- PARAM_CATALOGUE$suggested_upper_bound[i]
+          .put_param(7,  dv)
+          .put_param(8,  unc)
+          .put_param(9,  lb)
+          .put_param(10, ub)
+          .put_param(11, PARAM_CATALOGUE$suggested_distribution[i])
+          if (!is.na(lb))                     .put_param(12, lb)
+          else if (!is.na(dv) && !is.na(unc)) .put_param(12, dv * (1 - unc / 100))
+          if (!is.na(ub))                     .put_param(13, ub)
+          else if (!is.na(dv) && !is.na(unc)) .put_param(13, dv * (1 + unc / 100))
+          .put_param(16, "ipcc_default")
         }
       }
     }

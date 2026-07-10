@@ -77,41 +77,12 @@ params <- rbind(
     P("CP", 8, 12, "normal"),     P("Ym", 7.0, 20, "pert"),
     P("Bo", 0.13, 20, "pert")))
 )
-
-# ---- Complete every group with IPCC catalogue defaults ----------------------
-# The app writes ONE Parameters row per catalogue parameter per sub-category.
-# Any parameter we don't set explicitly here would be written as a blank row
-# (distribution = NA) and rejected on upload with "Invalid distribution:" —
-# the blank-template skeleton only pre-fills the FIRST sub-category block, so
-# groups 2+ come through empty. So fill each group's gaps with the catalogue
-# default value / distribution / uncertainty (data_source = "ipcc_default"),
-# exactly as a complete inventory (or the AI translator) would. Asymmetric
-# parameters (suggested_uncertainty_pct = NA) take the catalogue's explicit
-# lower/upper bounds; symmetric ones derive bounds from mean ± uncertainty%.
-complete_group <- function(g) {
-  miss <- setdiff(PARAM_CATALOGUE$parameter, g$parameter)
-  ci   <- match(miss, PARAM_CATALOGUE$parameter)
-  m    <- PARAM_CATALOGUE$ipcc_default[ci]
-  keep <- !is.na(m)                         # skip params with no default (N)
-  miss <- miss[keep]; ci <- ci[keep]; m <- m[keep]
-  if (length(miss) == 0) return(g)
-  u  <- PARAM_CATALOGUE$suggested_uncertainty_pct[ci]
-  d  <- PARAM_CATALOGUE$suggested_distribution[ci]
-  lo <- PARAM_CATALOGUE$suggested_lower_bound[ci]
-  hi <- PARAM_CATALOGUE$suggested_upper_bound[ci]
-  sym <- !is.na(u)                          # symmetric -> bounds from mean ± u%
-  lo[sym] <- m[sym] * (1 - u[sym] / 100)
-  hi[sym] <- m[sym] * (1 + u[sym] / 100)
-  add <- data.frame(
-    cattle_type = g$cattle_type[1], aggregation_level = g$aggregation_level[1],
-    sub_category = g$sub_category[1], parameter = miss, mean = m,
-    uncertainty_pct = u, distribution = d, lower = lo, upper = hi,
-    data_source = "ipcc_default", stringsAsFactors = FALSE)
-  rbind(g, add)
-}
-gkey   <- with(params, paste(cattle_type, aggregation_level, sub_category, sep = "||"))
-params <- do.call(rbind, lapply(split(params, gkey), complete_group))
-rownames(params) <- NULL
+# NOTE: we deliberately supply only the "interesting" parameters per group.
+# The app's template writer (.translator_write_official_template) backfills
+# every other catalogue parameter with its IPCC default (data_source =
+# "ipcc_default") for ALL sub-category blocks, so the written file is complete
+# and uploads cleanly. (Before that writer fix, blocks 2+ came through with
+# blank distribution cells and upload failed with "Invalid distribution:".)
 
 # ---- Manure management -------------------------------------------------------
 # 2 MMS per group (pasture + solid_storage; valid in both IPCC versions),
