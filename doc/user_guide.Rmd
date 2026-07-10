@@ -102,14 +102,16 @@ The tool assumes basic familiarity with IPCC Tier 2 methodology. Users do not ne
 \textbf{IPCC Category} & \textbf{Source} \\
 \midrule
 3.A.1 & Enteric fermentation — cattle (CH\textsubscript{4}) \\
-3.A.2 & Manure management — cattle (CH\textsubscript{4}) \\
-3.A.2 & Manure management — cattle (N\textsubscript{2}O direct) \\
-3.A.2 & Manure management — cattle (N\textsubscript{2}O indirect) \\
-3.C.4 & Direct N\textsubscript{2}O from pasture/range/paddock deposition \\
-3.C.5 & Indirect N\textsubscript{2}O from pasture/range/paddock deposition \\
+3.B.1 & Manure management — cattle (CH\textsubscript{4}) \\
+3.B.1 & Manure management — cattle (N\textsubscript{2}O direct) \\
+3.B.5 & Manure management — cattle (N\textsubscript{2}O indirect) \\
+3.D.1.c & Direct N\textsubscript{2}O from pasture/range/paddock deposition \\
+3.D.2 & Indirect N\textsubscript{2}O from pasture/range/paddock deposition \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+The Monte Carlo simulations can be run for enteric fermentation alone, or for enteric fermentation together with one or more (or all) of the other emission sources listed above. If you are interested to only run simulations for manure-related emission sources, you should supply country-specific Tier 2 input parameters for enteric fermentation. If these are not supplied, the tool will auto-fill these inputs using IPCC default parameters and uncertainty ranges, which may not reflect the assumptions in your inventory.
 
 \newpage
 
@@ -119,26 +121,30 @@ The tool assumes basic familiarity with IPCC Tier 2 methodology. Users do not ne
 
 Before opening the tool, assemble the following:
 
-1. **Activity data**: For each animal sub-category, the population (N), body weight (BW), weight gain (WG), milk yield (for dairy), milk fat %, digestible energy (DE%), manure management system (MMS) fractions, and other Tier 2 inputs.
+1. **Activity data**: For each animal sub-category, the population (N), body weight (BW), weight gain (WG), milk yield (for cows), milk fat %, digestible energy (DE%), manure management system (MMS) fractions, and other Tier 2 inputs.
 
 2. **Uncertainty ranges**: For each parameter, an estimate of its uncertainty — typically either:
    - A percentage uncertainty (e.g. ±20% representing the half-width of a 95% confidence interval), or
    - Explicit lower and upper bounds.
 
-3. **Manure management fractions** (if running manure N\textsubscript{2}O): The percentage of manure allocated to each management system (pasture, solid storage, liquid, etc.). If you are uncertain about the allocation itself, the Manure_Management tab also has optional \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns — fill them and the tool will sample each MMS within its range, renormalising every Monte Carlo iteration so the simplex (per-group rows sum to 100\%) is preserved. The sampled values surface as \texttt{fraction\_<mms>} in the sensitivity tornado so MMS allocation can show up as an influential driver. Leave blank to keep \texttt{fraction\_pct} deterministic (the default, matching the IPCC Inventory Software).
+3. **Manure management fractions** (if running manure management CH\textsubscript{4} or N\textsubscript{2}O): The percentage of manure allocated to each management system (e.g.\ pasture, solid storage, liquid, etc.). If you are uncertain about the allocation itself, the tool uses a data uploading template in which the Manure_Management tab has optional \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns — fill them and the tool will sample each MMS within its range, renormalising every Monte Carlo iteration so the simplex (per-group rows sum to 100\%) is preserved. The sampled values surface as \texttt{fraction\_<mms>} in the sensitivity tornado so MMS allocation can show up as an influential driver. Leave blank to keep \texttt{fraction\_pct} deterministic (the default, matching the IPCC Inventory Software).
+
+4. **Emission factors and other coefficients**: If your inventory uses country-specific emission factors (e.g.\ EF3, EF4, etc.) or country-specific values of other parameters (e.g.\ C, Ca, Cp, Frac\_GasMS, etc.), prepare these parameter values and the associated uncertainty estimates. If your inventory uses the IPCC default values, the tool can auto-fill these default values.
 
 If you do not yet have uncertainty estimates, see Section 2.4 for guidance on obtaining them.
 
-\textbf{You only need the parameters used by the emission sources you tick.} The tool's pre-run check is source-aware: if you select only the methane sources (enteric, manure CH\textsubscript{4}), it will not ask you to fill the N\textsubscript{2}O parameters, and vice versa. So a methane-only run never blocks on blank manure-N\textsubscript{2}O cells. The managed-storage N\textsubscript{2}O quantities (EF3 per system, Frac\_GasMS, Frac\_LeachMS) live in the Manure\_Management tab — fill them there, not in the Parameters tab.
+\textbf{You only need the parameters used by the emission sources you select.} The tool's pre-run check is source-aware: if you select only the methane sources (i.e.\ enteric fermentation, manure management CH\textsubscript{4}), it will not ask you to fill the N\textsubscript{2}O parameters, and vice versa. So a methane-only run never blocks on blank manure-N\textsubscript{2}O cells. The managed-storage N\textsubscript{2}O quantities (EF3 per system, Frac\_GasMS, Frac\_LeachMS) live in the Manure\_Management tab — fill them there, not in the Parameters tab.
+
+The tool uses a specific data upload template, described in the following sections. When you assemble your inputs to the tool, you may either input them directly into the template (which can be downloaded from the `1. Data input' tab), or you can use AI-assisted data preparation (see Section 2.2 below) to convert the data from your format into the template's format. In either case, it is useful to familiarise yourself with the parameter definitions and units used by the tool (see the `Definitions' tab) so that your inputs are aligned with how the tool treats each parameter. For example, MMS fractions should be expressed as percentages (e.g.\ `5' meaning 5\%) rather than fractions (e.g.\ 0.05).
 
 ## AI-assisted data preparation
 
-If your raw inventory data lives in your own Excel or CSV files with column names that do not match the template, the tool offers an \textbf{in-app AI translator} that does the column-mapping and unit-conversion work for you. It is a small chat panel on the Resources tab; you upload your data and the AI walks you through a three-step process that produces a filled template you can download.
+If your raw inventory data lives in your own Excel or CSV files with column names or other formatting that does not match the template, the tool offers an \textbf{in-app AI translator} that does the column-mapping and unit-conversion work for you. It is a small chat panel on the `Resources' tab; you upload your data and the AI walks you through a three-step process that produces a filled template you can download.
 
-\textbf{The three steps (each inventory).} The translator works in three explicit passes — Explore, Clarify, Emit — instead of trying to do everything at once. This structure stops the AI from silently dropping rows or substituting catalogue defaults for values you supplied.
+\textbf{The three steps (for each inventory).} The translator works in three explicit passes — Explore, Clarify, Emit — instead of trying to do everything at once. This structure stops the AI from silently dropping rows or substituting catalogue defaults for values you supplied.
 
 \begin{enumerate}
-\item Open the \textbf{Resources tab}. The "AI Translator" card is the first item, with a green left-edge accent and a short intro paragraph explaining what it does.
+\item Open the \textbf{Resources tab}. The "AI Translator" card is the first item below the user manual, with a green left-edge accent and a short intro paragraph explaining what it does.
 \item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day). The sign-in is then remembered indefinitely on this browser — once an email has been approved, it stays signed in. To sign out, clear the site data in your browser settings.
 
 \textit{Non-CGIAR email — exact step-by-step:}
@@ -152,13 +158,13 @@ If your raw inventory data lives in your own Excel or CSV files with column name
   \item Click the new link. This time the app confirms your access, drops a long-lived sign-in cookie in your browser, and the chat panel unlocks.
 \end{enumerate}
 On subsequent visits from the same browser the cookie keeps you signed in --- there is no need to repeat the magic-link step unless you have cleared site data.
-\item \textbf{Step 1 — Explore.} Upload your raw data file (\texttt{.xlsx} or \texttt{.csv}) using the file picker at the top of the chat panel. The AI reads every sheet, classifies the layout (column-oriented vs wide-stacked vs reference table vs calc sheet), and responds with a four-section \emph{exploration report}: (A) file shape, (B) inventory of values found per parameter and sub-category with bounds and units, (C) gaps that will need IPCC defaults, (D) ambiguities to ask you about. Read it carefully — section B should list every parameter your file actually contains.
-\item \textbf{Step 2 — Clarify.} Answer the AI's section D questions in plain English in the chat box (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}, or \textit{``Your MMS row labelled `PIT' --- does that map to} \texttt{liquid\_slurry} \textit{or} \texttt{solid\_storage}\textit{?''}). If section B missed a parameter that IS in your file, point that out. If you want to add data the file doesn't have (population numbers, country-specific defaults), type them now. If you'd rather defer specific parameters to IPCC defaults, just say so.
-\item \textbf{Step 3 — Emit.} When section D is fully answered, click \textbf{"Produce template now"} (left-most button below the chat box). The AI translates section B + section C + the biological zeros you confirmed, mechanically, into the JSON template. A green \textbf{"Download template (.xlsx)"} button appears alongside the Reset conversation button.
-\item \textbf{Click the green Download button} to save the file, then upload it on Tab 1 (Data Input). Open the file first and skim the \texttt{data\_source} column on the Parameters sheet to confirm that values from your file are tagged \texttt{user\_file} (not \texttt{ipcc\_default}); that's the spot-check that catches translation failures.
+\item \textbf{Step 1 — Explore.} Upload your raw data file (\texttt{.xlsx} or \texttt{.csv}) using the file picker at the top of the chat panel. The AI reads every sheet and responds with a brief summary of what it found: the values it identified for each parameter and sub-category (with their units and bounds), and which parameters are missing and will fall back to IPCC defaults. Read the summary carefully to confirm it captured every parameter your file actually contains.
+\item \textbf{Step 2 — Clarify.} The AI then asks a short set of clarifying questions --- answer them in plain English in the chat box (typically 2--5 short questions, e.g. \textit{``Is your column} \texttt{weight} \textit{body weight or mature weight?''}, or \textit{``Your MMS row labelled `PIT' --- does that map to} \texttt{liquid\_slurry} \textit{or} \texttt{solid\_storage}\textit{?''}). If the summary missed a parameter that IS in your file, point that out. If you want to add data the file doesn't have (population numbers, country-specific defaults), type them now. If you'd rather defer specific parameters to IPCC defaults, just say so. Note: when the AI asks a set of questions it may say to provide your answers and then click \textbf{Produce template now}; even so, it is a good idea to answer the questions first and confirm that the AI has understood your answers and has no further clarifications before you click it.
+\item \textbf{Step 3 — Emit.} When you have answered the AI's questions, click \textbf{"Produce template now"} (left-most button below the chat box). The AI mechanically translates the values it identified, the IPCC defaults for the missing parameters, and the biological zeros you confirmed into the template. A green \textbf{"Download template (.xlsx)"} button appears alongside the Reset conversation button.
+\item \textbf{Click the green Download button} to save the file. Open the filled template and check the values --- for example, view the \texttt{data\_source} column on the Parameters sheet to confirm that values from your file are tagged \texttt{user\_file} (not \texttt{ipcc\_default}) in case there were any translation failures. When you are satisfied that the values in the template match your input data, proceed to the \textbf{1. Data Input} tab in the online interface.
 \end{enumerate}
 
-\textbf{When to use.} The translator is most useful when (a) your data is in a non-standard shape, (b) your column names differ from the template (e.g. \texttt{cattle\_pop}, \texttt{live\_wt\_lb}), (c) you have data in inconsistent units (lbs vs kg, fractions vs percentages), or (d) you want IPCC defaults filled in for the parameters you do not measure.
+\textbf{When to use.} The translator is most useful when (a) your data is in a different format from the template (e.g.\ rows are parameters, columns are years), (b) your column names differ from the template (e.g. \texttt{cattle\_pop}, \texttt{live\_wt\_lb}), (c) you have data in inconsistent units (lbs vs kg, fractions vs percentages), or (d) you want IPCC defaults filled in for the parameters you do not measure.
 
 \textbf{Quality control.} The translator does column-mapping, not analysis. Always (a) spot-check the key numbers (population, body weight, milk yield) by comparing with your original file, and (b) review the QA/QC tab after upload --- any value the translator filled from an IPCC default is flagged in amber there.
 
@@ -166,7 +172,9 @@ On subsequent visits from the same browser the cookie keeps you signed in --- th
 
 ## Complete parameter reference
 
-The table below lists all parameters accepted by the tool. Required parameters depend on the emission sources you are running. Parameters marked \textit{n/a} in the IPCC default column must be supplied from your national data. The tool will auto-fill missing optional parameters with IPCC defaults and flag them in Tab 1 (see Section 3.2).
+The table below lists all parameters accepted by the tool. Required parameters depend on the emission sources you are running. Parameters marked \textit{n/a} in the IPCC default column must be supplied from your national data. The tool will auto-fill missing optional parameters with IPCC defaults and flag them in Tab 1 (see Section 3.2). When uploading your data, be sure to select 2006 IPCC Guidelines or 2019 Refinement so that the tool auto-fills and performs data quality checks according to the correct version of the guidelines.
+
+\textit{Note: the table presents illustrative default values, not the complete range of defaults provided in the 2006 IPCC Guidelines or 2019 Refinement.}
 
 \begin{landscape}
 \small
@@ -250,20 +258,18 @@ Frac\_LeachPRP & Fraction of N lost through leaching from pasture deposition (us
 \end{longtable}
 \end{landscape}
 
-\textit{Note on asymmetric uncertainty}: Parameters flagged "asymmetric" use explicit lower/upper bounds from the IPCC tables rather than a symmetric ±\% formula. The template pre-fills these bounds automatically from the IPCC 2019 Refinement tables. \textit{Note on \texttt{pct\_pregnant}}: this is the canonical name (matches IPCC Vol.4 Ch.10 Eq. 10.13's "% females pregnant" — includes pregnant heifers that have not yet calved). Legacy column names \texttt{pct\_lactating} and \texttt{pct\_calving} are automatically renamed to \texttt{pct\_pregnant} on upload, so existing templates continue to work without edits.
+\textit{Note on asymmetric uncertainty}: Parameters flagged "asymmetric" use explicit lower/upper bounds from the IPCC tables rather than a symmetric ±\% formula. The template pre-fills these bounds automatically from the IPCC 2019 Refinement tables.
 
 ## Understanding the input structure
 
-The tool uses an Excel template with a specific structure. Download the template from the **Data Input** tab (Tab 1) by clicking "Download Excel template".
+The tool uses an Excel template with a specific structure. On the **Data Input** tab, under `Data source', select `Custom Upload', then select the IPCC Guidelines version, and download the template by clicking "Download blank template".
 
 ## The Inventory_Metadata sheet
 
-The first sheet captures who and where the inventory is for. Two cells deserve a note:
+The first sheet captures where the inventory is for. Two cells deserve a note:
 
 - \textbf{Country}: free text (e.g.\ \texttt{Zimbabwe}). Used in the report header — not used for any lookup.
 - \textbf{Continental region}: a \textbf{dropdown} (\texttt{africa / asia / europe / americas / oceania / global}). This drives the QA tab's BW deviation check, which compares your body-weight value against the IPCC Vol.4 Ch.10 Annex Tables 10A.1 / 10A.2 / 10A.3 default for your continent. Pick the continent your inventory's animal sub-categories are in. If you genuinely do not know or are running a hypothetical example, select \texttt{global}.
-
-\textit{Legacy templates}: if you uploaded a template downloaded before this region field was split out (i.e.\ only the old single ``Country / region'' cell), the parser maps common country names (Zimbabwe, India, Brazil, …) to the right continent automatically. Anything unrecognised falls back to \texttt{global} (no false BW warnings; the QA message will just say ``global''). Re-downloading the current template is recommended but not required.
 
 The Parameters sheet has the following key columns:
 
@@ -287,29 +293,31 @@ The Parameters sheet has the following key columns:
 \end{tabular}
 \end{center}
 
-\textbf{Important:} Each row is one parameter for one sub-category. A country with two production systems and five sub-categories each would have approximately 12--15 parameters × 10 sub-categories = 100--150 rows.
+\textbf{Important:} Each row is one parameter for one sub-category. A country with two production systems and five sub-categories each would have approximately 12--15 parameters × 10 sub-categories = 100--150 rows. (Hence, the AI translator may be particularly useful for users with large numbers of sub-categories.)
 
 ## Defining sub-categories
 
-Sub-categories should match your national inventory. Typical sub-categories include:
+Sub-categories should match your national inventory. Examples of typical sub-categories include:
 
 - Dairy: \texttt{cows} (lactating), \texttt{dry\_cows}, \texttt{heifers}, \texttt{calves}, \texttt{bulls}
 - Non-dairy beef: \texttt{breeding\_cows}, \texttt{growing\_males}, \texttt{heifers}, \texttt{calves}, \texttt{oxen}
 
-Each sub-category needs its own rows for all relevant parameters. The values of \texttt{cattle\_type}, \texttt{aggregation\_level}, and \texttt{sub\_category} together identify each group uniquely — they must be spelled consistently across all rows for the same group.
+Each sub-category needs its own rows for each relevant parameter. The values of \texttt{cattle\_type}, \texttt{aggregation\_level}, and \texttt{sub\_category} together identify each group uniquely — they must be spelled consistently across all rows for the same group. (If manually entering data, consistency in spelling can be achieved by `dragging' an already-filled cell across unfilled cells, rather than retyping words.)
 
 ## Obtaining uncertainty estimates
 
+\textbf{Refer to the guidance in the IPCC Guidelines Vol.1 Ch.3. In brief:}
+
 \textbf{For activity data (N, BW, milk yields):}
 
-- \textbf{Survey-based estimates}: If populations are estimated from livestock surveys, the survey sampling error provides a direct estimate of uncertainty. The 95% confidence interval from a survey translates directly to the \texttt{lower} and \texttt{upper} bounds (or to \texttt{uncertainty\_pct} if symmetric).
+- \textbf{Survey-based estimates}: If populations are estimated from representative livestock surveys, the survey sampling error may provide a direct estimate of uncertainty. The 95% confidence interval from a survey translates directly to the \texttt{lower} and \texttt{upper} bounds (or to \texttt{uncertainty\_pct} if symmetric).
 - \textbf{Expert elicitation}: Ask the data provider to give a range within which they are 95\% confident the true value falls.
 - \textbf{IPCC defaults}: IPCC 2019 Refinement Chapter 11 provides uncertainty ranges for key emission factors. Use these as the starting point if no country-specific data is available.
 
 \textbf{For emission factors and coefficients (Ym, Bo, DE, MCF, etc.):}
 
 - \textbf{Literature review}: If you used a country-specific value from a published study, the study's reported confidence interval or standard deviation can be used.
-- \textbf{IPCC default uncertainty ranges}: IPCC 2019 Refinement (Vol.4 Ch.10 / Ch.11) gives lower / upper bounds for several emission factors (e.g. EF\textsubscript{3,PRP}, Ym, MCF). The template pre-fills these where IPCC publishes them; where IPCC does not publish a CI, the template falls back to ranges from Penman \emph{et al.} (2000) and Monni \emph{et al.} (2007) — these are clearly distinguished in the template footnotes.
+- \textbf{IPCC default uncertainty ranges}: IPCC 2019 Refinement (Vol.4 Ch.10 / Ch.11) gives uncertainty percentages or lower / upper bounds for several parameters (e.g. EF\textsubscript{3,PRP}, Ym, MCF). The template pre-fills these where IPCC publishes them; where IPCC does not publish an uncertainty range, the template falls back to ranges from Penman \emph{et al.} (2000) and Monni \emph{et al.} (2007) — these are clearly distinguished in the template footnotes.
 - \textbf{Expert elicitation}: Ask the expert who provided the value to estimate the plausible range.
 
 If you genuinely have no information about a parameter's uncertainty, a reasonable default for emission factors is \ensuremath{\pm}20--40\%. For population data with census-based estimates, \ensuremath{\pm}5--15\% is typical.
@@ -367,7 +375,7 @@ The MMS dropdown in the downloaded template is automatically filtered to show on
 2. Fill in the **Parameters** sheet following the structure in Section 2.3
 3. Fill in the **Manure\_Management** sheet if you are running manure N\textsubscript{2}O sources
 4. *(Optional)* Fill in the **Parameter\_TimeSeries** sheet if you want correlations computed automatically from historical data
-5. Save the file as .xlsx and upload it using the file picker
+5. Save the file as .xlsx and upload it using the file picker.
 
 **Step 3 — Review upload notifications.**
 
@@ -380,7 +388,7 @@ After a successful upload, a green notification confirms how many parameters wer
   \item Show a \textbf{yellow warning notification} listing exactly which parameters were auto-filled and with what values (e.g. "\textit{3 parameters auto-filled from IPCC defaults: Ym = 6.5, Bo = 0.10, DE = 55.0}").
   \item Flag those parameters as \textbf{Missing} (purple/grey) in the QA/QC tab (Tab 2).
 \end{itemize}
-You should review whether the IPCC defaults are appropriate for your country context and, where possible, supply country-specific values before your final simulation run.
+You should review whether the IPCC defaults are appropriate for your country context and, where necessary, revise any auto-filled values before your final simulation run.
 
 \textbf{Common upload issues:}
 \begin{itemize}
@@ -411,7 +419,7 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
 \end{tabular}
 \end{center}
 
-\textit{Scope of the benchmark-deviation check.} The deviation check (Pass / Warn / Fail thresholds based on ±50\% and ±200\% from the IPCC default) is applied \textbf{only to BW (body weight)} — the one parameter for which the tool keeps a defensible continental IPCC table lookup: Annex Tables 10A.1 (dairy cows), 10A.2 (non-dairy cattle), and 10A.3 (buffalo). Earlier versions of the tool also flagged deviations on Milk, MW, DE, Ym, and Bo, but those benchmarks were heuristic mid-points derived from the same Annex 10A tables rather than direct IPCC defaults — a reviewer auditing the QA tab could not locate the cited values in the guidelines, so they were removed (Andreas Wilkes review, May 2026). The remaining parameters are still auto-filled with the catalogue IPCC default when missing (flagged \textit{Missing}); they just no longer raise a \textit{Warn} purely for differing from a mid-point that was not citable to a published IPCC table. Reinstating per-parameter benchmarks properly would require a multi-dimensional lookup (parameter × continent × IPCC version × production system × animal sub-category) and is deferred to a future release.
+\textit{Scope of the benchmark-deviation check.} The deviation check (Pass / Warn / Fail thresholds based on ±50\% and ±200\% from the IPCC default) is applied \textbf{only to BW (body weight)} — the one parameter for which the tool keeps a defensible continental IPCC table lookup: Annex Tables 10A.1 (dairy cows), 10A.2 (non-dairy cattle), and 10A.3 (buffalo).
 
 \textit{Cross-sheet sub-category-key check.} If a Parameters-sheet \texttt{sub\_category} (e.g.\ \texttt{DINT\_heif}) has no exact match in the Manure\_Management sheet but \textit{is} close to exactly one Manure\_Management sub-category (e.g.\ \texttt{DINT\_heifer}, edit distance $\le 2$), the tool auto-matches them and emits a \textit{Warn} row labelled \texttt{sub\_category\_auto\_match} so you can verify the substitution. If multiple candidates match, the run is blocked with a clear error.
 
@@ -430,6 +438,8 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
 \textbf{Fail}: Either the \texttt{BW} mean deviates more than 200\% from the continental IPCC default (likely a data-entry error such as a live weight of 50,000 kg), or another structural validation failed: $DE_\% \leq 0$ or $\geq 100$; $lower > upper$; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. Correct the value before proceeding.
 
 \textbf{Missing}: A required parameter was not found in the upload. The tool auto-filled it with the IPCC default value from PARAM\_CATALOGUE; the value and the IPCC equation / table source are shown in the Tab 1 notification. Applies to every parameter, not just \texttt{BW}. Review whether the default is appropriate for your country context and, where possible, replace it with country-specific data.
+
+\textbf{Tip:} You can make any necessary corrections by editing in Tab 3 (`Uncertainty'). The final values used in the simulation runs will be documented in the reports output by the tool, but will not be updated in your data input file. Alternatively, if you edit the values in your data input file and re-upload in Tab 1 (`Data input'), the values used will be documented in the final reports and stored in your data input file.
 
 ## Documenting deviations
 
@@ -496,13 +506,15 @@ The central emission estimate is essentially unchanged regardless of which mode 
 
 If you select correlations and the result barely changes, that is usually expected, not a bug --- the IPCC equation chain multiplies around 13 parameters together, which dilutes the effect of any single correlated pair. See the Methodology document for the underlying mathematics.
 
+\textit{Note:} Before running your simulation, Tab 5 (`Simulate \& Results') lets you select \textit{compare with/without correlations}. Selecting this lets you inspect the influence of the correlation options you chose.
+
 ## Automatic correlations from time-series data
 
 If you included a Parameter\_TimeSeries sheet in your upload, the tool can compute historical correlations automatically:
 
 \begin{enumerate}
   \item On Tab 4, select \textbf{From template (auto, time-series)} under Activity Data Correlations.
-  \item The tool computes the \textbf{Spearman} rank correlation matrix of the historical parameter data after first-difference detrending (year-on-year changes, which strips out shared long-run growth) and samples using \textbf{Iman--Conover restricted pairing} --- the method explicitly cited by IPCC V1 Ch3 §3.2.3.2 (p.~26). Iman--Conover is distribution-free and reproduces the target rank correlation exactly, regardless of the marginal shapes.
+  \item The tool computes the \textbf{Spearman} rank correlation matrix of the historical parameter data after first-difference detrending (year-on-year changes, which strips out shared long-run growth) and samples using \textbf{Iman--Conover restricted pairing} --- the method explicitly cited by IPCC Vol.1 Ch.3 §3.2.3.2 (p.~26). Iman--Conover is distribution-free and reproduces the target rank correlation exactly, regardless of the marginal shapes.
   \item Inspect the heatmap that appears below the controls to confirm correlations are plausible.
 \end{enumerate}
 
@@ -522,7 +534,7 @@ If you prefer to specify correlations manually:
   \item \textbf{Download matrix with example values} --- the same matrix but pre-filled with the seven structural-defaults pairs (BW $\leftrightarrow$ MW, BW $\leftrightarrow$ WG, Milk $\leftrightarrow$ Fat, Milk $\leftrightarrow$ BW, Milk $\leftrightarrow$ DE, DE $\leftrightarrow$ CP, DE $\leftrightarrow$ Ym). This matrix is \textbf{identical} to what the in-app \textit{Structural defaults} preset applies internally --- it is a useful starting point if you want to tweak just one or two pairs.
 \end{itemize}
 
-\textit{Parameter-name rules.} The templates ship with the canonical parameter names already in the first column and the header row (\texttt{N}, \texttt{BW}, \texttt{MW}, \texttt{WG}, \texttt{Milk}, \texttt{Fat}, \texttt{pct\_pregnant}, \texttt{DE}, \texttt{Cfi}, \texttt{Ca}, \texttt{C}, \texttt{Cp}, \texttt{hours}, \texttt{CP}, \texttt{Ym}, \texttt{Bo}, \texttt{ASH}, \texttt{UE}, \texttt{EF3\_PRP}, \texttt{EF4}, \texttt{EF5}, \texttt{Frac\_GASM\_PRP}, \texttt{Frac\_LEACH\_PRP}, \texttt{MilkPR}, \texttt{Tw}). \textbf{Do not rename rows or columns} --- names that don't match a catalogue parameter are silently ignored when the matrix is applied to the simulation (no error message; the correlation just doesn't take effect). Legacy aliases such as \texttt{pct\_calving} are resolved on the \emph{Parameters-sheet} upload only; on the correlation matrix they need to be the canonical names listed above.
+\textit{Parameter-name rules.} The templates ship with the canonical parameter names already in the first column and the header row (\texttt{N}, \texttt{BW}, \texttt{MW}, \texttt{WG}, \texttt{Milk}, \texttt{Fat}, \texttt{pct\_pregnant}, \texttt{DE}, \texttt{Cfi}, \texttt{Ca}, \texttt{C}, \texttt{Cp}, \texttt{hours}, \texttt{CP}, \texttt{Ym}, \texttt{Bo}, \texttt{ASH}, \texttt{UE}, \texttt{EF3\_PRP}, \texttt{EF4}, \texttt{EF5}, \texttt{Frac\_GASM\_PRP}, \texttt{Frac\_LEACH\_PRP}, \texttt{MilkPR}, \texttt{Tw}). \textbf{Do not rename rows or columns} --- names that don't match a catalogue parameter are silently ignored when the matrix is applied to the simulation (no error message; the correlation just doesn't take effect).
 
 \textit{Missing parameters are assumed to have zero correlation.} If your uploaded matrix omits a parameter that the simulation uses (for example, you upload a small matrix covering only the parameters you want correlated), every pair involving the omitted parameter is treated as independent --- the simulation runs and uses the correlations you did provide, but it does not invent values for the missing ones. Equivalent rule for header typos: a misspelled row/column name is treated the same as a missing parameter, so the correlation simply does not take effect. This is intentional graceful degradation, not an error, so the easiest way to verify your matrix is being used as you expect is to use the downloadable templates above (which ship with all canonical names already in place).
 
@@ -536,7 +548,7 @@ A built-in preset of structural defaults is available. It applies the following 
 \toprule
 \textbf{Parameter A} & \textbf{Parameter B} & \textbf{$\rho$} & \textbf{Source} \\
 \midrule
-BW   & MW   & $+0.50$ & Growth-curve relation (Brody 1945); IPCC Eq 10.3. Set to $0.5$ rather than $0.85$ to reflect that BW comes from the national census while MW is usually a breed reference --- different sources, so the cross-source correlation is closer to $0.5$ than $0.85$. \\
+BW   & MW   & $+0.50$ & Growth-curve relation (Brody 1945); IPCC Eq 10.3. Set to $0.5$ rather than $0.85$ to reflect that BW comes from measured data while MW is usually a breed reference --- different sources, so the cross-source correlation is closer to $0.5$ than $0.85$. \\
 BW   & WG   & $+0.40$ & IPCC Eq 10.6 joint estimation (NRC 2001 energy-balance studies, published range $0.30$--$0.50$). Sign is system-dependent; $+0.40$ reflects well-fed adult dairy/beef systems. \\
 Milk & Fat  & $-0.30$ & Milk dilution effect, dairy genetics literature (Wilmink 1987; VandeHaar 1998); within-herd literature $-0.20$ to $-0.40$. \\
 Milk & BW   & $+0.30$ & High-producing dairy breeds are physically larger (Holstein $\sim$650 kg \& $\sim$30 kg milk/day vs Jersey $\sim$450 kg \& $\sim$20 kg). NRC Dairy 2001; Stallings \& Knowlton 2013. \\
@@ -548,8 +560,6 @@ DE   & Ym   & $-0.50$ & IPCC 2019 Refinement Eq 10.21 (Ym decreases with DE) + m
 \end{center}
 
 All other pairs are set to zero.
-
-\textit{Derivation notes.} A previously included N $\leftrightarrow$ BW $= 0.30$ pair was removed (no defensible cross-country source); DE $\leftrightarrow$ Ym is set to $-0.50$ rather than $-0.40$ (cross-diet meta-analyses); Cfi $\leftrightarrow$ Ca is set to $0.30$ rather than $0.60$ (Cfi and Ca are independent inputs in IPCC Eq 10.3 / 10.4); BW $\leftrightarrow$ MW is set to $0.50$ rather than $0.85$ (typical mixed-source data provenance); two cross-group dairy pairs (Milk $\leftrightarrow$ BW and Milk $\leftrightarrow$ DE) were added; Milk $\leftrightarrow$ pct\_pregnant is not included (sign ambiguous).
 
 ## Coefficient (emission factor) correlations
 
@@ -565,8 +575,6 @@ The right-hand card on Tab~4 controls correlations \emph{between} the per-head I
   \end{itemize}
   Cross-block correlation is zero --- these three literatures are independent. $\rho = 0.3$ is a moderate assumption capturing shared measurement bias within a block.
 \end{itemize}
-
-\textit{Note: a single-$\rho$ ``Uniform EF correlation'' option was removed in the May~2026 audit. Applying one $\rho$ to all coefficients implies that rumen-fermentation, BMP-lagoon and NH$_3$ volatilisation studies share a common bias, which is statistically indefensible.}
 
 \newpage
 
@@ -587,15 +595,15 @@ Before clicking Run, configure:
 
 \textbf{Random seed}: Fixing the seed ensures results are exactly reproducible. Change the seed to verify convergence: if the 95\% CI changes substantially between runs, increase the number of iterations.
 
-\textbf{Analysis mode}: Single-year (most common) or Trend (multi-year time series).
+\textbf{Analysis mode}: Single-year (e.g.\ simulation run only on the latest year in your inventory time series) or Trend (multi-year time series).
 
-\textbf{Emission sources}: Tick all sources applicable to your inventory. Unticked sources contribute zero emissions to the total.
+\textbf{Emission sources}: Tick all sources applicable to your inventory. Unticked sources contribute zero emissions to the total. (Note: you can choose not to select enteric fermentation, but the Tier 2 input data for enteric fermentation should be supplied. Not selecting enteric fermentation means that the emissions and uncertainty of this emission source will not be reported in the results.)
 
 ## Trend mode — year-to-year coefficient correlation
 
 If you picked \textbf{Trend} analysis mode on Tab 1, an extra control appears on Tab 5: \textbf{Year-to-year correlation}. It governs how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next \emph{within a single Monte Carlo iteration}. Activity data (N, BW, Milk, \ldots) is always re-sampled fresh each year — this setting only affects the per-head coefficients.
 
-\textbf{Why does this matter?} If your country uses the same emission factors for the whole inventory series (the typical case — either IPCC defaults or one national estimation), then a high-Ym draw in your base year should also be a high-Ym draw in the current year. The coefficient uncertainty then cancels when you compare the two years, so the trend uncertainty reflects only the activity-data changes. This is what IPCC V1 Ch3 §3.2.3 calls a ``Type A'' sensitivity. If you instead treated EFs as independent across years, you would artificially inflate the trend uncertainty.
+\textbf{Why does this matter?} If your country uses the same emission factors for the whole inventory time series (e.g.\ when Tier 2 EFs were estimated using one dataset and applied to all inventory years), then a high-Ym draw in your base year should also be a high-Ym draw in the current year. The coefficient uncertainty then cancels when you compare the two years, so the trend uncertainty reflects only the activity-data changes. This is what IPCC Vol.1 Ch.3 §3.2.3 calls a ``Type A'' sensitivity. If you instead treated EFs as independent across years, you would artificially inflate the trend uncertainty.
 
 The three options:
 
@@ -611,7 +619,7 @@ A practical sanity check: re-run your trend with ``Fully correlated'' and again 
 
 ## Running the simulation
 
-Click \textbf{Run Monte Carlo Simulation}. A progress bar shows the simulation steps. For 10,000 iterations and a single production system, typical run time is 15–60 seconds.
+Click \textbf{Run Monte Carlo Simulation}. A progress bar shows the simulation steps. For 10,000 iterations and a single production system, typical run time is 15–60 seconds, but may be longer for inventories with large numbers of sub-categories.
 
 When complete, results appear in the lower section of the same tab.
 
@@ -643,7 +651,7 @@ After a successful run, five value boxes show:
   \item \textbf{Enteric CH\textsubscript{4} (t)}: Mean enteric fermentation contribution \textit{plus} the source-specific 95\% margin of error inline (e.g.\ \texttt{2,608 t · ±12\%})
   \item \textbf{Manure CH\textsubscript{4} (t)}: Mean manure CH\textsubscript{4} \textit{plus} its 95\% MoE
   \item \textbf{Pasture N\textsubscript{2}O (t)}: Mean combined direct and indirect N\textsubscript{2}O from pasture deposition \textit{plus} its 95\% MoE
-  \item \textbf{Total 95\% MoE (\%)}: The headline uncertainty --- half-width of the 95\% confidence interval as a percentage of the mean. This is the IPCC reporting convention (Vol.1 Ch.3 Table 3.3) and the single uncertainty metric used across every user-facing display in the app (results tables, comparison chart, IPCC Annex 7, Word report). Coefficient of variation (CV\%) is computed internally and exposed in the methodology document for context, but is no longer surfaced in any of the live tables to keep the user interface consistent.
+  \item \textbf{Total 95\% MoE (\%)}: The headline uncertainty --- half-width of the 95\% confidence interval as a percentage of the mean. This is the IPCC reporting convention (Vol.1 Ch.3 Table 3.3) and the single uncertainty metric used across every user-facing display in the app (results tables, comparison chart, IPCC Annex 7, Word report).
 \end{itemize}
 
 \textbf{Headline by cattle type.} Directly below the value boxes, a "Headline by cattle type" card appears whenever your inventory contains more than one \texttt{cattle\_type} on the Parameters sheet (typically \texttt{dairy} and \texttt{other}). It shows one row per cattle type with mean ± 95\% MoE for each of the four headline sources plus the total CO\textsubscript{2}eq. Single-cattle-type runs do not see this card.
@@ -663,7 +671,7 @@ If AD uncertainty dominates, improving livestock population surveys would most e
 
 \begin{itemize}
   \item \textbf{By-system breakdown}: Mean, 95\% CI, MoE\%, and CV\% for each production system and emission source. The aggregation-level selector at the top of the section lets you switch between \texttt{cattle\_type} (default — dairy / other), \texttt{aggregation\_level} (production system) and \texttt{sub\_category}.
-  \item \textbf{By reporting category (IPCC Table 3.3 layout)}: Grouped by IPCC source category (3.A.1, 3.A.2, 3.C.4, 3.C.5). The leftmost column is always \texttt{Cattle type}, regardless of the aggregation-level selector. Each row carries mean values for the raw gas (\texttt{Mean (t CH\textsubscript{4})} \textit{or} \texttt{Mean (t N\textsubscript{2}O)} — only one is populated per source) \textit{plus} \texttt{Mean (t CO\textsubscript{2}eq)} for cross-source comparison, plus MoE\%, CV\%, and the 95\% CI bounds.
+  \item \textbf{By reporting category (IPCC Table 3.3 layout)}: Grouped by IPCC source category (3.A.1, 3.B.1, 3.B.5, 3.D.1.c, 3.D.2). The leftmost column is always \texttt{Cattle type}, regardless of the aggregation-level selector. Each row carries mean values for the raw gas (\texttt{Mean (t CH\textsubscript{4})} \textit{or} \texttt{Mean (t N\textsubscript{2}O)} — only one is populated per source) \textit{plus} \texttt{Mean (t CO\textsubscript{2}eq)} for cross-source comparison, plus MoE\%, CV\%, and the 95\% CI bounds.
 \end{itemize}
 
 \newpage
@@ -681,7 +689,7 @@ Each bar is labelled as \texttt{<parameter> (<sub\_category>)} — for example \
 Bars are coloured by reducibility:
 \begin{itemize}
   \item \textcolor{cgiargreen}{\textbf{Green}}: Uncertainty can be reduced with better local data (surveys or measurement studies)
-  \item \textbf{Grey}: Uncertainty is largely irreducible with national-level data (e.g. fundamental biochemical constants)
+  \item \textbf{Grey}: Uncertainty is largely irreducible with national-level data (e.g. fundamental biochemical constants or IPCC defaults that are rarely measured)
 \end{itemize}
 
 ## SRC vs PRCC
@@ -700,7 +708,7 @@ Both are shown; they typically agree on the top-ranked parameters. If they disag
 
 ## IPCC Table 3.3
 
-The IPCC Report tab shows your results formatted as IPCC 2006 Vol. 1 Ch. 3 Table 3.3. The three uncertainty columns in the downloadable Excel sheet are now labelled explicitly so there is no ambiguity:
+The IPCC Report tab shows your results formatted as IPCC 2006 Vol. 1 Ch. 3 Table 3.3. The three uncertainty columns in the downloadable Excel sheet are:
 
 \begin{itemize}
   \item \textbf{AD uncertainty (95\% MoE \%)}: \% uncertainty from activity data alone
@@ -708,7 +716,7 @@ The IPCC Report tab shows your results formatted as IPCC 2006 Vol. 1 Ch. 3 Table
   \item \textbf{Combined uncertainty (95\% MoE \%)}: Overall \% uncertainty
 \end{itemize}
 
-\textbf{Definition of \% uncertainty}: Following IPCC Table 3.3 conventions, all values are expressed as the half-width of the 95\% confidence interval divided by the mean, multiplied by 100 --- i.e.\ \texttt{MoE\% = ((CI\_upper - CI\_lower) / 2) / mean * 100}. CV (\texttt{SD/mean}) is a different metric and is \textbf{not} what IPCC Annex 7 expects in this column.
+\textbf{Definition of \% uncertainty}: Following IPCC Table 3.3 conventions, all values are expressed as the half-width of the 95\% confidence interval divided by the mean, multiplied by 100 --- i.e.\ \texttt{MoE\% = ((CI\_upper - CI\_lower) / 2) / mean * 100}.
 
 \textit{Example: a Combined uncertainty of 35\% means the 95\% CI is approximately ±35\% of the mean emission estimate.}
 
@@ -742,11 +750,11 @@ The methodology PDF (available on the Resources tab) provides a complete technic
 
 Based on experience with IPCC expert reviews, reviewers typically focus on:
 \begin{itemize}
-  \item Whether the uncertainty metric reported is the correct one (\% uncertainty = MoE\%, not CV\%)
+  \item Whether the uncertainty metric is reported at the appropriate level of disaggregation (e.g.\ separately reported for `dairy' and `other cattle' per emission source when emissions from these cattle types are separately reported in the inventory)
   \item Whether the IPCC Table 3.3 format and column conventions are followed
   \item Whether Approach 2 (Monte Carlo) is described sufficiently to be reproducible
   \item Whether the number of iterations is sufficient for stable results
-  \item The basis for any country-specific emission factor values that deviate substantially from IPCC defaults
+  \item The basis for any country-specific uncertainty ranges that deviate from IPCC defaults
 \end{itemize}
 
 \newpage

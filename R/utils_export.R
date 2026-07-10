@@ -60,11 +60,11 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
   data.frame(
     `Emission category` = c(
       "3.A.1 Enteric Fermentation — Cattle",
-      "3.A.2 Manure Management — Cattle (CH₄)",
-      "3.A.2 Manure Management — Cattle (N₂O direct)",
-      "3.A.2 Manure Management — Cattle (N₂O indirect)",
-      "3.C.4 Direct N₂O — Pasture/Range/Paddock",
-      "3.C.5 Indirect N₂O — Pasture/Range/Paddock",
+      "3.B.1 Manure Management — Cattle (CH₄)",
+      "3.B.1 Manure Management — Cattle (N₂O direct)",
+      "3.B.5 Manure Management — Cattle (N₂O indirect)",
+      "3.D.1.c Direct N₂O — Pasture/Range/Paddock",
+      "3.D.2 Indirect N₂O — Pasture/Range/Paddock",
       "Total CH₄", "Total N₂O", "Total CO₂eq"
     ),
     Gas = c("CH₄", "CH₄", "N₂O", "N₂O", "N₂O", "N₂O", "CH₄", "N₂O", "CO₂eq"),
