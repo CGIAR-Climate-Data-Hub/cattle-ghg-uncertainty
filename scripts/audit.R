@@ -2276,9 +2276,14 @@ md <- c(md, "",
         "",
         "## Reproducibility",
         "",
-        "Run `Rscript _audit.R` from the repo root. Output is deterministic conditional on the seeds in each test block.",
+        "Run `Rscript scripts/audit.R` from the repo root. Output is deterministic conditional on the seeds in each test block.",
         "")
 
 writeLines(md, "AUDIT_REPORT.md", useBytes = TRUE)
 cat(sprintf("\n=== AUDIT COMPLETE ===\nTotal: %d  Pass: %d  Fail: %d  Skip: %d\nReport: AUDIT_REPORT.md\n",
             total, pass, fail, skip))
+
+# Non-zero exit on failure so CI (.github/workflows/audit.yml) gates on this.
+# Guarded on interactive() so sourcing the script in an R session still just
+# prints the summary instead of killing the session.
+if (fail > 0L && !interactive()) quit(save = "no", status = 1L)

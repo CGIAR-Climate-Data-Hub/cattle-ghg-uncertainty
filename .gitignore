@@ -144,3 +144,12 @@ analyze_zambia.R
 count_prompt.R
 inspect_zambia_tmp.R
 scripts/_inspect_translation.R
+
+# 2026-08: knowledge/ — a local-only project knowledge base written for AI
+# agent context (cold-start onboarding for future Claude Code sessions). It
+# indexes the codebase and records the decision/review history, so it names
+# the reviewers, quotes their comments, and describes the real-country test
+# inventories. All of that is deliberately kept out of the public repo by the
+# rules above, so the folder that summarises it stays local too.
+knowledge/
+CLAUDE.local.md

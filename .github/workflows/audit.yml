@@ -1,0 +1,63 @@
+# Regression gate for the calculation engine.
+#
+# Runs scripts/audit.R, which builds a synthetic hand-computed "golden case"
+# and asserts every IPCC Vol.4 Ch.10/11 equation, the Monte Carlo sampler, the
+# validators and the exporters against it. The script exits non-zero if any
+# check fails.
+#
+# Note: test_data/ is deliberately untracked (real-country inventories), so the
+# Zimbabwe fixture checks report as SKIP here. The synthetic golden case and
+# every sampler/validator/export check still run.
+
+name: audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.3.3'
+          use-public-rspm: true
+
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libcurl4-openssl-dev libssl-dev libxml2-dev \
+            libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev \
+            libpng-dev libtiff5-dev libjpeg-dev
+
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: ${{ runner.os }}-r4.3.3-${{ hashFiles('install.R') }}
+          restore-keys: ${{ runner.os }}-r4.3.3-
+
+      - name: Install R dependencies
+        run: Rscript install.R
+
+      - name: Run regression audit
+        run: Rscript scripts/audit.R
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: AUDIT_REPORT.md
+          if-no-files-found: warn

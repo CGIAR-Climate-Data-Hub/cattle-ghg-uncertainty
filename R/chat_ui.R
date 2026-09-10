@@ -1321,7 +1321,15 @@ translator_chat_server <- function(input, output, session) {
     "Template ready. Emitted %d parameter rows, %d manure_management",
     "rows, and %d time-series rows across %d aggregation_levels (%s).",
     "Click the green Download button below to save the .xlsx, then",
-    "upload it on the 1. Data Input tab."),
+    "upload it on the 1. Data Input tab.",
+    "\n\nNote on defaults: any parameter your file did not supply is filled",
+    "with the IPCC default for that animal sub-category and flagged as",
+    "'ipcc_default' in the data_source column. Manure MCF values are the",
+    "one exception to sub-category matching: they depend on climate zone,",
+    "which the template does not yet record, so a gap-filled MCF assumes a",
+    "TROPICAL zone (IPCC Table 10.17). Check the MCF_pct column in the",
+    "Manure_Management sheet and edit it if your inventory is temperate or",
+    "boreal."),
     n_params, n_mms, n_ts, length(agg_levels),
     paste(agg_levels, collapse = ", "))
   state$messages[[length(state$messages) + 1L]] <-
@@ -2018,20 +2026,38 @@ translator_chat_server <- function(input, output, session) {
           # uniform and simulator-safe: value + uncertainty% + distribution,
           # plus concrete lower/upper — asymmetric params take the catalogue's
           # explicit bounds, symmetric params take value ± uncertainty%.
-          dv  <- PARAM_CATALOGUE$ipcc_default[i]
-          unc <- PARAM_CATALOGUE$suggested_uncertainty_pct[i]
-          lb  <- PARAM_CATALOGUE$suggested_lower_bound[i]
-          ub  <- PARAM_CATALOGUE$suggested_upper_bound[i]
+          # Use the SUB-CATEGORY-AWARE default, not the bare catalogue row.
+          # resolve_subcat_default() knows each sub-category's sex and age, so
+          # it returns the bull/ox/calf-specific central value AND the
+          # biological zeros (Milk/Fat/MilkPR for males, pct_pregnant for
+          # males and calves, hours for anything that is not oxen). Filling
+          # PARAM_CATALOGUE$ipcc_default here instead gave bulls Milk = 3.5
+          # kg/day, which feeds NEl -> GE and inflates enteric CH4, VS and
+          # Nex for the group. Audit check F31 covers this.
+          #
+          # The resolver keeps the catalogue's distribution, uncertainty and
+          # bounds and overrides the central value only; all 9 sub-categories
+          # x 25 parameters were checked to confirm every overridden value
+          # still sits inside its catalogue bounds, so the run-time
+          # bounds-bracket check cannot trip on these.
+          rs  <- tryCatch(resolve_subcat_default(sub_cat, p_name, ipcc_version),
+                          error = function(e) NULL)
+          dv  <- if (!is.null(rs)) rs$value           else PARAM_CATALOGUE$ipcc_default[i]
+          unc <- if (!is.null(rs)) rs$uncertainty_pct else PARAM_CATALOGUE$suggested_uncertainty_pct[i]
+          lb  <- if (!is.null(rs)) rs$lower           else PARAM_CATALOGUE$suggested_lower_bound[i]
+          ub  <- if (!is.null(rs)) rs$upper           else PARAM_CATALOGUE$suggested_upper_bound[i]
+          dst <- if (!is.null(rs)) rs$distribution    else PARAM_CATALOGUE$suggested_distribution[i]
+          src <- if (!is.null(rs)) rs$data_source     else "ipcc_default"
           .put_param(7,  dv)
           .put_param(8,  unc)
           .put_param(9,  lb)
           .put_param(10, ub)
-          .put_param(11, PARAM_CATALOGUE$suggested_distribution[i])
+          .put_param(11, dst)
           if (!is.na(lb))                     .put_param(12, lb)
           else if (!is.na(dv) && !is.na(unc)) .put_param(12, dv * (1 - unc / 100))
           if (!is.na(ub))                     .put_param(13, ub)
           else if (!is.na(dv) && !is.na(unc)) .put_param(13, dv * (1 + unc / 100))
-          .put_param(16, "ipcc_default")
+          .put_param(16, src)
         }
       }
     }
@@ -2039,6 +2065,7 @@ translator_chat_server <- function(input, output, session) {
 
   # ---------- Manure_Management ---------------------------------------------
   mm <- parsed$manure_management
+  mm_gapfilled_mcf <- FALSE   # set below if any MCF had to be defaulted
   if (is.data.frame(mm) && nrow(mm) > 0) {
     MM_DATA_START <- 4L   # template puts banner @ row 1, headers @ 2, hints @ 3
     for (i in seq_len(nrow(mm))) {
@@ -2069,25 +2096,74 @@ translator_chat_server <- function(input, output, session) {
       #   Frac_GasMS_pct @ 17  (18 lower, 19 upper, 20 distribution)
       #   Frac_LeachMS_pct@ 21 (22 lower, 23 upper, 24 distribution)
       # The AI can be inconsistent on key case; tolerate both.
-      .put_mm(9,  mm$mcf[i]              %||% mm$MCF_pct[i])
+      #
+      # Gap-fill: the translator often supplies only mms_type + fraction_pct.
+      # Previously the coefficient columns were then left BLANK, parsed back
+      # as NA, and NA propagated through calc_manure_ch4() (VS * 365 * Bo *
+      # 0.67 * mcf * frac) to an NA emission. Fill IPCC defaults instead, so
+      # the row is a usable "ipcc_default" entry the compiler can override.
+      # Audit check F31 covers this.
+      #
+      # CLIMATE ZONE: MCF is climate-zone dependent (IPCC Table 10.17), but
+      # Inventory_Metadata carries no climate_zone field, so a gap-filled MCF
+      # here ASSUMES TROPICAL. That assumption is stated in the sheet banner
+      # (see below) and in the post-generation chat message so the compiler
+      # can change it. TODO: add climate_zone to Inventory_Metadata and key
+      # this off it instead of assuming.
+      mms_id  <- .translator_scalar(mm$mms_type[i])
+      mms_row <- MMS_DEFAULTS[MMS_DEFAULTS$id == mms_id, , drop = FALSE]
+      d_mcf   <- if (nrow(mms_row)) mms_row$mcf_tropical[1] else NA_real_
+      d_ef3   <- if (nrow(mms_row)) mms_row$ef3[1]          else NA_real_
+      d_fr    <- tryCatch(mms_frac_defaults_2019(mms_id), error = function(e) NULL)
+      # MMS_FRAC_DEFAULTS_2019 holds FRACTIONS; these columns are PERCENTAGES.
+      d_gas   <- if (!is.null(d_fr)) d_fr$frac_gas   * 100 else NA_real_
+      d_leach <- if (!is.null(d_fr)) d_fr$frac_leach * 100 else NA_real_
+      # Did we have to invent an MCF for this row? Drives the banner note.
+      # (`for` does not open a new scope in R, so a plain <- is correct here.)
+      if (is.na(.translator_scalar(mm$mcf[i] %||% mm$MCF_pct[i] %||% NA)) &&
+          !is.na(d_mcf))
+        mm_gapfilled_mcf <- TRUE
+
+      .put_mm(9,  mm$mcf[i]              %||% mm$MCF_pct[i] %||% d_mcf)
       .put_mm(10, mm$lower_mcf[i])
       .put_mm(11, mm$upper_mcf[i])
       .put_mm(12, mm$distribution_mcf[i])
-      .put_mm(13, mm$ef3[i]              %||% mm$EF3[i])
+      .put_mm(13, mm$ef3[i]              %||% mm$EF3[i] %||% d_ef3)
       .put_mm(14, mm$lower_ef3[i])
       .put_mm(15, mm$upper_ef3[i])
       .put_mm(16, mm$distribution_ef3[i])
       .put_mm(17, mm$Frac_GasMS_pct[i]   %||% mm$frac_gasms_pct[i] %||%
-                   mm$Frac_GasMS[i])
-      .put_mm(18, mm$lower_frac_gas[i])
-      .put_mm(19, mm$upper_frac_gas[i])
+                   mm$Frac_GasMS[i] %||% d_gas)
+      .put_mm(18, mm$lower_frac_gas[i]   %||%
+                   if (!is.null(d_fr)) d_fr$frac_gas_low  * 100 else NA_real_)
+      .put_mm(19, mm$upper_frac_gas[i]   %||%
+                   if (!is.null(d_fr)) d_fr$frac_gas_high * 100 else NA_real_)
       .put_mm(20, mm$distribution_frac_gas[i])
       .put_mm(21, mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
-                   mm$Frac_LeachMS[i])
-      .put_mm(22, mm$lower_frac_leach[i])
-      .put_mm(23, mm$upper_frac_leach[i])
+                   mm$Frac_LeachMS[i] %||% d_leach)
+      .put_mm(22, mm$lower_frac_leach[i] %||%
+                   if (!is.null(d_fr)) d_fr$frac_leach_low  * 100 else NA_real_)
+      .put_mm(23, mm$upper_frac_leach[i] %||%
+                   if (!is.null(d_fr)) d_fr$frac_leach_high * 100 else NA_real_)
       .put_mm(24, mm$distribution_frac_leach[i])
     }
+  }
+
+  # Make the tropical MCF assumption visible IN THE FILE, not just in the
+  # chat. Written into Inventory_Metadata > Notes (row 8), appended to
+  # whatever notes the source already carried, so it travels with the
+  # workbook to anyone who opens it later.
+  if (isTRUE(mm_gapfilled_mcf)) {
+    .mcf_note <- paste(
+      "MCF gap-fill: MCF values missing from the source data were filled with",
+      "IPCC Table 10.17 defaults for a TROPICAL climate zone (the template has",
+      "no climate-zone field yet). If your inventory is temperate or boreal,",
+      "review and edit the MCF_pct column in the Manure_Management sheet.")
+    .prior <- .translator_scalar(md$notes)
+    .prior <- if (is.na(.prior) || !nzchar(as.character(.prior))) ""
+              else paste0(as.character(.prior), " | ")
+    openxlsx::writeData(wb, "Inventory_Metadata", paste0(.prior, .mcf_note),
+                        startRow = 8, startCol = 3, colNames = FALSE)
   }
 
   # ---------- Parameter_TimeSeries -----------------------------------------

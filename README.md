@@ -4,6 +4,7 @@
 [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/HEAD?urlpath=shiny)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![R](https://img.shields.io/badge/R-%3E%3D4.3-276DC3?logo=r)](https://www.r-project.org/)
+[![audit](https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/actions/workflows/audit.yml/badge.svg)](https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/actions/workflows/audit.yml)
 
 A web-based tool for national cattle GHG inventory teams to quantify and report uncertainty in their IPCC Tier 2 emission estimates. Upload your country data, run 10,000 Monte Carlo simulations, and download results formatted directly for IPCC Table 3.3 — no coding required. An in-app **AI Translator** turns raw country data files (in any shape, any language) into the strict input template before you analyse.
 
@@ -35,19 +36,19 @@ Click the **launch binder** badge above. Once the environment is ready, the app 
 
 When a country reports cattle greenhouse-gas emissions under the Paris Agreement, every input — animal populations, body weights, feed quality, emission factors — has uncertainty attached to it. This tool propagates that uncertainty through the full IPCC Tier 2 equation chain so you can report not just a single emission number, but a defensible confidence interval, complete with a sensitivity ranking of which parameters drive the spread.
 
-**Emission sources covered:** Enteric fermentation CH₄ · Manure management CH₄ · Direct N₂O from manure · Indirect N₂O (atmospheric deposition + leaching)
+**Emission sources covered:** Enteric fermentation CH₄ · Manure management CH₄ · Direct N₂O from managed manure · Indirect N₂O from managed manure (volatilisation + leaching) · Direct N₂O from pasture/range/paddock (PRP) · Indirect N₂O from PRP
 
 | Feature | Detail |
 |---|---|
 | Methodology | IPCC 2006 Guidelines Vol. 4 Ch. 10–11; 2019 Refinement supported |
 | Simulation | 10 000 Monte Carlo iterations (configurable) |
-| Correlations | Gaussian copula for activity-data time series; preset, manual, or structural-default emission-factor correlation; per-MMS allocation simplex sampling |
+| Correlations | Iman-Conover restricted pairing on Spearman rank correlations (IPCC Vol.1 Ch.3 §3.2.3.2), which preserves each marginal distribution exactly; preset, manual, or structural-default emission-factor correlation; optional bounded per-MMS allocation sampling with per-iteration renormalisation |
 | Uncertainty decomposition | Activity data vs. emission factors, side-by-side |
 | Sensitivity analysis | Standardised Regression Coefficients (SRC) and partial rank correlation (PRCC) |
 | Trend uncertainty | Multi-year Monte Carlo with year-to-year temporal correlation of EFs (IPCC Vol.1 Ch.3 §3.2.2.4) |
 | Reporting output | IPCC Table 3.3 formatted XLSX / CSV download; Word run summary |
 | Input format | Excel template with dropdowns, formulas, IPCC defaults, and colour-coded guidance |
-| **AI Translator** | Built-in chat panel converts raw country data (.xlsx / .csv, multi-sheet, mixed languages, messy units) into the strict template. Backed by OpenAI GPT-4.1, gated by magic-link email auth. |
+| **AI Translator** | Built-in chat panel converts raw country data (.xlsx / .csv, multi-sheet, mixed languages, messy units) into the strict template. Backed by Anthropic Claude (default `claude-sonnet-4-6`, overridable via the `TRANSLATOR_MODEL` environment variable), gated by magic-link email auth. |
 | Example data | Country X (hypothetical dairy) and Country Y (hypothetical pastoral) — pre-loaded, no upload needed to explore |
 
 ---
@@ -74,7 +75,7 @@ When a country reports cattle greenhouse-gas emissions under the Paris Agreement
 
 If your raw inventory data lives in your own Excel or CSV files with column names that don't match the template, the tool's in-app AI Translator does the column mapping, unit conversion (lbs/kg, L/kg, %/fraction, °F/°C, etc.), sub-category vocabulary resolution, and IPCC-default fill-in for any parameter you don't have country-specific data for.
 
-**Workflow.** Open the **Resources** tab → the *AI Translator* card sits at the top. Sign in with your email (CGIAR addresses are auto-approved; other addresses require a one-time admin OK). Drop in your file. The AI reads every sheet, asks 2-5 clarifying questions, then — when you say *"go ahead"* — produces a downloadable .xlsx in the exact shape the **Data Input** tab expects.
+**Workflow.** Open the **Resources** tab → the *AI Translator* card sits at the top. Sign in with your email (CGIAR addresses are auto-approved; other addresses require a one-time admin OK). Drop in your file. The AI reads every sheet and asks 2-5 clarifying questions. When you have answered them, click the green **Produce template now** button: that button is the only trigger for template emission (typing *"go ahead"* in the chat does not start it). The result is a downloadable .xlsx in the exact shape the **Data Input** tab expects.
 
 ---
 
@@ -87,17 +88,46 @@ cattle-ghg-uncertainty/
 ├── runtime.txt                  # Binder R-version spec
 ├── README.md
 │
-├── R/                           # All application source
+├── R/                           # All application source (31 files)
 │   ├── app_ui.R, app_server.R   # Shiny UI + reactive server
-│   ├── calc_*.R                 # IPCC Vol.4 Ch.10/11 emission equations
-│   ├── mc_*.R                   # Monte Carlo sampling, simulation, uncertainty, sensitivity
-│   ├── utils_*.R                # IPCC defaults, templates, distributions, QA/QC, exports
-│   ├── auth_magic_link.R        # AI Translator magic-link email auth
-│   ├── chat_ui.R                # AI Translator chat panel UI + server
-│   ├── conversation_history.R   # Per-user persistent chat history
-│   ├── openai_client.R          # OpenAI GPT-4.1 client (streaming + json_schema)
-│   ├── usage_log.R              # Per-call token ledger + monthly budget gate
-│   └── trend_tab.R              # Trend tab UI helpers
+│   ├── i18n.R                   # English/French string catalogue
+│   ├── trend_tab.R              # Trend tab UI helpers
+│   │
+│   │   # Emission engine — IPCC Vol.4 Ch.10/11
+│   ├── calc_energy.R            #   Net-energy chain (NEm/NEa/NEg/NEl/NEw/NEp → GE)
+│   ├── calc_enteric.R           #   Enteric fermentation CH₄
+│   ├── calc_manure_ch4.R        #   Manure management CH₄ (VS × Bo × MCF)
+│   ├── calc_manure_n2o.R        #   Direct + indirect N₂O, managed storage and PRP
+│   ├── calc_ghg_master.R        #   Scalar + vectorised orchestration (kept bit-identical)
+│   │
+│   │   # Monte Carlo
+│   ├── mc_sampling.R            #   Iman-Conover restricted pairing; AR(1) temporal correlation
+│   ├── mc_simulation.R          #   Per-system and whole-inventory simulation
+│   ├── mc_sensitivity.R         #   SRC and PRCC sensitivity ranking
+│   ├── mc_uncertainty.R         #   Legacy decomposition helpers
+│   │
+│   │   # Utilities
+│   ├── utils_ipcc_defaults.R    #   Parameter catalogue, MMS defaults, built-in examples
+│   ├── utils_distributions.R    #   Marginal samplers (normal, lognormal, beta, PERT, …)
+│   ├── utils_template.R         #   Excel template reader/writer + validation contract
+│   ├── utils_timeseries_template.R  # Time-series sheet builder
+│   ├── utils_validation.R       #   Input validators
+│   ├── utils_qaqc.R             #   Traffic-light QA/QC checks
+│   ├── utils_export.R           #   XLSX / CSV exports, IPCC Table 3.3 formatting
+│   ├── utils_word_export.R      #   Word run-summary report
+│   ├── utils_diagnostics.R      #   Runtime diagnostics
+│   ├── utils_contact.R          #   Contact / mailto helpers
+│   ├── feedback.R               #   In-app feedback button + store
+│   │
+│   │   # AI Translator
+│   ├── chat_ui.R                #   Chat panel UI + server; explore/clarify/emit flow
+│   ├── anthropic_client.R       #   Anthropic Claude client — the live provider
+│   ├── mistral_client.R         #   Mistral client (A/B, routed by model-id prefix)
+│   ├── openai_client.R          #   Legacy OpenAI client; only the system-prompt
+│   │                            #     assembler is still called
+│   ├── auth_magic_link.R        #   Magic-link email auth
+│   ├── conversation_history.R   #   Per-user persistent chat history
+│   └── usage_log.R              #   Per-call token ledger + budget gate
 │
 ├── www/                         # Web assets — logos, built docs (PDF/DOCX),
 │                                #   Find-out-more topic HTML, custom CSS
@@ -115,6 +145,8 @@ cattle-ghg-uncertainty/
 │   ├── build_translator_kit.R   #   Refresh AI Translator knowledge files + kit zip
 │   ├── deploy.R                 #   Deploy to shinyapps.io
 │   ├── example_verify.R         #   End-to-end sanity check on built-in examples
+│   ├── check_i18n.R             #   Verify every i18n key resolves in both languages
+│   ├── notify_approved.R        #   Notify newly approved translator users
 │   └── make_stress_test_data.R  #   Generate stress-test dataset for the AI Translator
 ├── rsconnect/                   # shinyapps.io deploy state (auto-generated)
 │
@@ -127,6 +159,24 @@ cattle-ghg-uncertainty/
 ├── reviews/                     # Reviewer correspondence, response drafts, notes
 └── old/                         # Archive: one-off dev scripts, backups, stale duplicates
 ```
+
+---
+
+## Testing and verification
+
+The calculation engine has a regression gate at [`scripts/audit.R`](scripts/audit.R). It builds a synthetic hand-computed "golden case" and asserts every IPCC Vol.4 Ch.10/Ch.11 equation, the Monte Carlo sampler, the validators and the exporters against it, then writes `AUDIT_REPORT.md`.
+
+```bash
+Rscript scripts/audit.R    # exits non-zero if any check fails
+```
+
+It runs on every push and pull request (see the **audit** badge above). Checks that depend on fixtures in `test_data/` report as SKIP in a clean clone, because that directory holds real national inventory data and is deliberately untracked.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests go in GitHub issues. If you are a national inventory compiler rather than a developer, the structured 20-30 minute review package in `feedback_workflow/` is the most useful route, and it needs no login, no R and no installation.
 
 ---
 
