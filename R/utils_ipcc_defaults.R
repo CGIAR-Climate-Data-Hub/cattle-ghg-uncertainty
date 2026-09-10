@@ -1,7 +1,36 @@
-# IPCC Default Values for Africa/Developing Countries
-# Sources: IPCC 2006 Guidelines Vol 4 Ch 10, 2019 Refinement
+# =============================================================================
+# .IPCC_DEFAULTS_HISTORICAL -- NOT USED BY THE APP. DO NOT CITE ITS VALUES.
+# =============================================================================
+#
+# This was the original flat defaults table. It was consumed by the QA/QC
+# benchmark check until that check was rewritten (reviewer item T2.1) to use
+# IPCC_DEFAULTS_BY_REGION, scoped to BW only. Nothing reads it today; the only
+# other mention in R/ is a passing comment at R/mc_simulation.R:119.
+#
+# It is retained ONLY for the prose below, which is the clearest explanation in
+# the repo of the managed-storage (Vol.4 Ch.10) versus pasture/range/paddock
+# (Vol.4 Ch.11) nitrogen pathways -- a distinction that caused a real bug.
+#
+# ITS NUMBERS ARE STALE and in several places contradict values that were
+# verified at source and agreed in review during 2026-06. Known divergences
+# from what the app actually uses:
+#
+#   milk_yield  4.0    -> PARAM_CATALOGUE Milk        3.5  (Annex Table 10A.1)
+#   milk_fat    4.0    -> PARAM_CATALOGUE Fat         4.3  (Annex Table 10A.1)
+#   EF3_PRP     0.004  -> PARAM_CATALOGUE           0.006  (wet climate)
+#   EF4         0.010  -> PARAM_CATALOGUE           0.014  (wet climate)
+#   pct_pregnant 0.60  -> PCT_PREGNANT_BY_SUBCAT 0.85/0.50
+#   Cfi growing_males 0.370 -> CFI_BY_SUBCAT       0.322  (verified 2026-06-16)
+#
+# The authoritative objects are PARAM_CATALOGUE (R/utils_template.R),
+# MMS_DEFAULTS, MMS_FRAC_DEFAULTS_2019, the *_BY_SUBCAT lists below, and
+# resolve_subcat_default(). Use those.
+#
+# Original header: "IPCC Default Values for Africa/Developing Countries.
+# Sources: IPCC 2006 Guidelines Vol 4 Ch 10, 2019 Refinement."
+# =============================================================================
 
-IPCC_DEFAULTS <- list(
+.IPCC_DEFAULTS_HISTORICAL <- list(
   Cfi = list(cows_lactating = 0.386, cows_dry = 0.322, heifers = 0.322,
              bulls = 0.370, oxen = 0.322, growing_males = 0.370,
              calves_male = 0.370, calves_female = 0.322),

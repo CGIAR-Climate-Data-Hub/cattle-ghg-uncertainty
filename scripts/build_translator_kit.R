@@ -5,14 +5,50 @@
 # from the live R source and emits Markdown knowledge files into
 # translator_prompts/. These .md files are concatenated at runtime by
 # R/openai_client.R::assemble_translator_system_prompt() into the system
-# prompt sent to GPT-4.1. Re-run whenever PARAM_CATALOGUE, PARAM_ALIASES,
-# MMS_DEFAULTS, or the controlled vocabularies change in R/.
+# prompt sent to Anthropic Claude (see R/anthropic_client.R; the "GPT-4.1"
+# in older comments here is stale).
 #
 # Usage (from project root):
 #   Rscript scripts/build_translator_kit.R
 # =============================================================================
 
 if (basename(getwd()) == "scripts") setwd("..")
+
+# --- SAFETY GUARD: this script is currently DESTRUCTIVE -----------------------
+#
+# It regenerates translator_prompts/param_catalogue.md and template_schema.md
+# from the R constants. But both files have been HAND-EDITED since they were
+# last generated, and the generator does not reproduce those edits. Running it
+# today silently deletes, among other things:
+#
+#   * the whole "Sex- and physiology-specific coefficient overrides" section of
+#     param_catalogue.md (the 9-row Cfi/Ca/C table). system_instructions.md
+#     self-check #9 names that section explicitly, so removing it also breaks
+#     the check that keeps bulls.C = 1.2 and oxen.Cfi = 0.322 out of the
+#     model's output;
+#   * the expanded Ym / Bo / EF3_PRP / pct_pregnant definitions;
+#   * the asymmetric-bounds prose;
+#   * the fixed data_source vocabulary at template_schema.md:53, which the
+#     generator replaces with "free text".
+#
+# The generator is also still wrong in ways a rebuild would re-emit: it
+# hardcodes "27 parameters" (the catalogue has 25), cites IPCC Table 10.23 for
+# leaching (correct is 10.22), emits only 2 of the 4 MCF climate zones, and
+# still lists the removed EF3_S / Frac_GASMS / Frac_LEACH_* parameters.
+#
+# The fix is the generator refactor (plan Phase 3): move the numbers into R,
+# the prose into translator_prompts/partials/, and generate everything.
+# REMOVE THIS GUARD as part of that work.
+#
+# To run anyway, knowing the above:
+#   TRANSLATOR_KIT_ALLOW_DESTRUCTIVE=1 Rscript scripts/build_translator_kit.R
+if (!nzchar(Sys.getenv("TRANSLATOR_KIT_ALLOW_DESTRUCTIVE"))) {
+  stop("build_translator_kit.R is frozen: it would delete hand-added prompt ",
+       "content that self-check #9 depends on. See the guard comment at the ",
+       "top of this file. Set TRANSLATOR_KIT_ALLOW_DESTRUCTIVE=1 to override.",
+       call. = FALSE)
+}
+# -----------------------------------------------------------------------------
 
 suppressMessages({
   source("R/utils_template.R", local = FALSE)
