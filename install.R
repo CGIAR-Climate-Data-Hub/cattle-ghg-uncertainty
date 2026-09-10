@@ -4,15 +4,26 @@
 # reference under R/. scripts/audit.R sources R/*.R directly, so a package
 # missing here fails the CI regression gate.
 
-# Honour a repository the caller has already configured (CI points at the
-# Posit public package manager for Linux BINARIES; without this the hardcoded
-# CRAN URL below forced a full source build, and the newest sources of `fs`
-# and `Deriv` need a newer R than the runner had, which cascaded into shiny,
-# DT, plotly and mc2d all failing to install). Falls back to CRAN everywhere
-# else, so Binder and shinyapps.io behave exactly as before.
-.repo <- getOption("repos")[["CRAN"]]
-if (is.null(.repo) || is.na(.repo) || !nzchar(.repo) || .repo == "@CRAN@")
-  .repo <- "https://cloud.r-project.org"
+# Pick a repository, preferring Linux BINARIES when the caller offers them.
+#
+# r-lib/actions/setup-r with `use-public-rspm: true` publishes the Posit
+# public package manager URL as the RSPM *environment variable* -- not as
+# options(repos) -- so that is what we read first. Getting this wrong is not
+# cosmetic: falling through to source-only CRAN on Ubuntu noble made `fs` and
+# `Deriv` fail to build, which cascaded into sass -> bslib -> shiny/DT/plotly
+# and Deriv -> doBy -> pbkrtest -> car -> rstatix -> ggpubr -> mc2d, and the
+# audit then ran with mc2d missing and aborted three whole sections.
+#
+# Falls back to any repo the caller configured, then to CRAN, so Binder and
+# shinyapps.io behave exactly as before.
+.repo <- Sys.getenv("RSPM")
+if (!nzchar(.repo)) {
+  .opt <- getOption("repos")[["CRAN"]]
+  if (!is.null(.opt) && !is.na(.opt) && nzchar(.opt) && .opt != "@CRAN@")
+    .repo <- .opt
+}
+if (!nzchar(.repo)) .repo <- "https://cloud.r-project.org"
+message("install.R: using repository ", .repo)
 
 install.packages(c(
   "shiny",
