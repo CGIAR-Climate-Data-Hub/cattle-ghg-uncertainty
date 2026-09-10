@@ -1954,6 +1954,8 @@ section_F <- function() {
   mms_ok <-
     eq(mms_ef3("solid_storage"), 0.010) && eq(mms_ef3("solid_storage_covered"), 0.010) &&
     eq(mms_ef3("dry_lot"), 0.02) && eq(mms_ef3("liquid_slurry"), 0.005) &&
+    # composting models Static Pile (forced aeration) throughout — 2026-09-10
+    eq(mms_ef3("composting"), 0.010) &&
     eq(fr("lagoon")$frac_gas, 0.35) && eq(fr("aerobic_treatment")$frac_gas, 0.85) &&
     eq(fr("solid_storage_covered")$frac_gas, 0.22) &&
     eq(fr("solid_storage_covered")$frac_leach, 0.00) &&
@@ -1963,8 +1965,51 @@ section_F <- function() {
   check_bool("F29", "F",
              "MMS_DEFAULTS EF3 + MMS_FRAC_DEFAULTS_2019 match IPCC 2019R Tables 10.21/10.22 (Other Cattle)",
              mms_ok,
-             notes = if (mms_ok) "EF3 solid_storage=0.010; lagoon Frac_Gas=0.35; aerobic=0.85; dry_lot leach=0.035"
+             notes = if (mms_ok) "EF3 solid_storage=0.010, composting=0.010; lagoon Frac_Gas=0.35; aerobic=0.85; dry_lot leach=0.035"
                      else "a corrected MMS coefficient drifted from the IPCC Other-Cattle value")
+
+  # F29a — Frac_GasMS BOUNDS vs the published Table 10.22 ranges. F29 pinned the
+  # central values only, which is how five rows kept a mechanical +-50% spread
+  # from a superseded rule long after that rule was replaced (see the comment on
+  # MMS_FRAC_DEFAULTS_2019). Lock the ranges too.
+  fb <- function(id) { x <- fr(id); c(x$frac_gas_low, x$frac_gas_high) }
+  bounds_ok <-
+    eq(fb("daily_spread"),          c(0.05, 0.60)) &&
+    eq(fb("solid_storage"),         c(0.10, 0.65)) &&
+    eq(fb("solid_storage_covered"), c(0.03, 0.26)) &&
+    eq(fb("dry_lot"),               c(0.20, 0.50)) &&
+    eq(fb("deep_bedding"),          c(0.10, 0.30)) &&
+    eq(fb("liquid_slurry"),         c(0.15, 0.60)) &&
+    eq(fb("composting"),            c(0.14, 0.70)) &&
+    eq(fb("aerobic_treatment"),     c(0.27, 1.00)) &&
+    eq(fb("lagoon"),                c(0.20, 0.80))
+  check_bool("F29a", "F",
+             "MMS_FRAC_DEFAULTS_2019 Frac_Gas bounds match the published Table 10.22 ranges",
+             bounds_ok,
+             notes = if (bounds_ok) "9 of 9 gas ranges match Other Cattle; none is a mechanical +-50%"
+                     else "a Frac_Gas bound drifted from the published IPCC range")
+
+  # F29b — MCF cells verified against 2006 Table 10.17 on 2026-09-10. MCF stays
+  # on the 2006 convention by design (2019R needs a per-MMS Bo the engine lacks),
+  # but the individual cells had never been checked: dry_lot tropical was 5.0
+  # against a published 2.0, solid_storage boreal was 3.0 against 2.0, and
+  # composting carried the windrow row rather than static pile. Band mapping
+  # Cool->boreal, Temperate->temperate, Warm->tropical, confirmed exact by
+  # daily_spread and burned_for_fuel.
+  mcfv <- function(id) unlist(MMS_DEFAULTS[MMS_DEFAULTS$id == id,
+            c("mcf_tropical", "mcf_temperate", "mcf_boreal")], use.names = FALSE)
+  mcf_ok <-
+    eq(mcfv("daily_spread"),    c(1.0, 0.5, 0.1)) &&
+    eq(mcfv("burned_for_fuel"), c(10.0, 10.0, 10.0)) &&
+    eq(mcfv("solid_storage"),   c(5.0, 4.0, 2.0)) &&
+    eq(mcfv("dry_lot"),         c(2.0, 1.5, 1.0)) &&
+    eq(mcfv("composting"),      c(0.5, 0.5, 0.5)) &&
+    eq(MMS_DEFAULTS$mcf_tropical[MMS_DEFAULTS$id == "aerobic_treatment"], 0.0)
+  check_bool("F29b", "F",
+             "MMS_DEFAULTS MCF cells match 2006 Table 10.17 (Warm/Temperate/Cool)",
+             mcf_ok,
+             notes = if (mcf_ok) "dry_lot 2.0/1.5/1.0; solid_storage 5.0/4.0/2.0; composting static pile 0.5 flat"
+                     else "an MCF cell drifted from the published 2006 Table 10.17 value")
 
   # F30 — sparse-overlay resolver. resolve_subcat_default() is the single source
   # of truth for the IPCC defaults the app fills when the AI translator omits a

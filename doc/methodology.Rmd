@@ -145,10 +145,10 @@ Table \ref{tab:params} lists all parameters used in the calculation chain, their
 \texttt{MMS\_fractions} & Fraction of manure in each MMS (deterministic; constrained to sum to 1 per sub-category). Optional per-row \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns on the Manure\_Management sheet enable per-iteration sampling within the user's bounds, renormalised to preserve the simplex; sampled fractions surface as \texttt{fraction\_<mms>} in the sensitivity tornado. & — & country-specific (Worksheet 10.A-9) & Eq.~10.23 & Deterministic (default) or per-MMS PERT/Normal/etc.\ with renormalisation \\
 \texttt{Bo} & Maximum CH$_4$ producing capacity & m$^3$ CH$_4$/kg VS & 0.13 (2019R ``Other regions, low productivity'' cattle); 2006 Africa = 0.10 & Eq.~10.23; Table 10.16(a) (Updated) & Normal \\
 \texttt{MCF} & Methane conversion factor (MMS) & — & per-MMS \& climate (e.g.\ 80\% lagoon tropical) & Eq.~10.23; Table 10.17 (Updated) & Normal/PERT \\
-\texttt{EF3} & Direct-N$_2$O EF (per MMS) & kg N$_2$O-N/kg N & per-MMS (e.g.\ 0.005 solid storage) & Eq.~10.25; Table 10.21 & Lognormal/PERT \\
+\texttt{EF3} & Direct-N$_2$O EF (per MMS) & kg N$_2$O-N/kg N & per-MMS (e.g.\ 0.010 solid storage) & Eq.~10.25; Table 10.21 (Updated) & Lognormal/PERT \\
 \texttt{Frac\_GasMS} & Fraction N volatilised (MMS) & — & per-MMS, e.g.\ 0.45 solid storage (2019R) & Eq.~10.26; Table 10.22 (Updated) & PERT (preferred — IPCC ranges are asymmetric) / Normal \\
 \texttt{EF4} & EF for atmospheric deposition & kg N$_2$O-N/(kg NH$_3$-N+NO$_x$-N) & 0.010 aggregated 2019R (wet 0.014 / dry 0.005); 2006 = 0.010 & Eq.~10.27; Vol.4 Ch.11 Table 11.3 (Updated) & PERT \\
-\texttt{Frac\_LeachMS} & Fraction N leached (MMS) & — & per-MMS, e.g.\ 0.02 solid storage & Eq.~10.28; Table 10.23 (2019R) & PERT \\
+\texttt{Frac\_LeachMS} & Fraction N leached (MMS) & — & per-MMS, e.g.\ 0.02 solid storage & Eq.~10.28; Table 10.22 (Updated) & PERT \\
 \texttt{EF5} & EF for leaching/runoff & kg N$_2$O-N/kg N & 0.011 (2019R); 2006 = 0.0075 & Eq.~10.29; Vol.4 Ch.11 Table 11.3 (Updated) & PERT \\
 \texttt{Frac\_PRP} & Fraction of dung and urine deposited on pasture & — & country-specific & Vol.4 Ch.11 Eq.~11.5 ($MS_{(T,PRP)}$) & Beta / PERT (assignable via the \texttt{distribution} column) \\
 \texttt{EF3\_PRP} & Direct N$_2$O EF, pasture (cattle/poultry/pigs) & kg N$_2$O-N/kg N & 0.004 aggregated 2019R (wet 0.006 / dry 0.002); 2006 = 0.02 & Vol.4 Ch.11 Eq.~11.1; Table 11.1 (Updated) & PERT \\

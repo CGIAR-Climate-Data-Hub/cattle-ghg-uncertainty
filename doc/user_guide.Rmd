@@ -237,7 +237,7 @@ Ym & Methane conversion factor (\% of gross energy in feed converted to CH\texts
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Manure management — CH\textsubscript{4}}}} \\
 \addlinespace[2pt]
-Bo & Maximum CH\textsubscript{4} producing capacity of manure & m$^3$ CH\textsubscript{4}/kg VS & 2019R: 0.13 (Other regions, low productivity cattle); 0.24 (intensive dairy NA/W.Europe); 2006 Africa = 0.10 & ±20\% & PERT & Table 10.16(a) (Updated) \\
+Bo & Maximum CH\textsubscript{4} producing capacity of manure & m$^3$ CH\textsubscript{4}/kg VS & 2019R: 0.13 (Other regions, low productivity cattle); 0.24 (intensive dairy NA/W.Europe); 2006 Africa = 0.10 & ±15\% & PERT & Table 10.16(a) (Updated) \\
 ASH & Ash content of manure (fraction of dry matter) & fraction & 0.08 & ±25\% & PERT & Eq. 10.24 \\
 UE & Urinary energy as fraction of gross energy & fraction & 0.04 & ±25\% & PERT & Eq. 10.24 \\
 CP & Crude protein content of diet — used to estimate nitrogen excretion & \% & 10.0 & ±15\% & Normal & Eq. 10.32 \\

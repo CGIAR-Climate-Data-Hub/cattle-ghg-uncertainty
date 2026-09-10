@@ -112,7 +112,7 @@ MMS_DEFAULTS <- data.frame(
   label = c("Pasture/Paddock/Range", "Daily Spread", "Solid Storage",
             "Solid Storage – Covered/Compacted (2019)",
             "Dry Lot", "Deep Bedding (>1 month)", "Liquid/Slurry",
-            "Composting", "Anaerobic Lagoon",
+            "Composting - Static Pile (forced aeration)", "Anaerobic Lagoon",
             "Anaerobic Digester / Biogas (2019)",
             "Aerobic Treatment (2019)",
             "Burned for Fuel (2019)"),
@@ -124,15 +124,40 @@ MMS_DEFAULTS <- data.frame(
   # Pasture/Range/Paddock MCF (0.47%) must, per Table 10.17 footnote 2, be paired
   # with Bo = 0.19 m3/kg VS, and the engine uses a single per-animal Bo — so
   # adopting 2019R MCF correctly would require a per-MMS Bo (deferred engine
-  # change). Verified line-by-line vs Table 10.17 on 2026-06-16.
-  mcf_tropical     = c(1.5, 1.0, 5.0, 4.0, 5.0, 30.0, 80.0, 1.5, 80.0,  3.5, 0.0,  10.0),
-  mcf_tropical_dry = c(1.5, 1.0, 5.0, 4.0, 5.0, 30.0, 80.0, 1.5, 80.0,  3.5, 0.0,  10.0),
-  mcf_temperate    = c(1.0, 0.5, 4.0, 2.0, 1.5, 17.0, 35.0, 1.0, 66.0,  1.0, 0.0,  10.0),
-  mcf_boreal       = c(1.0, 0.1, 3.0, 1.0, 1.0,  3.0, 10.0, 0.5, 66.0,  1.0, 0.0,  10.0),
+  # change). The 2026-06-16 note recorded verification of that EDITION choice.
+  #
+  # 2026-09-10 CELL-LEVEL re-verification against 2006 Table 10.17, mapping the
+  # IPCC bands Cool/Temperate/Warm onto boreal/temperate/tropical (a mapping
+  # confirmed exact by daily_spread 0.1/0.5/1.0 and burned_for_fuel 10/10/10):
+  #   dry_lot       tropical + tropical_dry 5.0 -> 2.0. Published row is
+  #                 1.0/1.5/2.0 in BOTH editions; 5.0 duplicated the
+  #                 solid_storage value directly above it in the vector.
+  #   solid_storage boreal 3.0 -> 2.0. Published Cool value is 2.0.
+  #   composting    1.5/1.5/1.0/0.5 -> 0.5 in all zones. The old values were the
+  #                 *windrow* row (0.5/1.0/1.5); this tool now models Static Pile
+  #                 throughout (see the composting note on ef3 below), and 2006
+  #                 Table 10.17 gives Static pile 0.5% in every band, stating it
+  #                 is "not temperature dependant".
+  # Still open, deliberately unchanged pending review: the `pasture` row
+  # (published 1.0/1.5/2.0, held here at 1.0/1.0/1.5), `lagoon` temperate (66 is
+  # the Cool end of a 66-80 gradient), and `deep_bedding`, which appears to mix
+  # the "<1 month" and ">1 month" rows despite its label saying ">1 month".
+  mcf_tropical     = c(1.5, 1.0, 5.0, 4.0, 2.0, 30.0, 80.0, 0.5, 80.0,  3.5, 0.0,  10.0),
+  mcf_tropical_dry = c(1.5, 1.0, 5.0, 4.0, 2.0, 30.0, 80.0, 0.5, 80.0,  3.5, 0.0,  10.0),
+  mcf_temperate    = c(1.0, 0.5, 4.0, 2.0, 1.5, 17.0, 35.0, 0.5, 66.0,  1.0, 0.0,  10.0),
+  mcf_boreal       = c(1.0, 0.1, 2.0, 1.0, 1.0,  3.0, 10.0, 0.5, 66.0,  1.0, 0.0,  10.0),
   # EF3 = direct N2O EF by managed system, IPCC 2019R Table 10.21 (verified
   # 2026-06-16): solid_storage + solid_storage_covered corrected 0.005 -> 0.010.
   # pasture 0.02 is the PRP/Ch.11 pathway value (not a Table 10.21 MS), left as-is.
-  ef3 = c(0.02, 0.0, 0.010, 0.010, 0.02, 0.01, 0.005, 0.006, 0.0, 0.0006, 0.005, 0.0),
+  #
+  # 2026-09-10 COMPOSTING VARIANT DECISION. IPCC splits composting into four
+  # variants with different coefficients. This tool has one composting row, and
+  # it previously mixed two of them: EF3 took In-Vessel (0.006) while the
+  # volatilisation/leaching fractions took Static Pile (0.65 / 0.06). The row now
+  # models **Static Pile (forced aeration)** throughout, so EF3 moves
+  # 0.006 -> 0.010 per Table 10.21 "Composting - Static Pile (Forced aeration)".
+  # MCF and the Frac bounds were aligned to the same variant above and below.
+  ef3 = c(0.02, 0.0, 0.010, 0.010, 0.02, 0.01, 0.005, 0.010, 0.0, 0.0006, 0.005, 0.0),
   stringsAsFactors = FALSE
 )
 
@@ -193,6 +218,22 @@ get_mms_for_version <- function(version = "2006") {
 ## 10.23; Table 10.23 is the N2:N2O loss ratio.) Values are the "Other Cattle"
 ## column of Table 10.22; bounds use the IPCC ranges where the table gives them,
 ## else +-50% (Penman 2000 / Monni 2007).
+##
+## 2026-09-10: that rule was introduced on 2026-06-16 but applied only to the
+## four rows corrected that day. The other five still carried the blanket +-50%
+## bounds from the superseded rule, even though Table 10.22 publishes a range
+## for every one of them. Brought into line with the stated rule:
+##   daily_spread  gas 0.04-0.10 -> 0.05-0.60
+##   solid_storage gas 0.23-0.68 -> 0.10-0.65
+##   dry_lot       gas 0.15-0.45 -> 0.20-0.50
+##   liquid_slurry gas 0.24-0.72 -> 0.15-0.60   (no natural crust cover)
+##   composting    gas 0.33-0.98 -> 0.14-0.70   (Static Pile; old upper 0.98
+##                 exceeded the published maximum of 0.70)
+## Leaching bounds are unchanged: where Table 10.22 gives a single leach value
+## and no range, +-50% remains the correct fallback under the rule.
+## anaerobic_digester is left as-is: Table 10.22 gives "0.05 - 0.50" as a range
+## with no central value, so the choice of central is a judgement, not a
+## transcription. Flagged in reference/provenance_register.md.
 ## Verified + corrected line-by-line on 2026-06-16 against Table 10.22:
 ##   solid_storage_covered gas 0.10->0.22, leach 0.02->0.00
 ##   dry_lot      leach 0.00->0.035 (rainfall-dependent, range 0-0.07)
@@ -209,10 +250,10 @@ MMS_FRAC_DEFAULTS_2019 <- data.frame(
                "aerobic_treatment", "lagoon", "burned_for_fuel"),
   frac_gas       = c(0.00, 0.07, 0.45, 0.22, 0.30, 0.25,
                      0.48, 0.05, 0.65, 0.85, 0.35, 0.00),
-  frac_gas_low   = c(0.00, 0.04, 0.23, 0.03, 0.15, 0.10,
-                     0.24, 0.02, 0.33, 0.27, 0.20, 0.00),
-  frac_gas_high  = c(0.00, 0.10, 0.68, 0.26, 0.45, 0.30,
-                     0.72, 0.08, 0.98, 1.00, 0.80, 0.00),
+  frac_gas_low   = c(0.00, 0.05, 0.10, 0.03, 0.20, 0.10,
+                     0.15, 0.02, 0.14, 0.27, 0.20, 0.00),
+  frac_gas_high  = c(0.00, 0.60, 0.65, 0.26, 0.50, 0.30,
+                     0.60, 0.08, 0.70, 1.00, 0.80, 0.00),
   frac_leach     = c(0.00, 0.00, 0.02, 0.00, 0.035, 0.035,
                      0.00, 0.00, 0.06, 0.00, 0.00, 0.00),
   frac_leach_low = c(0.00, 0.00, 0.01, 0.00, 0.00, 0.00,
