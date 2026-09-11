@@ -108,49 +108,47 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
     Ym            = get_param_alt("Ym",      "Ym_pct"),
     Bo            = get_param("Bo"),
     ASH           = get_param_alt("ASH",     "ash"),
-    UE            = get_param("UE", 0.04),
-    CP            = get_param_alt("CP",      "CP_pct",        10),
+    UE            = get_param("UE"),
+    CP            = get_param_alt("CP",      "CP_pct"),
     mms_fractions = mms_fractions,
     mcf_values    = mcf_values,
     ef3_values    = ef3_values,
-    # IPCC alignment audit (2026-05): defaults updated to the 2019 Refinement
-    # aggregated values from Vol.4 Ch.11 Tables 11.1 and 11.3:
-    #   EF3_PRP,CPP   = 0.004 (aggregated; wet = 0.006, dry = 0.002)
-    #   FracGASM      = 0.21  (2019R; 2006 = 0.20)
-    #   EF4           = 0.010 (aggregated; wet = 0.014, dry = 0.005;
-    #                          coincides with the 2006 single value)
-    #   EF5           = 0.011 (2019R; 2006 = 0.0075)
-    #   FracLEACH-(H) = 0.02  on the MS side (Vol.4 Ch.10 Table 10.23)
-    # 2006 values (0.02 / 0.20 / 0.010 / 0.0075) remain valid for inventories
-    # that explicitly target the 2006 Guidelines — supply them via the
-    # template instead of relying on these fallbacks.
-    EF3_PRP       = get_param("EF3_PRP", 0.004),
+    # Chapter 11 PRP factors (Vol.4 Ch.11 Tables 11.1 and 11.3). These read
+    # the catalogue, so a template that omits one gets exactly the value the
+    # Parameters sheet, both guides and the AI translator all quote.
+    #
+    # Until 2026-09 they were literals holding the climate-AGGREGATED figures
+    # (EF3_PRP 0.004, EF4 0.010) while the catalogue shipped the WET-climate
+    # ones (0.006, 0.014), so the number a user got depended on whether they
+    # had filled the cell. The tool's declared Chapter 11 basis is wet
+    # climate: see DEFAULT_BASIS in the master and the basis block in both
+    # guides. Dry-climate inventories, and any run targeting the 2006
+    # Guidelines, must supply these through the Parameters template.
+    EF3_PRP        = get_param("EF3_PRP"),
+    EF4            = get_param("EF4"),
+    EF5            = get_param("EF5"),
+    Frac_GASM_PRP  = get_param("Frac_GASM_PRP"),
+    Frac_LEACH_PRP = get_param("Frac_LEACH_PRP"),
+    # Frac_GASMS and Frac_LEACH_H are the manure-management side (Vol.4
+    # Ch.10 Tables 10.22 and 10.23), a different quantity from the PRP pair
+    # above. They were removed from the Parameters sheet on review round 7
+    # and now live per-system in the Manure_Management sheet, so they have
+    # no PARAM_CATALOGUE row to read and keep explicit literals.
     Frac_GASMS    = get_param_alt("Frac_GASMS",   "Frac_GASM",  0.21),
-    EF4           = get_param("EF4", 0.010),
-    EF5           = get_param("EF5", 0.011),
     Frac_LEACH_H  = get_param_alt("Frac_LEACH_H", "Frac_LEACH", 0.02),
-    # Andreas 2026-05 #10: PRP-side fractions, distinct from MM (Table 11.3).
-    # Falls back to IPCC 2019 Table 11.3 defaults when the template does not
-    # provide them (most existing templates won't yet).
-    Frac_GASM_PRP  = get_param("Frac_GASM_PRP",  0.21),
-    # IPCC 2019R Vol.4 Ch.11 Table 11.3: Frac_LEACH-(H) = 0.24 (wet climate);
-    # dry-climate default is 0. 2006 default was 0.30. Aligned with the
-    # function default in calc_indirect_n2o_prp and the IPCC_DEFAULTS comment
-    # in utils_ipcc_defaults.R; runs targeting 2006 must supply the value
-    # via the Parameters template.
-    Frac_LEACH_PRP = get_param("Frac_LEACH_PRP", 0.24),
-    # Andreas 2026-05 follow-up: MilkPR (milk protein %) is now passed through
-    # from samples instead of being hardcoded in calc_n_excretion. Catalogue
-    # default is 3.3 (IPCC 2006 Table 10.11 African-dairy mid-point).
-    MilkPR         = get_param_alt("MilkPR", "protein_milk", 3.3),
+    # Andreas 2026-05 follow-up: MilkPR (milk protein %) is passed through
+    # from samples instead of being hardcoded in calc_n_excretion. The
+    # catalogue default is read here rather than repeated: it moved from 3.3
+    # to 3.6 in September 2026 and the literal did not follow.
+    MilkPR         = get_param_alt("MilkPR", "protein_milk"),
     gwp = gwp,
     # Andreas 2026-05 follow-up: Tw (mean winter temperature for the IPCC
     # Vol.4 Ch.10 Eq 10.2 cold-climate Cfi adjustment, which modifies the
     # Cfi from Eq 10.3) is now sourced exclusively from
-    # the Parameters template via the sampled values. Default 20°C makes
-    # the adjustment inert (matches the IPCC formula's neutral baseline).
-    # The old global Tw argument was retained as a fallback only.
-    Tw          = get_param("Tw", 20),
+    # the Parameters template via the sampled values. The catalogue default
+    # of 20°C makes the adjustment inert (the IPCC formula's neutral
+    # baseline). The old global Tw argument was retained as a fallback only.
+    Tw          = get_param("Tw"),
     pct_pregnant = get_param("pct_pregnant", pct_pregnant),
     frac_gas_values   = frac_gas_values,
     frac_leach_values = frac_leach_values,

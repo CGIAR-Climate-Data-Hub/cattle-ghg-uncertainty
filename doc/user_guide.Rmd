@@ -220,7 +220,7 @@ MW & Mature (adult) body weight — used in NEg growth equation & kg & 300 & ±1
 WG & Average daily weight gain — set 0 for non-growing adults & kg/day & 0 & ±30\% & PERT & Eq. 10.6 \\
 Milk & Average daily milk yield \textit{per head}, calculated as total annual production divided by 365 (IPCC Vol.4 Ch.10). This is already averaged across the whole year including the dry period, so do \textbf{not} scale it by the lactating or calving share of the herd. Set 0 for sub-categories that do not produce milk. & kg/head/day & 1.2 & ±20\% & Normal & Eq. 10.8 \\
 Fat & Fat content of milk & \% & 4.3 & ±10\% & Normal & Eq. 10.8 \\
-pct\_pregnant & Fraction of females in this sub-category pregnant during the year, 0--1 — includes pregnant heifers that have not yet calved. Aliases \texttt{pct\_calving} and \texttt{pct\_lactating} are accepted on upload. & fraction & 0.60 & ±20\% & Beta & 2019 Refinement Vol.4 Ch.10 §10.5; Eq. 10.13 \\
+pct\_pregnant & Fraction of females in this sub-category pregnant during the year, 0--1 — includes pregnant heifers that have not yet calved. Aliases \texttt{pct\_calving} and \texttt{pct\_lactating} are accepted on upload, but the three are not the same quantity: this field weights $C_p$ in Eq. 10.13 and the milk-N term in Eq. 10.33, and it does \textbf{not} weight lactation. & fraction & 0.52 & ±20\% & Beta & Annex 10A.1 (Africa, low productivity); Eq. 10.13 \\
 MilkPR & Protein content of milk — feeds the milk-N term in Eq. 10.33 (N retention rates for cattle, where the 6.38 milk-protein-to-N conversion is defined). The 2019 Refinement gives the relation \%MilkPR $= 1.9 + 0.4\times$\%Fat (so 4.3\% fat $\to$ 3.6\% protein, the Africa value); illustrative values are tabulated in Annex 10A.1 / 10A.2 / 10A.3. & \% & 3.6 & ±10\% & Normal & Eq. 10.33; Annex 10A.1–10A.3 \\
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Energy coefficients}}} \\
@@ -246,14 +246,14 @@ CP & Crude protein content of diet — used to estimate nitrogen excretion & \% 
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Manure management — N\textsubscript{2}O (indirect emission factors)}}} \\
 \addlinespace[2pt]
-EF4 & N\textsubscript{2}O EF for atmospheric N deposition (used in Eq. 10.27) & kg N\textsubscript{2}O-N/(kg NH\textsubscript{3}-N + NO\textsubscript{x}-N) & 2006: 0.010; 2019R aggregated: 0.010; wet 0.014; dry 0.005 & asymmetric & PERT & Eq. 10.27; Ch.11 Table 11.3 \\
+EF4 & N\textsubscript{2}O EF for atmospheric N deposition (used in Eq. 10.27) & kg N\textsubscript{2}O-N/(kg NH\textsubscript{3}-N + NO\textsubscript{x}-N) & \textbf{0.014} (2019R wet climate, the shipped default); 2019R aggregated 0.010; dry 0.005; 2006: 0.010 & asymmetric & PERT & Eq. 10.27; Ch.11 Table 11.3 \\
 EF5 & N\textsubscript{2}O EF for N leaching/runoff (used in Eq. 10.29) & kg N\textsubscript{2}O-N/kg N & 2006: 0.0075; 2019R: 0.011 & asymmetric & PERT & Eq. 10.29; Ch.11 Table 11.3 \\
 \addlinespace[2pt]
 \multicolumn{7}{p{\linewidth}}{\small\textit{The managed-storage N\textsubscript{2}O quantities EF3(S), Frac\_GasMS and Frac\_LeachMS are entered \textbf{per manure-management system} in the Manure\_Management tab (not in the Parameters tab), because each value is specific to a storage system. The tool reads them from there.}} \\
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Manure management — N\textsubscript{2}O (pasture/range/paddock)}}} \\
 \addlinespace[2pt]
-EF3\_PRP & N\textsubscript{2}O emission factor for dung/urine deposited on pasture (used in Ch.11 Eq. 11.1) & kg N\textsubscript{2}O-N/kg N & 2006: 0.02; 2019R EF3$_{PRP,CPP}$ aggregated: 0.004; wet 0.006; dry 0.002 & asymmetric & PERT & Ch.11 Eq. 11.1; Table 11.1 \\
+EF3\_PRP & N\textsubscript{2}O emission factor for dung/urine deposited on pasture (used in Ch.11 Eq. 11.1) & kg N\textsubscript{2}O-N/kg N & \textbf{0.006} (2019R EF3$_{PRP,CPP}$ wet climate, the shipped default); aggregated 0.004; dry 0.002; 2006: 0.02 & asymmetric & PERT & Ch.11 Eq. 11.1; Table 11.1 \\
 Frac\_GasPRP & Fraction of N volatilised from dung/urine on pasture (used in Ch.11 Eq. 11.9) & fraction & 0.21 (cattle) & asymmetric & PERT & Ch.11 Eq. 11.9; 2019 Table 11.3 \\
 Frac\_LeachPRP & Fraction of N lost through leaching from pasture deposition (used in Ch.11 Eq. 11.10) & fraction & 2006: 0.30; 2019R: 0.24 (wet) / 0 (dry) & asymmetric & PERT & Ch.11 Eq. 11.10; 2019 Table 11.3 \\
 

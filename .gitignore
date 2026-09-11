@@ -156,3 +156,15 @@ scripts/_inspect_translation.R
 knowledge/
 CLAUDE.local.md
 doc/*.log
+
+# 2026-09: documents received from named individuals. The reviewer rules
+# above match by FILENAME, so a new file dropped in this folder under any
+# other name would not be caught and `git add -A` would publish it. Ignore
+# the directory itself, which is the only rule that does not depend on
+# whoever saves the next file choosing a matching name.
+feedback_workflow/feedback_people/
+
+# 2026-09: old/ is the pre-audit junk drawer. Everything in it predates the
+# September 2026 IPCC verification and carries superseded parameter values,
+# including a complete copy of the published translator kit. See old/README.md.
+old/

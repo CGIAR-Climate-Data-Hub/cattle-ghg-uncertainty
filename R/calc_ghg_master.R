@@ -11,8 +11,10 @@ ghg_emissions <- function(
   mms_fractions, mcf_values, ef3_values,
   EF3_PRP, Frac_GASMS, EF4, EF5, Frac_LEACH_H,
   gwp = "AR5",
-  # E1: cold-climate Cfi adjustment; E3: pct_pregnant weights NEL, NEp, and N excretion
-  Tw = 20,
+  # E1: cold-climate Cfi adjustment. E3: pct_pregnant weights NEp (Eq 10.13)
+  # and the milk-N retention term (Eq 10.33). It does NOT weight NEl: Eq 10.8
+  # carries no such factor and the milk input is already an annual average.
+  Tw = .cat_default("Tw"),
   # Round 7 R1.13: per-MMS Frac_GasMS / Frac_LeachMS named vectors. NULL =
   # use IPCC 2019 defaults from mms_frac_defaults_2019(). For back-compat with
   # callers that haven't been updated, the legacy broadcast Frac_GASMS scalar
@@ -25,12 +27,15 @@ ghg_emissions <- function(
   # PRP-specific values.
   Frac_GASM_PRP  = NULL,
   Frac_LEACH_PRP = NULL,
-  # Andreas 2026-05 follow-up: MilkPR (milk protein %) is now threaded
-  # through here from the sampled parameters instead of being hardcoded
-  # in calc_n_excretion. Default 3.3 matches IPCC 2006 Table 10.11.
-  MilkPR = 3.3
+  # Andreas 2026-05 follow-up: MilkPR (milk protein %) is threaded through
+  # here from the sampled parameters instead of being hardcoded in
+  # calc_n_excretion. The default reads the catalogue so it cannot drift
+  # from it; it was 3.3, cited to Table 10.11, which is the Tier 1 enteric
+  # emission factor table and has no milk protein column.
+  MilkPR = .cat_default("MilkPR")
 ) {
   # E1: cold-climate Cfi adjustment via Tw
+  # (the 20 inside calc_nem is Eq 10.2's own threshold, not a default)
   nem <- calc_nem(live_weight, Cfi, Tw = Tw)
   nea <- calc_nea(nem, Ca)
   neg <- calc_neg(live_weight, weight_gain, C_growth, mature_weight)
@@ -119,7 +124,7 @@ ghg_emissions_vec <- function(
   mms_fractions, mcf_values, ef3_values,
   EF3_PRP, Frac_GASMS, EF4, EF5, Frac_LEACH_H,
   gwp = "AR5",
-  Tw = 20,
+  Tw = .cat_default("Tw"),
   frac_gas_values   = NULL,
   frac_leach_values = NULL,
   # Andreas 2026-05 #10: PRP-specific volatilization/leaching fractions

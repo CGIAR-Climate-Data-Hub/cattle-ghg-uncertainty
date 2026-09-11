@@ -492,9 +492,19 @@ S[["doc_rmd"]] <- local({
   for (f in c("doc/methodology.Rmd", "doc/user_guide.Rmd")) {
     if (!file.exists(f)) next
     ln <- readLines(file(f, encoding = "UTF-8"), warn = FALSE)
+    # A LaTeX table row writes an underscore as "\_", so "^pct_pregnant &"
+    # never matched "pct\_pregnant & ..." and every parameter with an
+    # underscore in its name was invisible to this surface. pct_pregnant sat
+    # at 0.60 in the user guide against a master of 0.52 through a full
+    # matrix run reporting zero divergences. Unwrap \texttt{} and drop the
+    # backslashes first, then match, and split the cells on the same
+    # normalised line.
+    lnp <- gsub("\\\\", "", gsub("\\\\texttt\\{([^}]*)\\}", "\\1", ln))
     for (p in pc$parameter) {
-      hit <- grep(sprintf("texttt\\{%s\\}|^%s &", p, p), ln, value = TRUE)[1]
-      if (is.na(hit)) next
+      i <- grep(sprintf("texttt\\{%s\\}|^%s &", p, p), ln)[1]
+      if (is.na(i)) i <- grep(sprintf("^%s *&", p), lnp)[1]
+      if (is.na(i)) next
+      hit <- lnp[i]
       cells <- trimws(strsplit(hit, "&", fixed = TRUE)[[1]])
       nums <- suppressWarnings(as.numeric(norm(cells)))
       key <- paste("PARAM_CATALOGUE", p, "ipcc_default", sep = "|")

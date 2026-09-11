@@ -2767,6 +2767,117 @@ section_F <- function() {
                        length(SOURCE_OF_RECORD))
              else paste(utils::head(src_fail, 4), collapse = "; "))
 
+
+  # F43 -- the engine's gap-fill reads the master, with declared exceptions.
+  #
+  # F40 proved this for Bo by perturbation. Bo reaches the engine through
+  # get_param("Bo") with no literal, so F40 was asking a question Bo could
+  # not fail, and it passed for two weeks while four other parameters were
+  # gap-filled from stale literals sitting right beside it:
+  #
+  #   CP       10     master 9.6    (the Table 10A.2 non-dairy figure)
+  #   MilkPR   3.3    master 3.6    (cited to Table 10.11, which is the
+  #                                  Tier 1 enteric EF table, not protein)
+  #   EF3_PRP  0.004  master 0.006  (climate-aggregated, not wet)
+  #   EF4      0.010  master 0.014  (climate-aggregated, not wet)
+  #
+  # A user who left those four cells blank got a different number from one
+  # who filled them with the value the Parameters sheet, both guides and the
+  # translator all quote. Direct PRP N2O was 43% low.
+  #
+  # The defect is not any one literal, it is that a literal was allowed at
+  # all. So the check is structural: inside the ghg_emissions_vec() call,
+  # every get_param()/get_param_alt() either passes no default, and so reads
+  # the catalogue, or is on this list with a reason.
+  ENGINE_LITERALS <- list(
+    N            = list(value = 0,    why = "no animals is safer than an invented herd"),
+    Milk         = list(value = 0,    why = "the engine cannot see the sub-category; an absent Milk row most likely means the group does not lactate, and filling the catalogue 1.2 would add lactation energy to every one"),
+    hours        = list(value = 0,    why = "absent means no draught work"),
+    Frac_GASMS   = list(value = 0.21, why = "manure-management side, Table 10.22; removed from the Parameters sheet on review round 7 and has no catalogue row"),
+    Frac_LEACH_H = list(value = 0.02, why = "manure-management side, Table 10.23; same as Frac_GASMS"))
+
+  gapfill_lit_fail <- tryCatch({
+    f <- character(0)
+    src <- readLines("R/mc_simulation.R", warn = FALSE)
+    a <- grep("^\\s*results <- ghg_emissions_vec\\(", src)
+    stopifnot(length(a) == 1L)
+    b <- a + which(grepl("^\\s*\\)\\s*$", src[(a + 1):length(src)]))[1]
+    block <- src[a:b]
+    # get_param("X", <literal>) or get_param_alt("X", "old", <literal>)
+    calls <- regmatches(block, gregexpr(
+      'get_param(_alt)?\\("[^"]+"(, *"[^"]+")?, *[0-9.]+\\)', block))
+    calls <- unlist(calls)
+    for (cl in calls) {
+      nm <- sub('^get_param(_alt)?\\("([^"]+)".*$', "\\2", cl)
+      lit <- as.numeric(sub('^.*, *([0-9.]+)\\)$', "\\1", cl))
+      dec <- ENGINE_LITERALS[[nm]]
+      if (is.null(dec)) {
+        f <- c(f, sprintf("%s is gap-filled from the literal %s instead of the master; delete the default or declare it in ENGINE_LITERALS with a reason",
+                          nm, format(lit)))
+      } else if (!isTRUE(all.equal(lit, dec$value))) {
+        f <- c(f, sprintf("%s is declared as the literal %s but the code passes %s",
+                          nm, format(dec$value), format(lit)))
+      }
+    }
+    # An exception is only ever legitimate for one of two reasons, and this
+    # asserts it is one of them. Either the fallback is a safety ZERO, which
+    # is deliberately independent of whatever the catalogue says (hours must
+    # stay 0 even though the catalogue's hours is a live open item that may
+    # move to the 1.1 hrs/day of Annex 10A.2 draft bullocks, because the
+    # engine cannot see whether the group is oxen), or the quantity has no
+    # catalogue row at all. Anything else is a literal competing with the
+    # master, which is the defect.
+    pc <- PARAM_CATALOGUE
+    for (nm in names(ENGINE_LITERALS)) {
+      dec <- ENGINE_LITERALS[[nm]]
+      if (isTRUE(all.equal(dec$value, 0))) next          # safety zero
+      if (!nm %in% pc$parameter) next                    # no catalogue row
+      f <- c(f, sprintf("%s has a catalogue row and a non-zero literal fallback of %s; read the master instead, or say why this one number must not follow it",
+                        nm, format(dec$value)))
+    }
+    # Signature defaults are the same hiding place: MilkPR sat at 3.3 in two
+    # of them, unreachable from the master. Any catalogue parameter
+    # defaulted in these signatures must read .cat_default() instead.
+    #
+    # The pattern must NOT be anchored to end of line. The first version was
+    # (`= [0-9.]+\s*[,)]?\s*$`) and it passed against the reinstated
+    # `MilkPR = 3.3) {`, because the line ends in `) {` rather than `)`.
+    # The check was written for that exact defect and could not see it.
+    #
+    # calc_energy.R is deliberately out of scope: the 20 in
+    # calc_nem(live_weight, Cfi, Tw = 20) is Equation 10.2's own threshold,
+    # the temperature below which the cold adjustment switches on. It must
+    # not follow the catalogue's Tw even though the two happen to be equal.
+    for (fl in c("R/calc_ghg_master.R", "R/calc_manure_n2o.R")) {
+      s <- readLines(fl, warn = FALSE)
+      s <- s[!grepl("^\\s*#", s)]
+      for (p in pc$parameter) {
+        if (p %in% names(ENGINE_LITERALS)) next
+        # Zero is exempt for the same reason as the engine's three zeros:
+        # it is never a stale reading of an IPCC table, it is always the
+        # "absent means none" choice (pct_pregnant = 0 in calc_n_excretion).
+        pat <- sprintf("(^|[(,[:space:]])%s[[:space:]]*=[[:space:]]*[0-9.]+[[:space:]]*[,)]",
+                       p)
+        hits <- grep(pat, s, value = TRUE)
+        nums <- suppressWarnings(as.numeric(
+          sub(sprintf("^.*%s[[:space:]]*=[[:space:]]*([0-9.]+).*$", p), "\\1", hits)))
+        if (any(!is.na(nums) & nums != 0))
+          f <- c(f, sprintf("%s has a bare numeric default in %s; read .cat_default(\"%s\") so it cannot drift from the master",
+                            p, fl, p))
+      }
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  gapfill_lit_ok <- length(gapfill_lit_fail) == 0L
+  check_bool("F43", "F",
+             "No engine gap-fill invents a value: every fallback reads the master or is a declared exception",
+             gapfill_lit_ok,
+             notes = if (gapfill_lit_ok)
+               sprintf("%d declared exceptions (%s), each with a reason; every other parameter reaching ghg_emissions_vec() falls back to the catalogue, and no calc_ signature defaults a catalogue parameter to a number",
+                       length(ENGINE_LITERALS),
+                       paste(names(ENGINE_LITERALS), collapse = ", "))
+             else paste(utils::head(gapfill_lit_fail, 4), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

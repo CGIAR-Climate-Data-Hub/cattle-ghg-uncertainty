@@ -203,9 +203,11 @@ PARAM_ALIASES <- c(
   # (Cpregnancy is weighted by proportion of females pregnant) and extends
   # the parameter to pregnant heifers that have not yet calved. Legacy
   # `pct_calving` and `pct_lactating` are accepted on upload and renamed to
-  # the canonical here. For sub-categories where lactation and pregnancy
-  # populations differ, users should enter pct_pregnant (the tool also uses
-  # it as the lactation-weight in Eq 10.8 NEl by convention).
+  # the canonical here. Users should enter the PREGNANCY fraction: the tool
+  # used to apply this value as a lactation weight in Eq 10.8 as well, which
+  # Eq 10.8 does not sanction, and that was removed in September 2026. The
+  # aliases remain accepted because existing templates use them, but the
+  # three quantities are not interchangeable.
   "pct_lactating" = "pct_pregnant",
   "pct_calving"   = "pct_pregnant"
 )

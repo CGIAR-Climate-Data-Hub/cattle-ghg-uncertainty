@@ -1652,7 +1652,7 @@ qa_msg <- function(key, ...) {
   WG           = "Gain de poids quotidien moyen — fixer 0 pour les animaux adultes (non en croissance)",
   Milk         = "Rendement laitier quotidien par vache en lactation (pas la moyenne de la sous-catégorie — l'outil multiplie par pct_pregnant en interne). Fixer 0 pour les sous-catégories qui ne lactent pas.",
   Fat          = "Teneur en matière grasse du lait (% en poids)",
-  pct_pregnant = "Fraction des femelles de cette sous-catégorie gestantes pendant l'année, entre 0 et 1 — inclut les génisses gestantes n'ayant pas encore vêlé. Pondère Cpregnancy dans l'Éq IPCC 10.13 (NEp) et le terme de rétention de N du lait dans l'Éq 10.33 ; l'outil l'applique aussi comme poids de lactation dans l'Éq 10.8 (NEl). Pour les sous-catégories où les populations en lactation et en gestation diffèrent, entrer la fraction gestante.",
+  pct_pregnant = "Fraction des femelles de cette sous-catégorie gestantes pendant l'année, entre 0 et 1, y compris les génisses gestantes n'ayant pas encore vêlé. Pondère Cpregnancy dans l'Éq IPCC 10.13 (NEp) et le terme de rétention de N du lait dans l'Éq 10.33. Ne pondère PAS la lactation : l'Éq 10.8 ne comporte aucun facteur de ce type et la production laitière fournie est déjà une moyenne annuelle par tête. Saisir la fraction gestante, et non la fraction en lactation.",
   DE           = "Énergie digestible en pourcentage de l'énergie brute — plage typique 45-75 %",
   Cfi          = "Coefficient d'énergie d'entretien — dépend du sexe et de l'état de lactation (IPCC Tableau 10.4)",
   Ca           = "Coefficient d'activité pour l'énergie de locomotion — dépend de la situation alimentaire (IPCC Tableau 10.5)",

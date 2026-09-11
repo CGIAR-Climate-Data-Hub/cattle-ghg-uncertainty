@@ -111,7 +111,17 @@
 # returned: no animals rather than an invented herd.
 .cat_default <- function(parameter) {
   v <- PARAM_CATALOGUE$ipcc_default[PARAM_CATALOGUE$parameter == parameter]
-  if (!length(v) || is.na(v[1])) 0 else as.numeric(v[1])
+  # An unknown parameter used to return 0 here, silently. That turns a typo
+  # or a quantity with no catalogue row (Frac_GASMS, Frac_LEACH_H) into a
+  # zero emission factor rather than an error, which is the worst available
+  # outcome. Fail instead; callers for those two pass explicit literals.
+  if (!length(v))
+    stop("no PARAM_CATALOGUE row for '", parameter,
+         "'; pass an explicit default at the call site and say why",
+         call. = FALSE)
+  # N is the one catalogue parameter with no published default: IPCC has no
+  # herd size to offer. 0 head is the safe reading.
+  if (is.na(v[1])) 0 else as.numeric(v[1])
 }
 
 # Pull a named vector (the *_BY_SUBCAT style lists) as a list, in order.

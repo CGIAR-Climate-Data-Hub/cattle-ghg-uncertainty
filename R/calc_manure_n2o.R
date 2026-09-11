@@ -5,14 +5,19 @@
 # C1: DE (was DE_pct), CP (was CP_pct) — IPCC software-aligned names.
 # Andreas 2026-05 follow-up: `MilkPR` (milk protein %) is now a function
 # argument instead of a hardcoded 3.3 constant. Users can override it
-# per sub-category via the Parameters template (catalogue default 3.3
-# is the IPCC 2006 Table 10.11 mid-point for African dairy).
+# per sub-category via the Parameters template. The default reads the
+# catalogue rather than repeating it: the value moved from 3.3 to 3.6 in
+# September 2026 and a literal here would not have followed. It was also
+# cited to "IPCC 2006 Table 10.11", which is the Tier 1 enteric
+# fermentation emission factor table for cattle and carries no milk
+# protein column. The figure comes from Table 10A.1 / 10A.2.
 # Weight-gain N retention uses the simplified coefficient 0.032 (Monni
 # 2007 / IPCC software approximation of the weight-gain term in Eq 10.33;
 # the full IPCC Eq 10.33 requires protein-content data not in the
 # standard input set).
 calc_n_excretion <- function(ge, CP, milk_yield = 0, pct_pregnant = 0,
-                              weight_gain = 0, MilkPR = 3.3) {
+                              weight_gain = 0,
+                              MilkPR = .cat_default("MilkPR")) {
   # IPCC 2006 / 2019 Refinement Vol.4 Ch.10 Eq 10.32 (N intake rates for cattle):
   #   N_intake = (GE / 18.45) * (CP% / 100) / 6.25
   # i.e. dry-matter feed mass (GE / 18.45) * protein fraction (CP% / 100) /
@@ -23,10 +28,12 @@ calc_n_excretion <- function(ge, CP, milk_yield = 0, pct_pregnant = 0,
   # downstream Nex / direct N2O MM / indirect N2O MM to be similarly low
   # (Andreas's A1/A2 finding, 2026-05-15 review). The `DE` argument was
   # removed from the signature after the fix; callers should pass only ge.
-  # Defensive bounds check on MilkPR (IPCC Table 10.11 range 2.8-3.8%).
+  # Defensive bounds check on MilkPR. The published spread is narrow:
+  # Table 10A.1 runs 3.1 to 3.7% across all dairy regions. The guard stays
+  # wide because a user's own measurement is allowed to sit outside it.
   if (!is.na(MilkPR) && (MilkPR < 0 || MilkPR > 10))
-    warning("MilkPR = ", MilkPR, " is outside the IPCC Table 10.11 typical ",
-            "range (2.8-3.8%). Verify the value.")
+    warning("MilkPR = ", MilkPR, " is far outside the IPCC Table 10A.1 ",
+            "range (3.1-3.7%). Verify the value.")
   DMI <- ge / 18.45
   N_intake <- DMI * (CP / 100) / 6.25
 
@@ -134,20 +141,25 @@ calc_direct_n2o_prp <- function(Nex, pct_pasture,
 
 # Indirect N2O from PRP - kg N2O/head/year
 # IPCC Vol.4 Ch.11 Eq. 11.9 (volatilisation, uses EF4 and FracGASM) and
-# Eq. 11.10 (leaching, uses EF5 and FracLEACH-(H)). Defaults are the 2019
-# Refinement Vol.4 Ch.11 Table 11.3 values:
-#   FracGASM            : 0.21 (2019R aggregated; 2006 = 0.20)
-#   EF4 (aggregated)    : 0.010 (2019R; same as 2006). Wet = 0.014; Dry = 0.005.
-#   FracLEACH-(H)       : 0.24 (2019R wet; 2006 = 0.30). In dry climates = 0.
-#   EF5                 : 0.011 (2019R; 2006 = 0.0075). Not climate-disaggregated.
+# Eq. 11.10 (leaching, uses EF5 and FracLEACH-(H)).
+#
+# The defaults read the catalogue, which holds the 2019 Refinement Table
+# 11.3 WET-climate figures throughout, that being the tool's declared
+# Chapter 11 basis. They used to be literals, and they mixed two bases:
+# EF4 was the climate-aggregated 0.010 while Frac_LEACH-(H) beside it was
+# the wet-climate 0.24. The app always passes all four explicitly so the
+# mixture never reached a result, but a direct caller would have got it.
+#
 # These are the soil-side PRP fractions (Vol.4 Ch.11). They share their
 # numerical IPCC source with the managed-soil indirect pathways but are
 # logically distinct from the managed-storage fractions in Vol.4 Ch.10
 # Tables 10.22 / 10.23; earlier versions of this app reused Frac_GASMS /
 # Frac_LEACH_H for both pathways, conflating the two.
 calc_indirect_n2o_prp <- function(Nex, pct_pasture,
-                                   Frac_GASM_PRP = 0.21, EF4 = 0.010,
-                                   Frac_LEACH_PRP = 0.24, EF5 = 0.011) {
+                                   Frac_GASM_PRP = .cat_default("Frac_GASM_PRP"),
+                                   EF4 = .cat_default("EF4"),
+                                   Frac_LEACH_PRP = .cat_default("Frac_LEACH_PRP"),
+                                   EF5 = .cat_default("EF5")) {
   N_prp <- Nex * pct_pasture
   volatilization <- N_prp * Frac_GASM_PRP * EF4 * (44 / 28)
   leaching <- N_prp * Frac_LEACH_PRP * EF5 * (44 / 28)
