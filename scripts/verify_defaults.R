@@ -108,10 +108,14 @@ for (i in seq_len(nrow(mf))) for (f in c(
 
 for (nm in c("CFI_BY_SUBCAT", "C_GROWTH_BY_SUBCAT", "LW_BY_SUBCAT",
              "MW_BY_SUBCAT", "WG_BY_SUBCAT", "PCT_PREGNANT_BY_SUBCAT",
-             "FEEDING_SITUATION_CA")) {
+             "DE_BY_SUBCAT", "CP_BY_SUBCAT", "FEEDING_SITUATION_CA")) {
   o <- get(nm)
   for (k in names(o)) add(nm, k, "value", o[[k]])
 }
+# Ym carries one column per guideline edition rather than a single value.
+for (i in seq_len(nrow(YM_BY_SUBCAT))) for (f in names(YM_BY_SUBCAT))
+  if (f != "sub_category")
+    add("YM_BY_SUBCAT", YM_BY_SUBCAT$sub_category[i], f, YM_BY_SUBCAT[[f]][i])
 for (i in seq_len(nrow(IPCC_DEFAULTS_BY_REGION)))
   add("IPCC_DEFAULTS_BY_REGION", IPCC_DEFAULTS_BY_REGION$region[i],
       "default_val", IPCC_DEFAULTS_BY_REGION$default_val[i])
@@ -230,6 +234,18 @@ S[["prompt_param_catalogue"]] <- local({
     v[paste("CFI_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["Cfi (Table 10.4)"]])
     if ("C (Eq 10.6)" %in% names(o))
       v[paste("C_GROWTH_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["C (Eq 10.6)"]])
+    # Ym carries a column per guideline edition; DE and CP exist so the
+    # feedlot row stays coherent. Without these three the prompt would state
+    # values no surface checked, which is the gap this matrix exists to close.
+    if ("Ym 2019R (Table 10.12)" %in% names(o))
+      v[paste("YM_BY_SUBCAT", k, "ym_2019_refinement", sep = "|")] <-
+        norm(o[["Ym 2019R (Table 10.12)"]])
+    if ("Ym 2006" %in% names(o))
+      v[paste("YM_BY_SUBCAT", k, "ym_2006", sep = "|")] <- norm(o[["Ym 2006"]])
+    if ("DE" %in% names(o))
+      v[paste("DE_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["DE"]])
+    if ("CP" %in% names(o))
+      v[paste("CP_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["CP"]])
   }
   v
 })
@@ -502,10 +518,19 @@ S[["prompt_worked_example"]] <- local({
     # first surface coverage.
     BY_SUBCAT <- c(Cfi = "CFI_BY_SUBCAT", C = "C_GROWTH_BY_SUBCAT",
                    BW = "LW_BY_SUBCAT", MW = "MW_BY_SUBCAT",
-                   WG = "WG_BY_SUBCAT", pct_pregnant = "PCT_PREGNANT_BY_SUBCAT")
+                   WG = "WG_BY_SUBCAT", pct_pregnant = "PCT_PREGNANT_BY_SUBCAT",
+                   DE = "DE_BY_SUBCAT", CP = "CP_BY_SUBCAT")
     keep <- !(pr$parameter %in% .WE_USER_KEYS)
     for (i in which(keep)) {
       prm <- pr$parameter[i]; sc <- pr$sub_category[i]
+      # Ym is keyed by edition rather than by a plain "value" field. The
+      # worked example declares ipcc_version 2019_refinement in its own
+      # inventory_metadata, so it must be compared against that column.
+      if (prm == "Ym") {
+        v[paste("YM_BY_SUBCAT", sc, "ym_2019_refinement", sep = "|")] <-
+          norm(pr$mean[i])
+        next
+      }
       if (prm %in% names(BY_SUBCAT)) {
         v[paste(BY_SUBCAT[[prm]], sc, "value", sep = "|")] <- norm(pr$mean[i])
         next

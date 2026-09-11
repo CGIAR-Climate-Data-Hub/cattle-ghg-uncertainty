@@ -139,7 +139,7 @@ Table \ref{tab:params} lists all parameters used in the calculation chain, their
 \texttt{WorkHours} & Daily working hours & h/head/d & 0 (no work) & Eq.~10.11 & Constant \\
 \texttt{Cp} & Pregnancy coefficient & — & 0.10 (cattle) & Eq.~10.13; Table 10.7 (Updated) & Constant \\
 \texttt{DE\_pct} & Digestible energy (\% of GE) & \% & 55.0 (Africa) & Eq.~10.14--16; Annex 10A & Normal \\
-\texttt{Ym} & Methane conversion factor & \% & 6.5 (cattle on forage) & Eq.~10.21; Table 10.12 & Normal/PERT \\
+\texttt{Ym} & Methane conversion factor & \% & 6.5 (lactating dairy cows, the catalogue default); resolved per sub-category: 7.0 non-dairy and multi-purpose, 4.0 feedlot under 2019R; 6.5 and 3.0 respectively under 2006 & Eq.~10.21; Table 10.12 (Updated), footnote 4 & Normal/PERT \\
 \texttt{UE} & Urinary energy (fraction of GE) & — & 0.04 (cattle) & Eq.~10.24 (footnote) & Constant \\
 \texttt{ASH} & Ash content of manure (fraction of DMI) & — & 0.08 (cattle; IPCC example 0.06 is pig-specific) & Eq.~10.24 & Constant \\
 \texttt{MMS\_fractions} & Fraction of manure in each MMS (deterministic; constrained to sum to 1 per sub-category). Optional per-row \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns on the Manure\_Management sheet enable per-iteration sampling within the user's bounds, renormalised to preserve the simplex; sampled fractions surface as \texttt{fraction\_<mms>} in the sensitivity tornado. & — & country-specific (Worksheet 10.A-9) & Eq.~10.23 & Deterministic (default) or per-MMS PERT/Normal/etc.\ with renormalisation \\

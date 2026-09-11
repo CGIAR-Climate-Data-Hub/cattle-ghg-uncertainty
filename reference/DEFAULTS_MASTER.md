@@ -4,19 +4,19 @@ Generated 2026-09-11 from `reference/defaults_master.csv` by `scripts/build_defa
 
 This is the single authority for every IPCC default the app ships. `R/load_defaults.R` builds `PARAM_CATALOGUE`, `MMS_DEFAULTS`, `MMS_FRAC_DEFAULTS_2019` and the per-sub-category lists from the CSV at start-up, and every other surface (the Excel template, the translator prompts, the published guides) derives from those objects. `scripts/verify_defaults.R` checks all 14 surfaces against it and runs in CI.
 
-- 537 value rows across 12 objects
+- 573 value rows across 15 objects
 - 57 rows carry a review provenance reference
 
 ## IPCC verification status
 
-All 253 numeric values below were checked one at a time against the IPCC source text on 2026-09-11. Each carries its verdict and the exact table it was read from, in the `ipcc_verdict` and `ipcc_source` columns of the CSV. Audit check F33 fails the build if a value is ever added without one.
+All 289 numeric values below were checked one at a time against the IPCC source text on 2026-09-11. Each carries its verdict and the exact table it was read from, in the `ipcc_verdict` and `ipcc_source` columns of the CSV. Audit check F33 fails the build if a value is ever added without one.
 
 | verdict | meaning | values |
 |---|---|---|
-| `CONFIRMED` | read at the cited IPCC table or equation | 162 |
-| `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 27 |
+| `CONFIRMED` | read at the cited IPCC table or equation | 191 |
+| `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 35 |
 | `DEVIATION_DOCUMENTED` | differs from IPCC deliberately, reason on record | 23 |
-| `NOT_IPCC` | a non-IPCC source or a project assumption | 21 |
+| `NOT_IPCC` | a non-IPCC source or a project assumption | 20 |
 | `NO_IPCC_DEFAULT` | IPCC publishes no default for this quantity | 10 |
 | `INTERPRETED` | a defensible reading of an IPCC category label, not a quotation | 6 |
 | `META` | not a shipped value | 4 |
@@ -93,17 +93,19 @@ The 25 parameters. `ipcc_default` is the generic value; where a sub-category ove
 
 ## Per-sub-category overrides
 
-| sub_category | Cfi | C | BW | MW | WG |
-|---|---|---|---|---|---|
-| dairy_cows | 0.386 | 0.8 | 275 | 300 | 0 |
-| other_cows | 0.322 | 0.8 | 275 | 300 | 0 |
-| bulls | 0.37 | 1.2 | 350 | 400 | 0 |
-| oxen | 0.322 | 1 | 300 | 350 | 0 |
-| heifers | 0.322 | 0.8 | 200 | 300 | 0.25 |
-| growing_males | 0.322 | 1 | 200 | 350 | 0.2 |
-| calves_female | 0.322 | 0.8 | 60 | 300 | 0.3 |
-| calves_male | 0.322 | 1 | 60 | 350 | 0.3 |
-| feedlot_cattle | 0.322 | 1 | 250 | 400 | 1 |
+`Ym` is the only default that depends on the guideline edition, so it has a column for each. The 2019 Refinement splits Table 10.12 by livestock category; the 2006 table does not, below feedlot.
+
+| sub_category | Cfi | C | BW | MW | WG | DE | CP | Ym_2019R | Ym_2006 |
+|---|---|---|---|---|---|---|---|---|---|
+| dairy_cows | 0.386 | 0.8 | 275 | 300 | 0 | 55 | 10 | 6.5 | 6.5 |
+| other_cows | 0.322 | 0.8 | 275 | 300 | 0 | 55 | 10 | 7 | 6.5 |
+| bulls | 0.37 | 1.2 | 350 | 400 | 0 | 55 | 10 | 7 | 6.5 |
+| oxen | 0.322 | 1 | 300 | 350 | 0 | 55 | 10 | 7 | 6.5 |
+| heifers | 0.322 | 0.8 | 200 | 300 | 0.25 | 55 | 10 | 7 | 6.5 |
+| growing_males | 0.322 | 1 | 200 | 350 | 0.2 | 55 | 10 | 7 | 6.5 |
+| calves_female | 0.322 | 0.8 | 60 | 300 | 0.3 | 55 | 10 | 7 | 6.5 |
+| calves_male | 0.322 | 1 | 60 | 350 | 0.3 | 55 | 10 | 7 | 6.5 |
+| feedlot_cattle | 0.322 | 1 | 250 | 400 | 1 | 74 | 14 | 4 | 3 |
 
 ## Effective value of every parameter, per sub-category
 
@@ -150,7 +152,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | other_cows | Cp | 0.1 | beta | catalogue default |
 | other_cows | hours | 0 | constant | biological zero |
 | other_cows | CP | 10 | normal | catalogue default |
-| other_cows | Ym | 6.5 | pert | catalogue default |
+| other_cows | Ym | 7 | pert | sub-category override |
 | other_cows | Bo | 0.13 | pert | catalogue default |
 | other_cows | ASH | 0.08 | pert | catalogue default |
 | other_cows | UE | 0.04 | pert | catalogue default |
@@ -175,7 +177,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | bulls | Cp | 0.1 | beta | catalogue default |
 | bulls | hours | 0 | constant | biological zero |
 | bulls | CP | 10 | normal | catalogue default |
-| bulls | Ym | 6.5 | pert | catalogue default |
+| bulls | Ym | 7 | pert | sub-category override |
 | bulls | Bo | 0.13 | pert | catalogue default |
 | bulls | ASH | 0.08 | pert | catalogue default |
 | bulls | UE | 0.04 | pert | catalogue default |
@@ -200,7 +202,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | oxen | Cp | 0.1 | beta | catalogue default |
 | oxen | hours | 0 | pert | catalogue default |
 | oxen | CP | 10 | normal | catalogue default |
-| oxen | Ym | 6.5 | pert | catalogue default |
+| oxen | Ym | 7 | pert | sub-category override |
 | oxen | Bo | 0.13 | pert | catalogue default |
 | oxen | ASH | 0.08 | pert | catalogue default |
 | oxen | UE | 0.04 | pert | catalogue default |
@@ -225,7 +227,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | heifers | Cp | 0.1 | beta | catalogue default |
 | heifers | hours | 0 | constant | biological zero |
 | heifers | CP | 10 | normal | catalogue default |
-| heifers | Ym | 6.5 | pert | catalogue default |
+| heifers | Ym | 7 | pert | sub-category override |
 | heifers | Bo | 0.13 | pert | catalogue default |
 | heifers | ASH | 0.08 | pert | catalogue default |
 | heifers | UE | 0.04 | pert | catalogue default |
@@ -250,7 +252,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | growing_males | Cp | 0.1 | beta | catalogue default |
 | growing_males | hours | 0 | constant | biological zero |
 | growing_males | CP | 10 | normal | catalogue default |
-| growing_males | Ym | 6.5 | pert | catalogue default |
+| growing_males | Ym | 7 | pert | sub-category override |
 | growing_males | Bo | 0.13 | pert | catalogue default |
 | growing_males | ASH | 0.08 | pert | catalogue default |
 | growing_males | UE | 0.04 | pert | catalogue default |
@@ -275,7 +277,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | calves_female | Cp | 0.1 | beta | catalogue default |
 | calves_female | hours | 0 | constant | biological zero |
 | calves_female | CP | 10 | normal | catalogue default |
-| calves_female | Ym | 6.5 | pert | catalogue default |
+| calves_female | Ym | 7 | pert | sub-category override |
 | calves_female | Bo | 0.13 | pert | catalogue default |
 | calves_female | ASH | 0.08 | pert | catalogue default |
 | calves_female | UE | 0.04 | pert | catalogue default |
@@ -300,7 +302,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | calves_male | Cp | 0.1 | beta | catalogue default |
 | calves_male | hours | 0 | constant | biological zero |
 | calves_male | CP | 10 | normal | catalogue default |
-| calves_male | Ym | 6.5 | pert | catalogue default |
+| calves_male | Ym | 7 | pert | sub-category override |
 | calves_male | Bo | 0.13 | pert | catalogue default |
 | calves_male | ASH | 0.08 | pert | catalogue default |
 | calves_male | UE | 0.04 | pert | catalogue default |
@@ -318,14 +320,14 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | feedlot_cattle | Milk | 3.5 | normal | catalogue default |
 | feedlot_cattle | Fat | 4.3 | normal | catalogue default |
 | feedlot_cattle | pct_pregnant | 0.6 | beta | catalogue default |
-| feedlot_cattle | DE | 55 | normal | catalogue default |
+| feedlot_cattle | DE | 74 | normal | sub-category override |
 | feedlot_cattle | Cfi | 0.322 | pert | sub-category override |
 | feedlot_cattle | Ca | 0.17 | triangular | catalogue default |
 | feedlot_cattle | C | 1 | triangular | sub-category override |
 | feedlot_cattle | Cp | 0.1 | beta | catalogue default |
 | feedlot_cattle | hours | 0 | constant | biological zero |
-| feedlot_cattle | CP | 10 | normal | catalogue default |
-| feedlot_cattle | Ym | 6.5 | pert | catalogue default |
+| feedlot_cattle | CP | 14 | normal | sub-category override |
+| feedlot_cattle | Ym | 4 | pert | sub-category override |
 | feedlot_cattle | Bo | 0.13 | pert | catalogue default |
 | feedlot_cattle | ASH | 0.08 | pert | catalogue default |
 | feedlot_cattle | UE | 0.04 | pert | catalogue default |
@@ -364,7 +366,7 @@ The only parameter with a defensible continental IPCC lookup; the other benchmar
 
 ## Values that differ from IPCC with no recorded reason
 
-27 of the 253 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
+35 of the 289 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
 
 | object | key | field | value | what IPCC says |
 |---|---|---|---|---|
@@ -393,6 +395,14 @@ The only parameter with a defensible continental IPCC lookup; the other benchmar
 | PCT_PREGNANT_BY_SUBCAT | dairy_cows | value | 0.85 | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
 | PCT_PREGNANT_BY_SUBCAT | other_cows | value | 0.85 | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
 | PCT_PREGNANT_BY_SUBCAT | heifers | value | 0.5 | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
+| DE_BY_SUBCAT | dairy_cows | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | other_cows | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | bulls | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | oxen | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | heifers | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | growing_males | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | calves_female | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | calves_male | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
 | IPCC_DEFAULTS_BY_REGION | asia | default_val | 350 | Table 10A.1 Asia dairy 386 kg (low productivity 355); Table 10A.2 Asia Mature Females 376, grazing 305. The 350 used here matches no Asia row; the only published 350 is Indian subcontinent high-productivity dairy |
 | IPCC_DEFAULTS_BY_REGION | oceania | default_val | 500 | Table 10A.1 Oceania dairy 488 kg; Table 10A.2 Oceania Mature Females 416, Mature Males 467. The 500 used here appears in no Oceania row |
 
@@ -429,8 +439,8 @@ Every numeric value with its verdict and source, in master order.
 | PARAM_CATALOGUE | hours | suggested_uncertainty_pct | 20 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | CP | ipcc_default | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0% |
 | PARAM_CATALOGUE | CP | suggested_uncertainty_pct | 15 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | Ym | ipcc_default | 6.5 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): low-producing dairy cows <5000 kg/yr, DE <= 62, NDF > 38, Ym 6.5%. Applies to dairy only; see the Ym finding in the provenance register |
-| PARAM_CATALOGUE | Ym | suggested_uncertainty_pct | 20 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
+| PARAM_CATALOGUE | Ym | ipcc_default | 6.5 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Low producing cows (<5000 kg/yr), DE <= 62, NDF > 38, Ym 6.5%. Footnote 4 restricts the dairy rows to LACTATING cows, which is exactly the dairy_cows sub-category, so 6.5 is right as the dairy default and wrong as the generic one: the same table gives 7.0 for non-dairy >75% forage and 4.0 for feedlot. See the Ym section of the provenance register |
+| PARAM_CATALOGUE | Ym | suggested_uncertainty_pct | 20 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated) footnote 3: 'Uncertainty values are +/- 20% based on published standard deviations from Niu et al. (2018) and data compilations for non dairy cattle as described in Annex 10B.2' |
 | PARAM_CATALOGUE | Bo | ipcc_default | 0.13 | `CONFIRMED` | 2019R V4 Ch10 Table 10.16A (Updated), Other regions low productivity: dairy and non-dairy cattle both 0.13 |
 | PARAM_CATALOGUE | Bo | suggested_uncertainty_pct | 15 | `CONFIRMED` | 2019R V4 Ch10 Table 10.16A (Updated), Other regions low productivity footer: uncertainty +/- 15% |
 | PARAM_CATALOGUE | ASH | ipcc_default | 0.08 | `DEVIATION_DOCUMENTED` | 2006 V4 Ch10 Eq 10.24 note: 0.08 for cattle. The 2019 Refinement rewrote the same note around swine (0.06 for sows), so it does not supersede the cattle figure |
@@ -640,9 +650,45 @@ Every numeric value with its verdict and source, in master order.
 | PCT_PREGNANT_BY_SUBCAT | dairy_cows | value | 0.85 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
 | PCT_PREGNANT_BY_SUBCAT | other_cows | value | 0.85 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
 | PCT_PREGNANT_BY_SUBCAT | heifers | value | 0.5 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
+| DE_BY_SUBCAT | dairy_cows | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | other_cows | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | bulls | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | oxen | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | heifers | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | growing_males | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | calves_female | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | calves_male | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| DE_BY_SUBCAT | feedlot_cattle | value | 74 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Latin America Feedlot cattle: digestibility of feed 74%. Required by Table 10.12, whose feedlot Ym of 4.0 is conditional on DE >= 72; the catalogue default of 55 would violate that precondition |
+| CP_BY_SUBCAT | dairy_cows | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | other_cows | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | bulls | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | oxen | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | heifers | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | growing_males | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | calves_female | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | calves_male | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| CP_BY_SUBCAT | feedlot_cattle | value | 14 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Latin America and North America Feedlot cattle both give CP in diet 14.0% |
 | FEEDING_SITUATION_CA | stall_fed | value | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10.5 (Updated), p.10.25: Stall 0 |
 | FEEDING_SITUATION_CA | pasture_flat | value | 0.17 | `CONFIRMED` | 2019R V4 Ch10 Table 10.5 (Updated), p.10.25: Pasture 0.17 |
 | FEEDING_SITUATION_CA | pasture_hilly | value | 0.36 | `CONFIRMED` | 2019R V4 Ch10 Table 10.5 (Updated), p.10.25: Grazing large areas 0.36 |
+| YM_BY_SUBCAT | dairy_cows | ym_2019_refinement | 6.5 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Low producing cows (<5000 kg/yr), DE <= 62, NDF > 38, Ym 6.5%. The dairy_cows sub-category is mature LACTATING females, which is exactly the population footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' restricts these rows to |
+| YM_BY_SUBCAT | dairy_cows | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | other_cows | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | other_cows | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | bulls | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | bulls | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | oxen | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | oxen | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | heifers | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | heifers | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | growing_males | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | growing_males | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | calves_female | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | calves_female | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | calves_male | ym_2019_refinement | 7 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
+| YM_BY_SUBCAT | calves_male | ym_2006 | 6.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot |
+| YM_BY_SUBCAT | feedlot_cattle | ym_2019_refinement | 4 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Feedlot (all other grains, 0-15% forage), DE >= 72, Ym 4.0%. Annex 10A.2 Latin America Feedlot cattle confirms it at DE 74. North America feedlot sits at DE 75 with Ym 3.0, the steam-flaked corn row |
+| YM_BY_SUBCAT | feedlot_cattle | ym_2006 | 3 | `CONFIRMED` | 2006 V4 Ch10 Table 10.12, p.10.30: 'Feedlot fed Cattle' 3.0%, footnote a 'when fed diets contain 90 percent or more concentrates' |
 | IPCC_DEFAULTS_BY_REGION | africa | default_val | 275 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Females - grazing, Large Areas 275 kg. Note Table 10A.1 gives Africa dairy 260 kg |
 | IPCC_DEFAULTS_BY_REGION | asia | default_val | 350 | `DEVIATION_OPEN` | Table 10A.1 Asia dairy 386 kg (low productivity 355); Table 10A.2 Asia Mature Females 376, grazing 305. The 350 used here matches no Asia row; the only published 350 is Indian subcontinent high-productivity dairy |
 | IPCC_DEFAULTS_BY_REGION | europe | default_val | 600 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1: Western Europe dairy 600 kg |

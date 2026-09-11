@@ -583,6 +583,173 @@ The 20 `suggested_uncertainty_pct` values are Penman (2000) and Monni (2007), di
 
 ## 4. What this pass did not do
 
-No value was changed. Of the 27 `DEVIATION_OPEN` rows, several carry review provenance: `Milk` 3.5 and `Fat` 4.3 were adjudicated at round 8 page 7, and the regional benchmark at round 7 item #3. Resolving 2.1, 2.3 or 2.4 would change reported emission means, and 2.3 would change them substantially for any inventory carrying feedlot cattle. Those are decisions to take deliberately, with the reviewer, not corrections to apply on the strength of a reading.
+**Amended after the Ym decision below: finding 2.3 has since been resolved and applied.** Everything else in section 2 still stands open.
+
+No other value was changed. Of the remaining `DEVIATION_OPEN` rows, several carry review provenance: `Milk` 3.5 and `Fat` 4.3 were adjudicated at round 8 page 7, and the regional benchmark at round 7 item #3. Resolving 2.1 or 2.4 would change reported emission means. Those are decisions to take deliberately, with the reviewer, not corrections to apply on the strength of a reading. Ym was different on exactly that point: no review round had ever adjudicated it.
 
 The PERT mean-shift measurement (Part B) is still outstanding and is now larger than first estimated, because `deep_bedding` moved to 80 and `liquid_slurry` to 50 after that estimate was made.
+
+---
+
+# Ym: deep verification, 2026-09-11
+
+Finding 2.3 above set this out in outline. This section is the full reading, because Ym is the one open finding that is wrong under **both** guideline editions and that inverts a qualitative conclusion, not just a number.
+
+## What IPCC actually publishes
+
+### 2019 Refinement, Table 10.12 (Updated), PDF page 10.46
+
+| Livestock category | Description | Condition | Ym % |
+|---|---|---|---|
+| Dairy cows and Buffalo | High-producing (>8500 kg/head/yr) | DE >= 70, NDF <= 35 | 5.7 |
+| Dairy cows and Buffalo | High-producing (>8500 kg/head/yr) | DE >= 70, NDF >= 35 | 6.0 |
+| Dairy cows and Buffalo | Medium producing (5000-8500 kg/yr) | DE 63-70, NDF > 37 | 6.3 |
+| Dairy cows and Buffalo | Low producing (<5000 kg/yr) | DE <= 62, NDF > 38 | **6.5** |
+| Non dairy and multi-purpose | > 75% forage | DE <= 62 | **7.0** |
+| Non dairy and multi-purpose | >75% high quality forage and/or mixed rations, 15-75% forage with grain/silage | DE 62-71 | 6.3 |
+| Non dairy and multi-purpose | Feedlot, all other grains, 0-15% forage | DE >= 72 | **4.0** |
+| Non dairy and multi-purpose | Feedlot, steam-flaked corn, 0-10% forage | DE >= 75 | **3.0** |
+
+Two footnotes decide how this maps onto the tool.
+
+**Footnote 4** is the one that matters most: *"Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected."*
+
+So IPCC restricts 6.5 to **lactating** dairy cows, and sends dry-phase animals in low-productivity systems to **7.0**. The tool's `dairy_cows` label already reads "mature lactating females" and its `other_cows` label reads "mature non-dairy females, inc. dry". Both land exactly where footnote 4 puts them.
+
+**Footnote 3**: *"Uncertainty values are +/- 20%."* The tool ships 20%. That is an IPCC-published figure, not the Penman/Monni default the first pass assumed, and the verdict on `Ym suggested_uncertainty_pct` has been corrected from `NOT_IPCC` to `CONFIRMED`. The internal change from 8 to 20 on 2026-06-15 cited "2019R Tier 2 guidance" without naming a table; this is the table.
+
+### 2006 Guidelines, Table 10.12, PDF page 10.30
+
+| Livestock category | Ym |
+|---|---|
+| Feedlot fed Cattle (90% or more concentrates) | **3.0% +/- 1.0** |
+| Dairy Cows (Cattle and Buffalo) and their young | 6.5% +/- 1.0 |
+| Other Cattle and Buffaloes primarily fed low quality crop residues and by-products | 6.5% +/- 1.0 |
+| Other Cattle or Buffalo, grazing | 6.5% +/- 1.0 |
+
+The 2006 table is much coarser: everything is 6.5 **except feedlot at 3.0**.
+
+### Independent confirmation from Annex 10A.2
+
+The annex was built by running the Tier 2 method over these same values, so its CH4-conversion column is a cross-check on the main table. It agrees exactly:
+
+| Annex row | DE | Ym | Matches Table 10.12 row |
+|---|---|---|---|
+| Africa, every non-dairy row including Calves on forage | 58-59 | **7.0** | >75% forage, DE <= 62 |
+| Latin America, Feedlot cattle | 74 | **4.0** | Feedlot all other grains, DE >= 72 |
+| North America, Feedlot cattle | 75 | **3.0** | Feedlot steam-flaked corn, DE >= 75 |
+| North America / Latin America, Calves on **milk** | 95 | **0.0** | none; pre-ruminant, EF is 0 |
+| Asia, Calves on forage | 62 | 6.3 | mixed rations, DE 62-71 |
+
+Every non-dairy row of the Africa block carries 7.0, in every category, including calves.
+
+## What the tool does
+
+`PARAM_CATALOGUE$Ym` is 6.5 and `resolve_subcat_default()` has no `Ym` case in its override switch, so all nine sub-categories receive 6.5. There is no `YM_BY_SUBCAT`. The resolver also accepts an `ipcc_version` argument and never reads it, so the 2006 and 2019R editions resolve identically.
+
+Ym enters only one place, `calc_enteric_ch4()`:
+
+    (ge * (Ym / 100) * 365) / 55.65
+
+It is strictly linear and it does not appear in volatile solids or anywhere in the manure pathway, so the effect is confined to enteric CH4 and scales one for one.
+
+## Measured effect
+
+Run through the app's own engine at its own resolved defaults, per 100,000 head:
+
+| Sub-category | Now (6.5) | IPCC | Change |
+|---|---|---|---|
+| dairy_cows | 6957.7 | 6957.7 | 0.0% (already correct) |
+| other_cows | 6063.5 | 6529.9 | +7.7% |
+| bulls | 5775.0 | 6219.2 | +7.7% |
+| oxen | 4477.1 | 4821.5 | +7.7% |
+| heifers | 5721.5 | 6161.7 | +7.7% |
+| calves | 2010.8 | 2165.5 | +7.7% |
+
+| Feedlot cattle | t CH4/yr | vs now |
+|---|---|---|
+| Now: Ym 6.5, DE 55 | 10213.5 | |
+| 2019R: Ym 4.0, DE 74 | 3655.2 | **-64.2%** |
+| 2006: Ym 3.0, DE 74 | 2741.4 | -73.2% |
+| Ym alone: Ym 4.0, DE 55 | 6285.2 | -38.5% |
+
+**The feedlot figure is qualitatively wrong, not just quantitatively.** At the tool's current defaults a feedlot animal is the *highest* per-head enteric emitter in the herd, above dairy cows. The whole point of IPCC's low feedlot Ym is that concentrate-fed animals emit *less* enteric methane per head. The tool currently reverses the direction of that comparison, which would invert any conclusion a user drew about intensification.
+
+**Feedlot cannot be fixed by moving Ym alone.** The 4.0 row is conditional on DE >= 72 and the tool's DE default is 55. Moving Ym without DE ships an animal on a combination IPCC does not sanction, and lands 41.8% away from the correct answer. Annex 10A.2 gives feedlot DE 74 and CP 14.0 against the tool's 55 and 10.0, so the feedlot sub-category is carrying grazing-animal diet parameters throughout.
+
+## Recommended values
+
+Edition-aware, keyed on sub-category, on the tool's existing low-productivity African basis:
+
+| Sub-category | 2019R | 2006 | Basis |
+|---|---|---|---|
+| dairy_cows | 6.5 | 6.5 | Table 10.12 low producing, lactating (footnote 4) |
+| other_cows | 7.0 | 6.5 | non-dairy >75% forage; footnote 4 also sends dry dairy here |
+| bulls | 7.0 | 6.5 | non-dairy >75% forage |
+| oxen | 7.0 | 6.5 | non-dairy >75% forage |
+| heifers | 7.0 | 6.5 | non-dairy >75% forage |
+| growing_males | 7.0 | 6.5 | non-dairy >75% forage |
+| calves_female | 7.0 | 6.5 | Annex 10A.2 Africa, Calves on forage |
+| calves_male | 7.0 | 6.5 | Annex 10A.2 Africa, Calves on forage |
+| feedlot_cattle | **4.0** | **3.0** | Feedlot, 0-15% forage, DE >= 72 |
+
+With two dependencies that have to move at the same time:
+
+1. **Feedlot DE must go to about 74** (Annex 10A.2 Latin America) or the Ym row's own precondition is violated. Feedlot CP should go to 14.0 on the same authority.
+2. The 7.0 assignment is conditional on DE <= 62. The tool's DE default of 55 satisfies it, but a user who raises DE into 62-71 should be getting 6.3. A per-sub-category constant cannot express that; only a DE-conditional lookup can. The constant is the right approximation for the shipped defaults and should be documented as conditional rather than absolute.
+
+Three further notes:
+
+- **Milk-fed calves are Ym 0.0** in the annex, with an enteric EF of zero. The tool has no pre-weaning category, and its calves default to the forage-fed reading. A user with a milk-fed calf population would be badly overstated. Worth a note in the guidance rather than a tenth sub-category.
+- `resolve_subcat_default()` already takes `ipcc_version` and ignores it. An edition-aware Ym is the first default that genuinely needs it, so this is also the change that makes that argument real.
+- **No review round adjudicated the Ym default.** The review record carries only the uncertainty change (internal, 2026-06-15). Unlike `Milk` 3.5 and `Fat` 4.3, correcting Ym does not overturn a reviewer decision.
+
+## Applied, 2026-09-11
+
+The full edition-aware split was adopted and is in the code. What changed:
+
+**New objects in the master:** `YM_BY_SUBCAT` (9 sub-categories x 2 editions), `DE_BY_SUBCAT` and `CP_BY_SUBCAT` (9 each). The master went from 537 to 573 rows. `YM_BY_SUBCAT` is the first object with a column per guideline edition; every other default is edition-neutral.
+
+**`resolve_subcat_default()` now honours its `ipcc_version` argument.** It had accepted that argument and ignored it since it was written. Ym is the first default where the distinction is load-bearing, so the argument is now real rather than decorative.
+
+**Resolved values:**
+
+| sub-category | Ym 2019R | Ym 2006 | DE | CP |
+|---|---|---|---|---|
+| dairy_cows | 6.5 | 6.5 | 55 | 10 |
+| other_cows | 7.0 | 6.5 | 55 | 10 |
+| bulls | 7.0 | 6.5 | 55 | 10 |
+| oxen | 7.0 | 6.5 | 55 | 10 |
+| heifers | 7.0 | 6.5 | 55 | 10 |
+| growing_males | 7.0 | 6.5 | 55 | 10 |
+| calves_female | 7.0 | 6.5 | 55 | 10 |
+| calves_male | 7.0 | 6.5 | 55 | 10 |
+| feedlot_cattle | 4.0 | 3.0 | 74 | 14 |
+
+**Measured effect on enteric CH4, per 100,000 head, under 2019R:**
+
+| sub-category | before | after | change |
+|---|---|---|---|
+| dairy_cows | 6957.7 | 6957.7 | 0.0% |
+| other_cows | 6063.5 | 6529.9 | +7.7% |
+| bulls | 5775.0 | 6219.2 | +7.7% |
+| oxen | 4477.1 | 4821.5 | +7.7% |
+| heifers | 5721.5 | 6161.7 | +7.7% |
+| growing_males | 4103.6 | 4419.3 | +7.7% |
+| calves_female | 2010.8 | 2165.5 | +7.7% |
+| calves_male | 1845.2 | 1987.2 | +7.7% |
+| feedlot_cattle | 10213.5 | 3655.2 | -64.2% |
+
+The qualitative inversion is gone: a feedlot animal now sits well below a dairy cow on per-head enteric methane, which is the direction IPCC's table implies.
+
+**Surfaces updated.** The prompt's sub-category override table carries Ym for both editions plus DE and CP, so the translator is told the rule rather than left to infer it. The worked example now emits heifers at 7.0. The methodology and user guide parameter tables state the split instead of a single 6.5. `reference/DEFAULTS_MASTER.md` shows all four new columns.
+
+**Coverage.** All 36 new cells are carried by at least one surface and read MATCH; the matrix went from 444 to 480 cells with zero divergences. Audit check **F35** asserts all nine sub-categories across both editions, plus that feedlot DE satisfies the `DE >= 72` precondition of its own Ym row and that no other sub-category's DE has drifted from the catalogue. A spot check would not have caught the original defect, because the one sub-category that was already right (dairy) is the one a spot check would most likely have picked.
+
+**Two latent bugs surfaced by the change.** The kit generator was passing an undefined `ipcc_version` to `resolve_subcat_default()` and got away with it only because R evaluates arguments lazily and the callee never read it; the worked example now resolves under the edition it declares in its own metadata. And the matrix's own extractors had to learn the new objects, without which the prompt would have stated nine Ym values that no surface checked.
+
+## Still open on Ym
+
+- The 7.0 row is conditional on DE <= 62. A per-sub-category constant cannot express that, so a user who raises DE into 62-71 should be getting 6.3 and will not. Only a DE-conditional lookup would be fully faithful; the constant is correct for the shipped defaults and is documented as conditional.
+- Milk-fed calves are Ym 0.0 in Annex 10A.2, with an enteric EF of zero. The tool has no pre-weaning category and its calves resolve to the forage-fed 7.0. An inventory with a large milk-fed calf population would be overstated. This belongs in the guidance rather than as a tenth sub-category.
+- `DE_BY_SUBCAT` inherits the unresolved `DE` question from finding 2.1 for the eight non-feedlot rows: 55 still matches neither annex table. The new object did not create that problem and does not fix it.

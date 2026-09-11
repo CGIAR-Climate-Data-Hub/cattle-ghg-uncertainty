@@ -62,7 +62,7 @@ This example has 2 sub-categories, so 2 x 25 = 50 parameter rows. An inventory w
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Cp", "mean": 0.1, "uncertainty_pct": 10, "distribution": "beta", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "hours", "mean": 0, "lower": 0, "upper": 0, "distribution": "constant", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "CP", "mean": 12, "uncertainty_pct": 15, "distribution": "normal", "param_type": "coefficient"},
-    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Ym", "mean": 6.5, "uncertainty_pct": 20, "distribution": "pert", "param_type": "coefficient"},
+    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Ym", "mean": 7, "uncertainty_pct": 20, "distribution": "pert", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Bo", "mean": 0.13, "uncertainty_pct": 15, "distribution": "pert", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "ASH", "mean": 0.08, "uncertainty_pct": 25, "distribution": "pert", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "UE", "mean": 0.04, "uncertainty_pct": 25, "distribution": "pert", "param_type": "coefficient"},

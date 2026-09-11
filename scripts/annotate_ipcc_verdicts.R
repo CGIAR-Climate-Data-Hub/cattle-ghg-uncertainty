@@ -69,7 +69,7 @@ cat_default <- list(
   Cp = c("CONFIRMED", paste0(T107, ": Cattle and Buffalo 0.10")),
   hours = c("CONFIRMED", paste0(T10A1, ": work 0 hrs/day for every dairy row")),
   CP = c("CONFIRMED", paste0(T10A2, ": CP in diet 10.0%")),
-  Ym = c("CONFIRMED", paste0(T1012, ": low-producing dairy cows <5000 kg/yr, DE <= 62, NDF > 38, Ym 6.5%. Applies to dairy only; see the Ym finding in the provenance register")),
+  Ym = c("CONFIRMED", paste0(T1012, ": Low producing cows (<5000 kg/yr), DE <= 62, NDF > 38, Ym 6.5%. Footnote 4 restricts the dairy rows to LACTATING cows, which is exactly the dairy_cows sub-category, so 6.5 is right as the dairy default and wrong as the generic one: the same table gives 7.0 for non-dairy >75% forage and 4.0 for feedlot. See the Ym section of the provenance register")),
   Bo = c("CONFIRMED", paste0(T1016A, ": dairy and non-dairy cattle both 0.13")),
   ASH = c("DEVIATION_DOCUMENTED", "2006 V4 Ch10 Eq 10.24 note: 0.08 for cattle. The 2019 Refinement rewrote the same note around swine (0.06 for sows), so it does not supersede the cattle figure"),
   UE = c("CONFIRMED", "2019R V4 Ch10 Eq 10.24 note: typically 0.04 GE for most ruminants"),
@@ -88,6 +88,12 @@ set("PARAM_CATALOGUE", "*", "suggested_uncertainty_pct", "NOT_IPCC",
     "Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide")
 set("PARAM_CATALOGUE", "Bo", "suggested_uncertainty_pct", "CONFIRMED",
     paste0(T1016A, " footer: uncertainty +/- 15%"))
+# Ym's uncertainty IS published by IPCC, so the blanket Penman/Monni
+# attribution above was wrong for this row. Table 10.12 footnote 3 gives it
+# outright. The internal 2026-06-15 change from 8 to 20 cited "2019R Tier 2
+# guidance" without a table; this is the table.
+set("PARAM_CATALOGUE", "Ym", "suggested_uncertainty_pct", "CONFIRMED",
+    paste0(T1012, " footnote 3: 'Uncertainty values are +/- 20% based on published standard deviations from Niu et al. (2018) and data compilations for non dairy cattle as described in Annex 10B.2'"))
 
 # PARAM_CATALOGUE asymmetric bounds, all five Chapter 11 parameters.
 bnd <- function(k, lo_v, lo_s, hi_v, hi_s) {
@@ -251,6 +257,39 @@ wg <- list(
   feedlot_cattle = c("DEVIATION_OPEN", "Table 10A.2 has no Africa feedlot row. Published feedlot gains are North America 1.4 and Latin America 0.90 kg/day. The 1.0 used here falls between them"))
 for (k in names(wg)) set("WG_BY_SUBCAT", k, "value", wg[[k]][1], wg[[k]][2])
 
+# --- Ym, and the two diet parameters that move with it ---------------------
+FN4 <- "footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected'"
+T1012_06 <- "2006 V4 Ch10 Table 10.12, p.10.30"
+A2_YM <- "Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included"
+set("YM_BY_SUBCAT", "dairy_cows", "ym_2019_refinement", "CONFIRMED",
+    paste0(T1012, ": Low producing cows (<5000 kg/yr), DE <= 62, NDF > 38, Ym 6.5%. The dairy_cows sub-category is mature LACTATING females, which is exactly the population ", FN4, " restricts these rows to"))
+for (k in c("other_cows", "bulls", "oxen", "heifers", "growing_males",
+            "calves_female", "calves_male"))
+  set("YM_BY_SUBCAT", k, "ym_2019_refinement", "CONFIRMED",
+      paste0(T1012, ": Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. ", A2_YM,
+             ". For other_cows, which includes dry dairy cows, ", FN4, " sends them to the same 7.0"))
+set("YM_BY_SUBCAT", "feedlot_cattle", "ym_2019_refinement", "CONFIRMED",
+    paste0(T1012, ": Feedlot (all other grains, 0-15% forage), DE >= 72, Ym 4.0%. Annex 10A.2 Latin America Feedlot cattle confirms it at DE 74. North America feedlot sits at DE 75 with Ym 3.0, the steam-flaked corn row"))
+for (k in c("dairy_cows", "other_cows", "bulls", "oxen", "heifers",
+            "growing_males", "calves_female", "calves_male"))
+  set("YM_BY_SUBCAT", k, "ym_2006", "CONFIRMED",
+      paste0(T1012_06, ": the 2006 table gives 6.5% for Dairy Cows and their young, for Other Cattle fed low quality crop residues, and for Other Cattle grazing alike. It draws no distinction below feedlot"))
+set("YM_BY_SUBCAT", "feedlot_cattle", "ym_2006", "CONFIRMED",
+    paste0(T1012_06, ": 'Feedlot fed Cattle' 3.0%, footnote a 'when fed diets contain 90 percent or more concentrates'"))
+
+DE_NOTE <- "Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row"
+for (k in c("dairy_cows", "other_cows", "bulls", "oxen", "heifers",
+            "growing_males", "calves_female", "calves_male")) {
+  set("DE_BY_SUBCAT", k, "value", "DEVIATION_OPEN",
+      paste0("Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. ", DE_NOTE))
+  set("CP_BY_SUBCAT", k, "value", "CONFIRMED",
+      paste0(T10A2, ": CP in diet 10.0%. ", DE_NOTE))
+}
+set("DE_BY_SUBCAT", "feedlot_cattle", "value", "CONFIRMED",
+    "2019R V4 Ch10 Table 10A.2 (New), Latin America Feedlot cattle: digestibility of feed 74%. Required by Table 10.12, whose feedlot Ym of 4.0 is conditional on DE >= 72; the catalogue default of 55 would violate that precondition")
+set("CP_BY_SUBCAT", "feedlot_cattle", "value", "CONFIRMED",
+    "2019R V4 Ch10 Table 10A.2 (New), Latin America and North America Feedlot cattle both give CP in diet 14.0%")
+
 set("PCT_PREGNANT_BY_SUBCAT", "*", "value", "DEVIATION_OPEN",
     "Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool")
 
@@ -303,6 +342,11 @@ if (any(gap)) {
 M$ipcc_verdict[is.na(M$ipcc_verdict)] <- "META"
 M$ipcc_source[is.na(M$ipcc_source)]   <- "Descriptive field, not a shipped numeric default"
 
+# row_order back to integer before writing. Reading with colClasses="character"
+# makes write.csv quote it, while export_defaults_master.R writes it unquoted,
+# so the two scripts would otherwise flip the quoting of all 573 lines on
+# alternate runs and every diff would look like a full-file rewrite.
+M$row_order <- as.integer(M$row_order)
 utils::write.csv(M, P, row.names = FALSE, na = "<NA>")
 
 cat(sprintf("annotated %d rows in %s\n", nrow(M), P))

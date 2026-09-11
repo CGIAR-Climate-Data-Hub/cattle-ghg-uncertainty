@@ -59,10 +59,16 @@ for (i in seq_len(nrow(mf))) for (f in names(mf))
 
 for (nm in c("CFI_BY_SUBCAT", "C_GROWTH_BY_SUBCAT", "LW_BY_SUBCAT",
              "MW_BY_SUBCAT", "WG_BY_SUBCAT", "PCT_PREGNANT_BY_SUBCAT",
-             "FEEDING_SITUATION_CA")) {
+             "DE_BY_SUBCAT", "CP_BY_SUBCAT", "FEEDING_SITUATION_CA")) {
   o <- get(nm); k <- names(o)
   for (i in seq_along(k)) add(nm, k[i], "value", o[[k[i]]], i)
 }
+
+# Ym is the one default that differs between guideline editions, so it is a
+# wide table (one column per edition) rather than a single "value" column.
+for (i in seq_len(nrow(YM_BY_SUBCAT))) for (f in names(YM_BY_SUBCAT))
+  if (f != "sub_category")
+    add("YM_BY_SUBCAT", YM_BY_SUBCAT$sub_category[i], f, YM_BY_SUBCAT[[f]][i], i)
 
 for (i in seq_len(nrow(IPCC_DEFAULTS_BY_REGION))) {
   r <- IPCC_DEFAULTS_BY_REGION[i, ]

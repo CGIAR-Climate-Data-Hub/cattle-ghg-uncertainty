@@ -189,13 +189,20 @@ lines <- c(lines, "",
   "",
   partial("subcat_overrides_intro"),
   "",
-  "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | notes |",
-  "|---|---|---|---|")
+  "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | DE | CP | notes |",
+  "|---|---|---|---|---|---|---|---|")
 for (sc in ANIMAL_SUBCATEGORIES) {
   cfi <- CFI_BY_SUBCAT[[sc]]; cg <- C_GROWTH_BY_SUBCAT[[sc]]
-  lines <- c(lines, sprintf("| `%s` | %s | %s | %s |", sc,
+  y19 <- ym_for_subcat(sc, "2019_refinement")
+  y06 <- ym_for_subcat(sc, "2006")
+  de_ <- DE_BY_SUBCAT[[sc]]; cp_ <- CP_BY_SUBCAT[[sc]]
+  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s |", sc,
     if (is.null(cfi)) "—" else fmt_num(cfi),
     if (is.null(cg))  "—" else fmt_num(cg),
+    if (is.null(y19)) "—" else fmt_num(y19),
+    if (is.null(y06)) "—" else fmt_num(y06),
+    if (is.null(de_)) "—" else fmt_num(de_),
+    if (is.null(cp_)) "—" else fmt_num(cp_),
     if (!is.null(.rownotes[[sc]])) gsub("\\|", "\\\\|", .rownotes[[sc]]) else ""))
 }
 lines <- c(lines, "",
@@ -434,6 +441,15 @@ writeLines(lines, file.path(out_dir, "template_schema.md"), useBytes = TRUE)
   if (is.na(x)) return("null")
   trimws(format(x, scientific = FALSE, trim = TRUE, drop0trailing = TRUE))
 }
+# The edition the worked example is written for. It appears in the example's
+# own inventory_metadata AND is passed to resolve_subcat_default(), so the
+# JSON and the numbers inside it can never describe different editions. Ym is
+# the first default where that distinction is load-bearing: it is 7.0 for
+# non-dairy under 2019R and 6.5 under 2006. Until Ym became edition-aware this
+# call site passed an undefined `ipcc_version` and got away with it only
+# because R evaluates arguments lazily and the callee never read it.
+.WE_IPCC_VERSION <- "2019_refinement"
+
 we <- c("# Worked example -- complete template-ready JSON for a small inventory",
         "", partial("worked_example_intro"), "",
         sprintf("This example has %d sub-categories, so %d x %d = %d parameter rows. An inventory with 8 sub-categories would need 8 x %d = %d.",
@@ -442,13 +458,14 @@ we <- c("# Worked example -- complete template-ready JSON for a small inventory"
         "", "```template-ready", "{",
         '  "inventory_metadata": {',
         '    "country": "Country Z", "year": 2023, "species": "cattle_dairy",',
-        '    "ipcc_version": "2019_refinement", "prepared_by": "National Inventory Team"',
+        sprintf('    "ipcc_version": "%s", "prepared_by": "National Inventory Team"',
+                .WE_IPCC_VERSION),
         "  },", '  "parameters": [')
 prow <- character(0)
 for (sc in .WE_SUBCATS) {
   usr <- .WE_USER[[sc]]
   for (prm in pc$parameter) {
-    rs <- resolve_subcat_default(sc, prm, ipcc_version)
+    rs <- resolve_subcat_default(sc, prm, .WE_IPCC_VERSION)
     is_user <- prm %in% names(usr)
     val  <- if (is_user) usr[[prm]] else if (!is.null(rs)) rs$value else NA_real_
     dist <- if (!is.null(rs)) rs$distribution else

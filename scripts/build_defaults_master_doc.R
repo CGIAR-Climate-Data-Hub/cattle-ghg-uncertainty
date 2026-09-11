@@ -94,6 +94,7 @@ out <- c(out, "## Manure management systems", "",
   tbl(MMS_FRAC_DEFAULTS_2019), "")
 
 out <- c(out, "## Per-sub-category overrides", "",
+  "`Ym` is the only default that depends on the guideline edition, so it has a column for each. The 2019 Refinement splits Table 10.12 by livestock category; the 2006 table does not, below feedlot.", "",
   tbl(data.frame(
     sub_category = names(CFI_BY_SUBCAT),
     Cfi = unlist(CFI_BY_SUBCAT),
@@ -101,6 +102,12 @@ out <- c(out, "## Per-sub-category overrides", "",
     BW  = unlist(LW_BY_SUBCAT)[names(CFI_BY_SUBCAT)],
     MW  = unlist(MW_BY_SUBCAT)[names(CFI_BY_SUBCAT)],
     WG  = unlist(WG_BY_SUBCAT)[names(CFI_BY_SUBCAT)],
+    DE  = unlist(DE_BY_SUBCAT)[names(CFI_BY_SUBCAT)],
+    CP  = unlist(CP_BY_SUBCAT)[names(CFI_BY_SUBCAT)],
+    Ym_2019R = YM_BY_SUBCAT$ym_2019_refinement[
+      match(names(CFI_BY_SUBCAT), YM_BY_SUBCAT$sub_category)],
+    Ym_2006  = YM_BY_SUBCAT$ym_2006[
+      match(names(CFI_BY_SUBCAT), YM_BY_SUBCAT$sub_category)],
     stringsAsFactors = FALSE)), "")
 
 # --- the table that did not exist before -----------------------------------

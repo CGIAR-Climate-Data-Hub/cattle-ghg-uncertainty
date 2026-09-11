@@ -2136,6 +2136,60 @@ section_F <- function() {
                           paste(utils::head(apply(verdict_gaps, 1, paste, collapse = "/"), 3),
                                 collapse = "; ")))
 
+  # F35 -- Ym resolves per sub-category AND per guideline edition.
+  #
+  # IPCC Table 10.12 is a per-category table. The tool applied one number,
+  # 6.5, to all nine sub-categories, which was right only for lactating dairy
+  # cows. Two consequences worth guarding separately:
+  #   * non-dairy should be 7.0 (2019R), a 7.7% understatement of enteric CH4
+  #   * feedlot should be 4.0 (2019R) / 3.0 (2006) against the 6.5 shipped,
+  #     which made a feedlot animal the HIGHEST per-head enteric emitter in
+  #     the herd when IPCC's point is that concentrate-fed animals emit less
+  #
+  # The feedlot Ym is conditional on DE >= 72, so the DE override is asserted
+  # in the same check: shipping Ym 4.0 next to the catalogue's DE of 55 would
+  # be a combination IPCC does not sanction, and the two must never drift
+  # apart. F29b exists because a spot check that happened to pick the already
+  # correct rows proved nothing, so this asserts all nine, both editions.
+  ym_expect_19 <- c(dairy_cows = 6.5, other_cows = 7.0, bulls = 7.0,
+                    oxen = 7.0, heifers = 7.0, growing_males = 7.0,
+                    calves_female = 7.0, calves_male = 7.0,
+                    feedlot_cattle = 4.0)
+  ym_expect_06 <- c(dairy_cows = 6.5, other_cows = 6.5, bulls = 6.5,
+                    oxen = 6.5, heifers = 6.5, growing_males = 6.5,
+                    calves_female = 6.5, calves_male = 6.5,
+                    feedlot_cattle = 3.0)
+  ym_bad <- character(0)
+  ym_ok <- tryCatch({
+    for (sc in names(ym_expect_19)) {
+      g19 <- resolve_subcat_default(sc, "Ym", "2019_refinement")$value
+      g06 <- resolve_subcat_default(sc, "Ym", "2006")$value
+      if (!isTRUE(all.equal(g19, unname(ym_expect_19[[sc]]))))
+        ym_bad <<- c(ym_bad, sprintf("%s 2019R %s!=%s", sc, g19, ym_expect_19[[sc]]))
+      if (!isTRUE(all.equal(g06, unname(ym_expect_06[[sc]]))))
+        ym_bad <<- c(ym_bad, sprintf("%s 2006 %s!=%s", sc, g06, ym_expect_06[[sc]]))
+    }
+    # The feedlot diet must satisfy the precondition on its own Ym row.
+    fd <- resolve_subcat_default("feedlot_cattle", "DE")$value
+    fc <- resolve_subcat_default("feedlot_cattle", "CP")$value
+    if (!isTRUE(fd >= 72))
+      ym_bad <<- c(ym_bad, sprintf("feedlot DE %s violates the DE>=72 precondition of Ym 4.0", fd))
+    if (!isTRUE(all.equal(fc, 14)))
+      ym_bad <<- c(ym_bad, sprintf("feedlot CP %s != 14.0 (Table 10A.2)", fc))
+    # Every other sub-category keeps the catalogue diet.
+    cat_de <- PARAM_CATALOGUE$ipcc_default[PARAM_CATALOGUE$parameter == "DE"]
+    for (sc in setdiff(names(ym_expect_19), "feedlot_cattle"))
+      if (!isTRUE(all.equal(resolve_subcat_default(sc, "DE")$value, cat_de)))
+        ym_bad <<- c(ym_bad, sprintf("%s DE drifted from the catalogue", sc))
+    length(ym_bad) == 0L
+  }, error = function(e) { ym_bad <<- conditionMessage(e); FALSE })
+  check_bool("F35", "F",
+             "Ym resolves per sub-category and per guideline edition, with a coherent feedlot diet",
+             ym_ok,
+             notes = if (ym_ok)
+               "9 sub-categories x 2 editions: dairy 6.5, non-dairy 7.0 (2019R) / 6.5 (2006), feedlot 4.0 / 3.0; feedlot DE 74 >= 72 and CP 14.0"
+             else paste(utils::head(ym_bad, 4), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

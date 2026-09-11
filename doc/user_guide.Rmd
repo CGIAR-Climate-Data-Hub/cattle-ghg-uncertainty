@@ -233,7 +233,7 @@ Tw & Mean daily temperature in winter ($^\circ$C) — Cfi cold-climate adjustmen
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Enteric fermentation}}} \\
 \addlinespace[2pt]
-Ym & Methane conversion factor (\% of gross energy in feed converted to CH\textsubscript{4}) & \% & 6.5 & ±20\% & PERT & Table 10.12 \\
+Ym & Methane conversion factor (\% of gross energy in feed converted to CH\textsubscript{4}). Depends on the animal class \emph{and} on the guidelines edition, so the template fills it per sub-category rather than using one value: under the 2019 Refinement, 7.0 for non-dairy and multi-purpose cattle and 4.0 for feedlot cattle; under 2006, 6.5 for everything except feedlot at 3.0. & \% & 6.5 & ±20\% & PERT & Table 10.12 \\
 \addlinespace[4pt]
 \multicolumn{7}{l}{\textbf{\textcolor{cgiargreen}{Manure management — CH\textsubscript{4}}}} \\
 \addlinespace[2pt]

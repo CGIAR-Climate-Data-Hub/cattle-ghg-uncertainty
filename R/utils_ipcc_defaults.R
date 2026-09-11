@@ -438,6 +438,43 @@ AGE_BY_SUBCAT <- list(
 # other sub-category falls back to the generic PARAM_CATALOGUE default (0.60).
 PCT_PREGNANT_BY_SUBCAT <- .master_list("PCT_PREGNANT_BY_SUBCAT")
 
+# Methane conversion factor by sub-category AND guideline edition.
+#
+# This is the only default that differs between editions, so it is the only
+# one carrying a column per edition rather than a single "value".
+#
+# 2019R Table 10.12 (Updated) is a per-category table and the tool used to
+# apply one number, 6.5, to all nine sub-categories. Footnote 4 restricts the
+# dairy rows to LACTATING cows and sends dry-phase animals in low-productivity
+# systems to the non-dairy 7.0, which is where other_cows sits. Annex 10A.2
+# confirms 7.0 on every non-dairy row of every region, calves included.
+#
+# Feedlot was wrong under BOTH editions: 2019R gives 4.0 (0-15% forage,
+# DE >= 72) and 2006 gives 3.0 (>= 90% concentrates), against 6.5 shipped.
+# That inverted a qualitative result, making a feedlot animal the highest
+# per-head enteric emitter in the herd when IPCC's whole point is that
+# concentrate-fed animals emit less.
+YM_BY_SUBCAT <- .master_wide("YM_BY_SUBCAT", "sub_category")
+
+# Diet parameters that exist ONLY to keep the feedlot row coherent. IPCC's
+# feedlot Ym is conditional on DE >= 72; shipping Ym 4.0 alongside the
+# catalogue's DE of 55 would describe a combination IPCC does not sanction and
+# would land ~42% away from the right answer. Annex 10A.2 gives feedlot
+# DE 74 and CP 14.0 (Latin America). Every other sub-category holds the
+# catalogue value, so these lists are overrides in name only for eight of nine.
+DE_BY_SUBCAT <- .master_list("DE_BY_SUBCAT")
+CP_BY_SUBCAT <- .master_list("CP_BY_SUBCAT")
+
+# Resolve Ym for a sub-category under a guideline edition. Returns NULL when
+# the sub-category is not one of the nine, so the caller falls back to the
+# generic catalogue default.
+ym_for_subcat <- function(sub_category, ipcc_version = "2019_refinement") {
+  i <- match(sub_category, YM_BY_SUBCAT$sub_category)
+  if (is.na(i)) return(NULL)
+  col <- if (identical(ipcc_version, "2006")) "ym_2006" else "ym_2019_refinement"
+  YM_BY_SUBCAT[[col]][i]
+}
+
 # ==========================================================================
 # SPARSE-OVERLAY RESOLVER
 # ==========================================================================
@@ -449,7 +486,8 @@ PCT_PREGNANT_BY_SUBCAT <- .master_list("PCT_PREGNANT_BY_SUBCAT")
 #
 # It is the SINGLE SOURCE OF TRUTH for "what the app derives", assembling only
 # objects verified against the IPCC source: the generic PARAM_CATALOGUE row plus
-# the per-sub-category overrides above (Cfi/C/BW/MW/WG/pct_pregnant) and the
+# the per-sub-category overrides above (Cfi/C/BW/MW/WG/pct_pregnant/Ym/DE/CP)
+# and the
 # biological-zero rules from the translator self-check #9 (Milk/Fat/MilkPR/
 # pct_pregnant = 0 for males; pct_pregnant = 0 for pre-pubertal calves; working
 # hours = 0 for non-oxen). Returns a list(value, distribution, uncertainty_pct,
@@ -492,6 +530,12 @@ resolve_subcat_default <- function(sub_category, parameter,
     MW  = MW_BY_SUBCAT[[sub_category]],
     WG  = WG_BY_SUBCAT[[sub_category]],
     pct_pregnant = PCT_PREGNANT_BY_SUBCAT[[sub_category]],
+    # Ym is the one default that depends on the guideline edition, which is
+    # why this function takes ipcc_version. DE and CP move with it so the
+    # feedlot row stays a coherent animal; see YM_BY_SUBCAT above.
+    Ym  = ym_for_subcat(sub_category, ipcc_version),
+    DE  = DE_BY_SUBCAT[[sub_category]],
+    CP  = CP_BY_SUBCAT[[sub_category]],
     NULL)
   if (!is.null(ov)) res$value <- ov
 
