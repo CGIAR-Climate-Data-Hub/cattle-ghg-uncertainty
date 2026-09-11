@@ -753,3 +753,61 @@ The qualitative inversion is gone: a feedlot animal now sits well below a dairy 
 - The 7.0 row is conditional on DE <= 62. A per-sub-category constant cannot express that, so a user who raises DE into 62-71 should be getting 6.3 and will not. Only a DE-conditional lookup would be fully faithful; the constant is correct for the shipped defaults and is documented as conditional.
 - Milk-fed calves are Ym 0.0 in Annex 10A.2, with an enteric EF of zero. The tool has no pre-weaning category and its calves resolve to the forage-fed 7.0. An inventory with a large milk-fed calf population would be overstated. This belongs in the guidance rather than as a tenth sub-category.
 - `DE_BY_SUBCAT` inherits the unresolved `DE` question from finding 2.1 for the eight non-feedlot rows: 55 still matches neither annex table. The new object did not create that problem and does not fix it.
+
+---
+
+# Bo: deep verification, 2026-09-11
+
+Tier 1 item 1 of the variable-by-variable pass. Same protocol as Ym: find every table in both editions, read the footnotes, ask the shape question, cross-check the annex, confirm the conditioning variable reaches the resolver, measure, then record.
+
+## What IPCC publishes
+
+**2019R Vol.4 Ch.10 Table 10.16A (Updated), PDF page 10.67.** Keyed by region and, within "Other Regions", by productivity:
+
+| Category | N. America | W. Europe | E. Europe | Oceania | Other, high productivity | Other, low productivity |
+|---|---|---|---|---|---|---|
+| Dairy cattle | 0.24 | 0.24 | 0.24 | 0.24 | 0.24 | **0.13** |
+| Non dairy cattle | 0.19 | 0.18 | 0.17 | 0.17 | 0.18 | **0.13** |
+| All Animals PRP | 0.19 across every region | | | | | |
+
+Footnote 1: "For other regions, low productivity is considered the default value for Tier 1 if not using the Tier 1a." Table footer: "Uncertainty values are +/- 15 percent."
+
+**2006 edition.** Table 10.16 in the 2006 Guidelines is a different table entirely: manure-management CH4 emission factors for deer, reindeer, rabbits and fur-bearing animals. The 2006 Bo values live in the Annex 10A.2 derivation tables. Table 10.16A's own source note says its values "are consistent with 2006 IPCC Guidelines values from Annex 10A.2 with the exception of PRP".
+
+## The shape question
+
+Bo is keyed by **region x productivity x dairy/non-dairy**, and the tool holds a single scalar of 0.13. That is the Ym pattern on its face, so it was worked through carefully. Three things decide it.
+
+**For the stated audience the single value is right.** The tool is built for developing-country inventory compilers, which maps to "Other regions", and footnote 1 makes low productivity the Tier 1 default there. In that column dairy and non-dairy are **both 0.13**, so the dairy/non-dairy split that mattered so much for Ym collapses to a single number here.
+
+**The app cannot express IPCC's regions anyway.** `COUNTRY_TO_REGION` maps 93 countries onto africa, americas, asia, europe and oceania. IPCC's columns are North America, Western Europe, Eastern Europe, Oceania and Other Regions. The app's `americas` conflates North America (0.24 dairy) with Latin America (Other Regions), and `europe` conflates Western with Eastern Europe. Keying Bo off the existing region vocabulary would therefore produce a value that is wrong for roughly half the countries in each of those two buckets. This is the opposite of the Ym case, where `sub_category` mapped onto IPCC's categories exactly.
+
+**The consequence is real but bounded.** A Western European or North American dairy inventory that accepts the default gets 0.13 where IPCC gives 0.24, understating manure CH4 by 46%. Bo is a user-supplied parameter, so this bites only on gap-filled rows, and the auto-fill hint already names Table 10.16(a) and the 0.24 figure explicitly.
+
+**Decision: keep 0.13, document the full table, keep warning.** Consistent with the decision taken for the Chapter 11 climate factors. Adding a region key would require replacing the app's region vocabulary with IPCC's, which is a larger change than the defect warrants and would silently reassign every existing inventory.
+
+## PRP Bo 0.19 is the other half of a matched pair
+
+Table 10.16A publishes a separate Bo of 0.19 for manure deposited on pasture, range and paddock, and `calc_manure_ch4()` applies one Bo to every management system including pasture. That looks like a straightforward omission and is not.
+
+The 2019 Refinement pairs that 0.19 with a pasture MCF of 0.47%. The tool deliberately holds pasture MCF on the 2006 convention (1.0 / 1.5 / 2.0), a decision already on record in this register. Taking 0.19 without 0.47% would combine the 2019R numerator with the 2006 denominator and inflate pasture manure CH4 by 46% on top of an MCF that is already four times the 2019R figure. The two coherent options are the 2006 pair (MCF 2.0, Bo 0.13) or the 2019R pair (MCF 0.47, Bo 0.19); the tool holds the first, consistently. `DEVIATION_DOCUMENTED`, unchanged.
+
+## Confirmed and corrected
+
+- `Bo` 0.13: **CONFIRMED** against Table 10.16A, Other regions low productivity, for dairy and non-dairy alike.
+- `Bo` uncertainty 15%: **CONFIRMED** from the table footer, as already recorded.
+- Citation **corrected**: `ipcc_ref` and the parameter definition said "Table 10.16", which in both editions is the deer and reindeer emission-factor table. Now "Table 10.16A".
+
+## What the Bo pass turned up elsewhere
+
+Checking whether Bo's context hint was accurate surfaced that `CONTEXT_DEPENDENT_HINTS` in `R/utils_qaqc.R`, the text shown to a user whenever a parameter is auto-filled, carried **no verification coverage at all** and three of its eight strings had drifted from the values the tool ships:
+
+| hint | said | tool ships |
+|---|---|---|
+| `EF4` | "DEFAULT IS THE 2019R AGGREGATED VALUE (0.010)" | 0.014, the wet-climate value |
+| `EF3_PRP` | "DEFAULT IS THE 2019R AGGREGATED VALUE" (0.004) | 0.006, the wet-climate value |
+| `Ym` | "6.5 ... low-productivity cattle on forage" | 6.5 is the low-producing DAIRY row; cattle on forage is 7.0 |
+
+A user reading the EF4 hint was told the number 0.010 when the value they had actually been given was 0.014. All three are corrected, and `qaqc_hints` is now a checked surface in `scripts/verify_defaults.R`: the opening clause of each hint must state that parameter's shipped default.
+
+The check needed two passes. The first version asserted only that the shipped value appeared somewhere in the hint, which every one of these strings satisfies because they all list the alternatives too; the negative test caught it passing against the deliberately broken text. Restricting the scan to the opening clause, with table citations and edition tokens stripped, makes it bite.

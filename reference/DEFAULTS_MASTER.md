@@ -44,7 +44,7 @@ The 25 parameters. `ipcc_default` is the generic value; where a sub-category ove
 | hours | hours/day | 0 | 20 |  |  | pert | coefficient | core | yes | Eq 10.11 |
 | CP | % | 10 | 15 |  |  | normal | coefficient | core | yes | Eq 10.32 |
 | Ym | % | 6.5 | 20 |  |  | pert | coefficient | advanced | no | Table 10.12 |
-| Bo | m3 CH₄/kg VS | 0.13 | 15 |  |  | pert | coefficient | advanced | no | Table 10.16 |
+| Bo | m3 CH₄/kg VS | 0.13 | 15 |  |  | pert | coefficient | advanced | no | Table 10.16A |
 | ASH | fraction | 0.08 | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
 | UE | fraction | 0.04 | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
 | EF3_PRP | kg N2O-N/kg N | 0.006 |  | 0.0005 | 0.027 | pert | coefficient | advanced | no | Ch.11 Table 11.1 |

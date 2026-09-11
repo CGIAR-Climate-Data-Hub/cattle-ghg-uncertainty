@@ -12,7 +12,7 @@ The **before** column is the value as it stood at commit `fbfa1bc` (2026-07-10),
 
 | status | count | meaning |
 |---|---|---|
-| `APPLIED` | 46 | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |
+| `APPLIED` | 47 | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |
 | `PROPOSED` | 4 | We think it is wrong, but a numbered review round adjudicated it, so it has **not** been changed. Your call. |
 | `OPEN` | 10 | Differs from IPCC with no recorded reason and no review history. A judgement call we did not want to take alone. |
 
@@ -20,7 +20,7 @@ Nothing here has been pushed or deployed.
 
 ---
 
-## 1. Already applied (46)
+## 1. Already applied (47)
 
 Changed since 2026-07-10. Each cites the IPCC table it was read from.
 
@@ -62,6 +62,7 @@ Changed since 2026-07-10. Each cites the IPCC table it was read from.
 | MMS_FRAC_DEFAULTS_2019 | liquid_slurry | frac_gas_low | 0.24 | 0.09 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98. Liquid/Slurry With natural crust cover: 0.30 (0.09-0.36), leach 0 |
 | MMS_FRAC_DEFAULTS_2019 | solid_storage | frac_gas_high | 0.68 | 0.65 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98. Solid storage plain: 0.45 (0.10-0.65), leach 0.02 |
 | MMS_FRAC_DEFAULTS_2019 | solid_storage | frac_gas_low | 0.23 | 0.1 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98. Solid storage plain: 0.45 (0.10-0.65), leach 0.02 |
+| PARAM_CATALOGUE | Bo | ipcc_ref | Table 10.16 | Table 10.16A | manure CH4 | Corrected citation, not a value change. Table 10.16 is the deer, reindeer, rabbit and fur-bearing animal emission-factor table in both editions. The cattle Bo values are in Table 10.16A (Updated) of the 2019 Refinement. |
 | PARAM_CATALOGUE | Bo | suggested_uncertainty_pct | 20 | 15 | manure CH4 | 2019R V4 Ch10 Table 10.16A (Updated), Other regions low productivity footer: uncertainty +/- 15% |
 | YM_BY_SUBCAT | bulls | ym_2019_refinement | 6.5 | 7 | enteric CH4 | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |
 | YM_BY_SUBCAT | calves_female | ym_2019_refinement | 6.5 | 7 | enteric CH4 | 2019R V4 Ch10 Table 10.12 (Updated): Non dairy and multi-purpose, >75% forage, DE <= 62, Ym 7.0%. Annex 10A.2 confirms it independently: every non-dairy row of the Africa block carries 7.0, calves on forage included. For other_cows, which includes dry dairy cows, footnote 4: 'Ym cited for dairy cattle are for lactating dairy cows. For dairy cattle during their dry phase, in high and medium production systems, the non-dairy high quality forage value (6.3) should be selected and for low production systems with >75% low quality forage the value of (7.0) should be selected' sends them to the same 7.0 |

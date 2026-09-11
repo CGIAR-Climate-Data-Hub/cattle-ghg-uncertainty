@@ -31,12 +31,12 @@ BENCHMARK_ELIGIBLE_PARAMS <- c("BW")
 # production system, animal class), the auto-fill notification appends an
 # explicit hint so users know to review the value rather than accept it.
 CONTEXT_DEPENDENT_HINTS <- list(
-  EF3_PRP        = "DEFAULT IS THE 2019R AGGREGATED VALUE. Climate-disaggregated values are available in Vol.4 Ch.11 Table 11.1: cattle/poultry/pigs = 0.006 (wet climate) / 0.002 (dry climate). Set the value that matches your country's climate.",
-  EF4            = "DEFAULT IS THE 2019R AGGREGATED VALUE (0.010). Climate-disaggregated values in Vol.4 Ch.11 Table 11.3: 0.014 (wet) / 0.005 (dry). Set the value that matches your country's climate.",
+  EF3_PRP        = "DEFAULT IS THE 2019R WET-CLIMATE VALUE (0.006). Vol.4 Ch.11 Table 11.1 also gives 0.002 for dry climates and 0.004 aggregated across both. A dry-climate inventory that keeps 0.006 overstates direct pasture N2O threefold. Set the value that matches your country's climate.",
+  EF4            = "DEFAULT IS THE 2019R WET-CLIMATE VALUE (0.014). Vol.4 Ch.11 Table 11.3 also gives 0.005 (dry) and 0.010 aggregated across both. A dry-climate inventory that keeps 0.014 overstates indirect N2O from deposition almost threefold. Set the value that matches your country's climate.",
   Frac_LEACH_PRP = "DEFAULT IS THE 2019R WET-CLIMATE VALUE (0.24). In dry climates the IPCC default is 0. Vol.4 Ch.11 Table 11.3.",
   Bo             = "DEFAULT IS THE 2019R 'OTHER REGIONS, LOW PRODUCTIVITY' CATTLE VALUE (0.13). For intensive dairy in North America / Western Europe, Vol.4 Ch.10 Table 10.16(a) gives 0.24; consult the table for your production system.",
   MCF            = "DEFAULT IS PER-MMS x CLIMATE ZONE. Pick the row that matches BOTH your manure-management system AND your climate zone (Vol.4 Ch.10 Table 10.17). Tropical lagoon MCF (80%) differs sharply from temperate solid storage (4%).",
-  Ym             = "DEFAULT IS 6.5% (Vol.4 Ch.10 Table 10.12, low-productivity cattle on forage). Other Table 10.12 rows: high-DE dairy = 5.7-6.0%; feedlot = 3.0-4.0%. Pick the row that matches your diet quality.",
+  Ym             = "DEFAULT IS 6.5% (Vol.4 Ch.10 Table 10.12, LOW-PRODUCING DAIRY COWS; footnote 4 restricts the dairy rows to lactating animals). The template now fills this per sub-category: 7.0 for non-dairy and multi-purpose cattle on >75% forage, 4.0 for feedlot under the 2019 Refinement, and 6.5 / 3.0 respectively under 2006. Other rows: high-DE dairy = 5.7-6.0%. Pick the row that matches your diet quality and animal class.",
   Cfi            = "DEFAULT IS THE LACTATING-COW VALUE (0.386, Vol.4 Ch.10 Table 10.4). For non-lactating cattle/buffalo = 0.322; for bulls = 0.370. Pick the row that matches your sub-category.",
   Ca             = "DEFAULT IS THE PASTURE-FLAT VALUE (0.17, Vol.4 Ch.10 Table 10.5). For stall-fed = 0; for hilly grazing = 0.36. Pick the row that matches the feeding situation."
 )

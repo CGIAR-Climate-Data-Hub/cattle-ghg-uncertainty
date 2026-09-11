@@ -419,6 +419,53 @@ S[["audit_literals"]] <- local({
   v
 })
 
+# --- S7b: the context-dependent auto-fill hints -----------------------------
+# CONTEXT_DEPENDENT_HINTS in R/utils_qaqc.R is the text a user is shown when a
+# parameter is auto-filled, and it quotes numbers. It carried no coverage
+# until now, and three of its strings had drifted: the EF4 hint announced the
+# aggregated 0.010 while the tool shipped the wet-climate 0.014, the EF3_PRP
+# hint claimed the aggregated value while shipping the wet one, and the Ym
+# hint described 6.5 as the forage value when 6.5 is the low-producing DAIRY
+# row and forage is 7.0. A user acting on that text was misinformed about the
+# number they had actually been given.
+#
+# The invariant asserted is deliberately simple and hard to satisfy by
+# accident: the hint for a parameter must state that parameter's shipped
+# default somewhere in its text. Prose around it is free.
+S[["qaqc_hints"]] <- local({
+  v <- .empty
+  if (!exists("CONTEXT_DEPENDENT_HINTS")) return(v)
+  for (p in names(CONTEXT_DEPENDENT_HINTS)) {
+    if (!p %in% pc$parameter) next
+    ref <- pc$ipcc_default[pc$parameter == p]
+    if (is.na(ref)) next
+    # Only the OPENING clause counts, not the whole hint. Every one of these
+    # strings also lists the alternative values a user might need, so
+    # "contains the right number somewhere" passes even when the hint
+    # announces the wrong one as the default. The first negative test of this
+    # check failed for exactly that reason.
+    txt <- CONTEXT_DEPENDENT_HINTS[[p]]
+    txt <- sub("[.][[:space:]]+[A-Z].*$", "", txt)
+    # Drop citations so "Ch.10" or "Table 11.3" cannot satisfy a parameter
+    # whose default happens to be 10 or 11.3.
+    txt <- gsub("(Vol|Ch|Table|Annex|footnote|Eq)[.]?[[:space:]]?[0-9]+[A-Za-z]?([.][0-9]+[A-Za-z]?)?",
+                " ", txt)
+    # Guideline-edition tokens are not values either, and leaving them in
+    # made a mismatch report "2019" as the hint's claim instead of the
+    # number the hint actually announced.
+    txt <- gsub("(2019R|2019|2006)", " ", txt)
+    nums <- regmatches(txt, gregexpr("[0-9]+[.][0-9]+|[0-9]+", txt))[[1]]
+    nums <- suppressWarnings(as.numeric(nums))
+    hit <- any(!is.na(nums) & abs(nums - ref) < TOL)
+    # Report the shipped value when the hint states it, and the hint's own
+    # first number when it does not, so a mismatch reads as DIFFERS rather
+    # than quietly as absent.
+    v[paste("PARAM_CATALOGUE", p, "ipcc_default", sep = "|")] <-
+      if (hit) norm(ref) else if (length(nums)) norm(nums[1]) else NA_character_
+  }
+  v
+})
+
 # --- S8: published guides (.Rmd sources) ------------------------------------
 S[["doc_rmd"]] <- local({
   v <- .empty
@@ -646,6 +693,9 @@ POLICY <- c(prompt_param_catalogue = "MUST", prompt_template_schema = "MUST",
             xlsx_parameters = "MUST", xlsx_lists = "MUST",
             xlsx_vocab = "MUST", xlsx_manure_example = "REVIEW",
             audit_literals = "REVIEW", doc_rmd = "REVIEW",
+            # MUST: a hint that announces a number the tool does not ship
+            # actively misinforms the user about the value they were given.
+            qaqc_hints = "MUST",
             built_docx = "REVIEW",
             prompt_worked_example = "MUST",
             prompt_system_instructions = "MUST",
@@ -654,7 +704,12 @@ POLICY <- c(prompt_param_catalogue = "MUST", prompt_template_schema = "MUST",
 
 SCOPE <- list(
   prompt_param_catalogue = list(
-    objects = c("PARAM_CATALOGUE", "CFI_BY_SUBCAT", "C_GROWTH_BY_SUBCAT")),
+    objects = c("PARAM_CATALOGUE", "CFI_BY_SUBCAT", "C_GROWTH_BY_SUBCAT",
+                "YM_BY_SUBCAT", "DE_BY_SUBCAT", "CP_BY_SUBCAT")),
+  # Only the parameters that actually have a hint, and only their default.
+  qaqc_hints = list(
+    objects = "PARAM_CATALOGUE", fields = "ipcc_default",
+    keys = intersect(names(CONTEXT_DEPENDENT_HINTS), PARAM_CATALOGUE$parameter)),
   prompt_template_schema = list(
     objects = c("MMS_DEFAULTS", "MMS_FRAC_DEFAULTS_2019")),
   xlsx_parameters = list(

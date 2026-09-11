@@ -166,6 +166,14 @@ R <- data.frame(
   is_new  = is.na(i),
   stringsAsFactors = FALSE)
 R$pathway <- mapply(PATHWAY, R$object, R$key, R$field)
+# A citation row's ipcc_source is the generic META note, which tells the
+# reviewer nothing. Say what the citation was and why it moved.
+CITE_WHY <- c(
+  Bo = "Corrected citation, not a value change. Table 10.16 is the deer, reindeer, rabbit and fur-bearing animal emission-factor table in both editions. The cattle Bo values are in Table 10.16A (Updated) of the 2019 Refinement.")
+is_cite <- R$field == "ipcc_ref"
+R$source[is_cite] <- ifelse(R$key[is_cite] %in% names(CITE_WHY),
+                            CITE_WHY[R$key[is_cite]],
+                            "Citation change only, no value moved.")
 # A row counts as changed when the value the app RESOLVES moved, whether or
 # not the row existed before. A new row holding the value the catalogue
 # already supplied changed nothing and must not appear.
@@ -181,7 +189,13 @@ R$status   <- ifelse(!is.na(j), PROPOSALS$status[j],
 # would only pad the table, EXCEPT where we are putting one to the reviewer:
 # MW's ipcc_ref cites a table that does not contain the value, which is a
 # citation defect worth as much as a wrong number.
-keep <- R$status != "" & (R$verdict != "META" | !is.na(j))
+# META fields (labels, units, the versions string) are not shipped numbers and
+# would only pad the table, with two exceptions. A changed ipcc_ref is a
+# verifiable claim about where a value came from and belongs in front of the
+# reviewer: Bo cited "Table 10.16", which in both editions is the deer and
+# reindeer emission-factor table. And MW's citation is itself a proposal.
+keep <- R$status != "" &
+        (R$verdict != "META" | !is.na(j) | R$field == "ipcc_ref")
 R <- R[keep, ]
 R <- R[order(factor(R$status, levels = c("APPLIED", "PROPOSED", "OPEN")),
              R$object, R$key, R$field), ]
