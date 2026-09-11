@@ -3059,6 +3059,70 @@ section_F <- function() {
                        length(SWEEP_FILES), length(ALLOW))
              else paste(utils::head(sweep_fail, 4), collapse = "; "))
 
+
+  # F45 -- the upload auto-fill uses the sub-category, not the dairy cow.
+  #
+  # ensure_completeness() runs on every dataset load and fills any missing
+  # core parameter. It filled every group from PARAM_CATALOGUE alone, and the
+  # catalogue IS the dairy-cow row, so:
+  #
+  #   a calves group with a blank BW  -> 270 kg, against a calf default of 60
+  #   a bulls group with a blank BW   -> 270 kg, against 350
+  #   a bulls group with a blank Milk -> 1.2 kg/day, for a bull
+  #
+  # BW enters the chain as BW^0.75, so a calf filled at 4.5 times its weight
+  # carries roughly 3.4 times the enteric emissions. resolve_subcat_default()
+  # has held the right answer since June and both the translator and the QA
+  # tab call it; this path did not.
+  #
+  # Asserted end to end through ensure_completeness() rather than by reading
+  # the lookup, because the defect was that the function never consulted the
+  # lookup at all. A check that compared the two tables would have passed.
+  fill_fail <- tryCatch({
+    f <- character(0)
+    mk <- function(sc, ct) data.frame(
+      cattle_type = ct, aggregation_level = "national", sub_category = sc,
+      parameter = "N", mean = 1000, uncertainty_pct = 10,
+      distribution = "normal", param_type = "activity_data",
+      stringsAsFactors = FALSE)
+    for (sc in ANIMAL_SUBCATEGORIES) {
+      ct <- if (grepl("dairy", sc)) "dairy" else "non_dairy"
+      out <- ensure_completeness(mk(sc, ct))
+      d <- out$param_specs
+      for (p in c("BW", "Milk", "WG", "DE", "CP")) {
+        got <- d$mean[d$parameter == p]
+        if (!length(got)) next
+        want <- tryCatch(resolve_subcat_default(sc, p)$value,
+                         error = function(e) NA_real_)
+        if (is.na(want)) next
+        if (!isTRUE(all.equal(as.numeric(got[1]), as.numeric(want))))
+          f <- c(f, sprintf("%s/%s auto-filled to %s but resolve_subcat_default gives %s",
+                            sc, p, format(got[1]), format(want)))
+      }
+    }
+    # And the regional table must NOT be filling anything: an unfindable
+    # continental figure reaching a result is what this was changed away from
+    # on 2026-09-11. Same input, every region, same answer.
+    base <- ensure_completeness(mk("dairy_cows", "dairy"))
+    bw0 <- base$param_specs$mean[base$param_specs$parameter == "BW"][1]
+    for (rg in IPCC_DEFAULTS_BY_REGION$region) {
+      o <- ensure_completeness(mk("dairy_cows", "dairy"), region = rg)
+      bw <- o$param_specs$mean[o$param_specs$parameter == "BW"][1]
+      if (!isTRUE(all.equal(as.numeric(bw), as.numeric(bw0))))
+        f <- c(f, sprintf("region '%s' changes the auto-filled BW to %s; the regional table is a QA benchmark, not a gap-fill",
+                          rg, format(bw)))
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  fill_ok <- length(fill_fail) == 0L
+  check_bool("F45", "F",
+             "The upload auto-fill resolves per sub-category, and no region changes it",
+             fill_ok,
+             notes = if (fill_ok)
+               sprintf("all %d sub-categories fill BW/Milk/WG/DE/CP from resolve_subcat_default (bulls, oxen, heifers, calves and feedlot each get their own weight, and the biological zeros hold); the auto-filled BW is identical across all %d regions",
+                       length(ANIMAL_SUBCATEGORIES), nrow(IPCC_DEFAULTS_BY_REGION))
+             else paste(utils::head(fill_fail, 4), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

@@ -204,24 +204,25 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   type_lut     <- setNames(catalogue$param_type, catalogue$parameter)
   ref_lut      <- setNames(catalogue$ipcc_ref, catalogue$parameter)
 
-  # Round 7 T2.1: when a region is supplied, prefer the regional default for
-  # the 5 parameters covered by IPCC_DEFAULTS_BY_REGION (W, Milk, DE, Ym, Bo)
-  # before falling back to the global PARAM_CATALOGUE default. Helper exists
-  # since Round 3 G2 but was never wired to ensure_completeness().
+  # THE REGIONAL TABLE NO LONGER FILLS VALUES. Decided 2026-09-11.
   #
-  # The regional value is NOT applied here. It was, and that made it blind to
-  # cattle type: the table gained a dairy column in September 2026 so that a
-  # dairy herd is compared against Annex 10A.1 rather than the non-dairy
-  # 10A.2, and this loop kept handing every group the non-dairy figure. The
-  # lookup now happens per group, below, where cattle_type is known. This
-  # block only records WHICH parameters the region covers, for the message.
-  use_region <- !is.null(region) && !is.na(region) && nzchar(region) &&
-                exists("get_regional_default")
-  region_used <- character()
-  if (use_region)
-    for (p in names(defaults_lut))
-      if (!is.na(get_regional_default(p, region)))
-        region_used <- c(region_used, p)
+  # Round 7 T2.1 wired IPCC_DEFAULTS_BY_REGION into this function so a missing
+  # BW took a continental figure instead of the catalogue default. The
+  # reviewer's round 7 item 3 objection was that the tool cited IPCC defaults
+  # he could not find in the guidelines; the response narrowed the benchmark
+  # to BW only and never re-checked BW's own regional numbers. Read against
+  # Table 10A.2 in September 2026, five of the six non-dairy values come from
+  # the wrong table or from no table at all: asia 350, oceania 500 and
+  # americas 500 match no 10A.2 row, europe 600 and americas 500 were read off
+  # the DAIRY table, and no annex table has a global row. Only africa 275 is a
+  # genuine 10A.2 figure.
+  #
+  # An unfindable number reaching a result is worse than a coarse one raising
+  # a warning, and BW drives the entire energy chain through BW^0.75. So a
+  # missing value now takes the catalogue default, which is verified to a
+  # cited table and row. The regional table survives for the QA/QC
+  # plausibility warning only, where an indicative continental yardstick is an
+  # honest thing to compare against.
 
   group_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category"),
                           names(param_specs))
@@ -241,16 +242,28 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
     miss  <- setdiff(required, found)
     if (length(miss) == 0) next
 
+    # The sub-category is known here, so use it. This loop used to fill every
+    # group from the CATALOGUE alone, and the catalogue is the dairy-cow row:
+    # a calves group with a blank BW was auto-filled at 270 kg against a calf
+    # default of 60, and a bulls group at 270 against 350. BW enters the
+    # energy chain as BW^0.75, so a calf filled at 4.5x its weight carries
+    # roughly 3.4x the enteric emissions. resolve_subcat_default() has held
+    # the right answer since June; the translator and the QA tab both call it,
+    # and this path, the one that runs on every upload, did not.
+    #
+    # It also returns biological zeros, so a bulls group no longer gets a
+    # milk yield.
+    sub_cat <- if ("sub_category" %in% names(g)) as.character(g[["sub_category"]]) else NA
+    subcat_default <- function(p) {
+      if (is.na(sub_cat) || !nzchar(sub_cat)) return(NULL)
+      r <- tryCatch(resolve_subcat_default(sub_cat, p), error = function(e) NULL)
+      if (is.null(r) || is.null(r$value) || is.na(r$value)) return(NULL)
+      r
+    }
+
     for (p in miss) {
-      def <- defaults_lut[[p]]
-      # Regional override, resolved with this group's cattle type so a dairy
-      # herd gets the Table 10A.1 column and a non-dairy herd 10A.2.
-      if (use_region) {
-        reg_val <- get_regional_default(
-          p, region,
-          cattle_type = if ("cattle_type" %in% names(g)) g[["cattle_type"]] else NULL)
-        if (!is.na(reg_val)) def <- reg_val
-      }
+      rs  <- subcat_default(p)
+      def <- if (!is.null(rs)) rs$value else defaults_lut[[p]]
       if (is.null(def) || is.na(def)) {
         # No default — record as unfillable
         unfillable[[length(unfillable) + 1]] <- list(
@@ -260,10 +273,13 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
         # Skip; row is left missing, downstream will warn but not crash
         next
       }
-      pct <- unc_lut[[p]]
-      if (is.na(pct)) pct <- 20  # safe fallback
-      lower <- def * (1 - pct / 100)
-      upper <- def * (1 + pct / 100)
+      pct <- if (!is.null(rs) && !is.null(rs$uncertainty_pct) &&
+                 !is.na(rs$uncertainty_pct)) rs$uncertainty_pct else unc_lut[[p]]
+      if (is.null(pct) || is.na(pct)) pct <- 20  # safe fallback
+      lower <- if (!is.null(rs) && !is.null(rs$lower) && !is.na(rs$lower))
+                 rs$lower else def * (1 - pct / 100)
+      upper <- if (!is.null(rs) && !is.null(rs$upper) && !is.na(rs$upper))
+                 rs$upper else def * (1 + pct / 100)
       new_row <- as.data.frame(
         c(as.list(g),
           list(parameter = p,
@@ -271,7 +287,9 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
                uncertainty_pct = pct,
                lower = lower,
                upper = upper,
-               distribution = dist_lut[[p]],
+               distribution = if (!is.null(rs) && !is.null(rs$distribution) &&
+                                  !is.na(rs$distribution))
+                                rs$distribution else dist_lut[[p]],
                param_type = type_lut[[p]],
                ipcc_ref = ref_lut[[p]],
                data_source = "AUTO-FILLED (IPCC default)",
@@ -299,10 +317,10 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   if (length(added_rows) > 0) {
     base_msg <- sprintf("Auto-filled %d core parameter(s) from IPCC defaults.",
                          length(added_rows))
-    if (length(region_used) > 0)
-      base_msg <- paste0(base_msg,
-        sprintf(" Region '%s' applied for: %s.",
-                region, paste(region_used, collapse = ", ")))
+    # The "Region 'X' applied for: ..." clause used to appear here. It is gone
+    # with the regional override itself: the auto-fill no longer varies by
+    # region, so saying that it did would be false. `region` is still accepted
+    # as an argument because callers pass it and the QA tab still uses it.
     msg_parts <- c(msg_parts, base_msg)
   }
   if (length(unfillable) > 0) {
