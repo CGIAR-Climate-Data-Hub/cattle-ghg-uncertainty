@@ -150,7 +150,33 @@ IPCC_DEFAULTS_BY_REGION <- IPCC_DEFAULTS_BY_REGION[
   , c("parameter", "region", "default_val", "default_val_dairy")]
 
 # Lookup: returns region-specific default or NA
-get_regional_default <- function(parameter, region = "global") {
+## Is this cattle_type a DAIRY herd?
+##
+## `grepl("dairy", x)` is the obvious test and it is wrong: the canonical
+## vocabulary is dairy / non_dairy / other, and "non_dairy" contains "dairy".
+## Both the QA benchmark and the regional gap-fill used the naive test, so
+## every non-dairy herd was compared against, and filled from, the dairy
+## column. Caught 2026-09-11 by testing the two types side by side; the naive
+## version returned the same weight for both, which is what gave it away.
+.is_dairy_type <- function(x) {
+  if (is.null(x) || length(x) != 1L || is.na(x)) return(FALSE)
+  x <- tolower(trimws(x))
+  grepl("dairy", x) && !grepl("non[-_[:space:]]*dairy", x)
+}
+
+## NOTE: this is a GAP-FILL, not a warning. ensure_completeness() calls it and
+## the value it returns is written into the user's inventory as BW, overriding
+## the catalogue default, and BW drives the whole energy chain through BW^0.75.
+## Treat a change here as a change to results.
+##
+## `cattle_type` was added 2026-09-11. The table gained a default_val_dairy
+## column in September because benchmarking a dairy herd against the non-dairy
+## Table 10A.2 weight produced false warnings. The QA path was taught that; this
+## one was not, so a DAIRY group with a blank BW was still auto-filled from the
+## non-dairy column. Callers that do not know the cattle type get the non-dairy
+## value, which is the previous behaviour.
+get_regional_default <- function(parameter, region = "global",
+                                 cattle_type = NULL) {
   if (is.null(region) || is.na(region)) region <- "global"
   region <- tolower(trimws(region))
   if (!region %in% IPCC_DEFAULTS_BY_REGION$region) region <- "global"
@@ -158,6 +184,10 @@ get_regional_default <- function(parameter, region = "global") {
     IPCC_DEFAULTS_BY_REGION$parameter == parameter &
     IPCC_DEFAULTS_BY_REGION$region == region, , drop = FALSE]
   if (nrow(hit) == 0) return(NA_real_)
+  is_dairy <- .is_dairy_type(cattle_type)
+  if (is_dairy && "default_val_dairy" %in% names(hit) &&
+      !is.na(hit$default_val_dairy[1]))
+    return(as.numeric(hit$default_val_dairy[1]))
   hit$default_val[1]
 }
 

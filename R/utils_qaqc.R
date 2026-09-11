@@ -94,7 +94,9 @@ BENCHMARK_ELIGIBLE_PARAMS <- c("BW")
       return(list(value = as.numeric(v), source = sprintf(
         "the tool's IPCC default for sub-category '%s' (Vol.4 Ch.10 Annex Table 10A.1/10A.2, Africa, low productivity)", sc)))
   }
-  is_dairy <- grepl("dairy", tolower(cattle_type))
+  # See .is_dairy_type(): grepl("dairy", "non_dairy") is TRUE, so this
+  # benchmark was comparing non-dairy herds against the dairy column.
+  is_dairy <- .is_dairy_type(cattle_type)
   reg <- if (is.null(region) || is.na(region)) "global" else tolower(trimws(region))
   if (!reg %in% IPCC_DEFAULTS_BY_REGION$region) reg <- "global"
   row <- IPCC_DEFAULTS_BY_REGION[IPCC_DEFAULTS_BY_REGION$region == reg &
@@ -242,10 +244,15 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
   names(ref)[names(ref) == "ipcc_ref"] <- "ipcc_ref_cat"
   ps <- merge(ps, ref, by = "parameter", all.x = TRUE, sort = FALSE)
 
-  # G2: override ipcc_default with region-specific value where available
+  # G2: override ipcc_default with region-specific value where available.
+  # Cattle-type aware for the same reason as .bench_reference() above: the
+  # table has a dairy column and a non-dairy column, and handing every row the
+  # non-dairy one made a dairy herd look wrong against its own benchmark.
   if (exists("get_regional_default")) {
+    ct_col <- if ("cattle_type" %in% names(ps)) ps$cattle_type else NULL
     for (i in seq_len(nrow(ps))) {
-      reg_val <- get_regional_default(ps$parameter[i], region)
+      reg_val <- get_regional_default(ps$parameter[i], region,
+                                      cattle_type = if (is.null(ct_col)) NULL else ct_col[i])
       if (!is.na(reg_val)) ps$ipcc_default[i] <- reg_val
     }
   }

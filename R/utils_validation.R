@@ -208,17 +208,20 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   # the 5 parameters covered by IPCC_DEFAULTS_BY_REGION (W, Milk, DE, Ym, Bo)
   # before falling back to the global PARAM_CATALOGUE default. Helper exists
   # since Round 3 G2 but was never wired to ensure_completeness().
+  #
+  # The regional value is NOT applied here. It was, and that made it blind to
+  # cattle type: the table gained a dairy column in September 2026 so that a
+  # dairy herd is compared against Annex 10A.1 rather than the non-dairy
+  # 10A.2, and this loop kept handing every group the non-dairy figure. The
+  # lookup now happens per group, below, where cattle_type is known. This
+  # block only records WHICH parameters the region covers, for the message.
+  use_region <- !is.null(region) && !is.na(region) && nzchar(region) &&
+                exists("get_regional_default")
   region_used <- character()
-  if (!is.null(region) && !is.na(region) && nzchar(region) &&
-      exists("get_regional_default")) {
-    for (p in names(defaults_lut)) {
-      reg_val <- get_regional_default(p, region)
-      if (!is.na(reg_val)) {
-        defaults_lut[[p]] <- reg_val
+  if (use_region)
+    for (p in names(defaults_lut))
+      if (!is.na(get_regional_default(p, region)))
         region_used <- c(region_used, p)
-      }
-    }
-  }
 
   group_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category"),
                           names(param_specs))
@@ -240,6 +243,14 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
 
     for (p in miss) {
       def <- defaults_lut[[p]]
+      # Regional override, resolved with this group's cattle type so a dairy
+      # herd gets the Table 10A.1 column and a non-dairy herd 10A.2.
+      if (use_region) {
+        reg_val <- get_regional_default(
+          p, region,
+          cattle_type = if ("cattle_type" %in% names(g)) g[["cattle_type"]] else NULL)
+        if (!is.na(reg_val)) def <- reg_val
+      }
       if (is.null(def) || is.na(def)) {
         # No default — record as unfillable
         unfillable[[length(unfillable) + 1]] <- list(
