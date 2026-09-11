@@ -4,7 +4,7 @@ Generated 2026-09-11 from `reference/defaults_master.csv` by `scripts/build_defa
 
 This is the single authority for every IPCC default the app ships. `R/load_defaults.R` builds `PARAM_CATALOGUE`, `MMS_DEFAULTS`, `MMS_FRAC_DEFAULTS_2019` and the per-sub-category lists from the CSV at start-up, and every other surface (the Excel template, the translator prompts, the published guides) derives from those objects. `scripts/verify_defaults.R` checks all 14 surfaces against it and runs in CI.
 
-- 639 value rows across 16 objects
+- 664 value rows across 16 objects
 - 63 rows carry a review provenance reference
 
 ## IPCC verification status
@@ -13,10 +13,10 @@ All 295 numeric values below were checked one at a time against the IPCC source 
 
 | verdict | meaning | values |
 |---|---|---|
-| `CONFIRMED` | read at the cited IPCC table or equation | 215 |
+| `CONFIRMED` | read at the cited IPCC table or equation | 216 |
 | `DEVIATION_DOCUMENTED` | differs from IPCC deliberately, reason on record | 23 |
 | `NOT_IPCC` | a non-IPCC source or a project assumption | 19 |
-| `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 15 |
+| `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 14 |
 | `NO_IPCC_DEFAULT` | IPCC publishes no default for this quantity | 13 |
 | `INTERPRETED` | a defensible reading of an IPCC category label, not a quotation | 6 |
 | `META` | not a shipped value | 4 |
@@ -60,30 +60,30 @@ The 25 parameters. `ipcc_default` is the generic value; where a sub-category ove
 | parameter | unit | ipcc_default | basis | suggested_uncertainty_pct | suggested_lower_bound | suggested_upper_bound | suggested_distribution | param_type | param_tier | user_reducible | ipcc_ref |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | N | head |  |  | 10 |  |  | normal | activity_data | core | yes |  |
-| BW | kg | 270 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 15 |  |  | normal | coefficient | core | yes | Table 10A.2 |
+| BW | kg | 270 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 15 |  |  | normal | coefficient | core | yes | Table 10A.1 |
 | MW | kg | 300 | Geography: Africa; resolved per sub-category | 10 |  |  | normal | coefficient | core | yes |  |
 | WG | kg/day | 0 | Geography: Africa; resolved per sub-category | 30 |  |  | pert | coefficient | core | yes | Table 10A.1 |
-| Milk | kg/head/day | 1.2 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 20 |  |  | normal | coefficient | core | yes |  |
-| Fat | % | 4.3 | Geography: Africa; resolved per sub-category | 10 |  |  | normal | coefficient | core | yes |  |
-| pct_pregnant | fraction (0-1) | 0.52 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 20 |  |  | beta | coefficient | core | yes |  |
-| DE | % | 51 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 15 |  |  | normal | coefficient | core | yes | Eq 10.14--16 |
+| Milk | kg/head/day | 1.2 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 20 |  |  | normal | coefficient | core | yes | Table 10A.1 |
+| Fat | % | 4.3 | Geography: Africa; resolved per sub-category | 10 |  |  | normal | coefficient | core | yes | Table 10A.1 |
+| pct_pregnant | fraction (0-1) | 0.52 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 20 |  |  | beta | coefficient | core | yes | Table 10A.1 |
+| DE | % | 51 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 15 |  |  | normal | coefficient | core | yes | Table 10A.1 |
 | Cfi | MJ/day/kg^0.75 | 0.386 | Resolved per sub-category | 30 |  |  | pert | coefficient | advanced | no | Table 10.4 |
 | Ca | dimensionless | 0.17 | Feeding situation: Pasture / Range, flat terrain | 30 |  |  | triangular | coefficient | advanced | no | Table 10.5 |
-| C | dimensionless | 0.8 | Resolved per sub-category | 30 |  |  | triangular | coefficient | advanced | no | Eq 10.6 |
+| C | dimensionless | 0.8 | Resolved per sub-category | 30 |  |  | triangular | coefficient | advanced | no | Eq 10.6 (note) |
 | Cp | dimensionless | 0.1 | Species: Cattle | 10 |  |  | beta | coefficient | advanced | no | Table 10.7 |
-| hours | hours/day | 0 | Geography: Africa | 20 |  |  | pert | coefficient | core | yes | Eq 10.11 |
-| CP | % | 9.6 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 15 |  |  | normal | coefficient | core | yes | Eq 10.32 |
+| hours | hours/day | 0 | Geography: Africa | 20 |  |  | pert | coefficient | core | yes | Table 10A.1 |
+| CP | % | 9.6 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 15 |  |  | normal | coefficient | core | yes | Table 10A.1 |
 | Ym | % | 6.5 | Productivity class: Low productivity; resolved per sub-category | 20 |  |  | pert | coefficient | advanced | no | Table 10.12 |
 | Bo | m3 CH₄/kg VS | 0.13 | Productivity class: Low productivity; Species: Cattle | 15 |  |  | pert | coefficient | advanced | no | Table 10.16A |
-| ASH | fraction | 0.08 | Species: Cattle | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
-| UE | fraction | 0.04 |  | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
+| ASH | fraction | 0.08 | Species: Cattle | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 (note) |
+| UE | fraction | 0.04 |  | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 (note) |
 | EF3_PRP | kg N2O-N/kg N | 0.006 | Climate, soils pathway: Wet |  | 0.0005 | 0.027 | pert | coefficient | advanced | no | Ch.11 Table 11.1 |
 | EF4 | kg N2O-N/kg N | 0.014 | Climate, soils pathway: Wet |  | 0.011 | 0.017 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
 | EF5 | kg N2O-N/kg N | 0.011 |  |  | 0.0005 | 0.02 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
 | Frac_GASM_PRP | fraction | 0.21 |  |  | 0.005 | 0.31 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
 | Frac_LEACH_PRP | fraction | 0.24 | Climate, soils pathway: Wet |  | 0.01 | 0.73 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
-| MilkPR | % | 3.6 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 10 |  |  | normal | coefficient | core | yes | Eq 10.33 |
-| Tw | °C | 20 |  | 25 |  |  | normal | coefficient | advanced | yes | Eq 10.2 |
+| MilkPR | % | 3.6 | Geography: Africa; Productivity class: Low productivity; resolved per sub-category | 10 |  |  | normal | coefficient | core | yes | Table 10A.1 |
+| Tw | °C | 20 |  | 25 |  |  | normal | coefficient | advanced | yes |  |
 
 ## Manure management systems
 
@@ -396,18 +396,17 @@ The only parameter with a defensible continental IPCC lookup; the other benchmar
 
 ## Values that differ from IPCC with no recorded reason
 
-15 of the 295 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
+14 of the 295 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
 
 | object | key | field | value | what IPCC says |
 |---|---|---|---|---|
-| LW_BY_SUBCAT | dairy_cows | value | 270 | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
 | LW_BY_SUBCAT | bulls | value | 350 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Males 540 kg, Bulls - Grazing 340 kg. The 350 used here matches neither |
 | LW_BY_SUBCAT | oxen | value | 300 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Draft Bullocks 340 kg. The 300 used here is 12% lower |
 | LW_BY_SUBCAT | heifers | value | 200 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Growing/Replacement 204 kg. The 200 used here is a rounding of it, not a transcription |
 | LW_BY_SUBCAT | growing_males | value | 200 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Growing/Replacement 204 kg. The 200 used here is a rounding of it, not a transcription |
 | LW_BY_SUBCAT | calves_female | value | 60 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 82 kg. The 60 used here is 27% lower than any IPCC calf row |
 | LW_BY_SUBCAT | calves_male | value | 60 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 82 kg. The 60 used here is 27% lower than any IPCC calf row |
-| LW_BY_SUBCAT | feedlot_cattle | value | 250 | Table 10A.2 has no Africa feedlot row. The two published feedlot weights are North America 500 kg and Latin America 460 kg. The 250 used here is half the lower of them |
+| LW_BY_SUBCAT | feedlot_cattle | value | 250 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108 has no Africa feedlot row. The two published feedlot weights are North America 500 kg and Latin America 460 kg. The 250 used here is half the lower of them |
 | WG_BY_SUBCAT | heifers | value | 0.25 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Growing/Replacement 0.24 kg/day. The 0.25 used here is a rounding of it |
 | WG_BY_SUBCAT | growing_males | value | 0.2 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Growing/Replacement 0.24 kg/day. The 0.20 used here is 17% lower and matches no Africa row |
 | WG_BY_SUBCAT | calves_female | value | 0.3 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 0.33 kg/day. The 0.30 used here is a rounding of it |
@@ -477,66 +476,66 @@ Every numeric value with its verdict and source, in master order.
 | PARAM_CATALOGUE | Tw | ipcc_default | 20 | `NOT_IPCC` | Winter temperature is country-specific; IPCC publishes no default. Project assumption |
 | PARAM_CATALOGUE | Tw | suggested_uncertainty_pct | 25 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | MMS_DEFAULTS | pasture | mcf_tropical | 2 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Pasture/Range/Paddock: 1.0 / 1.5 / 2.0 |
-| MMS_DEFAULTS | pasture | mcf_tropical_dry | 2 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | pasture | mcf_tropical_dry | 2 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | pasture | mcf_temperate | 1.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Pasture/Range/Paddock: 1.0 / 1.5 / 2.0 |
 | MMS_DEFAULTS | pasture | mcf_boreal | 1 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Pasture/Range/Paddock: 1.0 / 1.5 / 2.0 |
 | MMS_DEFAULTS | pasture | ef3 | 0.02 | `DEVIATION_DOCUMENTED` | 0.02 is the Chapter 11 EF3PRP for cattle on pasture, not a Table 10.21 manure-management factor. Table 10.21 routes pasture N to Chapter 11 explicitly. Carried on this row so the pasture pathway resolves; documented |
 | MMS_DEFAULTS | daily_spread | mcf_tropical | 1 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Daily spread: 0.1 / 0.5 / 1.0 |
-| MMS_DEFAULTS | daily_spread | mcf_tropical_dry | 1 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | daily_spread | mcf_tropical_dry | 1 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | daily_spread | mcf_temperate | 0.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Daily spread: 0.1 / 0.5 / 1.0 |
 | MMS_DEFAULTS | daily_spread | mcf_boreal | 0.1 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Daily spread: 0.1 / 0.5 / 1.0 |
 | MMS_DEFAULTS | daily_spread | ef3 | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Daily spread: 0 |
 | MMS_DEFAULTS | solid_storage | mcf_tropical | 5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature and 2019R V4 Ch10 Table 10.17 (Updated), Solid storage: 2.0 / 4.0 / 5.0 |
-| MMS_DEFAULTS | solid_storage | mcf_tropical_dry | 5 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | solid_storage | mcf_tropical_dry | 5 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | solid_storage | mcf_temperate | 4 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature and 2019R V4 Ch10 Table 10.17 (Updated), Solid storage: 2.0 / 4.0 / 5.0 |
 | MMS_DEFAULTS | solid_storage | mcf_boreal | 2 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature and 2019R V4 Ch10 Table 10.17 (Updated), Solid storage: 2.0 / 4.0 / 5.0 |
 | MMS_DEFAULTS | solid_storage | ef3 | 0.01 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Solid storage: 0.010 |
 | MMS_DEFAULTS | solid_storage_covered | versions | 2019 | `META` | Which guideline editions offer this system |
 | MMS_DEFAULTS | solid_storage_covered | mcf_tropical | 5 | `CONFIRMED` | 2019R V4 Ch10 Table 10.17 (Updated), Solid storage - Covered/compacted: 2.00 / 4.00 / 5.00 |
-| MMS_DEFAULTS | solid_storage_covered | mcf_tropical_dry | 5 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | solid_storage_covered | mcf_tropical_dry | 5 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | solid_storage_covered | mcf_temperate | 4 | `CONFIRMED` | 2019R V4 Ch10 Table 10.17 (Updated), Solid storage - Covered/compacted: 2.00 / 4.00 / 5.00 |
 | MMS_DEFAULTS | solid_storage_covered | mcf_boreal | 2 | `CONFIRMED` | 2019R V4 Ch10 Table 10.17 (Updated), Solid storage - Covered/compacted: 2.00 / 4.00 / 5.00 |
 | MMS_DEFAULTS | solid_storage_covered | ef3 | 0.01 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Solid storage - Covered/compacted: 0.01 |
 | MMS_DEFAULTS | dry_lot | mcf_tropical | 2 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature and 2019R V4 Ch10 Table 10.17 (Updated), Dry lot: 1.0 / 1.5 / 2.0 |
-| MMS_DEFAULTS | dry_lot | mcf_tropical_dry | 2 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | dry_lot | mcf_tropical_dry | 2 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | dry_lot | mcf_temperate | 1.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature and 2019R V4 Ch10 Table 10.17 (Updated), Dry lot: 1.0 / 1.5 / 2.0 |
 | MMS_DEFAULTS | dry_lot | mcf_boreal | 1 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature and 2019R V4 Ch10 Table 10.17 (Updated), Dry lot: 1.0 / 1.5 / 2.0 |
 | MMS_DEFAULTS | dry_lot | ef3 | 0.02 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Dry lot: 0.02 |
 | MMS_DEFAULTS | deep_bedding | mcf_tropical | 80 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Cattle and Swine deep bedding > 1 month: 17 / 39 / 80. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
-| MMS_DEFAULTS | deep_bedding | mcf_tropical_dry | 80 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | deep_bedding | mcf_tropical_dry | 80 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | deep_bedding | mcf_temperate | 39 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Cattle and Swine deep bedding > 1 month: 17 / 39 / 80. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
 | MMS_DEFAULTS | deep_bedding | mcf_boreal | 17 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Cattle and Swine deep bedding > 1 month: 17 / 39 / 80. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
 | MMS_DEFAULTS | deep_bedding | ef3 | 0.01 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Cattle and swine deep bedding, No mixing: 0.01 |
 | MMS_DEFAULTS | liquid_slurry | mcf_tropical | 50 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Liquid/Slurry with natural crust cover: 10 / 24 / 50. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
-| MMS_DEFAULTS | liquid_slurry | mcf_tropical_dry | 50 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | liquid_slurry | mcf_tropical_dry | 50 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | liquid_slurry | mcf_temperate | 24 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Liquid/Slurry with natural crust cover: 10 / 24 / 50. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
 | MMS_DEFAULTS | liquid_slurry | mcf_boreal | 10 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Liquid/Slurry with natural crust cover: 10 / 24 / 50. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
 | MMS_DEFAULTS | liquid_slurry | ef3 | 0.005 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Liquid/Slurry With natural crust cover: 0.005 |
 | MMS_DEFAULTS | composting | mcf_tropical | 0.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Composting - Static pile: 0.5 / 0.5 / 0.5, marked 'Not temperature dependant'. This was briefly recorded as a DEVIATION_OPEN on the grounds that 2019R gives Static pile (Forced aeration) 1.00 / 2.00 / 2.50 and 0.5 is the 2019R In-vessel figure. That reading was WRONG: the tool's declared MCF basis is the 2006 table, where static pile IS 0.5, and 10 of the 12 systems read their MCF from it. The variant is consistent across all three coefficient families; only the edition differs between families, which is the documented tool-wide convention. A 2019R user does get 0.5 rather than 1.00 to 2.50, and that is part of the same documented MCF basis, alongside pasture |
-| MMS_DEFAULTS | composting | mcf_tropical_dry | 0.5 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | composting | mcf_tropical_dry | 0.5 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | composting | mcf_temperate | 0.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Composting - Static pile: 0.5 / 0.5 / 0.5, marked 'Not temperature dependant'. This was briefly recorded as a DEVIATION_OPEN on the grounds that 2019R gives Static pile (Forced aeration) 1.00 / 2.00 / 2.50 and 0.5 is the 2019R In-vessel figure. That reading was WRONG: the tool's declared MCF basis is the 2006 table, where static pile IS 0.5, and 10 of the 12 systems read their MCF from it. The variant is consistent across all three coefficient families; only the edition differs between families, which is the documented tool-wide convention. A 2019R user does get 0.5 rather than 1.00 to 2.50, and that is part of the same documented MCF basis, alongside pasture |
 | MMS_DEFAULTS | composting | mcf_boreal | 0.5 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Composting - Static pile: 0.5 / 0.5 / 0.5, marked 'Not temperature dependant'. This was briefly recorded as a DEVIATION_OPEN on the grounds that 2019R gives Static pile (Forced aeration) 1.00 / 2.00 / 2.50 and 0.5 is the 2019R In-vessel figure. That reading was WRONG: the tool's declared MCF basis is the 2006 table, where static pile IS 0.5, and 10 of the 12 systems read their MCF from it. The variant is consistent across all three coefficient families; only the edition differs between families, which is the documented tool-wide convention. A 2019R user does get 0.5 rather than 1.00 to 2.50, and that is part of the same documented MCF basis, alongside pasture |
 | MMS_DEFAULTS | composting | ef3 | 0.01 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Composting - Static Pile (Forced aeration): 0.010 |
 | MMS_DEFAULTS | lagoon | mcf_tropical | 80 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Uncovered anaerobic lagoon: 66 / 77 / 80. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
-| MMS_DEFAULTS | lagoon | mcf_tropical_dry | 80 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | lagoon | mcf_tropical_dry | 80 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | lagoon | mcf_temperate | 77 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Uncovered anaerobic lagoon: 66 / 77 / 80. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
 | MMS_DEFAULTS | lagoon | mcf_boreal | 66 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Uncovered anaerobic lagoon: 66 / 77 / 80. boreal = the '<= 10 C' column, temperate = the '19 C' column, tropical = the '>= 28 C' column |
 | MMS_DEFAULTS | lagoon | ef3 | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Uncovered anaerobic lagoon: 0 |
 | MMS_DEFAULTS | anaerobic_digester | versions | 2019 | `META` | Which guideline editions offer this system |
 | MMS_DEFAULTS | anaerobic_digester | mcf_tropical | 4.59 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.11, high quality biogas digester with open storage: 3.55 cold / 4.38 temperate / 4.59 warm. The 2006 table gives only a 0 to 100% range requiring Formula 1 |
-| MMS_DEFAULTS | anaerobic_digester | mcf_tropical_dry | 4.59 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | anaerobic_digester | mcf_tropical_dry | 4.59 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | anaerobic_digester | mcf_temperate | 4.38 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.11, high quality biogas digester with open storage: 3.55 cold / 4.38 temperate / 4.59 warm. The 2006 table gives only a 0 to 100% range requiring Formula 1 |
 | MMS_DEFAULTS | anaerobic_digester | mcf_boreal | 3.55 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.11, high quality biogas digester with open storage: 3.55 cold / 4.38 temperate / 4.59 warm. The 2006 table gives only a 0 to 100% range requiring Formula 1 |
 | MMS_DEFAULTS | anaerobic_digester | ef3 | 0.0006 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Anaerobic digester: 0.0006 |
 | MMS_DEFAULTS | aerobic_treatment | versions | 2019 | `META` | Which guideline editions offer this system |
 | MMS_DEFAULTS | aerobic_treatment | mcf_tropical | 0 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Aerobic treatment: 0 / 0 / 0 |
-| MMS_DEFAULTS | aerobic_treatment | mcf_tropical_dry | 0 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | aerobic_treatment | mcf_tropical_dry | 0 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | aerobic_treatment | mcf_temperate | 0 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Aerobic treatment: 0 / 0 / 0 |
 | MMS_DEFAULTS | aerobic_treatment | mcf_boreal | 0 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Aerobic treatment: 0 / 0 / 0 |
 | MMS_DEFAULTS | aerobic_treatment | ef3 | 0.005 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated), Aerobic treatment, forced aeration: 0.005 |
 | MMS_DEFAULTS | burned_for_fuel | versions | 2019 | `META` | Which guideline editions offer this system |
 | MMS_DEFAULTS | burned_for_fuel | mcf_tropical | 10 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Burned for fuel: 10 / 10 / 10 |
-| MMS_DEFAULTS | burned_for_fuel | mcf_tropical_dry | 10 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_DEFAULTS | burned_for_fuel | mcf_tropical_dry | 10 | `DEVIATION_DOCUMENTED` | Mirrors mcf_tropical on every system, so it carries the same value read from 2006 V4 Ch10 Table 10.17, MCF by average annual temperature (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
 | MMS_DEFAULTS | burned_for_fuel | mcf_temperate | 10 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Burned for fuel: 10 / 10 / 10 |
 | MMS_DEFAULTS | burned_for_fuel | mcf_boreal | 10 | `CONFIRMED` | 2006 V4 Ch10 Table 10.17, MCF by average annual temperature, Burned for fuel: 10 / 10 / 10 |
 | MMS_DEFAULTS | burned_for_fuel | ef3 | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10.21 (Updated): reported under Fuel Combustion, not as manure management |
@@ -630,7 +629,7 @@ Every numeric value with its verdict and source, in master order.
 | C_GROWTH_BY_SUBCAT | calves_female | value | 0.8 | `CONFIRMED` | 2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (NRC 1996) |
 | C_GROWTH_BY_SUBCAT | calves_male | value | 1 | `INTERPRETED` | 2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (NRC 1996). The tool assigns the castrate value 1.0 to growing and feedlot males, the same reading it applies to Cfi |
 | C_GROWTH_BY_SUBCAT | feedlot_cattle | value | 1 | `INTERPRETED` | 2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (NRC 1996). The tool assigns the castrate value 1.0 to growing and feedlot males, the same reading it applies to Cfi |
-| LW_BY_SUBCAT | dairy_cows | value | 270 | `DEVIATION_OPEN` | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
+| LW_BY_SUBCAT | dairy_cows | value | 270 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: Weight 270 kg. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. Previously 275, the Table 10A.2 non-dairy grazing weight, so the dairy sub-category had been carrying a non-dairy figure. |
 | LW_BY_SUBCAT | other_cows | value | 275 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Females - grazing, Large Areas 275 kg |
 | LW_BY_SUBCAT | bulls | value | 350 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Males 540 kg, Bulls - Grazing 340 kg. The 350 used here matches neither |
 | LW_BY_SUBCAT | oxen | value | 300 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Draft Bullocks 340 kg. The 300 used here is 12% lower |
@@ -638,7 +637,7 @@ Every numeric value with its verdict and source, in master order.
 | LW_BY_SUBCAT | growing_males | value | 200 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Growing/Replacement 204 kg. The 200 used here is a rounding of it, not a transcription |
 | LW_BY_SUBCAT | calves_female | value | 60 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 82 kg. The 60 used here is 27% lower than any IPCC calf row |
 | LW_BY_SUBCAT | calves_male | value | 60 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 82 kg. The 60 used here is 27% lower than any IPCC calf row |
-| LW_BY_SUBCAT | feedlot_cattle | value | 250 | `DEVIATION_OPEN` | Table 10A.2 has no Africa feedlot row. The two published feedlot weights are North America 500 kg and Latin America 460 kg. The 250 used here is half the lower of them |
+| LW_BY_SUBCAT | feedlot_cattle | value | 250 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108 has no Africa feedlot row. The two published feedlot weights are North America 500 kg and Latin America 460 kg. The 250 used here is half the lower of them |
 | MW_BY_SUBCAT | dairy_cows | value | 300 | `NO_IPCC_DEFAULT` | Mature weight appears in Eq 10.6 as an input but IPCC publishes no default for it: neither Table 10A.1 nor Table 10A.2 has a mature-weight column. Reviewer R7 #3 raised exactly this. These are project assumptions and must not be shown as IPCC defaults |
 | MW_BY_SUBCAT | other_cows | value | 300 | `NO_IPCC_DEFAULT` | Mature weight appears in Eq 10.6 as an input but IPCC publishes no default for it: neither Table 10A.1 nor Table 10A.2 has a mature-weight column. Reviewer R7 #3 raised exactly this. These are project assumptions and must not be shown as IPCC defaults |
 | MW_BY_SUBCAT | bulls | value | 400 | `NO_IPCC_DEFAULT` | Mature weight appears in Eq 10.6 as an input but IPCC publishes no default for it: neither Table 10A.1 nor Table 10A.2 has a mature-weight column. Reviewer R7 #3 raised exactly this. These are project assumptions and must not be shown as IPCC defaults |

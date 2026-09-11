@@ -2102,7 +2102,7 @@ section_F <- function() {
       nrow(.defaults_master) > 400 &&
       identical(names(PARAM_CATALOGUE)[1], "parameter") &&
       nrow(PARAM_CATALOGUE) == 25L &&
-      ncol(PARAM_CATALOGUE) == 13L &&
+      ncol(PARAM_CATALOGUE) == 14L &&   # gained ipcc_equation
       is.logical(PARAM_CATALOGUE$user_reducible) &&
       is.numeric(PARAM_CATALOGUE$ipcc_default) &&
       identical(PARAM_CATALOGUE$parameter[1], "N") &&
@@ -2652,6 +2652,120 @@ section_F <- function() {
              notes = if (lact_ok)
                "calc_nel equals Milk x (1.47 + 0.40 x Fat) and no longer takes pct_pregnant; calc_nep still responds to it; halving the fraction leaves enteric CH4 almost unchanged; feedlot is a biological zero and heifers keep theirs"
              else paste(utils::head(lact_fail, 3), collapse = "; "))
+
+  # F42 -- the value came from the RIGHT table, not merely from some table.
+  #
+  # "Is this number in IPCC?" is the wrong question and it passed things it
+  # should not have. Composting's MCF of 0.5 is in IPCC twice: as the 2019
+  # Refinement's In-vessel figure and as the 2006 static-pile figure. I
+  # checked it against the first, found a mismatch with the variant the row
+  # declares, and proposed changing a correct value. The tool reads MCF from
+  # the 2006 table, where 0.5 IS static pile.
+  #
+  # The fix is to write down, per coefficient family, which table it must
+  # come from, and check against that rather than against whichever table
+  # happens to contain the number.
+  #
+  # Hardcoded deliberately: this is the verification's own reference, and
+  # deriving it from the data it verifies would be circular.
+  SOURCE_OF_RECORD <- list(
+    # mcf_tropical_dry is excluded: it is definitionally a COPY of
+    # mcf_tropical, so its provenance is that column's, and asserting a
+    # table name against it tests a string rather than the property that
+    # matters. The property is asserted directly below instead.
+    list(object = "MMS_DEFAULTS", field = "^mcf_(tropical$|temperate|boreal)",
+         table = "10.17", edition = "2006",
+         why = "the tool resolves four climate zones and the 2006 per-degree table maps onto them cleanly; the 2019R ten-zone table does not",
+         except = list(
+           solid_storage_covered = c("10.17", "2019R"),   # no 2006 row exists
+           anaerobic_digester    = c("10A.11", "2019R"))),# 2006 gives only 0-100%
+    list(object = "MMS_DEFAULTS", field = "^ef3$", table = "10.21",
+         edition = "2019R", why = "2006 does not split these systems into variants",
+         except = list(pasture = c("11.1", ""))),         # PRP is a Chapter 11 pathway
+    list(object = "MMS_FRAC_DEFAULTS_2019", field = "^frac_", table = "10.22",
+         edition = "2019R", why = "2006 publishes no per-system nitrogen fractions",
+         except = list(pasture = c("", ""), burned_for_fuel = c("", ""))),
+    list(object = "CFI_BY_SUBCAT", field = "^value$", table = "10.4",
+         edition = "2019R", why = "the per-category Cfi table"),
+    list(object = "YM_BY_SUBCAT", field = "^ym_", table = "10.12",
+         edition = "", why = "Table 10.12 in both editions; the column says which"),
+    list(object = "LW_BY_SUBCAT", field = "^value$", table = "10A.",
+         edition = "2019R", why = "Annex 10A.1 for the dairy row, 10A.2 for the rest"),
+    list(object = "DE_BY_SUBCAT", field = "^value$", table = "10A.",
+         edition = "2019R", why = "as LW_BY_SUBCAT"),
+    list(object = "CP_BY_SUBCAT", field = "^value$", table = "10A.",
+         edition = "2019R", why = "as LW_BY_SUBCAT"),
+    list(object = "FEEDING_SITUATION_CA", field = "^value$", table = "10.5",
+         edition = "2019R", why = "the activity-coefficient table"))
+
+  m <- .defaults_master
+  isnum <- !is.na(suppressWarnings(as.numeric(m$value)))
+  # DEVIATION_DOCUMENTED is exempt from the TABLE requirement because such a
+  # value by definition does not come from the declared table; that is what
+  # makes it a deviation, and its source is required to explain the
+  # departure instead. DEVIATION_OPEN is NOT exempt: an unexplained
+  # difference is precisely the case where the declared table must be cited
+  # so the gap is visible.
+  EXEMPT <- c("NOT_IPCC", "NO_IPCC_DEFAULT", "META", "DEVIATION_DOCUMENTED")
+  src_fail <- tryCatch({
+    f <- character(0)
+    for (rule in SOURCE_OF_RECORD) {
+      sel <- isnum & m$object == rule$object & grepl(rule$field, m$field)
+      for (i in which(sel)) {
+        if (m$ipcc_verdict[i] %in% EXEMPT) next
+        want_t <- rule$table; want_e <- rule$edition
+        ex <- rule$except[[m$key[i]]]
+        if (!is.null(ex)) { want_t <- ex[1]; want_e <- ex[2] }
+        if (!nzchar(want_t)) next
+        src <- m$ipcc_source[i]
+        if (is.na(src) || !grepl(want_t, src, fixed = TRUE))
+          f <- c(f, sprintf("%s/%s/%s should be read from Table %s and its source does not say so",
+                            m$object[i], m$key[i], m$field[i], want_t))
+        else if (nzchar(want_e) && !grepl(want_e, src, fixed = TRUE))
+          f <- c(f, sprintf("%s/%s/%s should be the %s edition of Table %s",
+                            m$object[i], m$key[i], m$field[i], want_e, want_t))
+      }
+    }
+    # The mirrored column: assert it actually mirrors, on every system.
+    md <- .master_wide("MMS_DEFAULTS", "id")
+    if (!isTRUE(all.equal(md$mcf_tropical_dry, md$mcf_tropical)))
+      f <- c(f, "mcf_tropical_dry no longer mirrors mcf_tropical; it has no source of its own, so it must")
+
+    # Citation invariants on the catalogue. ipcc_ref means WHERE THE VALUE
+    # COMES FROM; ipcc_equation means where it is used. Conflating them is
+    # how MW cited a table with no mature-weight column, and how BW kept
+    # citing 10A.2 after its value moved to 10A.1.
+    pc <- .master_wide("PARAM_CATALOGUE", "parameter")
+    for (i in seq_len(nrow(pc))) {
+      v <- m$ipcc_verdict[m$object == "PARAM_CATALOGUE" &
+                          m$key == pc$parameter[i] & m$field == "ipcc_default"]
+      if (!length(v)) next
+      ref <- pc$ipcc_ref[i]; if (is.na(ref)) ref <- ""
+      if (v[1] %in% c("NOT_IPCC", "NO_IPCC_DEFAULT") && nzchar(ref))
+        f <- c(f, sprintf("%s is %s yet cites '%s' as the source of its value",
+                          pc$parameter[i], v[1], ref))
+      if (v[1] %in% c("CONFIRMED", "INTERPRETED", "DEVIATION_DOCUMENTED") &&
+          !nzchar(ref))
+        f <- c(f, sprintf("%s is %s but names no source for its value",
+                          pc$parameter[i], v[1]))
+      # and the citation must name the table the source actually read
+      tb <- regmatches(ref, regexpr("[0-9]+[A-Z]?[.][0-9]+[A-Z]?", ref))
+      src <- m$ipcc_source[m$object == "PARAM_CATALOGUE" &
+                           m$key == pc$parameter[i] & m$field == "ipcc_default"]
+      if (length(tb) && length(src) && !grepl(tb[1], src[1], fixed = TRUE))
+        f <- c(f, sprintf("%s cites Table %s but was read from a different table",
+                          pc$parameter[i], tb[1]))
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  src_ok <- length(src_fail) == 0L
+  check_bool("F42", "F",
+             "Each value comes from its declared source table, and its citation says so",
+             src_ok,
+             notes = if (src_ok)
+               sprintf("%d coefficient families each have a declared source table with its exceptions; every non-exempt value cites it, and no catalogue parameter cites a table it was not read from",
+                       length(SOURCE_OF_RECORD))
+             else paste(utils::head(src_fail, 4), collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

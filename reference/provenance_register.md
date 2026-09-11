@@ -1182,3 +1182,58 @@ This is the same variant-mixing class again: the MCF followed open storage and t
 The **value** is fine. Eq 10.6 footnote 4 explicitly allows mature weight to be read as "target weight related to stage of growth", which is how the per-sub-category values are set, and they are coherent: every BW sits below its MW, with ratios running from 0.17 for calves to 0.92 for mature cows. MW also enters only the growth term, which is skipped when weight gain is zero, so it has no effect at all on the four mature sub-categories.
 
 Citation removed, the definition now states plainly that it is a project assumption and cites footnote 4 for the reading, and the verdict is `NO_IPCC_DEFAULT`.
+
+---
+
+# Checking against the RIGHT table, not merely against IPCC
+
+## Why this was needed
+
+Two failures this week came from the same weak question. The first pass asked *"is this number in IPCC?"* and passed values that were in IPCC but in the wrong row. Then I made the mirror-image error on composting: its MCF of 0.5 is in IPCC **twice**, as the 2019 Refinement's In-vessel figure and as the 2006 static-pile figure. I checked it against the first, found it inconsistent with the variant the row declares, and proposed changing a value that was already correct.
+
+Existence in IPCC is not the test. Coming from the table that coefficient is supposed to come from is the test.
+
+## What was found while making that checkable
+
+`ipcc_ref` was doing two different jobs and nobody had noticed:
+
+| meaning | parameters |
+|---|---|
+| the table the VALUE was read from | Cfi, Ca, Cp, Ym, Bo, WG, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP |
+| the EQUATION that consumes the parameter | DE "Eq 10.14--16", hours "Eq 10.11", CP "Eq 10.32", MilkPR "Eq 10.33", Tw "Eq 10.2", C and ASH and UE "Eq 10.x" |
+| wrong table | BW cited 10A.2 while its value had moved to 10A.1 |
+| blank but should cite | Milk, Fat, pct_pregnant, all CONFIRMED from 10A.1 |
+
+In a column headed "IPCC reference", sitting beside an IPCC default, an equation number reads as though IPCC published the value there. That ambiguity is how `MW` came to cite Table 10A.2, a table with no mature-weight column, and survive a review round that objected to exactly that. It is also how `BW` kept pointing at 10A.2 after the low-productivity decision moved its value to 10A.1.
+
+Now separated. `ipcc_ref` means **where the value is published**: a table, or an equation's note where IPCC states the number in prose (C, ASH, UE). It is **empty** where IPCC publishes nothing, which is the honest answer for N, MW and Tw. A new `ipcc_equation` carries where the parameter is used, populated only from the strings moved out of `ipcc_ref` so nothing is invented.
+
+## The check
+
+F42 has three parts.
+
+**A declared source of record per coefficient family.** Nine families, each naming the table and edition its values must come from, with explicit exceptions:
+
+| family | table | edition | exceptions |
+|---|---|---|---|
+| MMS MCF | 10.17 | 2006 | solid_storage_covered 2019R (no 2006 row); anaerobic_digester 2019R Table 10A.11 (2006 gives only 0 to 100%) |
+| MMS EF3 | 10.21 | 2019R | pasture, a Chapter 11 pathway |
+| MMS nitrogen fractions | 10.22 | 2019R | pasture and burned_for_fuel, absent from the table |
+| Cfi | 10.4 | 2019R | |
+| Ym | 10.12 | both | the column says which |
+| BW, DE, CP per sub-category | 10A. | 2019R | |
+| Ca | 10.5 | 2019R | |
+
+Hardcoded on purpose: this is the verification's own reference, and deriving it from the data it verifies would be circular.
+
+**Two citation invariants.** A value whose verdict is `NOT_IPCC` or `NO_IPCC_DEFAULT` must name no source. A value whose verdict is `CONFIRMED`, `INTERPRETED` or `DEVIATION_DOCUMENTED` must name one, and it must be the table its `ipcc_source` actually read.
+
+**`DEVIATION_DOCUMENTED` is exempt from the table requirement** and nothing else. Such a value by definition does not come from the declared table; that is what makes it a deviation, and its source is required to explain the departure instead. `DEVIATION_OPEN` is deliberately NOT exempt: an unexplained difference is precisely where the declared table must be cited so the gap stays visible.
+
+**One column is checked by property rather than by text.** `mcf_tropical_dry` is definitionally a copy of `mcf_tropical`, so asserting a table name against it would test a string. The check asserts it actually equals `mcf_tropical` on all twelve systems.
+
+## What it caught immediately
+
+Running it for the first time flagged stale verdict text on `LW_BY_SUBCAT/dairy_cows`, still describing the old 275 and the 10A.2 grazing row, months after the value moved to 270 from 10A.1. The verdict prose had not been updated with the value. F32 also caught the new `ipcc_equation` column through its shape assertion.
+
+Demonstrated failing on the exact mistake it exists for: claiming a composting MCF came from the 2019 Refinement gives *"MMS_DEFAULTS/composting/mcf_tropical should be the 2006 edition of Table 10.17"*. And re-attaching the false citation to MW gives *"MW is NO_IPCC_DEFAULT yet cites 'Table 10A.2' as the source of its value"*.

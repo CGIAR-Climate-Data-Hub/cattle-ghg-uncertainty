@@ -143,7 +143,7 @@ for (k in names(mcf)) for (f in c("mcf_tropical", "mcf_temperate", "mcf_boreal")
   set("MMS_DEFAULTS", k, f, mcf[[k]][1], mcf[[k]][2])
 # The dry-tropical column mirrors the tropical one on every row.
 set("MMS_DEFAULTS", "*", "mcf_tropical_dry", "DEVIATION_DOCUMENTED",
-    "Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both")
+    paste0("Mirrors mcf_tropical on every system, so it carries the same value read from ", T1017_06, " (or, for the two systems that table does not cover, their stated source). The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both"))
 
 ef3 <- list(
   pasture = c("DEVIATION_DOCUMENTED", "0.02 is the Chapter 11 EF3PRP for cattle on pasture, not a Table 10.21 manure-management factor. Table 10.21 routes pasture N to Chapter 11 explicitly. Carried on this row so the pasture pathway resolves; documented"),
@@ -234,7 +234,7 @@ for (k in c("growing_males", "calves_male", "feedlot_cattle"))
 
 A2 <- "2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108"
 lw <- list(
-  dairy_cows     = c("DEVIATION_OPEN", "Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure"),
+  dairy_cows     = c("CONFIRMED", paste0(A1_LOW, ": Weight 270 kg. ", BASIS_NOTE, " Previously 275, the Table 10A.2 non-dairy grazing weight, so the dairy sub-category had been carrying a non-dairy figure.")),
   other_cows     = c("CONFIRMED", paste0(A2, ": Mature Females - grazing, Large Areas 275 kg")),
   bulls          = c("DEVIATION_OPEN", paste0(A2, ": Mature Males 540 kg, Bulls - Grazing 340 kg. The 350 used here matches neither")),
   oxen           = c("DEVIATION_OPEN", paste0(A2, ": Draft Bullocks 340 kg. The 300 used here is 12% lower")),
@@ -242,7 +242,7 @@ lw <- list(
   growing_males  = c("DEVIATION_OPEN", paste0(A2, ": Growing/Replacement 204 kg. The 200 used here is a rounding of it, not a transcription")),
   calves_female  = c("DEVIATION_OPEN", paste0(A2, ": Calves on forage 82 kg. The 60 used here is 27% lower than any IPCC calf row")),
   calves_male    = c("DEVIATION_OPEN", paste0(A2, ": Calves on forage 82 kg. The 60 used here is 27% lower than any IPCC calf row")),
-  feedlot_cattle = c("DEVIATION_OPEN", "Table 10A.2 has no Africa feedlot row. The two published feedlot weights are North America 500 kg and Latin America 460 kg. The 250 used here is half the lower of them"))
+  feedlot_cattle = c("DEVIATION_OPEN", paste0(A2, " has no Africa feedlot row. The two published feedlot weights are North America 500 kg and Latin America 460 kg. The 250 used here is half the lower of them")))
 for (k in names(lw)) set("LW_BY_SUBCAT", k, "value", lw[[k]][1], lw[[k]][2])
 
 set("MW_BY_SUBCAT", "*", "value", "NO_IPCC_DEFAULT",
