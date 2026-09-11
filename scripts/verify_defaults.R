@@ -211,6 +211,18 @@ S[["prompt_param_catalogue"]] <- local({
     v[paste("PARAM_CATALOGUE", k, "suggested_lower_bound", sep = "|")] <- norm(b$lower)
     v[paste("PARAM_CATALOGUE", k, "suggested_upper_bound", sep = "|")] <- norm(b$upper)
   }
+  # Ca line generated from FEEDING_SITUATION_CA:
+  #   "Values: stall_fed = 0; pasture_flat = 0.17; pasture_hilly = 0.36."
+  ca_ln <- grep("^Values: ",
+                readLines(file("translator_prompts/param_catalogue.md",
+                               encoding = "UTF-8"), warn = FALSE),
+                value = TRUE)
+  if (length(ca_ln)) for (piece in strsplit(sub("^Values: ", "", ca_ln[1]),
+                                            ";", fixed = TRUE)[[1]]) {
+    kv <- trimws(strsplit(sub("[.]$", "", piece), "=", fixed = TRUE)[[1]])
+    if (length(kv) == 2 && kv[1] %in% names(FEEDING_SITUATION_CA))
+      v[paste("FEEDING_SITUATION_CA", kv[1], "value", sep = "|")] <- norm(kv[2])
+  }
   o <- pick_table(md_tables("translator_prompts/param_catalogue.md"),
                   c("sub-category", "Cfi (Table 10.4)"))
   if (!is.null(o)) {
@@ -408,6 +420,19 @@ S[["doc_rmd"]] <- local({
       if (!is.na(ref) && any(!is.na(nums) & abs(nums - ref) < TOL))
         v[key] <- format(ref, scientific = FALSE, drop0trailing = TRUE)
     }
+    # GWP table (methodology.Rmd 4.11): "AR5 (100-yr) & 28 & 265 & ..."
+    for (ar in names(GWP_VALUES)) {
+      hit <- grep(paste0("^", ar, " \\(100-yr"), ln, value = TRUE)[1]
+      if (is.na(hit)) next
+      cells <- trimws(strsplit(hit, "&", fixed = TRUE)[[1]])
+      nums <- suppressWarnings(as.numeric(norm(cells)))
+      for (g in names(GWP_VALUES[[ar]])) {
+        ref <- as.numeric(GWP_VALUES[[ar]][[g]])
+        if (any(!is.na(nums) & abs(nums - ref) < TOL))
+          v[paste("GWP_VALUES", paste0(ar, ".", g), "value", sep = "|")] <-
+            format(ref, scientific = FALSE, drop0trailing = TRUE)
+      }
+    }
   }
   v
 })
@@ -442,9 +467,148 @@ S[["built_docx"]] <- local({
       if (grepl(lab, txt, fixed = TRUE))
         v[paste("PARAM_CATALOGUE", prm, "ipcc_default", sep = "|")] <- lab
     }
+    for (ar in names(GWP_VALUES)) for (g in names(GWP_VALUES[[ar]])) {
+      ref <- as.numeric(GWP_VALUES[[ar]][[g]])
+      lab <- format(ref, scientific = FALSE, drop0trailing = TRUE)
+      if (grepl(lab, txt, fixed = TRUE))
+        v[paste("GWP_VALUES", paste0(ar, ".", g), "value", sep = "|")] <- lab
+    }
   }
   v
 })
+
+# --- S10: worked_example.md (GENERATED, so it must reproduce) --------------
+# The user-supplied country values are legitimately different; everything
+# else in the example is an IPCC default and must match.
+.WE_USER_KEYS <- c("N", "BW", "MW", "Milk", "Fat", "DE", "CP")
+S[["prompt_worked_example"]] <- local({
+  v <- .empty
+  f <- "translator_prompts/worked_example.md"
+  if (!file.exists(f)) return(v)
+  ln <- readLines(file(f, encoding = "UTF-8"), warn = FALSE)
+  a <- grep("^```template-ready", ln); b <- grep("^```$", ln)
+  if (!length(a) || !length(b)) return(v)
+  j <- tryCatch(jsonlite::fromJSON(paste(ln[(a[1]+1):(b[b > a[1]][1]-1)],
+                                         collapse = "
+")),
+                error = function(e) NULL)
+  if (is.null(j)) { message("NOTE: worked_example JSON did not parse"); return(v) }
+  pr <- j$parameters
+  if (!is.null(pr) && nrow(pr)) {
+    # Parameters with a per-sub-category override must be compared against
+    # that override, not the catalogue default: the example legitimately
+    # shows heifers Cfi 0.322 where the catalogue holds the lactating 0.386.
+    # Routing them to the *_BY_SUBCAT objects also gives those objects their
+    # first surface coverage.
+    BY_SUBCAT <- c(Cfi = "CFI_BY_SUBCAT", C = "C_GROWTH_BY_SUBCAT",
+                   BW = "LW_BY_SUBCAT", MW = "MW_BY_SUBCAT",
+                   WG = "WG_BY_SUBCAT", pct_pregnant = "PCT_PREGNANT_BY_SUBCAT")
+    keep <- !(pr$parameter %in% .WE_USER_KEYS)
+    for (i in which(keep)) {
+      prm <- pr$parameter[i]; sc <- pr$sub_category[i]
+      if (prm %in% names(BY_SUBCAT)) {
+        v[paste(BY_SUBCAT[[prm]], sc, "value", sep = "|")] <- norm(pr$mean[i])
+        next
+      }
+      k <- function(fld) paste("PARAM_CATALOGUE", prm, fld, sep = "|")
+      v[k("ipcc_default")] <- norm(pr$mean[i])
+      v[k("param_type")]   <- norm(pr$param_type[i])
+      # A biological zero overrides the catalogue distribution to "constant";
+      # that is the resolver working, not a mismatch.
+      rs <- resolve_subcat_default(sc, prm, ipcc_version = "2019_refinement")
+      cat_dist <- pc$suggested_distribution[pc$parameter == prm]
+      if (!is.null(rs) && identical(rs$distribution, cat_dist)) {
+        v[k("suggested_distribution")] <- norm(pr$distribution[i])
+        if (!is.null(pr$uncertainty_pct) && !is.na(pr$uncertainty_pct[i]))
+          v[k("suggested_uncertainty_pct")] <- norm(pr$uncertainty_pct[i])
+      }
+    }
+  }
+  mm <- j$manure_management
+  if (!is.null(mm) && nrow(mm)) for (i in seq_len(nrow(mm))) {
+    id <- mm$mms_type[i]
+    v[paste("MMS_DEFAULTS", id, "mcf_tropical", sep = "|")] <- norm(mm$MCF_pct[i])
+    v[paste("MMS_DEFAULTS", id, "ef3", sep = "|")]          <- norm(mm$EF3[i])
+    v[paste("MMS_FRAC_DEFAULTS_2019", id, "frac_gas", sep = "|")] <-
+      norm(as.numeric(mm$Frac_GasMS_pct[i]) / 100)
+    v[paste("MMS_FRAC_DEFAULTS_2019", id, "frac_leach", sep = "|")] <-
+      norm(as.numeric(mm$Frac_LeachMS_pct[i]) / 100)
+  }
+  v
+})
+
+# --- S11: system_instructions.md -------------------------------------------
+# Hand-written and the largest prompt file. Self-check #9 asserts specific
+# Cfi and C values, and Step 5b asserts pct_pregnant defaults. Those are the
+# numbers that can drift from the resolver, so those are what we extract.
+S[["prompt_system_instructions"]] <- local({
+  v <- .empty
+  f <- "translator_prompts/system_instructions.md"
+  if (!file.exists(f)) return(v)
+  txt <- paste(readLines(file(f, encoding = "UTF-8"), warn = FALSE),
+               collapse = "
+")
+  grab <- function(pat) {
+    m <- regmatches(txt, regexpr(pat, txt, perl = TRUE))
+    if (!length(m)) return(NA_character_)
+    norm(sub(pat, "\\1", m, perl = TRUE))
+  }
+  for (sc in ANIMAL_SUBCATEGORIES) {
+    x <- grab(sprintf("`%s\\.C`[^0-9]{0,40}([0-9.]+)", sc))
+    if (!is.na(x)) v[paste("C_GROWTH_BY_SUBCAT", sc, "value", sep = "|")] <- x
+    x <- grab(sprintf("`%s\\.Cfi`[^0-9]{0,40}([0-9.]+)", sc))
+    if (!is.na(x)) v[paste("CFI_BY_SUBCAT", sc, "value", sep = "|")] <- x
+  }
+  # pct_pregnant block: "- `dairy_cows`, `other_cows` -> 0.85"
+  for (ln in strsplit(txt, "
+")[[1]]) {
+    if (!grepl("pct_pregnant", txt, fixed = TRUE)) break
+    m <- regmatches(ln, regexpr("([0-9]*\\.?[0-9]+)\\s*$", ln))
+    if (!length(m) || !grepl("`", ln) || !grepl("→|->", ln)) next
+    for (sc in names(PCT_PREGNANT_BY_SUBCAT))
+      if (grepl(paste0("`", sc, "`"), ln, fixed = TRUE))
+        v[paste("PCT_PREGNANT_BY_SUBCAT", sc, "value", sep = "|")] <- norm(m)
+  }
+  v
+})
+
+# --- S12: mapping_examples.md / questionnaire.md (vocabulary presence) -----
+# Hand-written illustrative content. Checked for MMS-id vocabulary only:
+# a code offered to the user that no longer exists is the failure mode here
+# (questionnaire.md offered three removed parameters until 2026-09-11).
+S[["prompt_vocab_files"]] <- local({
+  v <- .empty
+  for (f in c("translator_prompts/questionnaire.md",
+              "translator_prompts/mapping_examples.md")) {
+    if (!file.exists(f)) next
+    txt <- paste(readLines(file(f, encoding = "UTF-8"), warn = FALSE),
+                 collapse = " ")
+    for (id in MMS_DEFAULTS$id)
+      if (grepl(paste0("\\b", id, "\\b"), txt))
+        v[paste("MMS_DEFAULTS", id, "versions", sep = "|")] <-
+          MMS_DEFAULTS$versions[MMS_DEFAULTS$id == id]
+  }
+  v
+})
+
+# --- S13/S14: the built-in example inventories -----------------------------
+# Country data by design: differences are expected and INFORMATIONAL, never
+# failures. Listed so a stale value (as solid_storage EF3 0.005 was) is at
+# least visible rather than invisible.
+.example_surface <- function(gen) {
+  v <- .empty
+  d <- tryCatch(gen(), error = function(e) NULL)
+  if (is.null(d)) return(v)
+  for (i in seq_len(nrow(d))) {
+    id <- d$mms_type[i]
+    if (!id %in% MMS_DEFAULTS$id) next
+    v[paste("MMS_DEFAULTS", id, "mcf_tropical", sep = "|")] <- norm(d$MCF_pct[i])
+    v[paste("MMS_DEFAULTS", id, "ef3", sep = "|")]          <- norm(d$EF3[i])
+  }
+  v
+}
+S[["example_country_x"]] <- .example_surface(generate_country_x_manure)
+S[["example_country_y"]] <- .example_surface(generate_country_y_manure)
 
 # --- surface policies and SCOPE ---------------------------------------------
 #
@@ -457,7 +621,11 @@ POLICY <- c(prompt_param_catalogue = "MUST", prompt_template_schema = "MUST",
             xlsx_parameters = "MUST", xlsx_lists = "MUST",
             xlsx_vocab = "MUST", xlsx_manure_example = "REVIEW",
             audit_literals = "REVIEW", doc_rmd = "REVIEW",
-            built_docx = "REVIEW")
+            built_docx = "REVIEW",
+            prompt_worked_example = "MUST",
+            prompt_system_instructions = "MUST",
+            prompt_vocab_files = "REVIEW",
+            example_country_x = "INFO", example_country_y = "INFO")
 
 SCOPE <- list(
   prompt_param_catalogue = list(
@@ -478,7 +646,12 @@ SCOPE <- list(
   # Deliberate spot-check subset, not full coverage.
   audit_literals = list(objects = character(0)),
   doc_rmd   = list(objects = character(0)),
-  built_docx = list(objects = character(0)))
+  built_docx = list(objects = character(0)),
+  prompt_worked_example = list(objects = character(0)),
+  prompt_system_instructions = list(objects = character(0)),
+  prompt_vocab_files = list(objects = character(0)),
+  example_country_x = list(objects = character(0)),
+  example_country_y = list(objects = character(0)))
 
 in_scope <- function(sn, obj, key, fld) {
   sc <- SCOPE[[sn]]
@@ -513,14 +686,36 @@ for (sn in names(S)) {
   allowed <- paste(M$object, M$key, M$field, sn) %in%
              paste(ALLOW$object, ALLOW$key, ALLOW$field, ALLOW$surface)
   verdict[allowed & verdict == "DIFFERS"] <- "ALLOWED"
+  # On an INFO surface (the built-in example inventories) a difference is
+  # country-specific data by design, not a defect. Given its own verdict so a
+  # stale example value stays visible: solid_storage EF3 sat at the superseded
+  # 0.005 in both examples and nothing flagged it.
+  if (identical(unname(POLICY[[sn]]), "INFO"))
+    verdict[verdict == "DIFFERS"] <- "INFO-DIFF"
   M[[sn]] <- verdict
   M[[paste0(sn, "_val")]] <- got
 }
 
 surf <- names(S)
 M$n_differs <- rowSums(M[, surf, drop = FALSE] == "DIFFERS")
+M$n_info    <- rowSums(M[, surf, drop = FALSE] == "INFO-DIFF")
 M$n_match   <- rowSums(M[, surf, drop = FALSE] == "MATCH")
 M$n_absent  <- rowSums(M[, surf, drop = FALSE] == "absent")
+
+# Honest coverage accounting. Three reasons a cell has no document surface:
+#   NO-VALUE  the reference is NA, so there is nothing to carry anywhere
+#             (the 20 symmetric params have no lower/upper bound).
+#   INTERNAL  a single-consumer R constant that by design appears in no
+#             document: the per-sub-category weights feed only
+#             resolve_subcat_default(), and the regional BW table feeds only
+#             the QA/QC benchmark. Guarded by audit F30 and F13a instead.
+#   UNCOVERED a real gap: the value IS published somewhere and nothing checks it.
+INTERNAL_OBJECTS <- c("LW_BY_SUBCAT", "MW_BY_SUBCAT", "WG_BY_SUBCAT",
+                      "IPCC_DEFAULTS_BY_REGION")
+M$coverage <- ifelse(
+  is.na(M$reference_n), "NO-VALUE",
+  ifelse(rowSums(M[, surf, drop = FALSE] == "MATCH") > 0, "CHECKED",
+  ifelse(M$object %in% INTERNAL_OBJECTS, "INTERNAL", "UNCOVERED")))
 
 bad <- M[M$n_differs > 0 | M$n_absent > 0, ]
 bad <- bad[order(bad$object, bad$key, bad$field), ]
@@ -557,6 +752,19 @@ if (nrow(bad)) {
 } else out <- c(out, "## No rows need attention", "",
                 "Every cell on every MUST surface matches the R constant.", "")
 
+if (sum(M$n_info) > 0) {
+  out <- c(out, "## Informational: example inventories that differ", "",
+    "Country data by design, not defects. Listed so a stale example value stays visible.", "",
+    "| object | key | field | default | surface | example |", "|---|---|---|---|---|---|")
+  ii <- M[M$n_info > 0, ]
+  for (i in seq_len(nrow(ii))) for (sn in surf)
+    if (identical(ii[[sn]][i], "INFO-DIFF"))
+      out <- c(out, sprintf("| %s | %s | %s | %s | %s | %s |",
+        ii$object[i], ii$key[i], ii$field[i], ii$reference_n[i], sn,
+        ii[[paste0(sn, "_val")]][i]))
+  out <- c(out, "")
+}
+
 out <- c(out, "## Allow-list", "",
   "| object | key | field | surface | justification |", "|---|---|---|---|---|")
 for (i in seq_len(nrow(ALLOW)))
@@ -564,11 +772,28 @@ for (i in seq_len(nrow(ALLOW)))
                         ALLOW$key[i], ALLOW$field[i], ALLOW$surface[i],
                         ALLOW$why[i]))
 
-out <- c(out, "", "## Coverage per surface", "",
-  "| surface | policy | MATCH | DIFFERS | absent | n/a |", "|---|---|---|---|---|---|")
+out <- c(out, "", "## Cell coverage", "",
+  "| class | cells | meaning |", "|---|---|---|",
+  sprintf("| CHECKED | %d | matched on at least one surface |",
+          sum(M$coverage == "CHECKED")),
+  sprintf("| NO-VALUE | %d | reference is NA, nothing to carry |",
+          sum(M$coverage == "NO-VALUE")),
+  sprintf("| INTERNAL | %d | single-consumer constant, no document surface by design |",
+          sum(M$coverage == "INTERNAL")),
+  sprintf("| **UNCOVERED** | **%d** | published somewhere and checked nowhere |",
+          sum(M$coverage == "UNCOVERED")),
+  "",
+  if (sum(M$coverage == "UNCOVERED") > 0)
+    paste("Uncovered:", paste(unique(paste(M$object[M$coverage == "UNCOVERED"],
+          M$field[M$coverage == "UNCOVERED"])), collapse = "; "))
+  else "No uncovered cells.",
+  "", "## Coverage per surface", "",
+  "| surface | policy | MATCH | DIFFERS | INFO | absent | n/a |",
+  "|---|---|---|---|---|---|---|")
 for (sn in surf)
-  out <- c(out, sprintf("| %s | %s | %d | %d | %d | %d |", sn, POLICY[[sn]],
+  out <- c(out, sprintf("| %s | %s | %d | %d | %d | %d | %d |", sn, POLICY[[sn]],
     sum(M[[sn]] == "MATCH"), sum(M[[sn]] == "DIFFERS"),
+    sum(M[[sn]] == "INFO-DIFF"),
     sum(M[[sn]] == "absent"), sum(M[[sn]] == "n/a")))
 
 writeLines(out, "DEFAULTS_MATRIX.md", useBytes = TRUE)

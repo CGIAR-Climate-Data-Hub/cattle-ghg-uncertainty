@@ -58,10 +58,15 @@ jobs:
       - name: Run regression audit
         run: Rscript scripts/audit.R
 
+      - name: Cross-surface defaults check
+        run: Rscript scripts/verify_defaults.R
+
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: audit-report
-          path: AUDIT_REPORT.md
+          path: |
+            AUDIT_REPORT.md
+            DEFAULTS_MATRIX.md
           if-no-files-found: warn
