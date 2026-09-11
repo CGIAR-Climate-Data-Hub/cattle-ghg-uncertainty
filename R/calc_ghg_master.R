@@ -34,7 +34,7 @@ ghg_emissions <- function(
   nem <- calc_nem(live_weight, Cfi, Tw = Tw)
   nea <- calc_nea(nem, Ca)
   neg <- calc_neg(live_weight, weight_gain, C_growth, mature_weight)
-  nel <- calc_nel(milk_yield, milk_fat, pct_pregnant)
+  nel <- calc_nel(milk_yield, milk_fat)
   new_energy <- calc_new(nem, hours)
   # E3: Cp pro-rated by pct_pregnant (% of females that give birth in a year)
   nep <- calc_nep(nem, Cp, pct_pregnant = pct_pregnant)
@@ -228,7 +228,7 @@ ghg_emissions_vec <- function(
   neg_full <- 22.02 * ((live_weight / (C_growth * mature_weight)) ^ 0.75) *
               (wg_pos ^ 1.097)
   neg <- ifelse(neg_zero, 0, neg_full)
-  nel <- calc_nel(milk_yield, milk_fat, pct_pregnant)
+  nel <- calc_nel(milk_yield, milk_fat)
   new_energy <- calc_new(nem, hours)
   nep <- calc_nep(nem, Cp, pct_pregnant = pct_pregnant)
   rem <- calc_rem(DE)
@@ -246,9 +246,10 @@ ghg_emissions_vec <- function(
   # ---- N excretion (Eq 10.32-10.34), inlined & vectorised ----
   DMI      <- ge / 18.45
   N_intake <- DMI * (CP / 100) / 6.25
-  N_ret_milk <- ifelse(!is.na(milk_yield) & !is.na(pct_pregnant) &
-                         milk_yield > 0 & pct_pregnant > 0,
-                       milk_yield * pct_pregnant * milkpr_vec / 100 / 6.38, 0)
+  # Eq 10.33 milk-N term. No pct_pregnant here either, for the same reason
+  # as NE_l: the milk figure is already an annual average per head.
+  N_ret_milk <- ifelse(!is.na(milk_yield) & milk_yield > 0,
+                       milk_yield * milkpr_vec / 100 / 6.38, 0)
   N_ret_wg   <- ifelse(!is.na(weight_gain) & weight_gain > 0,
                        weight_gain * 0.032, 0)
   Nex <- pmax(0, (N_intake - (N_ret_milk + N_ret_wg)) * 365)

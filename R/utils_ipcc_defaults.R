@@ -629,7 +629,23 @@ resolve_subcat_default <- function(sub_category, parameter,
   if (parameter %in% c("Milk", "Fat", "MilkPR") &&
       (identical(sex, "male") || !is_mature))
     return(bio_zero)
-  if (parameter == "pct_pregnant" && (identical(sex, "male") || is_calf))
+  # Pregnancy: males, calves, and fattening animals.
+  #
+  # feedlot_cattle was inheriting the catalogue's 0.52 because its sex is
+  # "mixed" and its age is not calf, so neither existing test caught it, and
+  # it was therefore carrying a net-energy-for-pregnancy term. Annex 10A.2
+  # leaves the Pregnant column blank for every Feedlot cattle row, in both
+  # regions that have one. Same hole that gave heifers a milk yield.
+  #
+  # Named explicitly rather than keyed on sex == "female": an unrecognised
+  # sub-category defaults to sex "mixed", so a sex test would silently zero
+  # pregnancy for any dairy group the tool did not recognise by name.
+  # Heifers KEEP a pregnancy fraction: review round 7 item 2 renamed
+  # pct_calving to pct_pregnant precisely so it "allows the variable to
+  # apply to pregnant heifers that have not calved".
+  if (parameter == "pct_pregnant" &&
+      (identical(sex, "male") || is_calf ||
+       identical(sub_category, "feedlot_cattle")))
     return(bio_zero)
   if (parameter == "hours" && !identical(sub_category, "oxen"))
     return(bio_zero)

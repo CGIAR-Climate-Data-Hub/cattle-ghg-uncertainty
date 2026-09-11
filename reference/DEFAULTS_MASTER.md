@@ -349,7 +349,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | feedlot_cattle | WG | 1 | pert | sub-category override |
 | feedlot_cattle | Milk | 0 | constant | biological zero |
 | feedlot_cattle | Fat | 0 | constant | biological zero |
-| feedlot_cattle | pct_pregnant | 0.52 | beta | catalogue default |
+| feedlot_cattle | pct_pregnant | 0 | constant | biological zero |
 | feedlot_cattle | DE | 74 | normal | sub-category override |
 | feedlot_cattle | Cfi | 0.322 | pert | sub-category override |
 | feedlot_cattle | Ca | 0.17 | triangular | catalogue default |

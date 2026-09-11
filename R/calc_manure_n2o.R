@@ -39,12 +39,13 @@ calc_n_excretion <- function(ge, CP, milk_yield = 0, pct_pregnant = 0,
   # sees an NA in the per-iteration result rather than a silent zero; the
   # pre-run NA-mean check in the simulation observer is the canonical
   # safeguard.
-  if (isTRUE(milk_yield > 0) && isTRUE(pct_pregnant > 0)) {
-    # IPCC Vol.4 Ch.10 Eq 10.33 (N retention rates for cattle, milk-N term):
-    # milk_yield is daily kg per lactating animal; pct_pregnant averages across
-    # the sub-category. MilkPR is in % (e.g. 3.3); /6.38 is the milk-protein
-    # to milk-N conversion (Jones casein factor) defined inside Eq 10.33.
-    N_retained <- milk_yield * pct_pregnant * MilkPR / 100 / 6.38
+  if (isTRUE(milk_yield > 0)) {
+    # IPCC Vol.4 Ch.10 Eq 10.33 (N retention rates for cattle, milk-N term).
+    # milk_yield is the IPCC input: total annual production divided by 365,
+    # so it is already an annual average per head and is NOT weighted by
+    # pct_pregnant a second time. MilkPR is in % (e.g. 3.6); /6.38 is the
+    # milk-protein to milk-N conversion defined inside Eq 10.33.
+    N_retained <- milk_yield * MilkPR / 100 / 6.38
   }
   if (isTRUE(weight_gain > 0)) {
     N_retained <- N_retained + weight_gain * 0.032

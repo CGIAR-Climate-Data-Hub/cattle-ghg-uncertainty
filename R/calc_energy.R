@@ -35,8 +35,28 @@ calc_neg <- function(live_weight, weight_gain, C, mature_weight) {
 }
 
 # Net Energy for Lactation (Eq 10.8) - MJ/head/day
-calc_nel <- function(milk_yield, milk_fat, pct_pregnant = 1) {
-  milk_yield * (1.47 + 0.40 * milk_fat) * pct_pregnant
+#
+# NO pct_pregnant factor, and the argument is REMOVED rather than ignored so
+# that a caller still passing it fails loudly.
+#
+# Equation 10.8 is NE_l = Milk x (1.47 + 0.40 x Fat), with nothing else in
+# it, and IPCC defines the Milk input as "total annual production divided by
+# 365" (Vol.4 Ch.10, Average daily milk production). That figure is ALREADY
+# averaged over the whole year including the dry period, so weighting it
+# again by the fraction of females calving discounted it twice: at
+# pct_pregnant 0.52 the tool produced 1.99 MJ/day where Eq 10.8 gives 3.83.
+#
+# The weighting IS correct for pregnancy, and calc_nep() keeps it: Table
+# 10.7 says "the NEp estimate must be weighted by the portion of the mature
+# females that actually go through gestation in a year". It was never
+# sanctioned for lactation.
+#
+# Review round 5 item 9 asked whether merging pct_lactating into
+# pct_pregnant was "both IPCC-compliant and simpler". The 28 May rename
+# settled simpler. This settles compliant: one parameter can serve both
+# roles only if it is applied where IPCC applies it, which is NE_p alone.
+calc_nel <- function(milk_yield, milk_fat) {
+  milk_yield * (1.47 + 0.40 * milk_fat)
 }
 
 # Net Energy for Work (Eq 10.11) - MJ/head/day

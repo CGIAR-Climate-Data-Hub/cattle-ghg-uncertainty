@@ -1082,3 +1082,50 @@ F40 closes it by running the engine rather than reading a table. `Bo` is omitted
 That check needed two attempts. The first called `ghg_emissions_vec()` directly, which skips `get_param()` altogether, so it passed against a deliberately reinstated `get_param("Bo", 0.10)`. Routed through `run_mc_simulation()` it fails with "doubling Bo in the master did not double manure CH4 (3.266008 -> 3.266008)".
 
 That is now the fourth check in this audit that had to be watched failing before it could be trusted, after F34, F35/F36 and the first `qaqc_hints` extractor. The rule has earned its place: a check that has never been seen to fail is not evidence.
+
+---
+
+# Lactation weighting: answering the other half of review round 5 item 9
+
+## The question, and which half was answered
+
+Review round 5 item 9: *"The pct_lactating vs Cp question, is it both IPCC-compliant and simpler to have just one parameter (pct_pregnant)?"* Recorded outcome: *"Resolved 28 May as the pct_calving to pct_pregnant rename."*
+
+Two questions were asked. The rename answered the second. `pct_lactating` and `pct_calving` survive as aliases pointing at `pct_pregnant`, and one parameter has been doing two jobs ever since. Nobody appears to have tested the first.
+
+## The answer
+
+**Compliant for pregnancy.** Table 10.7's note is explicit: *"When using NEp to calculate GE for cattle, sheep and goats, the NEp estimate must be weighted by the portion of the mature females that actually go through gestation in a year. For example, if 80 percent of the mature females in the animal category give birth in a year, then 80 percent of the NEp value would be used."* `calc_nep()` does exactly that and is unchanged.
+
+**Not compliant for lactation.** Equation 10.8 is `NE_l = Milk x (1.47 + 0.40 x Fat)` and contains nothing else. And the milk input is defined in the Chapter 10 input list as *"Average daily milk production (kg day-1) ... The average daily production should be calculated by dividing the total annual production by 365"*, which Table 10A.1 footnote 1 repeats: *"The value represent milk yield in kg per day during the whole year."*
+
+The figure is therefore already averaged across the dry period. Weighting it again by the calving fraction discounted it twice.
+
+| | tool | Eq 10.8 |
+|---|---|---|
+| dairy_cows, Milk 1.2, Fat 4.3, pp 0.52 | 1.99 MJ/day | **3.83** |
+| other_cows, pp 0.54 | 2.07 MJ/day | **3.83** |
+
+**The low-productivity decision made it worse.** At the old `pct_pregnant` of 0.85 the discount was 15%; at 0.52 it became 48%.
+
+The same double-discount sat in the Equation 10.33 milk-N term, in both the scalar and vectorised paths.
+
+## What changed
+
+`calc_nel()` is now `Milk x (1.47 + 0.40 x Fat)`, and the `pct_pregnant` argument was **removed rather than ignored**, so any caller still passing it fails loudly. The Eq 10.33 milk-N term drops the factor in both paths. `calc_nep()` keeps it.
+
+Effect, per 100,000 head: dairy cows enteric CH4 +5.5% and total CO2e +5.3%; other cows +6.1% and +5.8%.
+
+The `Milk` field definition changed with it, in the master and in the user guide. It used to read "per lactating animal, the tool multiplies by pct_pregnant internally", which was a coherent convention that the shipped IPCC default did not match. It now states IPCC's own definition and warns against scaling by the lactating or calving share.
+
+## A second defect in the same rule
+
+`feedlot_cattle` was resolving to `pct_pregnant` 0.52 and therefore carrying a net-energy-for-pregnancy term. Its sex is "mixed" and its age is not calf, so neither existing biological-zero test caught it. Annex 10A.2 leaves the Pregnant column blank for every Feedlot cattle row in both regions that have one. Now a biological zero.
+
+Named explicitly rather than keyed on `sex == "female"`, because an unrecognised sub-category defaults to sex "mixed" and a sex test would silently zero pregnancy for any dairy group the tool did not recognise by name. **Heifers keep their fraction**: review round 7 item 2 renamed the parameter precisely so it *"allows the variable to apply to pregnant heifers that have not calved"*.
+
+## Golden values
+
+Nineteen checks failed on the change, which is what they are for. Every one was a stored hand-computed reference, and each was fixed **by correcting the formula in the reference, not by pasting in what the code now returns**. `golden_ref$NEL` dropped its `* 0.50` and everything downstream recomputes from it; F11's Zimbabwe reference was recomputed through the whole chain, moving Nex from 72.81 to 77.60 kg N/head/yr.
+
+F41 asserts the behaviour as a property of the functions rather than as a stored number, so it cannot be satisfied by editing a golden: `calc_nel` must equal Eq 10.8, must not accept `pct_pregnant`, `calc_nep` must still respond to it, halving the fraction must leave enteric CH4 nearly unchanged, feedlot must be a biological zero and heifers must not. Both halves were demonstrated failing first.

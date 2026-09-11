@@ -106,7 +106,10 @@ golden_ref <- list(
   NEM                 = 0.386 * 300^0.75,           # 27.8234
   NEA                 = 0.17 * 0.386 * 300^0.75,    # 4.7300
   NEG                 = 0,
-  NEL                 = 5.0 * (1.47 + 0.40 * 4.0) * 0.50,  # 7.675
+  # Eq 10.8 exactly: no pct_pregnant. The milk input is IPCC's annual
+  # average per head, so weighting it again discounted it twice.
+  # NEP below KEEPS the 0.50, which Table 10.7 sanctions.
+  NEL                 = 5.0 * (1.47 + 0.40 * 4.0),        # 15.35
   NEW                 = 0,
   NEP                 = 0.10 * 0.50 * 0.386 * 300^0.75,    # 1.3912
   REM                 = 1.123 - 4.092e-3 * 60 + 1.126e-5 * 60^2 - 25.4 / 60,
@@ -121,8 +124,9 @@ golden_ref$VS                   <- (golden_ref$GE * (1 - 0.6) +
                                     (1 - 0.08) / 18.45
 golden_ref$manure_ch4_head      <- golden_ref$VS * 365 * 0.13 * 0.67 *
                                     0.015 * 1.0
+# Eq 10.33 milk-N term, also without pct_pregnant, for the same reason.
 golden_ref$Nex                  <- (golden_ref$GE / 18.45 * 0.12 / 6.25 -
-                                      5.0 * 0.5 * 3.3 / 100 / 6.38) * 365
+                                      5.0 * 3.3 / 100 / 6.38) * 365
 golden_ref$direct_n2o_mm_head   <- 0
 golden_ref$indirect_n2o_mm_head <- 0
 golden_ref$direct_n2o_prp_head  <- golden_ref$Nex * 1.0 * 0.004 * 44 / 28
@@ -276,8 +280,10 @@ section_A <- function() {
   NEA <- calc_nea(NEM, golden_in$Ca)
   NEG <- calc_neg(golden_in$live_weight, golden_in$weight_gain,
                    golden_in$C_growth, golden_in$mature_weight)
-  NEL <- calc_nel(golden_in$milk_yield, golden_in$milk_fat,
-                   pct_pregnant = golden_in$pct_pregnant)
+  # No pct_pregnant: Eq 10.8 has no such factor and the milk input is
+  # already IPCC's annual average per head. calc_nep() below keeps it,
+  # because Table 10.7 sanctions the weighting for pregnancy.
+  NEL <- calc_nel(golden_in$milk_yield, golden_in$milk_fat)
   NEW <- calc_new(NEM, golden_in$hours)
   NEP <- calc_nep(NEM, golden_in$Cp, pct_pregnant = golden_in$pct_pregnant)
   REM <- calc_rem(golden_in$DE)
@@ -1127,14 +1133,18 @@ section_F <- function() {
   inv_m <- as.list(sim_multi$inventory[1, , drop = FALSE])
 
   # Hand-comp Nex for DINT_cow at the means:
-  # NEm = 0.322 * 539.3^0.75 = 36.07; NEa = 0.17*36.07 = 6.13;
-  # NEl = 15.22*(1.47+0.4*3.8)*0.81 = 36.86; NEp = 0.10*0.81*36.07 = 2.92.
-  # REM = 1.123 - 4.092e-3*73.52 + 1.126e-5*73.52^2 - 25.4/73.52 ≈ 0.5385
-  # GE_num = (36.07+6.13+36.86+0+2.92)/0.5385 = 152.04; GE = 152.04/0.7352=206.80
-  # DMI = 206.80/18.45 = 11.21; N_intake = 11.21*0.148/6.25 = 0.2655 kg N/day
-  # N_retained_milk = 15.22*0.81*0.0342/6.38 = 0.0660 kg N/day
-  # Nex/day = 0.1995; Nex/yr = 72.81 kg N/head/yr
-  nex_ref <- 72.81
+  # NEm = 0.322 * 539.3^0.75 = 36.04; NEa = 0.17*36.04 = 6.13;
+  # NEl = 15.22*(1.47+0.4*3.8) = 45.51  <- Eq 10.8, NO pct_pregnant: the
+  #   milk input is IPCC's annual average per head, so weighting it by the
+  #   calving fraction discounted it twice. Was 36.86.
+  # NEp = 0.10*0.81*36.04 = 2.92  <- KEEPS the weighting, Table 10.7.
+  # REM = 1.123 - 4.092e-3*73.52 + 1.126e-5*73.52^2 - 25.4/73.52 = 0.5375
+  # GE = ((36.04+6.13+45.51+0+2.92)/0.5375)/0.7352 = 229.22  (was 206.80)
+  # DMI = 229.22/18.45 = 12.42; N_intake = 12.42*0.148/6.25 = 0.2942 kg N/day
+  # N_retained_milk = 15.22*0.0342/6.38 = 0.0816  <- Eq 10.33, also no
+  #   pct_pregnant. Was 0.0660.
+  # Nex/day = 0.2126; Nex/yr = 77.60 kg N/head/yr  (was 72.81)
+  nex_ref <- 77.60
   # MM direct (excl pasture):
   # sum(fr*EF3) = 0.04*0.005 + 0.77*0.01 + 0.08*0.02 + 0.01*0.0006 = 0.00951
   # direct/head = 72.81 * 0.00951 * 44/28 = 1.088 kg N2O/head/yr
@@ -2580,6 +2590,68 @@ section_F <- function() {
              notes = if (gapfill_ok)
                "Bo omitted from the inputs and doubled in a temp master; the gap-fill and the resulting manure CH4 both doubled, so no literal is standing in for it"
              else paste(utils::head(gapfill_fail, 3), collapse = "; "))
+
+  # F41 -- lactation is NOT weighted by the calving fraction; pregnancy IS.
+  #
+  # One parameter was doing two jobs. Review round 5 item 9 asked whether
+  # merging pct_lactating into pct_pregnant was "both IPCC-compliant and
+  # simpler"; the 28 May rename settled simpler and left compliant open.
+  #
+  # It is compliant for NE_p: Table 10.7 says "the NEp estimate must be
+  # weighted by the portion of the mature females that actually go through
+  # gestation in a year". It is not compliant for NE_l: Equation 10.8 is
+  # Milk x (1.47 + 0.40 x Fat) and nothing else, and IPCC defines the milk
+  # input as "total annual production divided by 365", already averaged
+  # over the dry period. Applying the fraction discounted it twice, by 48%
+  # once the low-productivity basis moved pct_pregnant to 0.52.
+  #
+  # Asserted as a property of the functions, not a stored number, so it
+  # cannot be satisfied by updating a golden value.
+  lact_fail <- tryCatch({
+    f <- character(0)
+    milk <- 5; fat <- 4
+    if (!isTRUE(all.equal(calc_nel(milk, fat), milk * (1.47 + 0.40 * fat))))
+      f <- c(f, "calc_nel does not equal Eq 10.8")
+    if ("pct_pregnant" %in% names(formals(calc_nel)))
+      f <- c(f, "calc_nel still accepts pct_pregnant; remove the argument so a caller passing it fails loudly")
+    # NE_p must still respond to it.
+    if (isTRUE(all.equal(calc_nep(100, 0.1, 0.5), calc_nep(100, 0.1, 1))))
+      f <- c(f, "calc_nep ignores pct_pregnant, but Table 10.7 requires the weighting")
+    # End to end: halving pct_pregnant must NOT halve enteric CH4, because
+    # lactation no longer depends on it, while N excretion must not move at
+    # all through the milk-N term.
+    g <- function(p) resolve_subcat_default("dairy_cows", p)$value
+    run <- function(pp) ghg_emissions(cattle_pop = 1e5,
+      live_weight = g("BW"), weight_gain = g("WG"), mature_weight = g("MW"),
+      milk_yield = g("Milk"), milk_fat = g("Fat"), pct_pregnant = pp,
+      hours = g("hours"), DE = g("DE"), Cfi = g("Cfi"), Ca = g("Ca"),
+      C_growth = g("C"), Cp = g("Cp"), Ym = g("Ym"), Bo = g("Bo"),
+      ASH = g("ASH"), UE = g("UE"), CP = g("CP"),
+      mms_fractions = c(pasture = 1), mcf_values = c(pasture = 0.02),
+      ef3_values = c(pasture = 0.02), EF3_PRP = 0.006, Frac_GASMS = 0.21,
+      EF4 = 0.014, EF5 = 0.011, Frac_LEACH_H = 0.24, gwp = "AR5")
+    a <- run(0.52); b <- run(0.26)
+    # It should still move a little, through NE_p, but nowhere near halving.
+    ratio <- b$enteric_ch4_total / a$enteric_ch4_total
+    if (ratio < 0.97)
+      f <- c(f, sprintf("halving pct_pregnant moved enteric CH4 by %.1f%%, so lactation is still weighted by it",
+                        100 * (ratio - 1)))
+    # feedlot cattle must not carry a pregnancy fraction at all
+    r <- resolve_subcat_default("feedlot_cattle", "pct_pregnant")
+    if (!identical(r$data_source, "biological_zero") || !isTRUE(r$value == 0))
+      f <- c(f, sprintf("feedlot_cattle pct_pregnant = %s; Annex 10A.2 leaves the Pregnant column blank for every feedlot row", r$value))
+    # heifers MUST keep one (review round 7 item 2)
+    if (isTRUE(resolve_subcat_default("heifers", "pct_pregnant")$value == 0))
+      f <- c(f, "heifers lost their pregnancy fraction; review round 7 item 2 required it")
+    f
+  }, error = function(e) conditionMessage(e))
+  lact_ok <- length(lact_fail) == 0L
+  check_bool("F41", "F",
+             "NE_l follows Eq 10.8 with no calving-fraction weighting; NE_p keeps it",
+             lact_ok,
+             notes = if (lact_ok)
+               "calc_nel equals Milk x (1.47 + 0.40 x Fat) and no longer takes pct_pregnant; calc_nep still responds to it; halving the fraction leaves enteric CH4 almost unchanged; feedlot is a biological zero and heifers keep theirs"
+             else paste(utils::head(lact_fail, 3), collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
