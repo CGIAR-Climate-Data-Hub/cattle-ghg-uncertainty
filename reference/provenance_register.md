@@ -896,3 +896,89 @@ F36 was written for the rule above and **passed against the deliberately reverte
 Both built their failure list with `<<-` inside `tryCatch`. These checks run inside `section_F()`, and `tryCatch` evaluates its expression in the caller's frame, so `<<-` skips the local variable and writes to the global environment; the check then reads an empty local list and passes regardless. Both now return the failure list from the `tryCatch` block instead, and both have been demonstrated failing against their own defect before passing.
 
 This is the third time in this audit that a check has had to be tested against the broken state before it could be trusted: F34 was masked by the audit's own globals, the first `qaqc_hints` extractor was satisfied by a number appearing anywhere in the prose, and now these two. A check that has never been seen to fail is not evidence.
+
+---
+
+# DECLARED BASIS: low productivity, adopted 2026-09-11
+
+Until now the tool had no declared basis. Its defaults were drawn from whichever IPCC row had seemed right at the time each one was set, and finding 2.1 showed the result described no animal IPCC published: `Milk`, `Fat` and `Ym` from the Africa dairy aggregate, `BW` and `CP` from the Africa non-dairy grazing row, and `MilkPR`, `pct_pregnant` and `DE` from neither.
+
+**The decision: where IPCC offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY.**
+
+## Why that row
+
+Three things already pointed at it before the decision was taken.
+
+`Bo` is 0.13, which Table 10.16A labels "Other regions, low productivity systems" and which footnote 1 of that table makes the Tier 1 default for those regions. `Ca` is 0.17, the Pasture/Range activity coefficient, and Pasture/Range is exactly how Table 10A.1 characterises the low-productivity feeding situation, while the aggregate row is marked Stall Fed. `Ym` is 6.5, the low-producing dairy row of Table 10.12.
+
+So the tool was already sitting on the low-productivity row for its three most consequential coefficients. The decision makes the animal-characteristic defaults agree with them rather than contradict them.
+
+It also matches the user base. The tool is built for developing-country inventory compilers working with smallholder and pastoral systems, which is what the low-productivity row describes.
+
+## What the basis resolves to
+
+**Generic catalogue defaults, from Table 10A.1 (New), Africa, Low productivity systems (PDF p.10.104):**
+
+| parameter | was | now | note |
+|---|---|---|---|
+| BW | 275 | **270** | was the Table 10A.2 non-dairy grazing weight |
+| Milk | 3.5 | **1.2** | was the aggregate of high (5.8) and low (1.2) |
+| Fat | 4.3 | 4.3 | identical in all three rows; unchanged |
+| MilkPR | 3.3 | **3.6** | was a leftover of the pre-correction Fat of 3.5 |
+| pct_pregnant | 0.60 | **0.52** | matched no row in either table |
+| DE | 55 | **51** | sat between the two tables, matching neither |
+| CP | 10.0 | **9.6** | was the Table 10A.2 non-dairy grazing figure |
+| Ym | 6.5 | 6.5 | low-producing dairy row; unchanged |
+
+**Per sub-category.** The dairy row follows Table 10A.1 low productivity; every non-dairy row follows its matching Table 10A.2 Africa grazing row, which is the same extensive-system reading:
+
+| sub-category | DE | CP | pct_pregnant | IPCC row |
+|---|---|---|---|---|
+| dairy_cows | 51 | 9.6 | 0.52 | 10A.1 Africa low productivity |
+| other_cows | 58 | 10.0 | 0.54 | 10A.2 Mature Females - grazing |
+| bulls | 58 | 10.0 | zero | 10A.2 Bulls - Grazing |
+| oxen | 58 | 10.0 | zero | 10A.2 Draft Bullocks |
+| heifers | 59 | 10.4 | 0.50 | 10A.2 Growing/Replacement |
+| growing_males | 59 | 10.4 | zero | 10A.2 Growing/Replacement |
+| calves | 59 | 10.3 | zero | 10A.2 Calves on forage |
+| feedlot_cattle | 74 | 14.0 | zero | 10A.2 Latin America Feedlot |
+
+Two independent confirmations fell out of this. The dairy low-productivity milk yield (10A.1) and the non-dairy grazing milk yield (10A.2) are both **1.2 kg/day**, so both mature-female categories land on the same figure from different tables. And `heifers` pregnancy has no IPCC figure at all: Table 10A.2 leaves the Pregnant column blank for Growing/Replacement, so 0.50 is now marked `NO_IPCC_DEFAULT` rather than passed off as a default.
+
+## Measured effect
+
+Total CO2e per 100,000 head, AR5, pasture-only manure:
+
+| sub-category | before | after | change |
+|---|---|---|---|
+| dairy_cows | 224,117 | 203,397 | -9.2% |
+| other_cows | 208,025 | 150,027 | **-27.9%** |
+| bulls | 200,706 | 183,947 | -8.4% |
+| oxen | 155,598 | 142,606 | -8.4% |
+| heifers | 165,456 | 144,731 | -12.5% |
+| growing_males | 141,493 | 124,653 | -11.9% |
+| calves_female | 68,194 | 59,200 | -13.2% |
+| calves_male | 62,440 | 54,454 | -12.8% |
+| feedlot_cattle | 113,414 | 113,414 | 0.0% |
+
+`other_cows` moves most because three changes compound on it: milk yield from 3.5 to 1.2, pregnancy from the Eastern Europe 0.85 to the Africa 0.54, and digestibility from 55 to 58. Feedlot is unaffected because it was already resolved onto its own IPCC row.
+
+These are reductions across the board. An inventory that accepts the defaults will now report materially lower emissions than the same inventory did in July. That is the point of the change and it is the single most important thing for a reviewer to see.
+
+## This overturns a review decision
+
+`Milk` 3.5 was agreed at review round 8 page 7, where the comment was "check this, I think it's closer to 3.5" against a previous unsourced 4.0. **That was right for the aggregate row.** What changed is the basis, not the reading of the table. The reviewer was correcting an unsourced number, not choosing between productivity systems, and the productivity question does not appear to have been put to them.
+
+Flagged as `APPLIED_OVERTURNS_REVIEW` in `reference/VALUE_CHANGES_FOR_REVIEW.md` so it cannot pass unnoticed. If the reviewer prefers the aggregate row, the change to revert is a single cell in the master.
+
+`Fat` 4.3, agreed in the same round, is untouched and unaffected: Table 10A.1 gives 4.3 in all three Africa rows.
+
+## Three audit checks had to be updated, and one had a real gap
+
+F30, F31 and F35 all failed on the change, which is what they are for. Their expectations were rewritten against the IPCC rows rather than against whatever the code now produces.
+
+F35 had asserted that every sub-category carried the *catalogue* DE. That was true only while DE was a uniform 55 matching no IPCC row; it now asserts the full nine-row diet table. F31 turned out to be asserting `pick("other_cows", ...)` on a fixture that writes only dairy_cows, bulls and oxen, where an absent row returns NA and the assertion tests nothing; it now uses oxen. F31 also still asserted bulls EF3 without bulls MCF, the omission that let the dry_lot correction through once before, and that is now closed.
+
+## Still open after this decision
+
+The basis choice does not settle the `BW` and `WG` roundings of finding 2.7: `bulls` 350 against the table's 340, `oxen` 300 against 340, `heifers` 200 against 204, `calves` 60 against 82, `feedlot` 250 against 460. Those are separate from the productivity question and remain open.

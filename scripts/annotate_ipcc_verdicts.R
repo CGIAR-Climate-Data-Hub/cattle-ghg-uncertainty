@@ -52,23 +52,26 @@ E106 <- "2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (
 T1012 <- "2019R V4 Ch10 Table 10.12 (Updated)"
 T1016A <- "2019R V4 Ch10 Table 10.16A (Updated), Other regions low productivity"
 T10A1 <- "2019R V4 Ch10 Table 10A.1 (New), Africa dairy row, p.10.104"
+A1_LOW <- "2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104"
+BASIS_NOTE <- "Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions."
 T10A2 <- "2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108"
+A2G <- "2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108"
 
 # PARAM_CATALOGUE ipcc_default
 cat_default <- list(
-  BW = c("CONFIRMED", paste0(T10A2, ": Weight 275 kg")),
+  BW = c("CONFIRMED", paste0(A1_LOW, ": Weight 270 kg. ", BASIS_NOTE)),
   MW = c("NOT_IPCC", "Neither Table 10A.1 nor Table 10A.2 has a mature-weight column; the cited table does not contain this value. Reviewer R7 #3 listed 300 kg MW as unfindable in IPCC"),
   WG = c("CONFIRMED", paste0(T10A1, ": weight gain 0 for every dairy row")),
-  Milk = c("CONFIRMED", paste0(T10A1, ": milk yield 3.5 kg/day")),
-  Fat = c("CONFIRMED", paste0(T10A1, ": fat content 4.3%")),
-  pct_pregnant = c("DEVIATION_OPEN", "Table 10A.1 Africa dairy gives 54%; Table 10A.2 Africa grazing 54%, Pasture/Range 62%. The 0.60 default matches no row"),
-  DE = c("DEVIATION_OPEN", "Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither"),
+  Milk = c("CONFIRMED", paste0(A1_LOW, ": milk yield 1.2 kg/day. ", BASIS_NOTE, " The previous 3.5 was the Africa AGGREGATE row, a population-weighted average of the high (5.8) and low (1.2) productivity systems per footnote 4. Changing it overturns the value agreed at review round 8 page 7, which was right for the aggregate row; the basis, not the reading, is what changed.")),
+  Fat = c("CONFIRMED", paste0(A1_LOW, ": fat content 4.3%. Identical in the aggregate, high and low productivity rows, so the basis choice cannot move it. Agreed at review round 8 page 7 and unaffected.")),
+  pct_pregnant = c("CONFIRMED", paste0(A1_LOW, ": 52% pregnant. ", BASIS_NOTE, " The previous 0.60 matched no row in either table.")),
+  DE = c("CONFIRMED", paste0(A1_LOW, ": digestibility of feed 51%. ", BASIS_NOTE, " The previous 55% sat between the two tables and matched neither.")),
   Cfi = c("CONFIRMED", paste0(T104, ": lactating cows 0.386")),
   Ca = c("CONFIRMED", paste0(T105, ": Pasture 0.17")),
   C = c("CONFIRMED", E106),
   Cp = c("CONFIRMED", paste0(T107, ": Cattle and Buffalo 0.10")),
   hours = c("CONFIRMED", paste0(T10A1, ": work 0 hrs/day for every dairy row")),
-  CP = c("CONFIRMED", paste0(T10A2, ": CP in diet 10.0%")),
+  CP = c("CONFIRMED", paste0(A1_LOW, ": CP in diet 9.6%. ", BASIS_NOTE, " The previous 10.0% was the Table 10A.2 non-dairy grazing figure, which now sits on the non-dairy sub-categories instead.")),
   Ym = c("CONFIRMED", paste0(T1012, ": Low producing cows (<5000 kg/yr), DE <= 62, NDF > 38, Ym 6.5%. Footnote 4 restricts the dairy rows to LACTATING cows, which is exactly the dairy_cows sub-category, so 6.5 is right as the dairy default and wrong as the generic one: the same table gives 7.0 for non-dairy >75% forage and 4.0 for feedlot. See the Ym section of the provenance register")),
   Bo = c("CONFIRMED", paste0(T1016A, ": dairy and non-dairy cattle both 0.13")),
   ASH = c("DEVIATION_DOCUMENTED", "2006 V4 Ch10 Eq 10.24 note: 0.08 for cattle. The 2019 Refinement rewrote the same note around swine (0.06 for sows), so it does not supersede the cattle figure"),
@@ -78,7 +81,7 @@ cat_default <- list(
   EF5 = c("CONFIRMED", "2019R V4 Ch11 Table 11.3 (Updated): 0.011"),
   Frac_GASM_PRP = c("CONFIRMED", "2019R V4 Ch11 Table 11.3 (Updated), FracGASM: 0.21"),
   Frac_LEACH_PRP = c("CONFIRMED", "2019R V4 Ch11 Table 11.3 (Updated), FracLEACH-(H) wet climates: 0.24, confirmed in the body text at Ch11 s11.2.2"),
-  MilkPR = c("DEVIATION_OPEN", "Both Africa rows give protein content 3.6% (Table 10A.1 and Table 10A.2), and the tool's own documented route %MilkPR = 1.9 + 0.4 x %Fat gives 3.62 at Fat 4.3. No IPCC reading supports 3.3; 3.3 is what that formula returns for Fat 3.5, the value Fat held before it was corrected"),
+  MilkPR = c("CONFIRMED", paste0(A1_LOW, ": protein content of milk 3.6%. Identical in all three Africa rows of Table 10A.1 and in Table 10A.2, and the tool's own documented route %MilkPR = 1.9 + 0.4 x %Fat gives 3.62 at Fat 4.3. The previous 3.3 was what that formula returns for Fat 3.5, the value Fat held before review round 8 corrected it.")),
   Tw = c("NOT_IPCC", "Winter temperature is country-specific; IPCC publishes no default. Project assumption"))
 for (k in names(cat_default))
   set("PARAM_CATALOGUE", k, "ipcc_default", cat_default[[k]][1], cat_default[[k]][2])
@@ -277,21 +280,40 @@ for (k in c("dairy_cows", "other_cows", "bulls", "oxen", "heifers",
 set("YM_BY_SUBCAT", "feedlot_cattle", "ym_2006", "CONFIRMED",
     paste0(T1012_06, ": 'Feedlot fed Cattle' 3.0%, footnote a 'when fed diets contain 90 percent or more concentrates'"))
 
-DE_NOTE <- "Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row"
-for (k in c("dairy_cows", "other_cows", "bulls", "oxen", "heifers",
-            "growing_males", "calves_female", "calves_male")) {
-  set("DE_BY_SUBCAT", k, "value", "DEVIATION_OPEN",
-      paste0("Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. ", DE_NOTE))
+# Diet now follows the declared low-productivity / grazing basis: the dairy
+# row from Table 10A.1 Africa low productivity, every non-dairy row from the
+# matching Table 10A.2 Africa grazing row. Previously all nine carried a
+# uniform DE of 55 and CP of 10, neither of which matched any single row.
+A2_DIET <- list(
+  other_cows    = c("58", "10.0", "Mature Females - grazing, Large Areas"),
+  bulls         = c("58", "10.0", "Bulls - Grazing"),
+  oxen          = c("58", "10.0", "Draft Bullocks"),
+  heifers       = c("59", "10.4", "Growing/Replacement"),
+  growing_males = c("59", "10.4", "Growing/Replacement"),
+  calves_female = c("59", "10.3", "Calves on forage"),
+  calves_male   = c("59", "10.3", "Calves on forage"))
+set("DE_BY_SUBCAT", "dairy_cows", "value", "CONFIRMED",
+    paste0(A1_LOW, ": digestibility of feed 51%. ", BASIS_NOTE))
+set("CP_BY_SUBCAT", "dairy_cows", "value", "CONFIRMED",
+    paste0(A1_LOW, ": CP in diet 9.6%. ", BASIS_NOTE))
+for (k in names(A2_DIET)) {
+  d <- A2_DIET[[k]]
+  set("DE_BY_SUBCAT", k, "value", "CONFIRMED",
+      paste0(A2G, ", ", d[3], ": digestibility of feed ", d[1], "%"))
   set("CP_BY_SUBCAT", k, "value", "CONFIRMED",
-      paste0(T10A2, ": CP in diet 10.0%. ", DE_NOTE))
+      paste0(A2G, ", ", d[3], ": CP in diet ", d[2], "%"))
 }
 set("DE_BY_SUBCAT", "feedlot_cattle", "value", "CONFIRMED",
-    "2019R V4 Ch10 Table 10A.2 (New), Latin America Feedlot cattle: digestibility of feed 74%. Required by Table 10.12, whose feedlot Ym of 4.0 is conditional on DE >= 72; the catalogue default of 55 would violate that precondition")
+    "2019R V4 Ch10 Table 10A.2 (New), Latin America Feedlot cattle: digestibility of feed 74%. Required by Table 10.12, whose feedlot Ym of 4.0 is conditional on DE >= 72")
 set("CP_BY_SUBCAT", "feedlot_cattle", "value", "CONFIRMED",
     "2019R V4 Ch10 Table 10A.2 (New), Latin America and North America Feedlot cattle both give CP in diet 14.0%")
 
-set("PCT_PREGNANT_BY_SUBCAT", "*", "value", "DEVIATION_OPEN",
-    "Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool")
+set("PCT_PREGNANT_BY_SUBCAT", "dairy_cows", "value", "CONFIRMED",
+    paste0(A1_LOW, ": 52% pregnant. ", BASIS_NOTE, " The previous 0.85 was the Eastern Europe dairy rate, which sat on a different continent from every other default in the tool."))
+set("PCT_PREGNANT_BY_SUBCAT", "other_cows", "value", "CONFIRMED",
+    paste0(A2G, ", Mature Females - grazing, Large Areas: 54% pregnant. The previous 0.85 was the Eastern Europe dairy rate."))
+set("PCT_PREGNANT_BY_SUBCAT", "heifers", "value", "NO_IPCC_DEFAULT",
+    "Table 10A.2 leaves the Pregnant column blank for Growing/Replacement, so IPCC publishes no figure for replacement heifers. 0.50 is a project assumption and must not be presented as an IPCC default.")
 
 set("FEEDING_SITUATION_CA", "stall_fed", "value", "CONFIRMED", paste0(T105, ": Stall 0"))
 set("FEEDING_SITUATION_CA", "pasture_flat", "value", "CONFIRMED", paste0(T105, ": Pasture 0.17"))

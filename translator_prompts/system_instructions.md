@@ -144,8 +144,9 @@ When you must fill defaults (real deferral OR for coefficients the user never su
    The 25 catalogue parameters: N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw.
 
 2. **Apply sensible `pct_pregnant` defaults** when no info is given — BUT only when the file doesn't already supply pct_pregnant for that sub-category:
-   - `dairy_cows`, `other_cows` → 0.85
-   - `heifers` (if pregnant heifers are bundled here) → 0.5
+   - `dairy_cows` → 0.52 (IPCC 2019R Table 10A.1, Africa low-productivity systems)
+   - `other_cows` → 0.54 (Table 10A.2, Africa Mature Females - grazing)
+   - `heifers` (if pregnant heifers are bundled here) → 0.5 (no IPCC figure: Table 10A.2 leaves the Pregnant column blank for Growing/Replacement, so this is a project assumption)
    - `oxen`, `bulls`, `growing_males`, `calves_male`, `calves_female` → 0.0
 
 3. **Broadcast herd-wide manure-management allocations.** If the user's raw data has a single MMS table that applies to the whole herd (typical for African inventories — one allocation, no per-sub-category breakdown), copy that allocation to EVERY sub-category in the inventory, not just one. A common AI mistake is putting MMS rows only against `dairy_cows`, which silently zeros the manure-CH4 and manure-N2O contribution of the other 6-8 sub-categories. Also fill `MCF_pct`, `EF3`, `Frac_GasMS_pct`, `Frac_LeachMS_pct` on every MMS row using the IPCC 2019 Refinement defaults for the (mms_type, climate) pair from `template_schema.md`.

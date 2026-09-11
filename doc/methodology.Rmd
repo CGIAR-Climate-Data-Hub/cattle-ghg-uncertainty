@@ -125,20 +125,20 @@ Table \ref{tab:params} lists all parameters used in the calculation chain, their
 \bottomrule
 \endlastfoot
 \texttt{N} & Number of animals (population) & head & \textit{n/a} & Eq.~10.1 (Tier 1 totals); national activity data & Normal \\
-\texttt{BW} & Mean live body weight & kg/head & 275 & Eq.~10.3; Annex 10A.2 (Africa cattle) & Normal \\
+\texttt{BW} & Mean live body weight & kg/head & 270 & Eq.~10.3; Annex 10A.1 (Africa, low productivity) & Normal \\
 \texttt{Cfi} & Coefficient for $NE_m$ & MJ/kg$^{0.75}$/d & 0.386 (lact.) / 0.322 (non-lact.) / 0.370 (bulls) & Eq.~10.3; Table 10.4 (Updated) & Constant \\
 \texttt{Tw} & Mean winter temperature & °C & 20 (inert) & Eq.~10.2 (cold-climate Cfi adjustment) & Constant \\
 \texttt{Ca} & Activity coefficient & — & 0.00 (stall) / 0.17 (pasture flat) / 0.36 (large/hilly) & Eq.~10.4; Table 10.5 (Updated) & Constant \\
 \texttt{WG} & Mean daily weight gain & kg/head/d & 0 (non-growing default) & Eq.~10.6 & Normal \\
 \texttt{MW} & Mature body weight & kg/head & 300 & Eq.~10.6; Annex 10A.2 & Normal \\
 \texttt{C} & Sex/condition coefficient for $NE_g$ & — & 0.8 (female) / 1.0 (castrate) / 1.2 (bull) & Eq.~10.6 & Constant \\
-\texttt{Milk} & Daily milk yield & kg/head/d & 3.5 (Africa, IPCC 2019R) & Eq.~10.8; Annex 10A.1 / 10A.2 & Normal/Lognormal \\
+\texttt{Milk} & Daily milk yield & kg/head/d & 1.2 (Africa, low productivity) & Eq.~10.8; Annex 10A.1 (Africa, low productivity) & Normal/Lognormal \\
 \texttt{MilkFat} & Milk fat content & \% & 4.3 (Africa, IPCC 2019R) & Eq.~10.8; Annex 10A.1 & Normal \\
-\texttt{pct\_pregnant} & Fraction of females pregnant / yr & — & 0.60 & 2019 Refinement Vol.4 Ch.10 §10.5 & Beta \\
-\texttt{MilkPR} & Milk protein content & \% & 3.3 ($\approx 1.9 + 0.4 \times$ \%Fat) & Eq.~10.33 (uses 6.38 milk-protein-to-N); Annex 10A.1--10A.3 & Normal \\
+\texttt{pct\_pregnant} & Fraction of females pregnant / yr & — & 0.52 & Annex 10A.1 (Africa, low productivity) & Beta \\
+\texttt{MilkPR} & Milk protein content & \% & 3.6 ($\approx 1.9 + 0.4 \times$ \%Fat at Fat 4.3) & Eq.~10.33 (uses 6.38 milk-protein-to-N); Annex 10A.1--10A.3 & Normal \\
 \texttt{WorkHours} & Daily working hours & h/head/d & 0 (no work) & Eq.~10.11 & Constant \\
 \texttt{Cp} & Pregnancy coefficient & — & 0.10 (cattle) & Eq.~10.13; Table 10.7 (Updated) & Constant \\
-\texttt{DE\_pct} & Digestible energy (\% of GE) & \% & 55.0 (Africa) & Eq.~10.14--16; Annex 10A & Normal \\
+\texttt{DE\_pct} & Digestible energy (\% of GE) & \% & 51.0 (Africa, low productivity) & Eq.~10.14--16; Annex 10A.1 (Africa, low productivity) & Normal \\
 \texttt{Ym} & Methane conversion factor & \% & 6.5 (lactating dairy cows, the catalogue default); resolved per sub-category: 7.0 non-dairy and multi-purpose, 4.0 feedlot under 2019R; 6.5 and 3.0 respectively under 2006 & Eq.~10.21; Table 10.12 (Updated), footnote 4 & Normal/PERT \\
 \texttt{UE} & Urinary energy (fraction of GE) & — & 0.04 (cattle) & Eq.~10.24 (footnote) & Constant \\
 \texttt{ASH} & Ash content of manure (fraction of DMI) & — & 0.08 (cattle; IPCC example 0.06 is pig-specific) & Eq.~10.24 & Constant \\

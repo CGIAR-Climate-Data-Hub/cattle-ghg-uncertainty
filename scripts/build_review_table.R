@@ -86,18 +86,9 @@ PATHWAY <- function(object, key, field) {
 # Research results, not derivable from the data, so written out explicitly.
 # A row here is NOT changed in the code; it is put to the reviewer.
 PROPOSALS <- rbind(
-  data.frame(object = "PARAM_CATALOGUE", key = "MilkPR", field = "ipcc_default",
-    proposed = "3.6", status = "OPEN",
-    why = "Both candidate Africa rows give milk protein 3.6% (Table 10A.1 dairy and Table 10A.2 non-dairy grazing), and the tool's own documented route %MilkPR = 1.9 + 0.4 x %Fat gives 3.62 at Fat 4.3. The shipped 3.3 is what that formula returns for Fat 3.5, the value Fat held before review round 8 corrected it. No IPCC reading supports 3.3."),
-  data.frame(object = "PARAM_CATALOGUE", key = "pct_pregnant", field = "ipcc_default",
-    proposed = "0.54", status = "OPEN",
-    why = "Table 10A.1 Africa dairy and Table 10A.2 Africa grazing both give 54% pregnant. The shipped 0.60 matches no row in either table."),
-  data.frame(object = "PCT_PREGNANT_BY_SUBCAT", key = "dairy_cows", field = "value",
-    proposed = "0.54", status = "OPEN",
-    why = "0.85 is the Eastern Europe dairy rate. Every other default in the tool is on an Africa basis, where both annex tables give 54%."),
-  data.frame(object = "PCT_PREGNANT_BY_SUBCAT", key = "other_cows", field = "value",
-    proposed = "0.54", status = "OPEN",
-    why = "As dairy_cows: 0.85 is the Eastern Europe rate, Africa is 54% in both annex tables."),
+  data.frame(object = "PARAM_CATALOGUE", key = "Milk", field = "ipcc_default",
+    proposed = "", status = "APPLIED_OVERTURNS_REVIEW",
+    why = "Changed from 3.5 to 1.2 by the low-productivity basis decision of 2026-09-11. 3.5 was the Africa AGGREGATE row of Table 10A.1, a population-weighted average of the high (5.8) and low (1.2) productivity systems; 1.2 is the low-productivity row. Review round 8 page 7 agreed 3.5 against a previous unsourced 4.0, and that was right FOR THE AGGREGATE ROW. What changed is the basis, not the reading: the productivity question does not appear to have been put to the reviewer. Reverting is a single cell in the master."),
   data.frame(object = "MMS_DEFAULTS", key = "composting", field = "mcf_tropical",
     proposed = "2.5", status = "OPEN",
     why = "The row declares the Static Pile variant and its EF3 (0.010) and Frac (0.65) both follow it, but 0.5 is the 2019R In-vessel figure. 2019R Table 10.17 gives Composting - Static pile (Forced aeration) 1.00 cool / 2.00 temperate / 2.50 warm. Correct as-is under 2006, where static pile is 0.5."),
@@ -121,7 +112,7 @@ PROPOSALS <- rbind(
     why = "3.5 is the Africa AGGREGATE row of Table 10A.1, which footnote 4 defines as a weighted average of high-productivity (5.8) and low-productivity (1.2) systems. The round 8 move from an unsourced 4.0 to 3.5 was right for that row. The open question is which row the tool should sit on: Bo is 0.13 on the stated basis of 'other regions, LOW productivity' and Ca is 0.17, the Pasture/Range coefficient that Table 10A.1 attaches to the low-productivity row, while the aggregate row is Stall Fed. On a consistent low-productivity basis Africa dairy milk is 1.2. Measured for dairy cows per 100,000 head: enteric CH4 6957.7 t/yr at 3.5 against 5929.6 t/yr at 1.2, a 14.8% difference. Separately, footnote 1 says the published figure is milk yield per day across the WHOLE YEAR, while the tool defines the field as per-lactating-cow and multiplies by pct_pregnant, discounting it a second time (NE_l 15% low)."),
   data.frame(object = "PARAM_CATALOGUE", key = "Fat", field = "ipcc_default",
     proposed = "no change", status = "PROPOSED",
-    why = "CONFIRMED and robust. Table 10A.1 gives 4.3 for Africa in all three rows (aggregate, high productivity and low productivity), so no choice of productivity basis can change it. The round 8 comment that IPCC 2019 gives 4.3 for Africa is exactly right. Listed only so the reviewer can see it was rechecked."),
+    why = "UNCHANGED and confirmed. Table 10A.1 gives 4.3 for Africa in all three rows (aggregate, high productivity and low productivity), so the low-productivity basis decision cannot move it. The round 8 comment that IPCC 2019 gives 4.3 for Africa is exactly right. Listed only so the reviewer can see it was rechecked and survived the basis change that moved Milk."),
   data.frame(object = "IPCC_DEFAULTS_BY_REGION", key = "asia", field = "default_val",
     proposed = "(decide)", status = "PROPOSED",
     why = "Table 10A.1 Asia dairy is 386 (low productivity 355); Table 10A.2 Asia gives 376 and 305. The shipped 350 matches no Asia row. Review round 7 item 3 kept this object for BW only after the other benchmarks were withdrawn."),
@@ -197,7 +188,7 @@ R$status   <- ifelse(!is.na(j), PROPOSALS$status[j],
 keep <- R$status != "" &
         (R$verdict != "META" | !is.na(j) | R$field == "ipcc_ref")
 R <- R[keep, ]
-R <- R[order(factor(R$status, levels = c("APPLIED", "PROPOSED", "OPEN")),
+R <- R[order(factor(R$status, levels = c("APPLIED_OVERTURNS_REVIEW", "APPLIED", "PROPOSED", "OPEN")),
              R$object, R$key, R$field), ]
 
 esc <- function(x) gsub("\\|", "\\\\|", ifelse(is.na(x), "", x))
@@ -210,6 +201,7 @@ sect <- function(d, cols, hdr) c(
 
 n_app <- sum(R$status == "APPLIED"); n_pro <- sum(R$status == "PROPOSED")
 n_opn <- sum(R$status == "OPEN")
+n_ovr <- sum(R$status == "APPLIED_OVERTURNS_REVIEW")
 
 out <- c(
 "# IPCC default values: what changed, and what we think is still wrong",
@@ -229,11 +221,20 @@ sprintf("The **before** column is the value as it stood at commit `fbfa1bc` (202
 sprintf("| `APPLIED` | %d | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |", n_app),
 sprintf("| `PROPOSED` | %d | We think it is wrong, but a numbered review round adjudicated it, so it has **not** been changed. Your call. |", n_pro),
 sprintf("| `OPEN` | %d | Differs from IPCC with no recorded reason and no review history. A judgement call we did not want to take alone. |", n_opn),
+sprintf("| `APPLIED_OVERTURNS_REVIEW` | %d | **Changed, and it reverses a value a review round agreed.** Read these first. |", n_ovr),
 "",
 "Nothing here has been pushed or deployed.",
 "",
 "---",
 "",
+sprintf("## 0. Applied, and it overturns an earlier review decision (%d)", n_ovr),
+"",
+"The one thing in this document that most needs a second opinion.",
+"")
+out <- c(out, sect(R[R$status == "APPLIED_OVERTURNS_REVIEW", ],
+  c("object", "key", "field", "before", "now", "round", "why"),
+  c("object", "key", "field", "was 2026-07-10", "now", "review round", "why")))
+out <- c(out, "",
 sprintf("## 1. Already applied (%d)", n_app),
 "",
 "Changed since 2026-07-10. Each cites the IPCC table it was read from.",

@@ -13,11 +13,11 @@ All 289 numeric values below were checked one at a time against the IPCC source 
 
 | verdict | meaning | values |
 |---|---|---|
-| `CONFIRMED` | read at the cited IPCC table or equation | 191 |
-| `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 35 |
+| `CONFIRMED` | read at the cited IPCC table or equation | 204 |
 | `DEVIATION_DOCUMENTED` | differs from IPCC deliberately, reason on record | 23 |
+| `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 21 |
 | `NOT_IPCC` | a non-IPCC source or a project assumption | 20 |
-| `NO_IPCC_DEFAULT` | IPCC publishes no default for this quantity | 10 |
+| `NO_IPCC_DEFAULT` | IPCC publishes no default for this quantity | 11 |
 | `INTERPRETED` | a defensible reading of an IPCC category label, not a quotation | 6 |
 | `META` | not a shipped value | 4 |
 
@@ -30,19 +30,19 @@ The 25 parameters. `ipcc_default` is the generic value; where a sub-category ove
 | parameter | unit | ipcc_default | suggested_uncertainty_pct | suggested_lower_bound | suggested_upper_bound | suggested_distribution | param_type | param_tier | user_reducible | ipcc_ref |
 |---|---|---|---|---|---|---|---|---|---|---|
 | N | head |  | 10 |  |  | normal | activity_data | core | yes |  |
-| BW | kg | 275 | 15 |  |  | normal | coefficient | core | yes | Table 10A.2 |
+| BW | kg | 270 | 15 |  |  | normal | coefficient | core | yes | Table 10A.2 |
 | MW | kg | 300 | 10 |  |  | normal | coefficient | core | yes | Table 10A.2 |
 | WG | kg/day | 0 | 30 |  |  | pert | coefficient | core | yes | Table 10A.1 |
-| Milk | kg/head/day | 3.5 | 20 |  |  | normal | coefficient | core | yes |  |
+| Milk | kg/head/day | 1.2 | 20 |  |  | normal | coefficient | core | yes |  |
 | Fat | % | 4.3 | 10 |  |  | normal | coefficient | core | yes |  |
-| pct_pregnant | fraction (0-1) | 0.6 | 20 |  |  | beta | coefficient | core | yes |  |
-| DE | % | 55 | 15 |  |  | normal | coefficient | core | yes | Eq 10.14--16 |
+| pct_pregnant | fraction (0-1) | 0.52 | 20 |  |  | beta | coefficient | core | yes |  |
+| DE | % | 51 | 15 |  |  | normal | coefficient | core | yes | Eq 10.14--16 |
 | Cfi | MJ/day/kg^0.75 | 0.386 | 30 |  |  | pert | coefficient | advanced | no | Table 10.4 |
 | Ca | dimensionless | 0.17 | 30 |  |  | triangular | coefficient | advanced | no | Table 10.5 |
 | C | dimensionless | 0.8 | 30 |  |  | triangular | coefficient | advanced | no | Eq 10.6 |
 | Cp | dimensionless | 0.1 | 10 |  |  | beta | coefficient | advanced | no | Table 10.7 |
 | hours | hours/day | 0 | 20 |  |  | pert | coefficient | core | yes | Eq 10.11 |
-| CP | % | 10 | 15 |  |  | normal | coefficient | core | yes | Eq 10.32 |
+| CP | % | 9.6 | 15 |  |  | normal | coefficient | core | yes | Eq 10.32 |
 | Ym | % | 6.5 | 20 |  |  | pert | coefficient | advanced | no | Table 10.12 |
 | Bo | m3 CH₄/kg VS | 0.13 | 15 |  |  | pert | coefficient | advanced | no | Table 10.16A |
 | ASH | fraction | 0.08 | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
@@ -52,7 +52,7 @@ The 25 parameters. `ipcc_default` is the generic value; where a sub-category ove
 | EF5 | kg N2O-N/kg N | 0.011 |  | 0.0005 | 0.02 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
 | Frac_GASM_PRP | fraction | 0.21 |  | 0.005 | 0.31 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
 | Frac_LEACH_PRP | fraction | 0.24 |  | 0.01 | 0.73 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
-| MilkPR | % | 3.3 | 10 |  |  | normal | coefficient | core | yes | Eq 10.33 |
+| MilkPR | % | 3.6 | 10 |  |  | normal | coefficient | core | yes | Eq 10.33 |
 | Tw | °C | 20 | 25 |  |  | normal | coefficient | advanced | yes | Eq 10.2 |
 
 ## Manure management systems
@@ -97,14 +97,14 @@ The 25 parameters. `ipcc_default` is the generic value; where a sub-category ove
 
 | sub_category | Cfi | C | BW | MW | WG | DE | CP | Ym_2019R | Ym_2006 |
 |---|---|---|---|---|---|---|---|---|---|
-| dairy_cows | 0.386 | 0.8 | 275 | 300 | 0 | 55 | 10 | 6.5 | 6.5 |
-| other_cows | 0.322 | 0.8 | 275 | 300 | 0 | 55 | 10 | 7 | 6.5 |
-| bulls | 0.37 | 1.2 | 350 | 400 | 0 | 55 | 10 | 7 | 6.5 |
-| oxen | 0.322 | 1 | 300 | 350 | 0 | 55 | 10 | 7 | 6.5 |
-| heifers | 0.322 | 0.8 | 200 | 300 | 0.25 | 55 | 10 | 7 | 6.5 |
-| growing_males | 0.322 | 1 | 200 | 350 | 0.2 | 55 | 10 | 7 | 6.5 |
-| calves_female | 0.322 | 0.8 | 60 | 300 | 0.3 | 55 | 10 | 7 | 6.5 |
-| calves_male | 0.322 | 1 | 60 | 350 | 0.3 | 55 | 10 | 7 | 6.5 |
+| dairy_cows | 0.386 | 0.8 | 270 | 300 | 0 | 51 | 9.6 | 6.5 | 6.5 |
+| other_cows | 0.322 | 0.8 | 275 | 300 | 0 | 58 | 10 | 7 | 6.5 |
+| bulls | 0.37 | 1.2 | 350 | 400 | 0 | 58 | 10 | 7 | 6.5 |
+| oxen | 0.322 | 1 | 300 | 350 | 0 | 58 | 10 | 7 | 6.5 |
+| heifers | 0.322 | 0.8 | 200 | 300 | 0.25 | 59 | 10.4 | 7 | 6.5 |
+| growing_males | 0.322 | 1 | 200 | 350 | 0.2 | 59 | 10.4 | 7 | 6.5 |
+| calves_female | 0.322 | 0.8 | 60 | 300 | 0.3 | 59 | 10.3 | 7 | 6.5 |
+| calves_male | 0.322 | 1 | 60 | 350 | 0.3 | 59 | 10.3 | 7 | 6.5 |
 | feedlot_cattle | 0.322 | 1 | 250 | 400 | 1 | 74 | 14 | 4 | 3 |
 
 ## Effective value of every parameter, per sub-category
@@ -114,19 +114,19 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | sub_category | parameter | value | distribution | source |
 |---|---|---|---|---|
 | dairy_cows | N |  | normal | catalogue default |
-| dairy_cows | BW | 275 | normal | catalogue default |
+| dairy_cows | BW | 270 | normal | catalogue default |
 | dairy_cows | MW | 300 | normal | catalogue default |
 | dairy_cows | WG | 0 | constant | catalogue default |
-| dairy_cows | Milk | 3.5 | normal | catalogue default |
+| dairy_cows | Milk | 1.2 | normal | catalogue default |
 | dairy_cows | Fat | 4.3 | normal | catalogue default |
-| dairy_cows | pct_pregnant | 0.85 | beta | sub-category override |
-| dairy_cows | DE | 55 | normal | catalogue default |
+| dairy_cows | pct_pregnant | 0.52 | beta | catalogue default |
+| dairy_cows | DE | 51 | normal | catalogue default |
 | dairy_cows | Cfi | 0.386 | pert | catalogue default |
 | dairy_cows | Ca | 0.17 | triangular | catalogue default |
 | dairy_cows | C | 0.8 | triangular | catalogue default |
 | dairy_cows | Cp | 0.1 | beta | catalogue default |
 | dairy_cows | hours | 0 | constant | biological zero |
-| dairy_cows | CP | 10 | normal | catalogue default |
+| dairy_cows | CP | 9.6 | normal | catalogue default |
 | dairy_cows | Ym | 6.5 | pert | catalogue default |
 | dairy_cows | Bo | 0.13 | pert | catalogue default |
 | dairy_cows | ASH | 0.08 | pert | catalogue default |
@@ -136,22 +136,22 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | dairy_cows | EF5 | 0.011 | lognormal | catalogue default |
 | dairy_cows | Frac_GASM_PRP | 0.21 | pert | catalogue default |
 | dairy_cows | Frac_LEACH_PRP | 0.24 | pert | catalogue default |
-| dairy_cows | MilkPR | 3.3 | normal | catalogue default |
+| dairy_cows | MilkPR | 3.6 | normal | catalogue default |
 | dairy_cows | Tw | 20 | normal | catalogue default |
 | other_cows | N |  | normal | catalogue default |
-| other_cows | BW | 275 | normal | catalogue default |
+| other_cows | BW | 275 | normal | sub-category override |
 | other_cows | MW | 300 | normal | catalogue default |
 | other_cows | WG | 0 | constant | catalogue default |
-| other_cows | Milk | 3.5 | normal | catalogue default |
+| other_cows | Milk | 1.2 | normal | catalogue default |
 | other_cows | Fat | 4.3 | normal | catalogue default |
-| other_cows | pct_pregnant | 0.85 | beta | sub-category override |
-| other_cows | DE | 55 | normal | catalogue default |
+| other_cows | pct_pregnant | 0.54 | beta | sub-category override |
+| other_cows | DE | 58 | normal | sub-category override |
 | other_cows | Cfi | 0.322 | pert | sub-category override |
 | other_cows | Ca | 0.17 | triangular | catalogue default |
 | other_cows | C | 0.8 | triangular | catalogue default |
 | other_cows | Cp | 0.1 | beta | catalogue default |
 | other_cows | hours | 0 | constant | biological zero |
-| other_cows | CP | 10 | normal | catalogue default |
+| other_cows | CP | 10 | normal | sub-category override |
 | other_cows | Ym | 7 | pert | sub-category override |
 | other_cows | Bo | 0.13 | pert | catalogue default |
 | other_cows | ASH | 0.08 | pert | catalogue default |
@@ -161,7 +161,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | other_cows | EF5 | 0.011 | lognormal | catalogue default |
 | other_cows | Frac_GASM_PRP | 0.21 | pert | catalogue default |
 | other_cows | Frac_LEACH_PRP | 0.24 | pert | catalogue default |
-| other_cows | MilkPR | 3.3 | normal | catalogue default |
+| other_cows | MilkPR | 3.6 | normal | catalogue default |
 | other_cows | Tw | 20 | normal | catalogue default |
 | bulls | N |  | normal | catalogue default |
 | bulls | BW | 350 | normal | sub-category override |
@@ -170,13 +170,13 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | bulls | Milk | 0 | constant | biological zero |
 | bulls | Fat | 0 | constant | biological zero |
 | bulls | pct_pregnant | 0 | constant | biological zero |
-| bulls | DE | 55 | normal | catalogue default |
+| bulls | DE | 58 | normal | sub-category override |
 | bulls | Cfi | 0.37 | pert | sub-category override |
 | bulls | Ca | 0.17 | triangular | catalogue default |
 | bulls | C | 1.2 | triangular | sub-category override |
 | bulls | Cp | 0.1 | beta | catalogue default |
 | bulls | hours | 0 | constant | biological zero |
-| bulls | CP | 10 | normal | catalogue default |
+| bulls | CP | 10 | normal | sub-category override |
 | bulls | Ym | 7 | pert | sub-category override |
 | bulls | Bo | 0.13 | pert | catalogue default |
 | bulls | ASH | 0.08 | pert | catalogue default |
@@ -195,13 +195,13 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | oxen | Milk | 0 | constant | biological zero |
 | oxen | Fat | 0 | constant | biological zero |
 | oxen | pct_pregnant | 0 | constant | biological zero |
-| oxen | DE | 55 | normal | catalogue default |
+| oxen | DE | 58 | normal | sub-category override |
 | oxen | Cfi | 0.322 | pert | sub-category override |
 | oxen | Ca | 0.17 | triangular | catalogue default |
 | oxen | C | 1 | triangular | sub-category override |
 | oxen | Cp | 0.1 | beta | catalogue default |
 | oxen | hours | 0 | pert | catalogue default |
-| oxen | CP | 10 | normal | catalogue default |
+| oxen | CP | 10 | normal | sub-category override |
 | oxen | Ym | 7 | pert | sub-category override |
 | oxen | Bo | 0.13 | pert | catalogue default |
 | oxen | ASH | 0.08 | pert | catalogue default |
@@ -220,13 +220,13 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | heifers | Milk | 0 | constant | biological zero |
 | heifers | Fat | 0 | constant | biological zero |
 | heifers | pct_pregnant | 0.5 | beta | sub-category override |
-| heifers | DE | 55 | normal | catalogue default |
+| heifers | DE | 59 | normal | sub-category override |
 | heifers | Cfi | 0.322 | pert | sub-category override |
 | heifers | Ca | 0.17 | triangular | catalogue default |
 | heifers | C | 0.8 | triangular | catalogue default |
 | heifers | Cp | 0.1 | beta | catalogue default |
 | heifers | hours | 0 | constant | biological zero |
-| heifers | CP | 10 | normal | catalogue default |
+| heifers | CP | 10.4 | normal | sub-category override |
 | heifers | Ym | 7 | pert | sub-category override |
 | heifers | Bo | 0.13 | pert | catalogue default |
 | heifers | ASH | 0.08 | pert | catalogue default |
@@ -245,13 +245,13 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | growing_males | Milk | 0 | constant | biological zero |
 | growing_males | Fat | 0 | constant | biological zero |
 | growing_males | pct_pregnant | 0 | constant | biological zero |
-| growing_males | DE | 55 | normal | catalogue default |
+| growing_males | DE | 59 | normal | sub-category override |
 | growing_males | Cfi | 0.322 | pert | sub-category override |
 | growing_males | Ca | 0.17 | triangular | catalogue default |
 | growing_males | C | 1 | triangular | sub-category override |
 | growing_males | Cp | 0.1 | beta | catalogue default |
 | growing_males | hours | 0 | constant | biological zero |
-| growing_males | CP | 10 | normal | catalogue default |
+| growing_males | CP | 10.4 | normal | sub-category override |
 | growing_males | Ym | 7 | pert | sub-category override |
 | growing_males | Bo | 0.13 | pert | catalogue default |
 | growing_males | ASH | 0.08 | pert | catalogue default |
@@ -270,13 +270,13 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | calves_female | Milk | 0 | constant | biological zero |
 | calves_female | Fat | 0 | constant | biological zero |
 | calves_female | pct_pregnant | 0 | constant | biological zero |
-| calves_female | DE | 55 | normal | catalogue default |
+| calves_female | DE | 59 | normal | sub-category override |
 | calves_female | Cfi | 0.322 | pert | sub-category override |
 | calves_female | Ca | 0.17 | triangular | catalogue default |
 | calves_female | C | 0.8 | triangular | catalogue default |
 | calves_female | Cp | 0.1 | beta | catalogue default |
 | calves_female | hours | 0 | constant | biological zero |
-| calves_female | CP | 10 | normal | catalogue default |
+| calves_female | CP | 10.3 | normal | sub-category override |
 | calves_female | Ym | 7 | pert | sub-category override |
 | calves_female | Bo | 0.13 | pert | catalogue default |
 | calves_female | ASH | 0.08 | pert | catalogue default |
@@ -295,13 +295,13 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | calves_male | Milk | 0 | constant | biological zero |
 | calves_male | Fat | 0 | constant | biological zero |
 | calves_male | pct_pregnant | 0 | constant | biological zero |
-| calves_male | DE | 55 | normal | catalogue default |
+| calves_male | DE | 59 | normal | sub-category override |
 | calves_male | Cfi | 0.322 | pert | sub-category override |
 | calves_male | Ca | 0.17 | triangular | catalogue default |
 | calves_male | C | 1 | triangular | sub-category override |
 | calves_male | Cp | 0.1 | beta | catalogue default |
 | calves_male | hours | 0 | constant | biological zero |
-| calves_male | CP | 10 | normal | catalogue default |
+| calves_male | CP | 10.3 | normal | sub-category override |
 | calves_male | Ym | 7 | pert | sub-category override |
 | calves_male | Bo | 0.13 | pert | catalogue default |
 | calves_male | ASH | 0.08 | pert | catalogue default |
@@ -319,7 +319,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | feedlot_cattle | WG | 1 | pert | sub-category override |
 | feedlot_cattle | Milk | 0 | constant | biological zero |
 | feedlot_cattle | Fat | 0 | constant | biological zero |
-| feedlot_cattle | pct_pregnant | 0.6 | beta | catalogue default |
+| feedlot_cattle | pct_pregnant | 0.52 | beta | catalogue default |
 | feedlot_cattle | DE | 74 | normal | sub-category override |
 | feedlot_cattle | Cfi | 0.322 | pert | sub-category override |
 | feedlot_cattle | Ca | 0.17 | triangular | catalogue default |
@@ -366,20 +366,17 @@ The only parameter with a defensible continental IPCC lookup; the other benchmar
 
 ## Values that differ from IPCC with no recorded reason
 
-35 of the 289 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
+21 of the 289 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
 
 | object | key | field | value | what IPCC says |
 |---|---|---|---|---|
-| PARAM_CATALOGUE | pct_pregnant | ipcc_default | 0.6 | Table 10A.1 Africa dairy gives 54%; Table 10A.2 Africa grazing 54%, Pasture/Range 62%. The 0.60 default matches no row |
-| PARAM_CATALOGUE | DE | ipcc_default | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither |
-| PARAM_CATALOGUE | MilkPR | ipcc_default | 3.3 | Both Africa rows give protein content 3.6% (Table 10A.1 and Table 10A.2), and the tool's own documented route %MilkPR = 1.9 + 0.4 x %Fat gives 3.62 at Fat 4.3. No IPCC reading supports 3.3; 3.3 is what that formula returns for Fat 3.5, the value Fat held before it was corrected |
 | MMS_DEFAULTS | composting | mcf_tropical | 0.5 | 0.5 is the 2006 Table 10.17 Composting - Static pile value, and also the 2019R In-vessel value. 2019R V4 Ch10 Table 10.17 (Updated) gives Composting - Static pile (Forced aeration) 1.00 / 2.00 / 2.50. The row declares the Static Pile variant and its EF3 and Frac both follow Static Pile under 2019R, so the MCF is the one coefficient still on the other edition's reading |
 | MMS_DEFAULTS | composting | mcf_temperate | 0.5 | 0.5 is the 2006 Table 10.17 Composting - Static pile value, and also the 2019R In-vessel value. 2019R V4 Ch10 Table 10.17 (Updated) gives Composting - Static pile (Forced aeration) 1.00 / 2.00 / 2.50. The row declares the Static Pile variant and its EF3 and Frac both follow Static Pile under 2019R, so the MCF is the one coefficient still on the other edition's reading |
 | MMS_DEFAULTS | composting | mcf_boreal | 0.5 | 0.5 is the 2006 Table 10.17 Composting - Static pile value, and also the 2019R In-vessel value. 2019R V4 Ch10 Table 10.17 (Updated) gives Composting - Static pile (Forced aeration) 1.00 / 2.00 / 2.50. The row declares the Static Pile variant and its EF3 and Frac both follow Static Pile under 2019R, so the MCF is the one coefficient still on the other edition's reading |
 | MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas | 0.05 | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central value. Footnote 3 assigns 0.05 to high-dry-matter covered digestate and up to 0.50 to uncovered. The tool takes 0.05 as the central and then applies bounds 0.02 to 0.08, so its whole sampled range sits at or below IPCC's floor and its upper bound is six times below IPCC's ceiling |
 | MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas_low | 0.02 | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central value. Footnote 3 assigns 0.05 to high-dry-matter covered digestate and up to 0.50 to uncovered. The tool takes 0.05 as the central and then applies bounds 0.02 to 0.08, so its whole sampled range sits at or below IPCC's floor and its upper bound is six times below IPCC's ceiling |
 | MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas_high | 0.08 | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central value. Footnote 3 assigns 0.05 to high-dry-matter covered digestate and up to 0.50 to uncovered. The tool takes 0.05 as the central and then applies bounds 0.02 to 0.08, so its whole sampled range sits at or below IPCC's floor and its upper bound is six times below IPCC's ceiling |
-| LW_BY_SUBCAT | dairy_cows | value | 275 | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
+| LW_BY_SUBCAT | dairy_cows | value | 270 | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
 | LW_BY_SUBCAT | bulls | value | 350 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Males 540 kg, Bulls - Grazing 340 kg. The 350 used here matches neither |
 | LW_BY_SUBCAT | oxen | value | 300 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Draft Bullocks 340 kg. The 300 used here is 12% lower |
 | LW_BY_SUBCAT | heifers | value | 200 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Growing/Replacement 204 kg. The 200 used here is a rounding of it, not a transcription |
@@ -392,17 +389,6 @@ The only parameter with a defensible continental IPCC lookup; the other benchmar
 | WG_BY_SUBCAT | calves_female | value | 0.3 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 0.33 kg/day. The 0.30 used here is a rounding of it |
 | WG_BY_SUBCAT | calves_male | value | 0.3 | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 0.33 kg/day. The 0.30 used here is a rounding of it |
 | WG_BY_SUBCAT | feedlot_cattle | value | 1 | Table 10A.2 has no Africa feedlot row. Published feedlot gains are North America 1.4 and Latin America 0.90 kg/day. The 1.0 used here falls between them |
-| PCT_PREGNANT_BY_SUBCAT | dairy_cows | value | 0.85 | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
-| PCT_PREGNANT_BY_SUBCAT | other_cows | value | 0.85 | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
-| PCT_PREGNANT_BY_SUBCAT | heifers | value | 0.5 | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
-| DE_BY_SUBCAT | dairy_cows | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | other_cows | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | bulls | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | oxen | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | heifers | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | growing_males | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | calves_female | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | calves_male | value | 55 | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
 | IPCC_DEFAULTS_BY_REGION | asia | default_val | 350 | Table 10A.1 Asia dairy 386 kg (low productivity 355); Table 10A.2 Asia Mature Females 376, grazing 305. The 350 used here matches no Asia row; the only published 350 is Indian subcontinent high-productivity dairy |
 | IPCC_DEFAULTS_BY_REGION | oceania | default_val | 500 | Table 10A.1 Oceania dairy 488 kg; Table 10A.2 Oceania Mature Females 416, Mature Males 467. The 500 used here appears in no Oceania row |
 
@@ -413,19 +399,19 @@ Every numeric value with its verdict and source, in master order.
 | object | key | field | value | verdict | source |
 |---|---|---|---|---|---|
 | PARAM_CATALOGUE | N | suggested_uncertainty_pct | 10 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | BW | ipcc_default | 275 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: Weight 275 kg |
+| PARAM_CATALOGUE | BW | ipcc_default | 270 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: Weight 270 kg. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. |
 | PARAM_CATALOGUE | BW | suggested_uncertainty_pct | 15 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | MW | ipcc_default | 300 | `NOT_IPCC` | Neither Table 10A.1 nor Table 10A.2 has a mature-weight column; the cited table does not contain this value. Reviewer R7 #3 listed 300 kg MW as unfindable in IPCC |
 | PARAM_CATALOGUE | MW | suggested_uncertainty_pct | 10 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | WG | ipcc_default | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa dairy row, p.10.104: weight gain 0 for every dairy row |
 | PARAM_CATALOGUE | WG | suggested_uncertainty_pct | 30 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | Milk | ipcc_default | 3.5 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa dairy row, p.10.104: milk yield 3.5 kg/day |
+| PARAM_CATALOGUE | Milk | ipcc_default | 1.2 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: milk yield 1.2 kg/day. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. The previous 3.5 was the Africa AGGREGATE row, a population-weighted average of the high (5.8) and low (1.2) productivity systems per footnote 4. Changing it overturns the value agreed at review round 8 page 7, which was right for the aggregate row; the basis, not the reading, is what changed. |
 | PARAM_CATALOGUE | Milk | suggested_uncertainty_pct | 20 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | Fat | ipcc_default | 4.3 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa dairy row, p.10.104: fat content 4.3% |
+| PARAM_CATALOGUE | Fat | ipcc_default | 4.3 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: fat content 4.3%. Identical in the aggregate, high and low productivity rows, so the basis choice cannot move it. Agreed at review round 8 page 7 and unaffected. |
 | PARAM_CATALOGUE | Fat | suggested_uncertainty_pct | 10 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | pct_pregnant | ipcc_default | 0.6 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54%; Table 10A.2 Africa grazing 54%, Pasture/Range 62%. The 0.60 default matches no row |
+| PARAM_CATALOGUE | pct_pregnant | ipcc_default | 0.52 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: 52% pregnant. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. The previous 0.60 matched no row in either table. |
 | PARAM_CATALOGUE | pct_pregnant | suggested_uncertainty_pct | 20 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | DE | ipcc_default | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither |
+| PARAM_CATALOGUE | DE | ipcc_default | 51 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: digestibility of feed 51%. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. The previous 55% sat between the two tables and matched neither. |
 | PARAM_CATALOGUE | DE | suggested_uncertainty_pct | 15 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | Cfi | ipcc_default | 0.386 | `CONFIRMED` | 2019R V4 Ch10 Table 10.4 (Updated), p.10.24: lactating cows 0.386 |
 | PARAM_CATALOGUE | Cfi | suggested_uncertainty_pct | 30 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
@@ -437,7 +423,7 @@ Every numeric value with its verdict and source, in master order.
 | PARAM_CATALOGUE | Cp | suggested_uncertainty_pct | 10 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | hours | ipcc_default | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa dairy row, p.10.104: work 0 hrs/day for every dairy row |
 | PARAM_CATALOGUE | hours | suggested_uncertainty_pct | 20 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
-| PARAM_CATALOGUE | CP | ipcc_default | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0% |
+| PARAM_CATALOGUE | CP | ipcc_default | 9.6 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: CP in diet 9.6%. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. The previous 10.0% was the Table 10A.2 non-dairy grazing figure, which now sits on the non-dairy sub-categories instead. |
 | PARAM_CATALOGUE | CP | suggested_uncertainty_pct | 15 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | Ym | ipcc_default | 6.5 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated): Low producing cows (<5000 kg/yr), DE <= 62, NDF > 38, Ym 6.5%. Footnote 4 restricts the dairy rows to LACTATING cows, which is exactly the dairy_cows sub-category, so 6.5 is right as the dairy default and wrong as the generic one: the same table gives 7.0 for non-dairy >75% forage and 4.0 for feedlot. See the Ym section of the provenance register |
 | PARAM_CATALOGUE | Ym | suggested_uncertainty_pct | 20 | `CONFIRMED` | 2019R V4 Ch10 Table 10.12 (Updated) footnote 3: 'Uncertainty values are +/- 20% based on published standard deviations from Niu et al. (2018) and data compilations for non dairy cattle as described in Annex 10B.2' |
@@ -462,7 +448,7 @@ Every numeric value with its verdict and source, in master order.
 | PARAM_CATALOGUE | Frac_LEACH_PRP | ipcc_default | 0.24 | `CONFIRMED` | 2019R V4 Ch11 Table 11.3 (Updated), FracLEACH-(H) wet climates: 0.24, confirmed in the body text at Ch11 s11.2.2 |
 | PARAM_CATALOGUE | Frac_LEACH_PRP | suggested_lower_bound | 0.01 | `CONFIRMED` | 2019R V4 Ch11 Table 11.3 (Updated), FracLEACH-(H): lower 0.01 |
 | PARAM_CATALOGUE | Frac_LEACH_PRP | suggested_upper_bound | 0.73 | `CONFIRMED` | 2019R V4 Ch11 Table 11.3 (Updated), FracLEACH-(H): upper 0.73 |
-| PARAM_CATALOGUE | MilkPR | ipcc_default | 3.3 | `DEVIATION_OPEN` | Both Africa rows give protein content 3.6% (Table 10A.1 and Table 10A.2), and the tool's own documented route %MilkPR = 1.9 + 0.4 x %Fat gives 3.62 at Fat 4.3. No IPCC reading supports 3.3; 3.3 is what that formula returns for Fat 3.5, the value Fat held before it was corrected |
+| PARAM_CATALOGUE | MilkPR | ipcc_default | 3.6 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: protein content of milk 3.6%. Identical in all three Africa rows of Table 10A.1 and in Table 10A.2, and the tool's own documented route %MilkPR = 1.9 + 0.4 x %Fat gives 3.62 at Fat 4.3. The previous 3.3 was what that formula returns for Fat 3.5, the value Fat held before review round 8 corrected it. |
 | PARAM_CATALOGUE | MilkPR | suggested_uncertainty_pct | 10 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
 | PARAM_CATALOGUE | Tw | ipcc_default | 20 | `NOT_IPCC` | Winter temperature is country-specific; IPCC publishes no default. Project assumption |
 | PARAM_CATALOGUE | Tw | suggested_uncertainty_pct | 25 | `NOT_IPCC` | Penman et al. (2000) IPCC Good Practice Guidance and Monni et al. (2007). Disclosed as a non-IPCC suggestion in the user guide |
@@ -620,7 +606,7 @@ Every numeric value with its verdict and source, in master order.
 | C_GROWTH_BY_SUBCAT | calves_female | value | 0.8 | `CONFIRMED` | 2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (NRC 1996) |
 | C_GROWTH_BY_SUBCAT | calves_male | value | 1 | `INTERPRETED` | 2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (NRC 1996). The tool assigns the castrate value 1.0 to growing and feedlot males, the same reading it applies to Cfi |
 | C_GROWTH_BY_SUBCAT | feedlot_cattle | value | 1 | `INTERPRETED` | 2019R V4 Ch10 Eq 10.6 note: C = 0.8 females, 1.0 castrates, 1.2 bulls (NRC 1996). The tool assigns the castrate value 1.0 to growing and feedlot males, the same reading it applies to Cfi |
-| LW_BY_SUBCAT | dairy_cows | value | 275 | `DEVIATION_OPEN` | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
+| LW_BY_SUBCAT | dairy_cows | value | 270 | `DEVIATION_OPEN` | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
 | LW_BY_SUBCAT | other_cows | value | 275 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Females - grazing, Large Areas 275 kg |
 | LW_BY_SUBCAT | bulls | value | 350 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Mature Males 540 kg, Bulls - Grazing 340 kg. The 350 used here matches neither |
 | LW_BY_SUBCAT | oxen | value | 300 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Draft Bullocks 340 kg. The 300 used here is 12% lower |
@@ -647,26 +633,26 @@ Every numeric value with its verdict and source, in master order.
 | WG_BY_SUBCAT | calves_female | value | 0.3 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 0.33 kg/day. The 0.30 used here is a rounding of it |
 | WG_BY_SUBCAT | calves_male | value | 0.3 | `DEVIATION_OPEN` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108: Calves on forage 0.33 kg/day. The 0.30 used here is a rounding of it |
 | WG_BY_SUBCAT | feedlot_cattle | value | 1 | `DEVIATION_OPEN` | Table 10A.2 has no Africa feedlot row. Published feedlot gains are North America 1.4 and Latin America 0.90 kg/day. The 1.0 used here falls between them |
-| PCT_PREGNANT_BY_SUBCAT | dairy_cows | value | 0.85 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
-| PCT_PREGNANT_BY_SUBCAT | other_cows | value | 0.85 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
-| PCT_PREGNANT_BY_SUBCAT | heifers | value | 0.5 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 54% pregnant and Table 10A.2 Africa grazing 54%. The 0.85 used for cows is the Eastern Europe dairy figure and the 0.50 for heifers matches no row, so this object is on a different regional basis from every other default in the tool |
-| DE_BY_SUBCAT | dairy_cows | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | other_cows | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | bulls | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | oxen | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | heifers | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | growing_males | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | calves_female | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | calves_male | value | 55 | `DEVIATION_OPEN` | Table 10A.1 Africa dairy gives 51%; Table 10A.2 Africa non-dairy 58 to 60%. The 55% default sits between the two tables and matches neither. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| DE_BY_SUBCAT | feedlot_cattle | value | 74 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Latin America Feedlot cattle: digestibility of feed 74%. Required by Table 10.12, whose feedlot Ym of 4.0 is conditional on DE >= 72; the catalogue default of 55 would violate that precondition |
-| CP_BY_SUBCAT | dairy_cows | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | other_cows | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | bulls | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | oxen | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | heifers | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | growing_males | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | calves_female | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
-| CP_BY_SUBCAT | calves_male | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa Mature Females - grazing, Large Areas, p.10.108: CP in diet 10.0%. Holds the PARAM_CATALOGUE default. This list exists so feedlot can differ; see the feedlot row |
+| PCT_PREGNANT_BY_SUBCAT | dairy_cows | value | 0.52 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: 52% pregnant. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. The previous 0.85 was the Eastern Europe dairy rate, which sat on a different continent from every other default in the tool. |
+| PCT_PREGNANT_BY_SUBCAT | other_cows | value | 0.54 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Mature Females - grazing, Large Areas: 54% pregnant. The previous 0.85 was the Eastern Europe dairy rate. |
+| PCT_PREGNANT_BY_SUBCAT | heifers | value | 0.5 | `NO_IPCC_DEFAULT` | Table 10A.2 leaves the Pregnant column blank for Growing/Replacement, so IPCC publishes no figure for replacement heifers. 0.50 is a project assumption and must not be presented as an IPCC default. |
+| DE_BY_SUBCAT | dairy_cows | value | 51 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: digestibility of feed 51%. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. |
+| DE_BY_SUBCAT | other_cows | value | 58 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Mature Females - grazing, Large Areas: digestibility of feed 58% |
+| DE_BY_SUBCAT | bulls | value | 58 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Bulls - Grazing: digestibility of feed 58% |
+| DE_BY_SUBCAT | oxen | value | 58 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Draft Bullocks: digestibility of feed 58% |
+| DE_BY_SUBCAT | heifers | value | 59 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Growing/Replacement: digestibility of feed 59% |
+| DE_BY_SUBCAT | growing_males | value | 59 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Growing/Replacement: digestibility of feed 59% |
+| DE_BY_SUBCAT | calves_female | value | 59 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Calves on forage: digestibility of feed 59% |
+| DE_BY_SUBCAT | calves_male | value | 59 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Calves on forage: digestibility of feed 59% |
+| DE_BY_SUBCAT | feedlot_cattle | value | 74 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Latin America Feedlot cattle: digestibility of feed 74%. Required by Table 10.12, whose feedlot Ym of 4.0 is conditional on DE >= 72 |
+| CP_BY_SUBCAT | dairy_cows | value | 9.6 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa LOW PRODUCTIVITY SYSTEMS row, p.10.104: CP in diet 9.6%. Declared basis, adopted 2026-09-11: where Table 10A.1 offers an aggregate, a high-productivity and a low-productivity row, the tool takes LOW PRODUCTIVITY. That is the row whose Pasture/Range feeding situation matches Ca 0.17, and it is consistent with Bo 0.13, which Table 10.16A footnote 1 makes the Tier 1 default for other regions. |
+| CP_BY_SUBCAT | other_cows | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Mature Females - grazing, Large Areas: CP in diet 10.0% |
+| CP_BY_SUBCAT | bulls | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Bulls - Grazing: CP in diet 10.0% |
+| CP_BY_SUBCAT | oxen | value | 10 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Draft Bullocks: CP in diet 10.0% |
+| CP_BY_SUBCAT | heifers | value | 10.4 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Growing/Replacement: CP in diet 10.4% |
+| CP_BY_SUBCAT | growing_males | value | 10.4 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Growing/Replacement: CP in diet 10.4% |
+| CP_BY_SUBCAT | calves_female | value | 10.3 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Calves on forage: CP in diet 10.3% |
+| CP_BY_SUBCAT | calves_male | value | 10.3 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Calves on forage: CP in diet 10.3% |
 | CP_BY_SUBCAT | feedlot_cattle | value | 14 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.2 (New), Latin America and North America Feedlot cattle both give CP in diet 14.0% |
 | FEEDING_SITUATION_CA | stall_fed | value | 0 | `CONFIRMED` | 2019R V4 Ch10 Table 10.5 (Updated), p.10.25: Stall 0 |
 | FEEDING_SITUATION_CA | pasture_flat | value | 0.17 | `CONFIRMED` | 2019R V4 Ch10 Table 10.5 (Updated), p.10.25: Pasture 0.17 |

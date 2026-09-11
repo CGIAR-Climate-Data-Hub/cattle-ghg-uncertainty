@@ -2061,11 +2061,15 @@ section_F <- function() {
     identical(rd("bulls","pct_pregnant")$data_source, "biological_zero") &&
     identical(rd("calves_female","pct_pregnant")$data_source, "biological_zero") &&
     identical(rd("heifers","hours")$data_source, "biological_zero") &&
-    eq(rd("dairy_cows","pct_pregnant")$value, 0.85) &&
+    # Low-productivity basis, adopted 2026-09-11: dairy_cows takes the
+    # Table 10A.1 Africa low-productivity row (52% pregnant, DE 51), not the
+    # aggregate row and not the Eastern Europe 0.85 that used to sit here.
+    eq(rd("dairy_cows","pct_pregnant")$value, 0.52) &&
+    eq(rd("other_cows","pct_pregnant")$value, 0.54) &&
     eq(rd("heifers","pct_pregnant")$value, 0.5) &&
     eq(rd("heifers","WG")$value, 0.25) &&
     eq(rd("bulls","WG")$value, 0) && identical(rd("bulls","WG")$distribution, "constant") &&
-    eq(rd("dairy_cows","DE")$value, 55) &&
+    eq(rd("dairy_cows","DE")$value, 51) &&
     identical(rd("dairy_cows","DE")$data_source, "ipcc_default") &&
     eq(rd("dairy_cows","EF3_PRP")$value, 0.006) &&
     eq(rd("dairy_cows","EF3_PRP")$lower, 0.0005) &&
@@ -2074,7 +2078,7 @@ section_F <- function() {
   check_bool("F30", "F",
              "resolve_subcat_default fills IPCC sex/age overrides + biological zeros + catalogue defaults",
              res_ok,
-             notes = if (res_ok) "bulls.Cfi=0.370, growing_males.Cfi=0.322, bulls.Milk=0/constant, dairy.pct_preg=0.85"
+             notes = if (res_ok) "bulls.Cfi=0.370, growing_males.Cfi=0.322, bulls.Milk=0/constant, dairy.pct_preg=0.52, dairy.DE=51 (low-productivity basis)"
                      else "resolver returned an unexpected default for a (sub_category, parameter)")
 
   # F32 -- the defaults master is the single authority. Every IPCC default
@@ -2172,16 +2176,29 @@ section_F <- function() {
     }
     # The feedlot diet must satisfy the precondition on its own Ym row.
     fd <- resolve_subcat_default("feedlot_cattle", "DE")$value
-    fc <- resolve_subcat_default("feedlot_cattle", "CP")$value
     if (!isTRUE(fd >= 72))
       f <- c(f, sprintf("feedlot DE %s violates the DE>=72 precondition of Ym 4.0", fd))
-    if (!isTRUE(all.equal(fc, 14)))
-      f <- c(f, sprintf("feedlot CP %s != 14.0 (Table 10A.2)", fc))
-    # Every other sub-category keeps the catalogue diet.
-    cat_de <- PARAM_CATALOGUE$ipcc_default[PARAM_CATALOGUE$parameter == "DE"]
-    for (sc in setdiff(names(ym_expect_19), "feedlot_cattle"))
-      if (!isTRUE(all.equal(resolve_subcat_default(sc, "DE")$value, cat_de)))
-        f <- c(f, sprintf("%s DE drifted from the catalogue", sc))
+    # The whole diet table, per sub-category, on the declared low-productivity
+    # basis. dairy_cows from Table 10A.1 Africa low productivity; every
+    # non-dairy row from its matching Table 10A.2 Africa grazing row; feedlot
+    # from Table 10A.2 Latin America. This replaced an assertion that every
+    # sub-category carried the CATALOGUE DE, which was true only while DE was
+    # a single uniform 55 that matched no IPCC row at all.
+    de_expect <- c(dairy_cows = 51, other_cows = 58, bulls = 58, oxen = 58,
+                   heifers = 59, growing_males = 59, calves_female = 59,
+                   calves_male = 59, feedlot_cattle = 74)
+    cp_expect <- c(dairy_cows = 9.6, other_cows = 10.0, bulls = 10.0,
+                   oxen = 10.0, heifers = 10.4, growing_males = 10.4,
+                   calves_female = 10.3, calves_male = 10.3,
+                   feedlot_cattle = 14.0)
+    for (sc in names(de_expect)) {
+      d <- resolve_subcat_default(sc, "DE")$value
+      cp <- resolve_subcat_default(sc, "CP")$value
+      if (!isTRUE(all.equal(d, unname(de_expect[[sc]]))))
+        f <- c(f, sprintf("%s DE %s != %s", sc, d, de_expect[[sc]]))
+      if (!isTRUE(all.equal(cp, unname(cp_expect[[sc]]))))
+        f <- c(f, sprintf("%s CP %s != %s", sc, cp, cp_expect[[sc]]))
+    }
     f
   }, error = function(e) conditionMessage(e))
   ym_ok <- length(ym_fail) == 0L
@@ -2189,7 +2206,7 @@ section_F <- function() {
              "Ym resolves per sub-category and per guideline edition, with a coherent feedlot diet",
              ym_ok,
              notes = if (ym_ok)
-               "9 sub-categories x 2 editions: dairy 6.5, non-dairy 7.0 (2019R) / 6.5 (2006), feedlot 4.0 / 3.0; feedlot DE 74 >= 72 and CP 14.0"
+               "9 sub-categories x 2 editions: dairy 6.5, non-dairy 7.0 (2019R) / 6.5 (2006), feedlot 4.0 / 3.0; the full DE and CP diet table on the low-productivity basis, with feedlot DE 74 >= 72"
              else paste(utils::head(ym_fail, 4), collapse = "; "))
 
   # F36 -- only mature females carry a milk yield.
@@ -2332,12 +2349,21 @@ section_F <- function() {
       # c) parameter gap-fill matches the resolver (sex overrides + zeros + default)
       gap_ok <- eq(pick("bulls","Cfi"), 0.370) && eq(pick("oxen","Cfi"), 0.322) &&
                 eq(pick("bulls","C"), 1.2) && eq(pick("bulls","Milk"), 0) &&
-                eq(pick("dairy_cows","DE"), 55) && eq(pick("dairy_cows","pct_pregnant"), 0.85) &&
+                eq(pick("dairy_cows","DE"), 51) &&
+                eq(pick("dairy_cows","pct_pregnant"), 0.52) &&
+                # oxen, not other_cows: this fixture writes three
+                # sub-categories (dairy_cows, bulls, oxen) and a pick() on an
+                # absent one returns NA, which fails silently rather than
+                # testing anything.
+                eq(pick("oxen","DE"), 58) && eq(pick("oxen","CP"), 10.0) &&
                 eq(pick("bulls","Bo"), 0.13)
       # d) MMS coefficient gap-fill from the tables
       mms_fill_ok <- eq(mmv("dairy_cows","EF3"), 0.010) &&
                      eq(mmv("dairy_cows","MCF_pct"), 5.0) &&   # solid_storage tropical
-                     eq(mmv("bulls","EF3"), 0.02)              # dry_lot
+                     eq(mmv("bulls","EF3"), 0.02) &&           # dry_lot
+                     # Asserting bulls EF3 without bulls MCF is how the
+                     # dry_lot 5.0 -> 2.0 correction got past this check once.
+                     eq(mmv("bulls","MCF_pct"), 2.0)           # dry_lot tropical
       cnt_ok && usr_ok && gap_ok && mms_fill_ok
     }, error = function(e) { message("F31 error: ", conditionMessage(e)); FALSE })
     unlink(f)

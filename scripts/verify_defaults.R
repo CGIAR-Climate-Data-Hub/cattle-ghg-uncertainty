@@ -480,8 +480,20 @@ S[["doc_rmd"]] <- local({
       key <- paste("PARAM_CATALOGUE", p, "ipcc_default", sep = "|")
       ref <- suppressWarnings(as.numeric(
         pc$ipcc_default[pc$parameter == p]))
-      if (!is.na(ref) && any(!is.na(nums) & abs(nums - ref) < TOL))
+      # Record something EITHER WAY. Only setting the key on a hit meant a
+      # guide that had drifted scored "absent" rather than DIFFERS, and on a
+      # REVIEW-policy surface absent is tolerated. Both guides sat stale on
+      # BW, Milk, MilkPR, DE and CP through a full matrix run that reported
+      # zero divergences. A surface that goes quiet when it disagrees is
+      # worse than no surface at all.
+      if (is.na(ref)) next
+      if (any(!is.na(nums) & abs(nums - ref) < TOL)) {
         v[key] <- format(ref, scientific = FALSE, drop0trailing = TRUE)
+      } else if (any(!is.na(nums))) {
+        v[key] <- paste(format(nums[!is.na(nums)], scientific = FALSE,
+                               drop0trailing = TRUE, trim = TRUE),
+                        collapse = "/")
+      }
     }
     # GWP table (methodology.Rmd 4.11): "AR5 (100-yr) & 28 & 265 & ..."
     for (ar in names(GWP_VALUES)) {
