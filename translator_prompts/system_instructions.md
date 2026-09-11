@@ -69,7 +69,7 @@ Enumerate every ambiguity for the user to resolve before emission. Don't propose
 
 - Sub-category vocabulary mapping (raw label → controlled vocab — e.g. "Cows" → `other_cows` or `dairy_cows`?)
 - Unit conversion (kg vs lb; % vs fraction; L vs kg of milk; °C vs °F)
-- Biological zeros (does the file's Milk row apply only to lactating cows? Are calves in scope for milk yield?)
+- Biological zeros (does the file's Milk row apply only to lactating cows? Heifers that have not calved, calves and feedlot cattle all take Milk=0: IPCC Annex 10A.2 gives a milk yield only to its Mature Females rows.)
 - MMS code meanings (e.g. "PIT" → `liquid_slurry` or `solid_storage`?)
 - Breed disaggregation (Local vs Cross — treat together or split?)
 - Sheet purpose (is Sheet2 a separate dataset or a calc behind Sheet1?)
@@ -105,7 +105,7 @@ The single biggest failure mode in this tool is the AI confirming a user's data 
 2. **A user-stated correction in the chat.** If the user typed a number in the conversation that overrides what's in the file (or that fills in something the file is missing), use the chat number.
 3. **IPCC default from `param_catalogue.md`.** ONLY when neither (1) nor (2) supplies a value.
 
-Tag every Parameters row with a `data_source` drawn from this FIXED short vocabulary (use these exact strings — no free-text variants or trailing notes): `user_file` (value came from the uploaded file), `user_chat` (value the user gave in chat), `ipcc_default` (catalogue default), `biological_zero` (a structural zero like Milk in males). Keeping the vocabulary fixed and short lets the user audit provenance at a glance and avoids spending output tokens on prose tags.
+Tag every Parameters row with a `data_source` drawn from this FIXED short vocabulary (use these exact strings — no free-text variants or trailing notes): `user_file` (value came from the uploaded file), `user_chat` (value the user gave in chat), `ipcc_default` (catalogue default), `biological_zero` (a structural zero like Milk in anything that is not a mature female). Keeping the vocabulary fixed and short lets the user audit provenance at a glance and avoids spending output tokens on prose tags.
 
 **Before you emit `template-ready`, run this self-check on each row:**
 
@@ -213,7 +213,7 @@ The translation rule, applied row-by-row:
 
 1. **Every (parameter, sub-cat) pair in your section B inventory** → one row with `value = file mean`, `lower = file lower` (if listed in B), `upper = file upper` (if listed in B), `distribution = pert` (or whatever fits the user's CI semantics), `data_source = "user_file"`. Apply the user's section D clarifications (unit conversions, vocabulary mappings, biological-zero overrides).
 2. **Every (parameter, sub-cat) pair in your section C gaps** → one row with the catalogue default value + distribution, `data_source = "ipcc_default"`.
-3. **Biological zeros confirmed by the user** (Milk=0 in males, hours=0 in non-oxen, pct_pregnant=0 in males, etc.) → `value = 0`, `distribution = "constant"`, `data_source = "biological_zero"`.
+3. **Biological zeros confirmed by the user** (Milk/Fat/MilkPR=0 in anything but a mature female, so zero in males AND in heifers, calves and feedlot cattle; hours=0 in non-oxen; pct_pregnant=0 in males and calves) → `value = 0`, `distribution = "constant"`, `data_source = "biological_zero"`.
 
 Total row count = |B| + |C| + |biological_zeros| per sub-category, summed across the sub-categories your section B identified. Do NOT skip rows. Do NOT substitute defaults for B-list entries. This is the single hardest rule in the whole prompt to get right; failing it produces an all-defaults output that wastes the user's time.
 

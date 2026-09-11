@@ -217,8 +217,8 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | heifers | BW | 200 | normal | sub-category override |
 | heifers | MW | 300 | normal | catalogue default |
 | heifers | WG | 0.25 | pert | sub-category override |
-| heifers | Milk | 3.5 | normal | catalogue default |
-| heifers | Fat | 4.3 | normal | catalogue default |
+| heifers | Milk | 0 | constant | biological zero |
+| heifers | Fat | 0 | constant | biological zero |
 | heifers | pct_pregnant | 0.5 | beta | sub-category override |
 | heifers | DE | 55 | normal | catalogue default |
 | heifers | Cfi | 0.322 | pert | sub-category override |
@@ -236,7 +236,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | heifers | EF5 | 0.011 | lognormal | catalogue default |
 | heifers | Frac_GASM_PRP | 0.21 | pert | catalogue default |
 | heifers | Frac_LEACH_PRP | 0.24 | pert | catalogue default |
-| heifers | MilkPR | 3.3 | normal | catalogue default |
+| heifers | MilkPR | 0 | constant | biological zero |
 | heifers | Tw | 20 | normal | catalogue default |
 | growing_males | N |  | normal | catalogue default |
 | growing_males | BW | 200 | normal | sub-category override |
@@ -267,8 +267,8 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | calves_female | BW | 60 | normal | sub-category override |
 | calves_female | MW | 300 | normal | catalogue default |
 | calves_female | WG | 0.3 | pert | sub-category override |
-| calves_female | Milk | 3.5 | normal | catalogue default |
-| calves_female | Fat | 4.3 | normal | catalogue default |
+| calves_female | Milk | 0 | constant | biological zero |
+| calves_female | Fat | 0 | constant | biological zero |
 | calves_female | pct_pregnant | 0 | constant | biological zero |
 | calves_female | DE | 55 | normal | catalogue default |
 | calves_female | Cfi | 0.322 | pert | sub-category override |
@@ -286,7 +286,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | calves_female | EF5 | 0.011 | lognormal | catalogue default |
 | calves_female | Frac_GASM_PRP | 0.21 | pert | catalogue default |
 | calves_female | Frac_LEACH_PRP | 0.24 | pert | catalogue default |
-| calves_female | MilkPR | 3.3 | normal | catalogue default |
+| calves_female | MilkPR | 0 | constant | biological zero |
 | calves_female | Tw | 20 | normal | catalogue default |
 | calves_male | N |  | normal | catalogue default |
 | calves_male | BW | 60 | normal | sub-category override |
@@ -317,8 +317,8 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | feedlot_cattle | BW | 250 | normal | sub-category override |
 | feedlot_cattle | MW | 400 | normal | sub-category override |
 | feedlot_cattle | WG | 1 | pert | sub-category override |
-| feedlot_cattle | Milk | 3.5 | normal | catalogue default |
-| feedlot_cattle | Fat | 4.3 | normal | catalogue default |
+| feedlot_cattle | Milk | 0 | constant | biological zero |
+| feedlot_cattle | Fat | 0 | constant | biological zero |
 | feedlot_cattle | pct_pregnant | 0.6 | beta | catalogue default |
 | feedlot_cattle | DE | 74 | normal | sub-category override |
 | feedlot_cattle | Cfi | 0.322 | pert | sub-category override |
@@ -336,7 +336,7 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 | feedlot_cattle | EF5 | 0.011 | lognormal | catalogue default |
 | feedlot_cattle | Frac_GASM_PRP | 0.21 | pert | catalogue default |
 | feedlot_cattle | Frac_LEACH_PRP | 0.24 | pert | catalogue default |
-| feedlot_cattle | MilkPR | 3.3 | normal | catalogue default |
+| feedlot_cattle | MilkPR | 0 | constant | biological zero |
 | feedlot_cattle | Tw | 20 | normal | catalogue default |
 
 ## Global warming potentials

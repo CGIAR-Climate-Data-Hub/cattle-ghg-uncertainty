@@ -2159,36 +2159,86 @@ section_F <- function() {
                     oxen = 6.5, heifers = 6.5, growing_males = 6.5,
                     calves_female = 6.5, calves_male = 6.5,
                     feedlot_cattle = 3.0)
-  ym_bad <- character(0)
-  ym_ok <- tryCatch({
+  # Failures RETURNED, not assigned with <<-; see the note on F36.
+  ym_fail <- tryCatch({
+    f <- character(0)
     for (sc in names(ym_expect_19)) {
       g19 <- resolve_subcat_default(sc, "Ym", "2019_refinement")$value
       g06 <- resolve_subcat_default(sc, "Ym", "2006")$value
       if (!isTRUE(all.equal(g19, unname(ym_expect_19[[sc]]))))
-        ym_bad <<- c(ym_bad, sprintf("%s 2019R %s!=%s", sc, g19, ym_expect_19[[sc]]))
+        f <- c(f, sprintf("%s 2019R %s != %s", sc, g19, ym_expect_19[[sc]]))
       if (!isTRUE(all.equal(g06, unname(ym_expect_06[[sc]]))))
-        ym_bad <<- c(ym_bad, sprintf("%s 2006 %s!=%s", sc, g06, ym_expect_06[[sc]]))
+        f <- c(f, sprintf("%s 2006 %s != %s", sc, g06, ym_expect_06[[sc]]))
     }
     # The feedlot diet must satisfy the precondition on its own Ym row.
     fd <- resolve_subcat_default("feedlot_cattle", "DE")$value
     fc <- resolve_subcat_default("feedlot_cattle", "CP")$value
     if (!isTRUE(fd >= 72))
-      ym_bad <<- c(ym_bad, sprintf("feedlot DE %s violates the DE>=72 precondition of Ym 4.0", fd))
+      f <- c(f, sprintf("feedlot DE %s violates the DE>=72 precondition of Ym 4.0", fd))
     if (!isTRUE(all.equal(fc, 14)))
-      ym_bad <<- c(ym_bad, sprintf("feedlot CP %s != 14.0 (Table 10A.2)", fc))
+      f <- c(f, sprintf("feedlot CP %s != 14.0 (Table 10A.2)", fc))
     # Every other sub-category keeps the catalogue diet.
     cat_de <- PARAM_CATALOGUE$ipcc_default[PARAM_CATALOGUE$parameter == "DE"]
     for (sc in setdiff(names(ym_expect_19), "feedlot_cattle"))
       if (!isTRUE(all.equal(resolve_subcat_default(sc, "DE")$value, cat_de)))
-        ym_bad <<- c(ym_bad, sprintf("%s DE drifted from the catalogue", sc))
-    length(ym_bad) == 0L
-  }, error = function(e) { ym_bad <<- conditionMessage(e); FALSE })
+        f <- c(f, sprintf("%s DE drifted from the catalogue", sc))
+    f
+  }, error = function(e) conditionMessage(e))
+  ym_ok <- length(ym_fail) == 0L
   check_bool("F35", "F",
              "Ym resolves per sub-category and per guideline edition, with a coherent feedlot diet",
              ym_ok,
              notes = if (ym_ok)
                "9 sub-categories x 2 editions: dairy 6.5, non-dairy 7.0 (2019R) / 6.5 (2006), feedlot 4.0 / 3.0; feedlot DE 74 >= 72 and CP 14.0"
-             else paste(utils::head(ym_bad, 4), collapse = "; "))
+             else paste(utils::head(ym_fail, 4), collapse = "; "))
+
+  # F36 -- only mature females carry a milk yield.
+  #
+  # The biological-zero rule tested sex == "male" alone, so heifers, female
+  # calves and feedlot cattle all inherited the dairy-cow 3.5 kg/day. That
+  # adds a net-energy-for-lactation term to animals that have never calved:
+  # heifers ran 19% high on enteric CH4 and feedlot cattle 14% high. IPCC
+  # Annex 10A.2 settles it for every region, giving a milk yield only to its
+  # Mature Females rows; Growing/Replacement, Calves and Feedlot are blank.
+  #
+  # Asserted for all nine sub-categories and all three milk parameters, not a
+  # spot check: the two that were already right (dairy_cows, other_cows) are
+  # exactly the ones a spot check would have picked.
+  MILK_PARAMS <- c("Milk", "Fat", "MilkPR")
+  LACTATES <- c("dairy_cows", "other_cows")
+  # NOTE: the failure list is RETURNED from tryCatch, never assigned with
+  # <<-. These checks run inside section_F(), and tryCatch evaluates its
+  # expression in the caller's frame, so <<- skips the local variable and
+  # writes to the global environment. The check then reads an empty local
+  # list and passes no matter what. Both F35 and F36 were built that way and
+  # both passed against a deliberately reverted rule before this was found.
+  milk_fail <- tryCatch({
+    f <- character(0)
+    for (sc in ANIMAL_SUBCATEGORIES) for (prm in MILK_PARAMS) {
+      r  <- resolve_subcat_default(sc, prm)
+      bz <- identical(r$data_source, "biological_zero")
+      if (sc %in% LACTATES) {
+        if (bz || isTRUE(r$value == 0))
+          f <- c(f, sprintf("%s/%s zeroed but it lactates", sc, prm))
+      } else if (!bz || !isTRUE(r$value == 0)) {
+        f <- c(f, sprintf("%s/%s = %s, should be a biological zero",
+                          sc, prm, r$value))
+      }
+    }
+    # An unrecognised sub-category must keep the catalogue value rather than
+    # being silently zeroed: it may well be a dairy group under another name.
+    if (identical(resolve_subcat_default("some_unmapped_dairy_group",
+                                         "Milk")$data_source, "biological_zero"))
+      f <- c(f, "an unmapped sub-category was zeroed instead of taking the catalogue default")
+    f
+  }, error = function(e) conditionMessage(e))
+  milk_ok <- length(milk_fail) == 0L
+  check_bool("F36", "F",
+             "Milk, Fat and MilkPR are non-zero only for mature females",
+             milk_ok,
+             notes = if (milk_ok)
+               "9 sub-categories x 3 parameters: non-zero for dairy_cows and other_cows only; heifers, calves, feedlot and all males are biological zeros; unmapped sub-categories keep the catalogue default"
+             else paste(utils::head(milk_fail, 4), collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

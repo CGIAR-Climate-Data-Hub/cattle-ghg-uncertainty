@@ -506,7 +506,21 @@ resolve_subcat_default <- function(sub_category, parameter,
                    data_source = "biological_zero")
 
   # Biological zeros (match translator self-check #9 / Step 8 rule 3).
-  if (parameter %in% c("Milk", "Fat", "MilkPR") && identical(sex, "male"))
+  #
+  # Lactation requires a MATURE FEMALE. Testing only for males left heifers,
+  # female calves and feedlot cattle carrying the dairy-cow milk yield of
+  # 3.5 kg/day, which adds a net-energy-for-lactation term to animals that
+  # cannot produce milk: heifers came out 19% high on enteric CH4 and feedlot
+  # cattle 14% high. Annex 10A.2 settles it, and does so for every region:
+  # only the Mature Females rows carry a milk yield at all. Growing and
+  # Replacement, Calves, and Feedlot cattle are blank in that column.
+  #
+  # Keyed on age rather than an explicit list so an unrecognised
+  # sub-category, which defaults to sex "mixed" and age "adult_>3yr", keeps
+  # the catalogue value instead of being silently zeroed.
+  is_mature <- identical(age, "adult_>3yr")
+  if (parameter %in% c("Milk", "Fat", "MilkPR") &&
+      (identical(sex, "male") || !is_mature))
     return(bio_zero)
   if (parameter == "pct_pregnant" && (identical(sex, "male") || is_calf))
     return(bio_zero)

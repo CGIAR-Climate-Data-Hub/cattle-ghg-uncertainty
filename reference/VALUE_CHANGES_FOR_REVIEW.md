@@ -82,8 +82,8 @@ Left alone deliberately. The earlier decision may rest on context the code does 
 |---|---|---|---|---|---|---|---|
 | IPCC_DEFAULTS_BY_REGION | asia | default_val | 350 | 350 | (decide) | R7 #3 | Table 10A.1 Asia dairy is 386 (low productivity 355); Table 10A.2 Asia gives 376 and 305. The shipped 350 matches no Asia row. Review round 7 item 3 kept this object for BW only after the other benchmarks were withdrawn. |
 | IPCC_DEFAULTS_BY_REGION | oceania | default_val | 500 | 500 | (decide) | R7 #3 | Table 10A.1 Oceania dairy is 488; Table 10A.2 gives 416 and 467. The shipped 500 appears in no Oceania row. Same review provenance as asia. |
-| PARAM_CATALOGUE | Fat | ipcc_default | 4.3 | 4.3 | (confirm) | R8 p7 | As Milk: correct against Table 10A.1 Africa dairy, but part of the same mixing question. Adjudicated at review round 8 page 7, so unchanged. |
-| PARAM_CATALOGUE | Milk | ipcc_default | 3.5 | 3.5 | (confirm) | R8 p7 | Correct against Table 10A.1 Africa dairy. Flagged only because it sits in the dairy/non-dairy mixing cluster: the catalogue draws Milk, Fat and Ym from the dairy row and BW and CP from the non-dairy grazing row, describing no animal IPCC published. Adjudicated at review round 8 page 7, so unchanged. |
+| PARAM_CATALOGUE | Fat | ipcc_default | 4.3 | 4.3 | no change | R8 p7 | CONFIRMED and robust. Table 10A.1 gives 4.3 for Africa in all three rows (aggregate, high productivity and low productivity), so no choice of productivity basis can change it. The round 8 comment that IPCC 2019 gives 4.3 for Africa is exactly right. Listed only so the reviewer can see it was rechecked. |
+| PARAM_CATALOGUE | Milk | ipcc_default | 3.5 | 3.5 | 3.5 or 1.2 | R8 p7 | 3.5 is the Africa AGGREGATE row of Table 10A.1, which footnote 4 defines as a weighted average of high-productivity (5.8) and low-productivity (1.2) systems. The round 8 move from an unsourced 4.0 to 3.5 was right for that row. The open question is which row the tool should sit on: Bo is 0.13 on the stated basis of 'other regions, LOW productivity' and Ca is 0.17, the Pasture/Range coefficient that Table 10A.1 attaches to the low-productivity row, while the aggregate row is Stall Fed. On a consistent low-productivity basis Africa dairy milk is 1.2. Measured for dairy cows per 100,000 head: enteric CH4 6957.7 t/yr at 3.5 against 5929.6 t/yr at 1.2, a 14.8% difference. Separately, footnote 1 says the published figure is milk yield per day across the WHOLE YEAR, while the tool defines the field as per-lactating-cow and multiplies by pct_pregnant, discounting it a second time (NE_l 15% low). |
 
 ## 3. Open questions (10)
 
@@ -103,6 +103,14 @@ Differs from IPCC with no recorded reason. These would move a reported number. W
 | PCT_PREGNANT_BY_SUBCAT | other_cows | value | 0.85 | 0.85 | 0.54 | gross energy and N excretion | As dairy_cows: 0.85 is the Eastern Europe rate, Africa is 54% in both annex tables. |
 
 ---
+
+## One change with no row in the tables above
+
+The biological-zero rule tested only for males, so every non-male sub-category inherited the dairy-cow milk yield of 3.5 kg/day, including heifers (which by the tool's own label have not calved), female calves and feedlot cattle. That added a net-energy-for-lactation term to animals that cannot produce milk. Annex 10A.2 gives a milk yield only to its Mature Females rows, in every region; Growing/Replacement, Calves and Feedlot cattle are blank.
+
+Corrected so that Milk, Fat and MilkPR are non-zero only for mature females. Measured per 100,000 head: heifers enteric CH4 6161.7 to 5170.6 t/yr (-16.1%), feedlot cattle 3655.2 to 3214.3 (-12.1%). Calves were unaffected numerically because the separate pregnancy zero already suppressed the term, but the filled template had been showing a milk yield for a calf.
+
+It does not appear in the tables above because it is a rule in the resolver, not a value in the defaults file.
 
 ## How to read the manure rows
 

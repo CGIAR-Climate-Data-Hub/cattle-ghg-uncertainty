@@ -811,3 +811,88 @@ Checking whether Bo's context hint was accurate surfaced that `CONTEXT_DEPENDENT
 A user reading the EF4 hint was told the number 0.010 when the value they had actually been given was 0.014. All three are corrected, and `qaqc_hints` is now a checked surface in `scripts/verify_defaults.R`: the opening clause of each hint must state that parameter's shipped default.
 
 The check needed two passes. The first version asserted only that the shipped value appeared somewhere in the hint, which every one of these strings satisfies because they all list the alternatives too; the negative test caught it passing against the deliberately broken text. Restricting the scan to the opening clause, with table citations and edition tokens stripped, makes it bite.
+
+---
+
+# Milk and Fat: deep verification, 2026-09-11
+
+Both were adjudicated at review round 8 page 7, so the value question was approached as an escalation, not a correction. The pass confirmed one of them outright, left the other open on a basis question, and found a separate defect neither the reviewer nor any earlier pass had looked at.
+
+## Fat 4.3: CONFIRMED, and robust
+
+Table 10A.1 (New) gives three rows for Africa, and the fat content is the same in all of them:
+
+| Africa row | Weight | Milk yield | **Fat** | Protein | Pregnant | DE | CP |
+|---|---|---|---|---|---|---|---|
+| Africa (aggregate) | 260 | **3.5** | **4.3** | 3.6 | 54 | 51 | 8.7 |
+| High productivity systems | 250 | 5.8 | **4.3** | 3.6 | 57 | 50 | 7.8 |
+| Low productivity systems | 270 | 1.2 | **4.3** | 3.6 | 52 | 51 | 9.6 |
+
+Fat does not move with the productivity basis, so no choice of basis can change it. The round 8 comment, "IPCC 2019 gives 4.3 for africa", is exactly right and nothing further is owed on it.
+
+The same table settles `MilkPR` a second way: protein content is **3.6** in all three rows, reinforcing that the shipped 3.3 is supported by no reading.
+
+## Milk 3.5: correct for the row it comes from, open on which row
+
+3.5 is the Africa **aggregate**, and footnote 4 says what that means: the regional rows "were estimated as weighted average by taking into account parameter values related to low production systems and high production systems and livestock population structure". For Africa the split is 49% high, 51% low.
+
+The round 8 change from an unsourced 4.0 to 3.5 was therefore right. What is open is whether the aggregate is the row this tool should use, because the tool does not consistently sit on any single row:
+
+| parameter | tool | Africa aggregate | Africa high | Africa low | non-dairy grazing (10A.2) |
+|---|---|---|---|---|---|
+| Milk | 3.5 | **3.5** | 5.8 | 1.2 | 1.2 |
+| Fat | 4.3 | **4.3** | **4.3** | **4.3** | 4.1 |
+| BW | 275 | 260 | 250 | 270 | **275** |
+| DE | 55 | 51 | 50 | 51 | 58 |
+| CP | 10.0 | 8.7 | 7.8 | 9.6 | **10.0** |
+| pct_pregnant | 0.60 | 0.54 | 0.57 | 0.52 | 0.54 |
+
+Two of the tool's other defaults point at the **low productivity** row specifically. `Bo` is 0.13 on the stated basis of "Other regions, low productivity", which Table 10.16A footnote 1 makes the Tier 1 default for those regions. `Ca` is 0.17, the Pasture/Range coefficient, and Pasture/Range is precisely how Table 10A.1 characterises the low-productivity feeding situation while the aggregate row is marked Stall Fed.
+
+On a consistent low-productivity basis, Africa dairy milk yield is **1.2 kg/day**, not 3.5. Measured through the engine for dairy cows, per 100,000 head: enteric CH4 6957.7 t/yr at 3.5, **5929.6 t/yr at 1.2** (-14.8%), and 7985.8 t/yr at the high-productivity 5.8.
+
+This is finding 2.1 again, not a new one: the tool mixes rows. Milk is the cell where the mixing is most visible because it is the only one of the six above where the aggregate and the low-productivity value differ by a factor of three.
+
+## A unit convention that does not match the default
+
+Table 10A.1 footnote 1: "The value represent milk yield in kg per day during the whole year." The published 3.5 is therefore an annual average per head, already diluted by the dry period.
+
+The tool's `Milk` field is documented as "Daily milk yield per lactating cow (not sub-category-average, the tool multiplies by pct_pregnant internally)", and `calc_nel()` implements exactly that:
+
+    NE_l = Milk x (1.47 + 0.40 x Fat) x pct_pregnant
+
+IPCC Equation 10.8 carries no such factor. The convention is coherent for a user supplying a per-lactating-cow figure, but the IPCC default shipped into that field is already an annual average, so it is discounted a second time. For dairy cows at pct_pregnant 0.85, NE_l is 9.49 MJ/day where Equation 10.8 as written gives 11.16, a 15% reduction, and enteric CH4 runs 4.7% low.
+
+Either the default should be grossed up to a per-lactating-cow basis, or the pct_pregnant factor should not apply when the value is the IPCC default. Recorded, not changed: it interacts with the basis question above and with `pct_pregnant` itself, which is separately open.
+
+## The defect that was actually fixed
+
+Checking who receives the Milk default turned up something neither the reviewer nor any earlier pass had examined. The biological-zero rule tested only `sex == "male"`, so **every non-male sub-category inherited the dairy-cow 3.5 kg/day**, including animals that have never calved:
+
+| sub-category | label | got Milk |
+|---|---|---|
+| heifers | "young females 1-3yr, not yet calved" | 3.5 |
+| calves_female | "Calves - Female (<1yr)" | 3.5 |
+| feedlot_cattle | fattening animals, mixed sex | 3.5 |
+
+That adds a net-energy-for-lactation term to animals that cannot produce milk. Measured per 100,000 head:
+
+| sub-category | enteric CH4 before | after | change |
+|---|---|---|---|
+| heifers | 6161.7 | 5170.6 | **-16.1%** |
+| feedlot_cattle | 3655.2 | 3214.3 | **-12.1%** |
+| calves_female | 2165.5 | 2165.5 | 0.0% |
+
+Heifers were running 19% high and feedlot cattle 14% high on enteric methane. Calves were unaffected in the numbers only because the separate pregnancy zero already forced their NE_l term to zero, but the filled template still displayed a milk yield of 3.5 kg/day for a calf, which is visibly wrong to a user and to the translator.
+
+**Annex 10A.2 settles it for every region, not just Africa:** only the Mature Females rows carry a milk yield at all. Growing/Replacement, Calves on forage and Feedlot cattle are blank in that column.
+
+Fixed by keying the zero on maturity rather than sex alone: `Milk`, `Fat` and `MilkPR` are non-zero only where the animal is female and `adult_>3yr`. Keyed on age rather than an explicit list so an unrecognised sub-category, which defaults to sex "mixed" and adult age, keeps the catalogue value instead of being silently zeroed. The translator prompt's biological-zero rules were updated to match.
+
+## Two audit checks were passing vacuously
+
+F36 was written for the rule above and **passed against the deliberately reverted code**. So did F35, the Ym check added earlier the same day.
+
+Both built their failure list with `<<-` inside `tryCatch`. These checks run inside `section_F()`, and `tryCatch` evaluates its expression in the caller's frame, so `<<-` skips the local variable and writes to the global environment; the check then reads an empty local list and passes regardless. Both now return the failure list from the `tryCatch` block instead, and both have been demonstrated failing against their own defect before passing.
+
+This is the third time in this audit that a check has had to be tested against the broken state before it could be trusted: F34 was masked by the audit's own globals, the first `qaqc_hints` extractor was satisfied by a number appearing anywhere in the prose, and now these two. A check that has never been seen to fail is not evidence.

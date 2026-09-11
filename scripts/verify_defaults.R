@@ -570,6 +570,14 @@ S[["prompt_worked_example"]] <- local({
     keep <- !(pr$parameter %in% .WE_USER_KEYS)
     for (i in which(keep)) {
       prm <- pr$parameter[i]; sc <- pr$sub_category[i]
+      # A biological zero is not a catalogue value and must not be compared
+      # against one. Heifers emit MilkPR 0 because they have not calved, not
+      # because the catalogue default is 0. Ask the resolver rather than
+      # hard-coding the rule, so this cannot drift from it.
+      bz <- tryCatch(identical(resolve_subcat_default(sc, prm)$data_source,
+                               "biological_zero"),
+                     error = function(e) FALSE)
+      if (isTRUE(bz)) next
       # Ym is keyed by edition rather than by a plain "value" field. The
       # worked example declares ipcc_version 2019_refinement in its own
       # inventory_metadata, so it must be compared against that column.

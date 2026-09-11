@@ -52,8 +52,8 @@ This example has 2 sub-categories, so 2 x 25 = 50 parameter rows. An inventory w
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "BW", "mean": 250, "uncertainty_pct": 15, "distribution": "normal", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "MW", "mean": 450, "uncertainty_pct": 10, "distribution": "normal", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "WG", "mean": 0.25, "uncertainty_pct": 30, "distribution": "pert", "param_type": "coefficient"},
-    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Milk", "mean": 3.5, "uncertainty_pct": 20, "distribution": "normal", "param_type": "coefficient"},
-    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Fat", "mean": 4.3, "uncertainty_pct": 10, "distribution": "normal", "param_type": "coefficient"},
+    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Milk", "mean": 0, "lower": 0, "upper": 0, "distribution": "constant", "param_type": "coefficient"},
+    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Fat", "mean": 0, "lower": 0, "upper": 0, "distribution": "constant", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "pct_pregnant", "mean": 0.5, "uncertainty_pct": 20, "distribution": "beta", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "DE", "mean": 58, "uncertainty_pct": 15, "distribution": "normal", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Cfi", "mean": 0.322, "uncertainty_pct": 30, "distribution": "pert", "param_type": "coefficient"},
@@ -71,7 +71,7 @@ This example has 2 sub-categories, so 2 x 25 = 50 parameter rows. An inventory w
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "EF5", "mean": 0.011, "lower": 0.0005, "upper": 0.02, "distribution": "lognormal", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Frac_GASM_PRP", "mean": 0.21, "lower": 0.005, "upper": 0.31, "distribution": "pert", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Frac_LEACH_PRP", "mean": 0.24, "lower": 0.01, "upper": 0.73, "distribution": "pert", "param_type": "coefficient"},
-    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "MilkPR", "mean": 3.3, "uncertainty_pct": 10, "distribution": "normal", "param_type": "coefficient"},
+    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "MilkPR", "mean": 0, "lower": 0, "upper": 0, "distribution": "constant", "param_type": "coefficient"},
     {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "heifers", "parameter": "Tw", "mean": 20, "uncertainty_pct": 25, "distribution": "normal", "param_type": "coefficient"}
   ],
   "manure_management": [
@@ -92,6 +92,6 @@ What to carry across to the user's inventory:
 1. One row per (sub_category, parameter) for every catalogue parameter, with nothing omitted.
 2. `param_type` taken from the catalogue, never inferred from whether a farmer could measure the quantity.
 3. Sub-category-specific `Cfi` and `C` from the override table in `param_catalogue.md`, not the lactating-cow value for everyone.
-4. Biological zeros where they apply: no milk, fat or milk protein for males, no pregnancy fraction for males or calves, no work hours for anything but oxen.
+4. Biological zeros where they apply: no milk, fat or milk protein except in MATURE FEMALES (so zero for males, and zero for heifers, calves and feedlot cattle, which have not calved), no pregnancy fraction for males or calves, no work hours for anything but oxen.
 5. Asymmetric parameters with bounds, symmetric ones with a percentage.
 6. Manure rows whose `fraction_pct` sums to 100 within each sub-category, every coefficient column filled.
