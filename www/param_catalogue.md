@@ -92,17 +92,17 @@ Feedlot cattle also carry their own `DE` and `CP`, because the IPCC feedlot `Ym`
 
 `Ca` is handled separately: it depends on the feeding situation, not on the sub-category.
 
-| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | DE | CP | notes |
-|---|---|---|---|---|---|---|---|
-| `dairy_cows` | 0.386 | 0.8 | 6.5 | 6.5 | 51 | 9.6 |  |
-| `other_cows` | 0.322 | 0.8 | 7 | 6.5 | 58 | 10 |  |
-| `bulls` | 0.37 | 1.2 | 7 | 6.5 | 58 | 10 |  |
-| `oxen` | 0.322 | 1 | 7 | 6.5 | 58 | 10 |  |
-| `heifers` | 0.322 | 0.8 | 7 | 6.5 | 59 | 10.4 |  |
-| `growing_males` | 0.322 | 1 | 7 | 6.5 | 59 | 10.4 | Genuinely ambiguous across countries: the term is used for both castrate steers and intact pre-castration bulls, which take different IPCC Eq 10.6 coefficients. The app assumes castrate. If the source file's Coefficients sheet gives the intact-bull value instead, that means the inventory team treats them as intact, so honour the file value with `data_source = user_file` and note it. If the file is silent, keep the generated value and surface the assumption in section D. |
-| `calves_female` | 0.322 | 0.8 | 7 | 6.5 | 59 | 10.3 | Takes the female Eq 10.6 coefficient, on the heifer-replacement track. Some inventories do not sex-disaggregate calves at all and report a single pooled calf growth coefficient; if the source file does that, say so in section D rather than splitting it yourself. |
-| `calves_male` | 0.322 | 1 | 7 | 6.5 | 59 | 10.3 | Takes the castrate Eq 10.6 coefficient. It rises to the intact-bull value only on the breeding-bull development path after puberty. Note the direction: castration LOWERS the growth coefficient, it does not raise it, so a file showing a higher value for castrated males than for intact ones has the two swapped. |
-| `feedlot_cattle` | 0.322 | 1 | 4 | 3 | 74 | 14 |  |
+| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | BW | MW | WG | DE | CP | notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `dairy_cows` | 0.386 | 0.8 | 6.5 | 6.5 | 270 | 300 | 0 | 51 | 9.6 |  |
+| `other_cows` | 0.322 | 0.8 | 7 | 6.5 | 275 | 300 | 0 | 58 | 10 |  |
+| `bulls` | 0.37 | 1.2 | 7 | 6.5 | 350 | 400 | 0 | 58 | 10 |  |
+| `oxen` | 0.322 | 1 | 7 | 6.5 | 300 | 350 | 0 | 58 | 10 |  |
+| `heifers` | 0.322 | 0.8 | 7 | 6.5 | 200 | 300 | 0.25 | 59 | 10.4 |  |
+| `growing_males` | 0.322 | 1 | 7 | 6.5 | 200 | 350 | 0.2 | 59 | 10.4 | Genuinely ambiguous across countries: the term is used for both castrate steers and intact pre-castration bulls, which take different IPCC Eq 10.6 coefficients. The app assumes castrate. If the source file's Coefficients sheet gives the intact-bull value instead, that means the inventory team treats them as intact, so honour the file value with `data_source = user_file` and note it. If the file is silent, keep the generated value and surface the assumption in section D. |
+| `calves_female` | 0.322 | 0.8 | 7 | 6.5 | 60 | 300 | 0.3 | 59 | 10.3 | Takes the female Eq 10.6 coefficient, on the heifer-replacement track. Some inventories do not sex-disaggregate calves at all and report a single pooled calf growth coefficient; if the source file does that, say so in section D rather than splitting it yourself. |
+| `calves_male` | 0.322 | 1 | 7 | 6.5 | 60 | 350 | 0.3 | 59 | 10.3 | Takes the castrate Eq 10.6 coefficient. It rises to the intact-bull value only on the breeding-bull development path after puberty. Note the direction: castration LOWERS the growth coefficient, it does not raise it, so a file showing a higher value for castrated males than for intact ones has the two swapped. |
+| `feedlot_cattle` | 0.322 | 1 | 4 | 3 | 250 | 400 | 1 | 74 | 14 |  |
 
 `Ca` is not per-sub-category: it depends on the feeding situation (IPCC Table 10.5).
 

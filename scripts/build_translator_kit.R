@@ -223,18 +223,22 @@ lines <- c(lines, "",
   "",
   partial("subcat_overrides_intro"),
   "",
-  "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | DE | CP | notes |",
-  "|---|---|---|---|---|---|---|---|")
+  "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | BW | MW | WG | DE | CP | notes |",
+  "|---|---|---|---|---|---|---|---|---|---|---|")
 for (sc in ANIMAL_SUBCATEGORIES) {
   cfi <- CFI_BY_SUBCAT[[sc]]; cg <- C_GROWTH_BY_SUBCAT[[sc]]
   y19 <- ym_for_subcat(sc, "2019_refinement")
   y06 <- ym_for_subcat(sc, "2006")
   de_ <- DE_BY_SUBCAT[[sc]]; cp_ <- CP_BY_SUBCAT[[sc]]
-  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s |", sc,
+  bw_ <- LW_BY_SUBCAT[[sc]]; mw_ <- MW_BY_SUBCAT[[sc]]; wg_ <- WG_BY_SUBCAT[[sc]]
+  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |", sc,
     if (is.null(cfi)) "—" else fmt_num(cfi),
     if (is.null(cg))  "—" else fmt_num(cg),
     if (is.null(y19)) "—" else fmt_num(y19),
     if (is.null(y06)) "—" else fmt_num(y06),
+    if (is.null(bw_)) "—" else fmt_num(bw_),
+    if (is.null(mw_)) "—" else fmt_num(mw_),
+    if (is.null(wg_)) "—" else fmt_num(wg_),
     if (is.null(de_)) "—" else fmt_num(de_),
     if (is.null(cp_)) "—" else fmt_num(cp_),
     if (!is.null(.rownotes[[sc]])) gsub("\\|", "\\\\|", .rownotes[[sc]]) else ""))

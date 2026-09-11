@@ -122,9 +122,14 @@ for (nm in c("CFI_BY_SUBCAT", "C_GROWTH_BY_SUBCAT", "LW_BY_SUBCAT",
 for (i in seq_len(nrow(YM_BY_SUBCAT))) for (f in names(YM_BY_SUBCAT))
   if (f != "sub_category")
     add("YM_BY_SUBCAT", YM_BY_SUBCAT$sub_category[i], f, YM_BY_SUBCAT[[f]][i])
+# Both columns. default_val_dairy was added for the QA benchmark and was
+# not enumerated here, so its six values had no surface coverage at all,
+# which is the gap this matrix exists to prevent. Generate from the object's
+# own columns so a future column cannot be missed the same way.
 for (i in seq_len(nrow(IPCC_DEFAULTS_BY_REGION)))
-  add("IPCC_DEFAULTS_BY_REGION", IPCC_DEFAULTS_BY_REGION$region[i],
-      "default_val", IPCC_DEFAULTS_BY_REGION$default_val[i])
+  for (fld in setdiff(names(IPCC_DEFAULTS_BY_REGION), c("region", "parameter")))
+    add("IPCC_DEFAULTS_BY_REGION", IPCC_DEFAULTS_BY_REGION$region[i],
+        fld, IPCC_DEFAULTS_BY_REGION[[fld]][i])
 for (ar in names(GWP_VALUES)) for (g in names(GWP_VALUES[[ar]]))
   add("GWP_VALUES", paste0(ar, ".", g), "value", GWP_VALUES[[ar]][[g]])
 
@@ -252,6 +257,15 @@ S[["prompt_param_catalogue"]] <- local({
       v[paste("DE_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["DE"]])
     if ("CP" %in% names(o))
       v[paste("CP_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["CP"]])
+    # BW, MW and WG per sub-category previously appeared on NO surface: the
+    # prompt table stopped at Cfi and C, so nine values each reached users
+    # through the template writer with nothing checking them.
+    if ("BW" %in% names(o))
+      v[paste("LW_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["BW"]])
+    if ("MW" %in% names(o))
+      v[paste("MW_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["MW"]])
+    if ("WG" %in% names(o))
+      v[paste("WG_BY_SUBCAT", k, "value", sep = "|")] <- norm(o[["WG"]])
   }
   v
 })
@@ -661,8 +675,15 @@ S[["prompt_system_instructions"]] <- local({
   for (ln in strsplit(txt, "
 ")[[1]]) {
     if (!grepl("pct_pregnant", txt, fixed = TRUE)) break
-    m <- regmatches(ln, regexpr("([0-9]*\\.?[0-9]+)\\s*$", ln))
-    if (!length(m) || !grepl("`", ln) || !grepl("→|->", ln)) next
+    # Take the number that FOLLOWS the arrow, not the one at end of line.
+    # The end-of-line form stopped matching the moment a citation was added
+    # after the value ("-> 0.54 (Table 10A.2 ...)"), and the cell went
+    # silently absent rather than reporting a mismatch. Same failure mode as
+    # the doc_rmd extractor had.
+    if (!grepl("`", ln) || !grepl("→|->", ln)) next
+    after <- sub("^.*(→|->)", "", ln)
+    m <- regmatches(after, regexpr("[0-9]*[.]?[0-9]+", after))
+    if (!length(m)) next
     for (sc in names(PCT_PREGNANT_BY_SUBCAT))
       if (grepl(paste0("`", sc, "`"), ln, fixed = TRUE))
         v[paste("PCT_PREGNANT_BY_SUBCAT", sc, "value", sep = "|")] <- norm(m)
@@ -731,7 +752,8 @@ POLICY <- c(prompt_param_catalogue = "MUST", prompt_template_schema = "MUST",
 SCOPE <- list(
   prompt_param_catalogue = list(
     objects = c("PARAM_CATALOGUE", "CFI_BY_SUBCAT", "C_GROWTH_BY_SUBCAT",
-                "YM_BY_SUBCAT", "DE_BY_SUBCAT", "CP_BY_SUBCAT")),
+                "YM_BY_SUBCAT", "DE_BY_SUBCAT", "CP_BY_SUBCAT",
+                "LW_BY_SUBCAT", "MW_BY_SUBCAT", "WG_BY_SUBCAT")),
   # Only the parameters that actually have a hint, and only their default.
   qaqc_hints = list(
     objects = "PARAM_CATALOGUE", fields = "ipcc_default",
