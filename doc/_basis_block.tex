@@ -1,0 +1,55 @@
+% BEGIN GENERATED: default basis (scripts/build_basis_block.R). Do not edit.
+\subsection{What the defaults assume}
+
+Every IPCC default this tool ships is one cell of a much larger table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. Those choices are listed below. \textbf{Where a choice does not describe the herd being reported, the parameters it governs must be replaced with country-specific values.}
+
+\renewcommand{\arraystretch}{1.25}
+\begin{small}
+\begin{longtable}{p{2.4cm} p{3.4cm} p{3.6cm} p{5.6cm}}
+\toprule
+\textbf{Choice} & \textbf{This tool uses} & \textbf{IPCC also publishes} & \textbf{Affects, and what to do otherwise} \\
+\midrule
+\endhead
+\textbf{Geography} & Africa & North America; Western Europe; Eastern Europe; Oceania; Latin America; Asia; Middle East; Indian subcontinent & \texttt{BW, MW, WG, Milk, Fat, MilkPR, pct\_pregnant, DE, CP, hours}. The tool is built for developing-country inventory compilers. Country-specific values should replace these wherever they exist. \\ \addlinespace[2pt]
+\textbf{Productivity class} & Low productivity & Regional aggregate (Milk 3.5, BW 260); high productivity (Milk 5.8, BW 250) & \texttt{BW, Milk, MilkPR, pct\_pregnant, DE, CP, Bo, Ym}. Adopted 2026-09-11. Table 10.16A footnote 1 makes low productivity the Tier 1 default for other regions, and the low-productivity row's Pasture/Range feeding situation is the one that matches the activity coefficient the tool uses. Before this the defaults mixed the aggregate and non-dairy rows and described no animal IPCC published. \\ \addlinespace[2pt]
+\textbf{Feeding situation} & Pasture / Range, flat terrain & Stall-fed (Ca 0); grazing large areas or hilly terrain (Ca 0.36) & \texttt{Ca}. Matches the low-productivity row, which Annex 10A.1 characterises as Pasture/Range. Stall-fed herds must override it. \\ \addlinespace[2pt]
+\textbf{Lactation state} & Lactating & Dry phase (Cfi 0.322; Ym 7.0 in low-productivity systems) & \texttt{Cfi, Ym, Milk, Fat, MilkPR}. The generic catalogue default describes a lactating dairy cow. Footnote 4 of Table 10.12 restricts the dairy Ym rows to lactating animals. Every other sub-category is resolved separately. \\ \addlinespace[2pt]
+\textbf{Animal class for manure nitrogen} & Other Cattle & Dairy Cow; Swine; Poultry; Other animals & \texttt{FRAC}. Table 10.22 publishes a separate column per animal class and the values differ substantially, for instance solid storage volatilisation 0.45 for Other Cattle against 0.30 for Dairy Cow. \\ \addlinespace[2pt]
+\textbf{Climate, soils pathway} & Wet & Dry (EF3\_PRP 0.002, EF4 0.005, Frac\_LEACH\_PRP 0); climate-aggregated (EF3\_PRP 0.004, EF4 0.010) & \texttt{EF3\_PRP, EF4, Frac\_LEACH\_PRP}. DRY-CLIMATE INVENTORIES MUST OVERRIDE THESE THREE. Keeping the wet-climate defaults in a dry climate overstates direct pasture N2O roughly threefold, overstates indirect N2O from deposition almost threefold, and reports a leaching pathway that IPCC treats as absent. \\ \addlinespace[2pt]
+\textbf{Climate zone, manure methane} & Chosen per inventory. Reference values are read at $\leq$10 C for boreal, 19 C for temperate and $\geq$28 C for tropical & The 2019 Refinement resolves ten climate zones; this tool resolves four, and its tropical-dry column mirrors tropical & \texttt{MCF}. The same three columns are used for every temperature-dependent system, so the systems stay comparable with each other. \\ \addlinespace[2pt]
+\textbf{Manure system variant} & One IPCC sub-type per manure system, named on every row of the manure-system table & Liquid slurry WITH versus without a natural crust; composting static pile versus in-vessel versus windrow; solid storage plain versus bulking agent versus additives; deep bedding with versus without mixing & \texttt{MCF, EF3, FRAC}. IPCC splits several systems into variants whose coefficients differ by a factor of two or more. Every coefficient on one of our rows comes from the single variant that row declares, so the row describes one real system rather than a blend. \\ \addlinespace[2pt]
+\textbf{Guidelines edition} & Selected by the user in Inventory\_Metadata: 2006 or 2019 Refinement & n/a & \texttt{Ym, MCF}. Ym is the only default whose value differs between the two editions. The pasture MCF is deliberately held on the 2006 convention, because the 2019 Refinement pasture MCF of 0.47\% has to be paired with a pasture-specific Bo of 0.19 that the engine does not carry. \\ \addlinespace[2pt]
+\textbf{Species} & Cattle & Buffalo (Bo 0.10) & \texttt{Bo, Cp, ASH}. The tool is a cattle tool. Buffalo values differ and are not carried. \\ \addlinespace[2pt]
+\bottomrule
+\end{longtable}
+\end{small}
+
+\texttt{MCF}, \texttt{EF3} and \texttt{FRAC} above are the per-manure-system coefficient families rather than catalogue parameters.
+
+\subsubsection{Which IPCC variant each manure system models}
+
+IPCC splits several manure systems into variants whose coefficients differ substantially. Liquid slurry with a natural crust emits less methane and volatilises less nitrogen than the same slurry without one, and composting in a static pile is not the same system as composting in a vessel. This tool carries \textbf{one row per manure system}, and every coefficient on that row (the methane conversion factor, the direct N\textsubscript{2}O emission factor, and the volatilisation and leaching fractions) is read from the single IPCC variant named below, so the row describes a real system rather than a blend. \textbf{A herd running a different variant must override the coefficients on that row.}
+
+\begin{small}
+\begin{longtable}{p{4.2cm} p{10.5cm}}
+\toprule
+\textbf{Manure system} & \textbf{IPCC variant modelled} \\
+\midrule
+\endhead
+\texttt{pasture} & PRP (Ch.11 pathway; MCF from 2006 Table 10.17 Pasture/Range/Paddock) \\ \addlinespace[2pt]
+\texttt{daily\_spread} & Daily spread \\ \addlinespace[2pt]
+\texttt{solid\_storage} & Solid storage (plain) \\ \addlinespace[2pt]
+\texttt{solid\_storage\_covered} & Solid storage - Covered/compacted (2019R Table 10.17) \\ \addlinespace[2pt]
+\texttt{dry\_lot} & Dry lot \\ \addlinespace[2pt]
+\texttt{deep\_bedding} & Deep bedding, >1 month accumulation \\ \addlinespace[2pt]
+\texttt{liquid\_slurry} & Liquid/Slurry, with natural crust cover \\ \addlinespace[2pt]
+\texttt{composting} & Composting - Static Pile (forced aeration) \\ \addlinespace[2pt]
+\texttt{lagoon} & Uncovered anaerobic lagoon \\ \addlinespace[2pt]
+\texttt{anaerobic\_digester} & Anaerobic digester, low leakage, high-quality industrial technology, open storage \\ \addlinespace[2pt]
+\texttt{aerobic\_treatment} & Aerobic treatment, forced aeration \\ \addlinespace[2pt]
+\texttt{burned\_for\_fuel} & Burned for fuel \\ \addlinespace[2pt]
+\bottomrule
+\end{longtable}
+\end{small}
+
+% END GENERATED: default basis

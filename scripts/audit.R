@@ -2257,6 +2257,55 @@ section_F <- function() {
                "9 sub-categories x 3 parameters: non-zero for dairy_cows and other_cows only; heifers, calves, feedlot and all males are biological zeros; unmapped sub-categories keep the catalogue default"
              else paste(utils::head(milk_fail, 4), collapse = "; "))
 
+  # F37 -- the declared basis reaches every user-facing surface.
+  #
+  # DEFAULT_BASIS states which IPCC row each family of defaults came from:
+  # Africa, low productivity, wet climate, liquid slurry WITH a crust,
+  # composting as a static pile. Until 2026-09-11 none of that reached a
+  # user. ipcc_variant existed but appeared only in an internal reference
+  # file, so someone reading "MCF 50% for liquid slurry" had no way to learn
+  # it assumes a natural crust, and no way to know what to change if their
+  # slurry has none.
+  #
+  # A basis that is declared but not rendered is worth nothing, so this
+  # asserts presence on each surface rather than trusting the generators.
+  basis_fail <- tryCatch({
+    f <- character(0)
+    if (!exists("DEFAULT_BASIS") || nrow(DEFAULT_BASIS) < 10L)
+      f <- c(f, "DEFAULT_BASIS missing or short")
+    # every dimension must say what it governs and why
+    for (cl in c("chosen", "alternatives", "ipcc_source", "governs", "why"))
+      if (any(!nzchar(DEFAULT_BASIS[[cl]])))
+        f <- c(f, sprintf("DEFAULT_BASIS has an empty %s", cl))
+    # the four choices a user is most likely to be caught out by
+    probes <- c("Low productivity", "Wet", "Africa")
+    surfaces <- c("doc/_basis_block.tex",
+                  "translator_prompts/param_catalogue.md",
+                  "reference/DEFAULTS_MASTER.md")
+    for (sf in surfaces) {
+      if (!file.exists(sf)) { f <- c(f, paste("missing surface", sf)); next }
+      txt <- paste(readLines(sf, warn = FALSE, encoding = "UTF-8"), collapse = " ")
+      for (pr in probes)
+        if (!grepl(pr, txt, fixed = TRUE))
+          f <- c(f, sprintf("%s does not state the basis '%s'", basename(sf), pr))
+      # and the manure variant that is easiest to get wrong
+      if (!grepl("natural crust cover", txt, fixed = TRUE))
+        f <- c(f, sprintf("%s does not name the liquid-slurry variant", basename(sf)))
+    }
+    # basis_for() must resolve, and must be silent where nothing governs
+    if (!length(basis_for("Bo"))) f <- c(f, "basis_for(Bo) returned nothing")
+    if (length(basis_for("N")))   f <- c(f, "basis_for(N) should be empty")
+    f
+  }, error = function(e) conditionMessage(e))
+  basis_ok <- length(basis_fail) == 0L
+  check_bool("F37", "F",
+             "The declared basis is stated on every user-facing surface",
+             basis_ok,
+             notes = if (basis_ok)
+               sprintf("%d choices, each with chosen/alternatives/source/governs/why, rendered into the guides, the translator prompt and the defaults reference",
+                       nrow(DEFAULT_BASIS))
+             else paste(utils::head(basis_fail, 4), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

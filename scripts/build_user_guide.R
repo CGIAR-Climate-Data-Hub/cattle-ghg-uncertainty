@@ -6,6 +6,12 @@
 
 if (basename(getwd()) == "scripts") setwd("..")
 
+# The "what the defaults assume" block is generated from DEFAULT_BASIS
+# and \input{} by both guides. Rebuild it first so a guide can never be
+# rendered against a stale basis table.
+source("scripts/build_basis_block.R")
+
+
 if (!requireNamespace("rmarkdown", quietly = TRUE)) install.packages("rmarkdown")
 
 # LaTeX engine: prefer whatever is already installed (MiKTeX / TeX Live / TinyTeX).

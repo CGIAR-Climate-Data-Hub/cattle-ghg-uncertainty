@@ -172,6 +172,8 @@ On subsequent visits from the same browser the cookie keeps you signed in --- th
 
 ## Complete parameter reference
 
+\input{_basis_block}
+
 The table below lists all parameters accepted by the tool. Required parameters depend on the emission sources you are running. Parameters marked \textit{n/a} in the IPCC default column must be supplied from your national data. The tool will auto-fill missing optional parameters with IPCC defaults and flag them in Tab 1 (see Section 3.2). When uploading your data, be sure to select 2006 IPCC Guidelines or 2019 Refinement so that the tool auto-fills and performs data quality checks according to the correct version of the guidelines.
 
 \textit{Note: the table presents illustrative default values, not the complete range of defaults provided in the 2006 IPCC Guidelines or 2019 Refinement.}

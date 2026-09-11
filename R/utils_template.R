@@ -1262,6 +1262,31 @@ generate_template_openxlsx <- function(filepath, include_example,
            used_in=rep("Inventory_Metadata.species", length(V_SPECIES)),
            stringsAsFactors=FALSE)),
 
+    # The declared basis comes FIRST on the Vocab sheet. Every default below
+    # it is one cell of a much larger IPCC table, and a user who cannot see
+    # which region, productivity class and climate were chosen cannot judge
+    # whether a default applies to their herd or know what to override.
+    list(title="WHAT THE DEFAULTS ASSUME — read this before accepting any pre-filled value",
+         cols=c("choice","this tool uses","IPCC also publishes","affects",
+                "IPCC source","why, and what to do otherwise"),
+         data=data.frame(
+           choice=unname(ifelse(is.na(DEFAULT_BASIS_LABELS[DEFAULT_BASIS$dimension]),
+                                DEFAULT_BASIS$dimension,
+                                DEFAULT_BASIS_LABELS[DEFAULT_BASIS$dimension])),
+           chosen=DEFAULT_BASIS$chosen,
+           alternatives=DEFAULT_BASIS$alternatives,
+           governs=gsub(" ", ", ", DEFAULT_BASIS$governs, fixed=TRUE),
+           source=DEFAULT_BASIS$ipcc_source,
+           why=DEFAULT_BASIS$why,
+           stringsAsFactors=FALSE)),
+
+    list(title="IPCC variant each manure system models  [every coefficient on a row comes from THIS variant]",
+         cols=c("mms_type","IPCC variant modelled"),
+         data=data.frame(
+           mms_type=MMS_DEFAULTS$id,
+           variant=MMS_DEFAULTS$ipcc_variant,
+           stringsAsFactors=FALSE)),
+
     list(title="IPCC Table 10.17 — MCF (%) by climate zone  [enter values into Manure_Management sheet]",
          cols=c("mms_type","tropical_moist_%","tropical_dry_%","temperate_%","boreal_%"),
          data=data.frame(

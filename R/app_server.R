@@ -2910,6 +2910,31 @@ app_server <- function(input, output, session) {
   # T1.4 + R1.7: parameter glossary — variable names are now IPCC-aligned, so the
   # separate ipcc_software_name column is dropped (redundant). "Our column"
   # renamed to "Variable name".
+  # The declared basis: which IPCC row each family of defaults comes from.
+  # Rendered straight from DEFAULT_BASIS so it cannot drift from the values.
+  output$basis_table <- DT::renderDT({
+    b <- DEFAULT_BASIS
+    lbl <- DEFAULT_BASIS_LABELS[b$dimension]
+    d <- data.frame(
+      dimension    = ifelse(is.na(lbl), b$dimension, lbl),
+      chosen       = b$chosen,
+      alternatives = b$alternatives,
+      governs      = gsub(" ", ", ", b$governs, fixed = TRUE),
+      ipcc_source  = b$ipcc_source,
+      why          = b$why,
+      stringsAsFactors = FALSE)
+    DT::datatable(
+      d, rownames = FALSE, escape = TRUE,
+      colnames = setNames(names(d),
+        c(t("basis_col_dimension"), t("basis_col_chosen"),
+          t("basis_col_alternatives"), t("basis_col_governs"),
+          t("basis_col_source"), t("basis_col_why"))),
+      options = list(pageLength = -1, dom = "t", scrollX = TRUE,
+                     columnDefs = list(list(width = "22%", targets = 5))),
+      class = "compact stripe")
+  })
+  outputOptions(output, "basis_table", suspendWhenHidden = FALSE)
+
   output$definitions_table <- DT::renderDT({
     cat <- PARAM_CATALOGUE
     is_fr <- identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
@@ -2928,17 +2953,23 @@ app_server <- function(input, output, session) {
     cat$ipcc_framing <- ifelse(cat$parameter %in% c("cattle_pop", "N"),
                                t("def_framing_ad"),
                                t("def_framing_coef"))
+    # Every default is one cell of a much larger IPCC table, reached by
+    # choosing a region, a productivity class, a climate and so on. Showing
+    # the number without the basis leaves a user unable to judge whether it
+    # applies to their herd, or what to change if it does not.
+    cat$ipcc_basis <- vapply(cat$parameter, basis_label, character(1))
     DT::datatable(
       cat[, c("parameter", "definition", "unit",
-              "ipcc_default", "suggested_distribution",
+              "ipcc_default", "ipcc_basis", "suggested_distribution",
               "param_tier", "ipcc_framing", "ipcc_ref")],
       rownames = FALSE,
       colnames = setNames(
-        c("parameter", "definition", "unit", "ipcc_default",
+        c("parameter", "definition", "unit", "ipcc_default", "ipcc_basis",
           "suggested_distribution", "param_tier",
           "ipcc_framing", "ipcc_ref"),
         c(t("def_col_variable"), t("def_col_definition"), t("def_col_unit"),
-          t("def_col_ipcc_default"), t("def_col_dist"), t("def_col_level"),
+          t("def_col_ipcc_default"), t("def_col_basis"), t("def_col_dist"),
+          t("def_col_level"),
           t("def_col_ipcc_framing"), t("def_col_ipcc_ref"))),
       options = list(pageLength = -1, dom = "t", scrollX = TRUE),
       class = "compact stripe"

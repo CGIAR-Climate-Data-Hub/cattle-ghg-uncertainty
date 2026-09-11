@@ -1,5 +1,41 @@
 # Parameter catalogue
 
+## What these defaults assume
+
+Every default in the table below is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. When the user's data shows that one of these choices does not describe their herd, say so in section D and use their value instead of the default.
+
+| choice | this tool uses | IPCC also publishes | affects | why, and what to do otherwise |
+|---|---|---|---|---|
+| **Geography** | Africa | North America; Western Europe; Eastern Europe; Oceania; Latin America; Asia; Middle East; Indian subcontinent | `BW`, `MW`, `WG`, `Milk`, `Fat`, `MilkPR`, `pct_pregnant`, `DE`, `CP`, `hours` | The tool is built for developing-country inventory compilers. Country-specific values should replace these wherever they exist. |
+| **Productivity class** | Low productivity | Regional aggregate (Milk 3.5, BW 260); high productivity (Milk 5.8, BW 250) | `BW`, `Milk`, `MilkPR`, `pct_pregnant`, `DE`, `CP`, `Bo`, `Ym` | Adopted 2026-09-11. Table 10.16A footnote 1 makes low productivity the Tier 1 default for other regions, and the low-productivity row's Pasture/Range feeding situation is the one that matches the activity coefficient the tool uses. Before this the defaults mixed the aggregate and non-dairy rows and described no animal IPCC published. |
+| **Feeding situation** | Pasture / Range, flat terrain | Stall-fed (Ca 0); grazing large areas or hilly terrain (Ca 0.36) | `Ca` | Matches the low-productivity row, which Annex 10A.1 characterises as Pasture/Range. Stall-fed herds must override it. |
+| **Lactation state** | Lactating | Dry phase (Cfi 0.322; Ym 7.0 in low-productivity systems) | `Cfi`, `Ym`, `Milk`, `Fat`, `MilkPR` | The generic catalogue default describes a lactating dairy cow. Footnote 4 of Table 10.12 restricts the dairy Ym rows to lactating animals. Every other sub-category is resolved separately. |
+| **Animal class for manure nitrogen** | Other Cattle | Dairy Cow; Swine; Poultry; Other animals | `FRAC` | Table 10.22 publishes a separate column per animal class and the values differ substantially, for instance solid storage volatilisation 0.45 for Other Cattle against 0.30 for Dairy Cow. |
+| **Climate, soils pathway** | Wet | Dry (EF3_PRP 0.002, EF4 0.005, Frac_LEACH_PRP 0); climate-aggregated (EF3_PRP 0.004, EF4 0.010) | `EF3_PRP`, `EF4`, `Frac_LEACH_PRP` | DRY-CLIMATE INVENTORIES MUST OVERRIDE THESE THREE. Keeping the wet-climate defaults in a dry climate overstates direct pasture N2O roughly threefold, overstates indirect N2O from deposition almost threefold, and reports a leaching pathway that IPCC treats as absent. |
+| **Climate zone, manure methane** | Chosen per inventory. Reference values are read at <=10 C for boreal, 19 C for temperate and >=28 C for tropical | The 2019 Refinement resolves ten climate zones; this tool resolves four, and its tropical-dry column mirrors tropical | `MCF` | The same three columns are used for every temperature-dependent system, so the systems stay comparable with each other. |
+| **Manure system variant** | One IPCC sub-type per manure system, named on every row of the manure-system table | Liquid slurry WITH versus without a natural crust; composting static pile versus in-vessel versus windrow; solid storage plain versus bulking agent versus additives; deep bedding with versus without mixing | `MCF`, `EF3`, `FRAC` | IPCC splits several systems into variants whose coefficients differ by a factor of two or more. Every coefficient on one of our rows comes from the single variant that row declares, so the row describes one real system rather than a blend. |
+| **Guidelines edition** | Selected by the user in Inventory_Metadata: 2006 or 2019 Refinement | n/a | `Ym`, `MCF` | Ym is the only default whose value differs between the two editions. The pasture MCF is deliberately held on the 2006 convention, because the 2019 Refinement pasture MCF of 0.47% has to be paired with a pasture-specific Bo of 0.19 that the engine does not carry. |
+| **Species** | Cattle | Buffalo (Bo 0.10) | `Bo`, `Cp`, `ASH` | The tool is a cattle tool. Buffalo values differ and are not carried. |
+
+### Which IPCC variant each manure system models
+
+Every coefficient on a manure row (MCF, EF3, and the volatilisation and leaching fractions) comes from the single variant named here, so the row describes one real system rather than a blend. If the user's file describes a different variant, flag it.
+
+| mms_type | IPCC variant modelled |
+|---|---|
+| `pasture` | PRP (Ch.11 pathway; MCF from 2006 Table 10.17 Pasture/Range/Paddock) |
+| `daily_spread` | Daily spread |
+| `solid_storage` | Solid storage (plain) |
+| `solid_storage_covered` | Solid storage - Covered/compacted (2019R Table 10.17) |
+| `dry_lot` | Dry lot |
+| `deep_bedding` | Deep bedding, >1 month accumulation |
+| `liquid_slurry` | Liquid/Slurry, with natural crust cover |
+| `composting` | Composting - Static Pile (forced aeration) |
+| `lagoon` | Uncovered anaerobic lagoon |
+| `anaerobic_digester` | Anaerobic digester, low leakage, high-quality industrial technology, open storage |
+| `aerobic_treatment` | Aerobic treatment, forced aeration |
+| `burned_for_fuel` | Burned for fuel |
+
 Single source of truth for the 25 IPCC-aligned parameters the cattle uncertainty app expects.
 When you (Claude) translate a user's raw column to a template field, use this table.
 All parameter codes are case-sensitive.

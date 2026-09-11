@@ -130,9 +130,42 @@ local({
 def_for <- function(prm) if (!is.null(.defs[[prm]])) .defs[[prm]] else
   pc$definition[pc$parameter == prm]
 
+# The declared basis goes at the TOP of the catalogue the model reads. The
+# model is asked to fill gaps with these defaults, so it has to know what
+# they assume, and it has to be able to tell the user when a choice does not
+# match their herd.
+basis_lines <- c(
+  "## What these defaults assume",
+  "",
+  "Every default in the table below is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. When the user's data shows that one of these choices does not describe their herd, say so in section D and use their value instead of the default.",
+  "",
+  "| choice | this tool uses | IPCC also publishes | affects | why, and what to do otherwise |",
+  "|---|---|---|---|---|")
+for (i in seq_len(nrow(DEFAULT_BASIS))) {
+  lb <- DEFAULT_BASIS_LABELS[[DEFAULT_BASIS$dimension[i]]]
+  # fixed = TRUE: a literal pipe would split the markdown table cell.
+  esc_ <- function(x) gsub("|", "\\|", x, fixed = TRUE)
+  basis_lines <- c(basis_lines, sprintf("| **%s** | %s | %s | `%s` | %s |",
+    if (is.null(lb)) DEFAULT_BASIS$dimension[i] else lb,
+    esc_(DEFAULT_BASIS$chosen[i]), esc_(DEFAULT_BASIS$alternatives[i]),
+    gsub(" ", "`, `", DEFAULT_BASIS$governs[i], fixed = TRUE),
+    esc_(DEFAULT_BASIS$why[i])))
+}
+basis_lines <- c(basis_lines, "",
+  "### Which IPCC variant each manure system models",
+  "",
+  "Every coefficient on a manure row (MCF, EF3, and the volatilisation and leaching fractions) comes from the single variant named here, so the row describes one real system rather than a blend. If the user's file describes a different variant, flag it.",
+  "",
+  "| mms_type | IPCC variant modelled |", "|---|---|")
+for (i in seq_len(nrow(MMS_DEFAULTS)))
+  basis_lines <- c(basis_lines, sprintf("| `%s` | %s |",
+    MMS_DEFAULTS$id[i], MMS_DEFAULTS$ipcc_variant[i]))
+basis_lines <- c(basis_lines, "")
+
 lines <- c(
   "# Parameter catalogue",
   "",
+  basis_lines,
   sprintf("Single source of truth for the %d IPCC-aligned parameters the cattle uncertainty app expects.", NPAR),
   "When you (Claude) translate a user's raw column to a template field, use this table.",
   "All parameter codes are case-sensitive.",

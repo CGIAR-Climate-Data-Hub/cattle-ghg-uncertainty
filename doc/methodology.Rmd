@@ -103,6 +103,8 @@ The tool implements **Tier 2** methods throughout the emission chain. Tier 2 ent
 
 All parameters are entered via an Excel template (one row per parameter per cattle sub-category) and loaded into the tool. Each parameter requires a central value, an uncertainty specification (distribution type and bounds or percentage), and an optional IPCC reference.
 
+\input{_basis_block}
+
 Table \ref{tab:params} lists all parameters used in the calculation chain, their units, the IPCC equation in which they appear, the default value pre-loaded in the tool (sourced from the IPCC Guidelines), and an indication of potentially suitable probability distributions that can be applied in uncertainty analysis. Where the 2006 Guidelines and the 2019 Refinement give different defaults, both are shown.
 
 \begin{landscape}

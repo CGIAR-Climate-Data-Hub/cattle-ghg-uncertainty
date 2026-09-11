@@ -1005,6 +1005,17 @@ app_ui <- function(request = NULL) {
           tags$strong(t("info_definitions_software")),
           t("info_definitions_tail"))
       ,
+      # The basis panel sits ABOVE the parameter table deliberately. The
+      # numbers in that table are only interpretable once a user knows which
+      # region, productivity class, climate and manure-system variant they
+      # were drawn from, and those choices used to appear nowhere in the app.
+      bslib::card(
+        bslib::card_header(t("basis_panel_title")),
+        bslib::card_body(
+          tags$p(t("basis_panel_intro")),
+          DT::DTOutput("basis_table")
+        )
+      ),
       bslib::card(
         bslib::card_header(t("card_param_definitions")),
         bslib::card_body(DT::DTOutput("definitions_table"))

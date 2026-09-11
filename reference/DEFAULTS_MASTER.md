@@ -4,7 +4,7 @@ Generated 2026-09-11 from `reference/defaults_master.csv` by `scripts/build_defa
 
 This is the single authority for every IPCC default the app ships. `R/load_defaults.R` builds `PARAM_CATALOGUE`, `MMS_DEFAULTS`, `MMS_FRAC_DEFAULTS_2019` and the per-sub-category lists from the CSV at start-up, and every other surface (the Excel template, the translator prompts, the published guides) derives from those objects. `scripts/verify_defaults.R` checks all 14 surfaces against it and runs in CI.
 
-- 573 value rows across 15 objects
+- 623 value rows across 16 objects
 - 57 rows carry a review provenance reference
 
 ## IPCC verification status
@@ -23,37 +23,56 @@ All 289 numeric values below were checked one at a time against the IPCC source 
 
 The `DEVIATION_OPEN` rows are the ones that would move a reported number if resolved. They are listed in full at the end of this document and discussed in `reference/provenance_register.md`.
 
+## What the defaults assume
+
+Every value in this document is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. Those choices are the declared basis, held in the master as `DEFAULT_BASIS` and rendered into the app's Definitions tab, both published guides, the Excel template and the translator prompt from this one place.
+
+| choice | this tool uses | IPCC also publishes | affects | IPCC source | why |
+|---|---|---|---|---|---|
+| **Geography** | Africa | North America; Western Europe; Eastern Europe; Oceania; Latin America; Asia; Middle East; Indian subcontinent | `BW`, `MW`, `WG`, `Milk`, `Fat`, `MilkPR`, `pct_pregnant`, `DE`, `CP`, `hours` | 2019R Vol.4 Ch.10 Annex 10A.1 (dairy cattle) and 10A.2 (other cattle), Africa block | The tool is built for developing-country inventory compilers. Country-specific values should replace these wherever they exist. |
+| **Productivity class** | Low productivity | Regional aggregate (Milk 3.5, BW 260); high productivity (Milk 5.8, BW 250) | `BW`, `Milk`, `MilkPR`, `pct_pregnant`, `DE`, `CP`, `Bo`, `Ym` | 2019R Annex 10A.1, Africa Low productivity systems row; Table 10.16A 'Other regions, low productivity' for Bo | Adopted 2026-09-11. Table 10.16A footnote 1 makes low productivity the Tier 1 default for other regions, and the low-productivity row's Pasture/Range feeding situation is the one that matches the activity coefficient the tool uses. Before this the defaults mixed the aggregate and non-dairy rows and described no animal IPCC published. |
+| **Feeding situation** | Pasture / Range, flat terrain | Stall-fed (Ca 0); grazing large areas or hilly terrain (Ca 0.36) | `Ca` | 2019R Vol.4 Ch.10 Table 10.5 (Updated) | Matches the low-productivity row, which Annex 10A.1 characterises as Pasture/Range. Stall-fed herds must override it. |
+| **Lactation state** | Lactating | Dry phase (Cfi 0.322; Ym 7.0 in low-productivity systems) | `Cfi`, `Ym`, `Milk`, `Fat`, `MilkPR` | 2019R Vol.4 Ch.10 Table 10.4 (Updated); Table 10.12 (Updated) footnote 4 | The generic catalogue default describes a lactating dairy cow. Footnote 4 of Table 10.12 restricts the dairy Ym rows to lactating animals. Every other sub-category is resolved separately. |
+| **Animal class for manure nitrogen** | Other Cattle | Dairy Cow; Swine; Poultry; Other animals | `FRAC` | 2019R Vol.4 Ch.10 Table 10.22 (Updated) | Table 10.22 publishes a separate column per animal class and the values differ substantially, for instance solid storage volatilisation 0.45 for Other Cattle against 0.30 for Dairy Cow. |
+| **Climate, soils pathway** | Wet | Dry (EF3_PRP 0.002, EF4 0.005, Frac_LEACH_PRP 0); climate-aggregated (EF3_PRP 0.004, EF4 0.010) | `EF3_PRP`, `EF4`, `Frac_LEACH_PRP` | 2019R Vol.4 Ch.11 Table 11.1 (Updated) and Table 11.3 (Updated) | DRY-CLIMATE INVENTORIES MUST OVERRIDE THESE THREE. Keeping the wet-climate defaults in a dry climate overstates direct pasture N2O roughly threefold, overstates indirect N2O from deposition almost threefold, and reports a leaching pathway that IPCC treats as absent. |
+| **Climate zone, manure methane** | Chosen per inventory. Reference values are read at <=10 C for boreal, 19 C for temperate and >=28 C for tropical | The 2019 Refinement resolves ten climate zones; this tool resolves four, and its tropical-dry column mirrors tropical | `MCF` | 2006 Vol.4 Ch.10 Table 10.17, which is tabulated per degree C | The same three columns are used for every temperature-dependent system, so the systems stay comparable with each other. |
+| **Manure system variant** | One IPCC sub-type per manure system, named on every row of the manure-system table | Liquid slurry WITH versus without a natural crust; composting static pile versus in-vessel versus windrow; solid storage plain versus bulking agent versus additives; deep bedding with versus without mixing | `MCF`, `EF3`, `FRAC` | 2019R Vol.4 Ch.10 Tables 10.17, 10.21 and 10.22 | IPCC splits several systems into variants whose coefficients differ by a factor of two or more. Every coefficient on one of our rows comes from the single variant that row declares, so the row describes one real system rather than a blend. |
+| **Guidelines edition** | Selected by the user in Inventory_Metadata: 2006 or 2019 Refinement | n/a | `Ym`, `MCF` | IPCC 2006 Guidelines; 2019 Refinement | Ym is the only default whose value differs between the two editions. The pasture MCF is deliberately held on the 2006 convention, because the 2019 Refinement pasture MCF of 0.47% has to be paired with a pasture-specific Bo of 0.19 that the engine does not carry. |
+| **Species** | Cattle | Buffalo (Bo 0.10) | `Bo`, `Cp`, `ASH` | 2019R Vol.4 Ch.10 Table 10.16A (Updated); Table 10.7 (Updated) | The tool is a cattle tool. Buffalo values differ and are not carried. |
+
+`MCF`, `EF3` and `FRAC` in the affects column are the per-manure-system coefficient families rather than catalogue parameters.
+
 ## Parameter catalogue
 
 The 25 parameters. `ipcc_default` is the generic value; where a sub-category overrides it, see the effective-values table below.
 
-| parameter | unit | ipcc_default | suggested_uncertainty_pct | suggested_lower_bound | suggested_upper_bound | suggested_distribution | param_type | param_tier | user_reducible | ipcc_ref |
-|---|---|---|---|---|---|---|---|---|---|---|
-| N | head |  | 10 |  |  | normal | activity_data | core | yes |  |
-| BW | kg | 270 | 15 |  |  | normal | coefficient | core | yes | Table 10A.2 |
-| MW | kg | 300 | 10 |  |  | normal | coefficient | core | yes | Table 10A.2 |
-| WG | kg/day | 0 | 30 |  |  | pert | coefficient | core | yes | Table 10A.1 |
-| Milk | kg/head/day | 1.2 | 20 |  |  | normal | coefficient | core | yes |  |
-| Fat | % | 4.3 | 10 |  |  | normal | coefficient | core | yes |  |
-| pct_pregnant | fraction (0-1) | 0.52 | 20 |  |  | beta | coefficient | core | yes |  |
-| DE | % | 51 | 15 |  |  | normal | coefficient | core | yes | Eq 10.14--16 |
-| Cfi | MJ/day/kg^0.75 | 0.386 | 30 |  |  | pert | coefficient | advanced | no | Table 10.4 |
-| Ca | dimensionless | 0.17 | 30 |  |  | triangular | coefficient | advanced | no | Table 10.5 |
-| C | dimensionless | 0.8 | 30 |  |  | triangular | coefficient | advanced | no | Eq 10.6 |
-| Cp | dimensionless | 0.1 | 10 |  |  | beta | coefficient | advanced | no | Table 10.7 |
-| hours | hours/day | 0 | 20 |  |  | pert | coefficient | core | yes | Eq 10.11 |
-| CP | % | 9.6 | 15 |  |  | normal | coefficient | core | yes | Eq 10.32 |
-| Ym | % | 6.5 | 20 |  |  | pert | coefficient | advanced | no | Table 10.12 |
-| Bo | m3 CH₄/kg VS | 0.13 | 15 |  |  | pert | coefficient | advanced | no | Table 10.16A |
-| ASH | fraction | 0.08 | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
-| UE | fraction | 0.04 | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
-| EF3_PRP | kg N2O-N/kg N | 0.006 |  | 0.0005 | 0.027 | pert | coefficient | advanced | no | Ch.11 Table 11.1 |
-| EF4 | kg N2O-N/kg N | 0.014 |  | 0.011 | 0.017 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
-| EF5 | kg N2O-N/kg N | 0.011 |  | 0.0005 | 0.02 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
-| Frac_GASM_PRP | fraction | 0.21 |  | 0.005 | 0.31 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
-| Frac_LEACH_PRP | fraction | 0.24 |  | 0.01 | 0.73 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
-| MilkPR | % | 3.6 | 10 |  |  | normal | coefficient | core | yes | Eq 10.33 |
-| Tw | °C | 20 | 25 |  |  | normal | coefficient | advanced | yes | Eq 10.2 |
+| parameter | unit | ipcc_default | basis | suggested_uncertainty_pct | suggested_lower_bound | suggested_upper_bound | suggested_distribution | param_type | param_tier | user_reducible | ipcc_ref |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| N | head |  |  | 10 |  |  | normal | activity_data | core | yes |  |
+| BW | kg | 270 | Geography: Africa; Productivity class: Low productivity | 15 |  |  | normal | coefficient | core | yes | Table 10A.2 |
+| MW | kg | 300 | Geography: Africa | 10 |  |  | normal | coefficient | core | yes | Table 10A.2 |
+| WG | kg/day | 0 | Geography: Africa | 30 |  |  | pert | coefficient | core | yes | Table 10A.1 |
+| Milk | kg/head/day | 1.2 | Geography: Africa; Productivity class: Low productivity; Lactation state: Lactating | 20 |  |  | normal | coefficient | core | yes |  |
+| Fat | % | 4.3 | Geography: Africa; Lactation state: Lactating | 10 |  |  | normal | coefficient | core | yes |  |
+| pct_pregnant | fraction (0-1) | 0.52 | Geography: Africa; Productivity class: Low productivity | 20 |  |  | beta | coefficient | core | yes |  |
+| DE | % | 51 | Geography: Africa; Productivity class: Low productivity | 15 |  |  | normal | coefficient | core | yes | Eq 10.14--16 |
+| Cfi | MJ/day/kg^0.75 | 0.386 | Lactation state: Lactating | 30 |  |  | pert | coefficient | advanced | no | Table 10.4 |
+| Ca | dimensionless | 0.17 | Feeding situation: Pasture / Range, flat terrain | 30 |  |  | triangular | coefficient | advanced | no | Table 10.5 |
+| C | dimensionless | 0.8 |  | 30 |  |  | triangular | coefficient | advanced | no | Eq 10.6 |
+| Cp | dimensionless | 0.1 | Species: Cattle | 10 |  |  | beta | coefficient | advanced | no | Table 10.7 |
+| hours | hours/day | 0 | Geography: Africa | 20 |  |  | pert | coefficient | core | yes | Eq 10.11 |
+| CP | % | 9.6 | Geography: Africa; Productivity class: Low productivity | 15 |  |  | normal | coefficient | core | yes | Eq 10.32 |
+| Ym | % | 6.5 | Productivity class: Low productivity; Lactation state: Lactating; Guidelines edition: Selected by the user in Inventory_Metadata: 2006 or 2019 Refinement | 20 |  |  | pert | coefficient | advanced | no | Table 10.12 |
+| Bo | m3 CH₄/kg VS | 0.13 | Productivity class: Low productivity; Species: Cattle | 15 |  |  | pert | coefficient | advanced | no | Table 10.16A |
+| ASH | fraction | 0.08 | Species: Cattle | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
+| UE | fraction | 0.04 |  | 25 |  |  | pert | coefficient | advanced | no | Eq 10.24 |
+| EF3_PRP | kg N2O-N/kg N | 0.006 | Climate, soils pathway: Wet |  | 0.0005 | 0.027 | pert | coefficient | advanced | no | Ch.11 Table 11.1 |
+| EF4 | kg N2O-N/kg N | 0.014 | Climate, soils pathway: Wet |  | 0.011 | 0.017 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
+| EF5 | kg N2O-N/kg N | 0.011 |  |  | 0.0005 | 0.02 | lognormal | coefficient | advanced | no | Ch.11 Table 11.3 |
+| Frac_GASM_PRP | fraction | 0.21 |  |  | 0.005 | 0.31 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
+| Frac_LEACH_PRP | fraction | 0.24 | Climate, soils pathway: Wet |  | 0.01 | 0.73 | pert | coefficient | advanced | no | Ch.11 Table 11.3 |
+| MilkPR | % | 3.6 | Geography: Africa; Productivity class: Low productivity; Lactation state: Lactating | 10 |  |  | normal | coefficient | core | yes | Eq 10.33 |
+| Tw | °C | 20 |  | 25 |  |  | normal | coefficient | advanced | yes | Eq 10.2 |
 
 ## Manure management systems
 

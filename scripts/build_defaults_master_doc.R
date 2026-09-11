@@ -77,10 +77,26 @@ out <- c(out, "",
   "The `DEVIATION_OPEN` rows are the ones that would move a reported number if resolved. They are listed in full at the end of this document and discussed in `reference/provenance_register.md`.",
   "")
 
+out <- c(out, "## What the defaults assume", "",
+  "Every value in this document is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. Those choices are the declared basis, held in the master as `DEFAULT_BASIS` and rendered into the app's Definitions tab, both published guides, the Excel template and the translator prompt from this one place.", "",
+  "| choice | this tool uses | IPCC also publishes | affects | IPCC source | why |",
+  "|---|---|---|---|---|---|")
+for (i in seq_len(nrow(DEFAULT_BASIS))) {
+  lb <- DEFAULT_BASIS_LABELS[[DEFAULT_BASIS$dimension[i]]]
+  out <- c(out, sprintf("| **%s** | %s | %s | `%s` | %s | %s |",
+    if (is.null(lb)) DEFAULT_BASIS$dimension[i] else lb,
+    fmt(DEFAULT_BASIS$chosen[i]), fmt(DEFAULT_BASIS$alternatives[i]),
+    gsub(" ", "`, `", DEFAULT_BASIS$governs[i], fixed = TRUE),
+    fmt(DEFAULT_BASIS$ipcc_source[i]), fmt(DEFAULT_BASIS$why[i])))
+}
+out <- c(out, "",
+  "`MCF`, `EF3` and `FRAC` in the affects column are the per-manure-system coefficient families rather than catalogue parameters.", "")
+
 out <- c(out, "## Parameter catalogue", "",
   "The 25 parameters. `ipcc_default` is the generic value; where a sub-category overrides it, see the effective-values table below.", "",
-  tbl(PARAM_CATALOGUE,
-      c("parameter", "unit", "ipcc_default", "suggested_uncertainty_pct",
+  tbl(cbind(PARAM_CATALOGUE,
+            basis = vapply(PARAM_CATALOGUE$parameter, basis_label, character(1))),
+      c("parameter", "unit", "ipcc_default", "basis", "suggested_uncertainty_pct",
         "suggested_lower_bound", "suggested_upper_bound",
         "suggested_distribution", "param_type", "param_tier",
         "user_reducible", "ipcc_ref")), "")

@@ -476,6 +476,57 @@ ym_for_subcat <- function(sub_category, ipcc_version = "2019_refinement") {
 }
 
 # ==========================================================================
+# DECLARED BASIS
+# ==========================================================================
+# Every IPCC default is one cell of a much larger table, reached by choosing
+# a region, a productivity class, a climate, a manure-system variant and so
+# on. Those choices were real and defensible but invisible: a user saw
+# "Bo = 0.13" with no way to know it is the other-regions low-productivity
+# figure, and nothing in the tool said the liquid-slurry coefficients assume
+# a natural crust. A default whose basis is not stated cannot be audited,
+# and cannot be sensibly overridden either.
+#
+# DEFAULT_BASIS holds those choices once. Every surface renders from it: the
+# Definitions tab, both published guides, the Excel template, the translator
+# prompt and reference/DEFAULTS_MASTER.md.
+DEFAULT_BASIS <- .master_wide("DEFAULT_BASIS", "dimension")
+
+# Human-readable dimension labels. Kept next to the data rather than in the
+# i18n table because they name IPCC concepts, not UI chrome.
+DEFAULT_BASIS_LABELS <- c(
+  geography             = "Geography",
+  productivity_class    = "Productivity class",
+  feeding_situation     = "Feeding situation",
+  lactation_state       = "Lactation state",
+  animal_class_manure_N = "Animal class for manure nitrogen",
+  soils_climate         = "Climate, soils pathway",
+  manure_climate_zone   = "Climate zone, manure methane",
+  manure_system_variant = "Manure system variant",
+  guidelines_edition    = "Guidelines edition",
+  species               = "Species")
+
+# Which basis choices govern a given parameter. `governs` lists parameter
+# codes plus three family tokens: MCF, EF3 and FRAC for the per-manure-system
+# coefficients, which are not PARAM_CATALOGUE parameters.
+basis_for <- function(parameter) {
+  hits <- vapply(DEFAULT_BASIS$governs, function(g)
+    parameter %in% strsplit(g, " ", fixed = TRUE)[[1]], logical(1))
+  if (!any(hits)) return(character(0))
+  d <- DEFAULT_BASIS[hits, , drop = FALSE]
+  stats::setNames(d$chosen,
+                  ifelse(is.na(DEFAULT_BASIS_LABELS[d$dimension]),
+                         d$dimension, DEFAULT_BASIS_LABELS[d$dimension]))
+}
+
+# One-line summary for a parameter, for the Definitions tab and the guides.
+# Empty when no dimension governs it, which is correct for N and Tw.
+basis_label <- function(parameter) {
+  b <- basis_for(parameter)
+  if (!length(b)) return("")
+  paste(sprintf("%s: %s", names(b), b), collapse = "; ")
+}
+
+# ==========================================================================
 # SPARSE-OVERLAY RESOLVER
 # ==========================================================================
 # resolve_subcat_default() returns the IPCC default for any (sub_category,
