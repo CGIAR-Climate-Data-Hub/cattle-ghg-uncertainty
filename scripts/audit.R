@@ -23,8 +23,19 @@
 # Bugs found are REPORTED, not fixed (per the approved plan).
 #
 # -----------------------------------------------------------------------------
-# HAND-COMPUTED GOLDEN-CASE REFERENCE  (verified by paper-and-pencil 2026-05-21)
+# HAND-COMPUTED GOLDEN-CASE REFERENCE
 # -----------------------------------------------------------------------------
+# Verified by paper-and-pencil 2026-05-21. Recomputed 2026-09-11 after the
+# lactation fix: NE_l no longer carries pct_pregnant (F41), and this comment
+# block had kept the old arithmetic while golden_ref below was corrected. The
+# audit compares the code against golden_ref, not against this text, so the
+# suite went on passing while the documented reference case was out by 18% on
+# CO2e. If you change golden_ref, change this block in the same commit.
+#
+# These are the scenario's own inputs, not the catalogue defaults. MilkPR 3.3
+# is deliberate here: the golden case is a fixed arithmetic fixture and must
+# stay put when a default moves, otherwise it stops being a regression test.
+#
 # Inputs:
 #   N=100000, BW=300, MW=300, WG=0, Milk=5.0, Fat=4.0, pct_pregnant=0.50,
 #   DE=60, CP=12, hours=0, Tw=20, Cfi=0.386, Ca=0.17, C=0.80, Cp=0.10,
@@ -34,52 +45,56 @@
 #   MMS: 100% pasture, MCF=0.015, EF3=0.020
 #
 #   NEM (Eq. 10.3) = 0.386 * 300^0.75
-#                  = 0.386 * 72.0813   = 27.823 MJ/day
-#   NEA (Eq. 10.4) = 0.17 * 27.823     =  4.730 MJ/day
+#                  = 0.386 * 72.0813   = 27.8246 MJ/day
+#   NEA (Eq. 10.4) = 0.17 * 27.8246    =  4.7302 MJ/day
 #   NEG (Eq. 10.6) = 0 (WG = 0 early-return branch)
-#   NEL (Eq. 10.8) = 5.0 * (1.47 + 0.40*4.0) * 0.50 = 5.0 * 3.07 * 0.50 = 7.675 MJ/day
-#   NEW (Eq. 10.11)= 0.10 * 27.823 * 0 = 0
-#   NEP (Eq. 10.13)= 0.10 * 0.50 * 27.823 = 1.3912 MJ/day
+#   NEL (Eq. 10.8) = 5.0 * (1.47 + 0.40*4.0) = 5.0 * 3.07 = 15.350 MJ/day
+#                    NO pct_pregnant: Eq 10.8 carries no such factor and the
+#                    milk input is already an annual average per head.
+#   NEW (Eq. 10.11)= 0.10 * 27.8246 * 0 = 0
+#   NEP (Eq. 10.13)= 0.10 * 0.50 * 27.8246 = 1.3912 MJ/day
+#                    NEP KEEPS the 0.50; Table 10.7 sanctions that weighting.
 #   REM (Eq. 10.14)= 1.123 - 4.092e-3*60 + 1.126e-5*3600 - 25.4/60
-#                  = 1.123 - 0.24552 + 0.040536 - 0.423333 = 0.49469
+#                  = 1.123 - 0.24552 + 0.040536 - 0.423333 = 0.49468
 #   REG (Eq. 10.15)= 1.164 - 5.160e-3*60 + 1.308e-5*3600 - 37.4/60
 #                  = 1.164 - 0.30960 + 0.047088 - 0.623333 = 0.27815
-#   GE  (Eq. 10.16)= ((27.823+4.730+7.675+0+1.3912)/0.49469 + 0/0.27815) / (60/100)
-#                  = 41.6196 / 0.49469 / 0.6
-#                  = 84.1342 / 0.6 = 140.224 MJ/head/day
-#   Enteric CH4 (Eq. 10.21) = 140.224 * (6.5/100) * 365 / 55.65 = 59.781 kg CH4/head/yr
-#   VS (Eq. 10.24) = (140.224 * (1-0.6) + 0.04*140.224) * (1-0.08) / 18.45
-#                  = (56.0894 + 5.6089) * 0.92 / 18.45
-#                  = 56.7625 / 18.45 = 3.07655 kg DM/head/day
-#   Manure CH4 (Eq. 10.23) = 3.07655 * 365 * 0.13 * 0.67 * 0.015 * 1.0 (pasture)
-#                          = 1.4671 kg CH4/head/yr
-#   N excretion (Eq. 10.32):
-#       DMI         = 140.224/18.45 = 7.6002
-#       N_intake    = 7.6002 * 0.12/6.25 = 0.145924
-#       N_retained  = 5.0*0.50*3.3/100/6.38 + 0 = 0.012931
-#       Nex per day = 0.132993; * 365 = 48.5424 kg N/head/yr
+#   GE  (Eq. 10.16)= ((27.8246+4.7302+15.350+0+1.3912)/0.49468 + 0/0.27815) / (60/100)
+#                  = 49.2960 / 0.49468 / 0.6
+#                  = 99.6518 / 0.6 = 166.086 MJ/head/day
+#   Enteric CH4 (Eq. 10.21) = 166.086 * (6.5/100) * 365 / 55.65 = 70.807 kg CH4/head/yr
+#   VS (Eq. 10.24) = (166.086 * (1-0.6) + 0.04*166.086) * (1-0.08) / 18.45
+#                  = (66.4344 + 6.6434) * 0.92 / 18.45
+#                  = 67.2316 / 18.45 = 3.64399 kg DM/head/day
+#   Manure CH4 (Eq. 10.23) = 3.64399 * 365 * 0.13 * 0.67 * 0.015 * 1.0 (pasture)
+#                          = 1.7377 kg CH4/head/yr
+#   N excretion (Eq. 10.32 + 10.33):
+#       DMI         = 166.086/18.45 = 9.0020
+#       N_intake    = 9.0020 * 0.12/6.25 = 0.172838
+#       N_retained  = 5.0*3.3/100/6.38 + 0 = 0.025862
+#                     NO pct_pregnant on the milk-N term either, same reason.
+#       Nex per day = 0.146976; * 365 = 53.6461 kg N/head/yr
 #   Direct MM N2O   = 0 (pasture excluded from MM loop)
 #   Indirect MM N2O = 0 (same)
-#   Direct PRP N2O  = 48.5424 * 1.0 * 0.004 * 44/28 = 0.30516 kg N2O/head/yr
-#   Indirect PRP N2O = 48.5424 * 1.0 * (0.21*0.010 + 0.24*0.011) * 44/28
-#                    = 48.5424 * 0.00474 * 1.5714 = 0.36154 kg N2O/head/yr
+#   Direct PRP N2O  = 53.6461 * 1.0 * 0.004 * 44/28 = 0.33720 kg N2O/head/yr
+#   Indirect PRP N2O = 53.6461 * 1.0 * (0.21*0.010 + 0.24*0.011) * 44/28
+#                    = 53.6461 * 0.00474 * 1.5714 = 0.39959 kg N2O/head/yr
 #
 #   At population N=100000, multiplying per-head by N/1000:
-#     total_enteric_ch4   = 59.781 * 100 = 5978.11 t CH4
-#     total_manure_ch4    =  1.4671*100 =  146.71 t CH4
+#     total_enteric_ch4   = 70.807 * 100 = 7080.67 t CH4
+#     total_manure_ch4    =  1.7377*100 =  173.77 t CH4
 #     total_direct_n2o_mm = 0
 #     total_indirect_n2o_mm = 0
-#     total_direct_n2o_prp = 0.30516 *100 =   30.516 t N2O
-#     total_indirect_n2o_prp = 0.36154*100 =  36.154 t N2O
-#     total_ch4           = 6124.82 t CH4
-#     total_n2o           = 66.670  t N2O
+#     total_direct_n2o_prp = 0.33720 *100 =   33.720 t N2O
+#     total_indirect_n2o_prp = 0.39959*100 =  39.959 t N2O
+#     total_ch4           = 7254.44 t CH4
+#     total_n2o           = 73.679  t N2O
 #
 #   AR5 GWP: CH4=28, N2O=265
-#     total_co2e_AR5 = 6124.82*28 + 66.670*265 = 171494.96 + 17667.55 = 189162.51 t CO2eq
+#     total_co2e_AR5 = 7254.44*28 + 73.679*265 = 203124.36 + 19524.99 = 222649.35 t CO2eq
 #   AR4 GWP: CH4=25, N2O=298
-#     total_co2e_AR4 = 6124.82*25 + 66.670*298 = 153120.50 + 19867.66 = 172988.16
+#     total_co2e_AR4 = 7254.44*25 + 73.679*298 = 181361.04 + 21956.39 = 203317.43
 #   AR6 GWP: CH4=27.0, N2O=273
-#     total_co2e_AR6 = 6124.82*27.0 + 66.670*273 = 165370.14 + 18200.91 = 183571.05
+#     total_co2e_AR6 = 7254.44*27.0 + 73.679*273 = 195869.92 + 20114.42 = 215984.34
 # =============================================================================
 
 # Run from project root: Rscript scripts/audit.R
