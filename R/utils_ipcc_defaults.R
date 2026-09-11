@@ -111,14 +111,39 @@ MMS_DEFAULTS <- data.frame(
          "anaerobic_digester", "aerobic_treatment", "burned_for_fuel"),
   label = c("Pasture/Paddock/Range", "Daily Spread", "Solid Storage",
             "Solid Storage – Covered/Compacted (2019)",
-            "Dry Lot", "Deep Bedding (>1 month)", "Liquid/Slurry",
+            "Dry Lot", "Deep Bedding (>1 month)",
+            "Liquid/Slurry (with natural crust cover)",
             "Composting - Static Pile (forced aeration)", "Anaerobic Lagoon",
-            "Anaerobic Digester / Biogas (2019)",
+            "Anaerobic Digester / Biogas (low leakage, open storage)",
             "Aerobic Treatment (2019)",
             "Burned for Fuel (2019)"),
   versions = c("2006,2019", "2006,2019", "2006,2019", "2019",
                "2006,2019", "2006,2019", "2006,2019", "2006,2019", "2006,2019",
                "2019", "2019", "2019"),
+  # ipcc_variant -- WHICH IPCC sub-type each row represents.
+  #
+  # This column exists because the tool has ONE row per manure system while
+  # IPCC disaggregates five of them into variants with materially different
+  # coefficients. Without a declared variant the row drifts: before
+  # 2026-09-11, liquid_slurry took its EF3 from "with natural crust cover",
+  # its Frac_GasMS from "without natural crust cover", and its MCF from both;
+  # deep_bedding was labelled ">1 month" but carried mostly "<1 month" MCFs;
+  # composting mixed in-vessel with static pile; anaerobic_digester mixed two
+  # technology tiers. Every coefficient on a row MUST now come from the
+  # variant named here. Audit check F29c enforces the spot values.
+  ipcc_variant = c(
+    "PRP (Ch.11 pathway; MCF from 2006 Table 10.17 Pasture/Range/Paddock)",
+    "Daily spread",
+    "Solid storage (plain)",
+    "Solid storage - Covered/compacted (2019R Table 10.17)",
+    "Dry lot",
+    "Deep bedding, >1 month accumulation",
+    "Liquid/Slurry, with natural crust cover",
+    "Composting - Static Pile (forced aeration)",
+    "Uncovered anaerobic lagoon",
+    "Anaerobic digester, low leakage, high-quality industrial technology, open storage",
+    "Aerobic treatment, forced aeration",
+    "Burned for fuel"),
   # MCF retained on the 2006-convention climate-zone values (a coherent set).
   # Deliberately NOT switched to the 2019R Table 10.17 values: the 2019R
   # Pasture/Range/Paddock MCF (0.47%) must, per Table 10.17 footnote 2, be paired
@@ -142,10 +167,32 @@ MMS_DEFAULTS <- data.frame(
   # (published 1.0/1.5/2.0, held here at 1.0/1.0/1.5), `lagoon` temperate (66 is
   # the Cool end of a 66-80 gradient), and `deep_bedding`, which appears to mix
   # the "<1 month" and ">1 month" rows despite its label saying ">1 month".
-  mcf_tropical     = c(1.5, 1.0, 5.0, 4.0, 2.0, 30.0, 80.0, 0.5, 80.0,  3.5, 0.0,  10.0),
-  mcf_tropical_dry = c(1.5, 1.0, 5.0, 4.0, 2.0, 30.0, 80.0, 0.5, 80.0,  3.5, 0.0,  10.0),
-  mcf_temperate    = c(1.0, 0.5, 4.0, 2.0, 1.5, 17.0, 35.0, 0.5, 66.0,  1.0, 0.0,  10.0),
-  mcf_boreal       = c(1.0, 0.1, 2.0, 1.0, 1.0,  3.0, 10.0, 0.5, 66.0,  1.0, 0.0,  10.0),
+  # 2026-09-11 full cell-level correction against 2006 Table 10.17 (and 2019R
+  # Table 10.17 for the four 2019R-only systems). Band mapping
+  # Cool(<=10C)->boreal, Temperate->temperate, Warm(>=28C)->tropical, proven
+  # exact by daily_spread (0.1/0.5/1.0) and burned_for_fuel (10/10/10).
+  #
+  # Four rows in Table 10.17 are a 19-point temperature GRADIENT rather than
+  # three bands. IPCC groups those columns as Cool <=10 | Temperate 11-27 |
+  # Warm >=28, so the temperate representative here is the midpoint of that
+  # span, 19 C. Stated explicitly because it is a choice, not a lookup:
+  #   lagoon        @19C = 77   (gradient 66 -> 80)
+  #   deep_bedding  @19C = 39   (>1 month gradient 17 -> 80)
+  #   liquid_slurry @19C = 24   (with-crust gradient 10 -> 50)
+  #
+  # Corrections made in this pass:
+  #   pasture               1.5/1.0/1.0 -> 2.0/1.5/1.0  (row was one band low)
+  #   solid_storage_covered 4.0/2.0/1.0 -> 5.0/4.0/2.0  (2019R Table 10.17)
+  #   deep_bedding          30/17/3     -> 80/39/17     (>1 month, per label)
+  #   liquid_slurry         80/35/10    -> 50/24/10     (with natural crust)
+  #   lagoon temperate      66          -> 77           (66 was the Cool cell)
+  #   anaerobic_digester    3.5/1.0/1.0 -> 4.59/4.38/3.55 (open storage; the
+  #                         old 3.5 was the open-storage COOL value placed in
+  #                         the tropical column, mixed with a gastight 1.0)
+  mcf_tropical     = c(2.0, 1.0, 5.0, 5.0, 2.0, 80.0, 50.0, 0.5, 80.0, 4.59, 0.0, 10.0),
+  mcf_tropical_dry = c(2.0, 1.0, 5.0, 5.0, 2.0, 80.0, 50.0, 0.5, 80.0, 4.59, 0.0, 10.0),
+  mcf_temperate    = c(1.5, 0.5, 4.0, 4.0, 1.5, 39.0, 24.0, 0.5, 77.0, 4.38, 0.0, 10.0),
+  mcf_boreal       = c(1.0, 0.1, 2.0, 2.0, 1.0, 17.0, 10.0, 0.5, 66.0, 3.55, 0.0, 10.0),
   # EF3 = direct N2O EF by managed system, IPCC 2019R Table 10.21 (verified
   # 2026-06-16): solid_storage + solid_storage_covered corrected 0.005 -> 0.010.
   # pasture 0.02 is the PRP/Ch.11 pathway value (not a Table 10.21 MS), left as-is.
@@ -248,12 +295,15 @@ MMS_FRAC_DEFAULTS_2019 <- data.frame(
                "solid_storage_covered", "dry_lot", "deep_bedding",
                "liquid_slurry", "anaerobic_digester", "composting",
                "aerobic_treatment", "lagoon", "burned_for_fuel"),
+  # liquid_slurry 0.48 -> 0.30 on 2026-09-11: 0.48 is the "without natural
+  # crust cover" figure, but the row now consistently models WITH crust (see
+  # MMS_DEFAULTS$ipcc_variant). Table 10.22 Other Cattle, with crust: 0.30.
   frac_gas       = c(0.00, 0.07, 0.45, 0.22, 0.30, 0.25,
-                     0.48, 0.05, 0.65, 0.85, 0.35, 0.00),
+                     0.30, 0.05, 0.65, 0.85, 0.35, 0.00),
   frac_gas_low   = c(0.00, 0.05, 0.10, 0.03, 0.20, 0.10,
-                     0.15, 0.02, 0.14, 0.27, 0.20, 0.00),
+                     0.09, 0.02, 0.14, 0.27, 0.20, 0.00),
   frac_gas_high  = c(0.00, 0.60, 0.65, 0.26, 0.50, 0.30,
-                     0.60, 0.08, 0.70, 1.00, 0.80, 0.00),
+                     0.36, 0.08, 0.70, 1.00, 0.80, 0.00),
   frac_leach     = c(0.00, 0.00, 0.02, 0.00, 0.035, 0.035,
                      0.00, 0.00, 0.06, 0.00, 0.00, 0.00),
   frac_leach_low = c(0.00, 0.00, 0.01, 0.00, 0.00, 0.00,

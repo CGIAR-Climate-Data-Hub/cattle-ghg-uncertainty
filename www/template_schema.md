@@ -99,16 +99,16 @@ One row per (cattle_type × aggregation_level × sub_category × mms_type). Per-
 
 | id | label | 2006? | 2019R? | MCF trop.moist | MCF trop.dry | MCF temperate | MCF boreal | EF3 |
 |----|-------|-------|--------|----------------|--------------|---------------|------------|-----|
-| `pasture` | Pasture/Paddock/Range | ✓ | ✓ | 1.5 | 1.5 | 1 | 1 | 0.02 |
+| `pasture` | Pasture/Paddock/Range | ✓ | ✓ | 2 | 2 | 1.5 | 1 | 0.02 |
 | `daily_spread` | Daily Spread | ✓ | ✓ | 1 | 1 | 0.5 | 0.1 | 0 |
 | `solid_storage` | Solid Storage | ✓ | ✓ | 5 | 5 | 4 | 2 | 0.01 |
-| `solid_storage_covered` | Solid Storage – Covered/Compacted (2019) |  | ✓ | 4 | 4 | 2 | 1 | 0.01 |
+| `solid_storage_covered` | Solid Storage – Covered/Compacted (2019) |  | ✓ | 5 | 5 | 4 | 2 | 0.01 |
 | `dry_lot` | Dry Lot | ✓ | ✓ | 2 | 2 | 1.5 | 1 | 0.02 |
-| `deep_bedding` | Deep Bedding (>1 month) | ✓ | ✓ | 30 | 30 | 17 | 3 | 0.01 |
-| `liquid_slurry` | Liquid/Slurry | ✓ | ✓ | 80 | 80 | 35 | 10 | 0.005 |
+| `deep_bedding` | Deep Bedding (>1 month) | ✓ | ✓ | 80 | 80 | 39 | 17 | 0.01 |
+| `liquid_slurry` | Liquid/Slurry (with natural crust cover) | ✓ | ✓ | 50 | 50 | 24 | 10 | 0.005 |
 | `composting` | Composting - Static Pile (forced aeration) | ✓ | ✓ | 0.5 | 0.5 | 0.5 | 0.5 | 0.01 |
-| `lagoon` | Anaerobic Lagoon | ✓ | ✓ | 80 | 80 | 66 | 66 | 0 |
-| `anaerobic_digester` | Anaerobic Digester / Biogas (2019) |  | ✓ | 3.5 | 3.5 | 1 | 1 | 0.0006 |
+| `lagoon` | Anaerobic Lagoon | ✓ | ✓ | 80 | 80 | 77 | 66 | 0 |
+| `anaerobic_digester` | Anaerobic Digester / Biogas (low leakage, open storage) |  | ✓ | 4.59 | 4.59 | 4.38 | 3.55 | 0.0006 |
 | `aerobic_treatment` | Aerobic Treatment (2019) |  | ✓ | 0 | 0 | 0 | 0 | 0.005 |
 | `burned_for_fuel` | Burned for Fuel (2019) |  | ✓ | 10 | 10 | 10 | 10 | 0 |
 
@@ -124,7 +124,7 @@ Use these when filling Frac_GasMS_pct and Frac_LeachMS_pct.
 | `solid_storage_covered` | 0.22 / 0.03 / 0.26 | 0 / 0 / 0 |
 | `dry_lot` | 0.3 / 0.2 / 0.5 | 0.035 / 0 / 0.07 |
 | `deep_bedding` | 0.25 / 0.1 / 0.3 | 0.035 / 0 / 0.07 |
-| `liquid_slurry` | 0.48 / 0.15 / 0.6 | 0 / 0 / 0 |
+| `liquid_slurry` | 0.3 / 0.09 / 0.36 | 0 / 0 / 0 |
 | `anaerobic_digester` | 0.05 / 0.02 / 0.08 | 0 / 0 / 0 |
 | `composting` | 0.65 / 0.14 / 0.7 | 0.06 / 0.03 / 0.09 |
 | `aerobic_treatment` | 0.85 / 0.27 / 1 | 0 / 0 / 0 |

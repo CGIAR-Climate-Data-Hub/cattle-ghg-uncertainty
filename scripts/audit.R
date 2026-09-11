@@ -1961,7 +1961,10 @@ section_F <- function() {
     eq(fr("solid_storage_covered")$frac_leach, 0.00) &&
     eq(fr("deep_bedding")$frac_gas, 0.25) && eq(fr("deep_bedding")$frac_leach, 0.035) &&
     eq(fr("dry_lot")$frac_leach, 0.035) && eq(fr("composting")$frac_leach, 0.06) &&
-    eq(fr("solid_storage")$frac_gas, 0.45) && eq(fr("liquid_slurry")$frac_gas, 0.48)
+    eq(fr("solid_storage")$frac_gas, 0.45) &&
+    # liquid_slurry models the WITH-natural-crust variant throughout
+    # (MMS_DEFAULTS$ipcc_variant); Table 10.22 Other Cattle gives 0.30.
+    eq(fr("liquid_slurry")$frac_gas, 0.30)
   check_bool("F29", "F",
              "MMS_DEFAULTS EF3 + MMS_FRAC_DEFAULTS_2019 match IPCC 2019R Tables 10.21/10.22 (Other Cattle)",
              mms_ok,
@@ -1979,7 +1982,7 @@ section_F <- function() {
     eq(fb("solid_storage_covered"), c(0.03, 0.26)) &&
     eq(fb("dry_lot"),               c(0.20, 0.50)) &&
     eq(fb("deep_bedding"),          c(0.10, 0.30)) &&
-    eq(fb("liquid_slurry"),         c(0.15, 0.60)) &&
+    eq(fb("liquid_slurry"),         c(0.09, 0.36)) &&
     eq(fb("composting"),            c(0.14, 0.70)) &&
     eq(fb("aerobic_treatment"),     c(0.27, 1.00)) &&
     eq(fb("lagoon"),                c(0.20, 0.80))
@@ -1996,20 +1999,53 @@ section_F <- function() {
   # composting carried the windrow row rather than static pile. Band mapping
   # Cool->boreal, Temperate->temperate, Warm->tropical, confirmed exact by
   # daily_spread and burned_for_fuel.
+  # ALL TWELVE systems, not a spot check. The previous version asserted six,
+  # and the six it chose were the ones that happened to be right: pasture,
+  # solid_storage_covered, deep_bedding, liquid_slurry, lagoon and
+  # anaerobic_digester were all wrong and none was guarded.
   mcfv <- function(id) unlist(MMS_DEFAULTS[MMS_DEFAULTS$id == id,
             c("mcf_tropical", "mcf_temperate", "mcf_boreal")], use.names = FALSE)
-  mcf_ok <-
-    eq(mcfv("daily_spread"),    c(1.0, 0.5, 0.1)) &&
-    eq(mcfv("burned_for_fuel"), c(10.0, 10.0, 10.0)) &&
-    eq(mcfv("solid_storage"),   c(5.0, 4.0, 2.0)) &&
-    eq(mcfv("dry_lot"),         c(2.0, 1.5, 1.0)) &&
-    eq(mcfv("composting"),      c(0.5, 0.5, 0.5)) &&
-    eq(MMS_DEFAULTS$mcf_tropical[MMS_DEFAULTS$id == "aerobic_treatment"], 0.0)
+  mcf_expect <- list(
+    pasture               = c(2.0,  1.5,  1.0),
+    daily_spread          = c(1.0,  0.5,  0.1),
+    solid_storage         = c(5.0,  4.0,  2.0),
+    solid_storage_covered = c(5.0,  4.0,  2.0),
+    dry_lot               = c(2.0,  1.5,  1.0),
+    deep_bedding          = c(80.0, 39.0, 17.0),   # >1 month gradient @19C
+    liquid_slurry         = c(50.0, 24.0, 10.0),   # with natural crust @19C
+    composting            = c(0.5,  0.5,  0.5),    # static pile, not temp-dependent
+    lagoon                = c(80.0, 77.0, 66.0),   # gradient @19C
+    anaerobic_digester    = c(4.59, 4.38, 3.55),   # low leakage, open storage
+    aerobic_treatment     = c(0.0,  0.0,  0.0),
+    burned_for_fuel       = c(10.0, 10.0, 10.0))
+  mcf_bad <- names(mcf_expect)[!vapply(names(mcf_expect),
+    function(id) eq(mcfv(id), mcf_expect[[id]]), logical(1))]
+  mcf_ok <- length(mcf_bad) == 0
   check_bool("F29b", "F",
-             "MMS_DEFAULTS MCF cells match 2006 Table 10.17 (Warm/Temperate/Cool)",
+             "MMS_DEFAULTS MCF: all 12 systems x 3 zones vs IPCC Table 10.17",
              mcf_ok,
-             notes = if (mcf_ok) "dry_lot 2.0/1.5/1.0; solid_storage 5.0/4.0/2.0; composting static pile 0.5 flat"
-                     else "an MCF cell drifted from the published 2006 Table 10.17 value")
+             notes = if (mcf_ok) "12/12 systems match; gradient rows use the 19C midpoint of the Temperate band"
+                     else paste("MCF drifted for:", paste(mcf_bad, collapse = ", ")))
+
+  # F29c -- every row must DECLARE which IPCC variant it models. The tool has
+  # one row per system while IPCC splits five of them into variants with
+  # different coefficients, and the row previously drifted across coefficient
+  # families: liquid_slurry took EF3 from "with crust" and Frac from "without".
+  var_ok <- "ipcc_variant" %in% names(MMS_DEFAULTS) &&
+    all(nzchar(MMS_DEFAULTS$ipcc_variant)) &&
+    grepl("with natural crust",
+          MMS_DEFAULTS$ipcc_variant[MMS_DEFAULTS$id == "liquid_slurry"]) &&
+    grepl(">1 month",
+          MMS_DEFAULTS$ipcc_variant[MMS_DEFAULTS$id == "deep_bedding"]) &&
+    grepl("Static Pile",
+          MMS_DEFAULTS$ipcc_variant[MMS_DEFAULTS$id == "composting"]) &&
+    grepl("open storage",
+          MMS_DEFAULTS$ipcc_variant[MMS_DEFAULTS$id == "anaerobic_digester"])
+  check_bool("F29c", "F",
+             "Every MMS row declares the IPCC variant it models (ipcc_variant)",
+             var_ok,
+             notes = if (var_ok) "12/12 declared; slurry=with crust, bedding=>1mo, composting=static pile, digester=open storage"
+                     else "a row has no declared IPCC variant, or a variant changed without its coefficients")
 
   # F30 — sparse-overlay resolver. resolve_subcat_default() is the single source
   # of truth for the IPCC defaults the app fills when the AI translator omits a
