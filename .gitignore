@@ -155,3 +155,4 @@ scripts/_inspect_translation.R
 # rules above, so the folder that summarises it stays local too.
 knowledge/
 CLAUDE.local.md
+doc/*.log
