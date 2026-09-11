@@ -1129,3 +1129,56 @@ Named explicitly rather than keyed on `sex == "female"`, because an unrecognised
 Nineteen checks failed on the change, which is what they are for. Every one was a stored hand-computed reference, and each was fixed **by correcting the formula in the reference, not by pasting in what the code now returns**. `golden_ref$NEL` dropped its `* 0.50` and everything downstream recomputes from it; F11's Zimbabwe reference was recomputed through the whole chain, moving Nex from 72.81 to 77.60 kg N/head/yr.
 
 F41 asserts the behaviour as a property of the functions rather than as a stored number, so it cannot be satisfied by editing a golden: `calc_nel` must equal Eq 10.8, must not accept `pct_pregnant`, `calc_nep` must still respond to it, halving the fraction must leave enteric CH4 nearly unchanged, feedlot must be a biological zero and heifers must not. Both halves were demonstrated failing first.
+
+---
+
+# Three open items resolved, 2026-09-11: one was my error
+
+## 1. Composting MCF 0.5: CORRECT. The finding against it was wrong.
+
+I recorded this as `DEVIATION_OPEN` and proposed moving it to 1.00 / 2.00 / 2.50, on the grounds that 0.5 is the 2019 Refinement's In-vessel figure while the row declares Static Pile. **That reasoning was faulty.** It compared the value against the wrong edition.
+
+The tool's declared MCF basis is the **2006** Table 10.17, and in that table Composting - Static pile is **0.5% / 0.5% / 0.5%**, marked "Not temperature dependant". Ten of the twelve systems read their MCF from the 2006 table:
+
+| system | tool | 2006 Table 10.17 |
+|---|---|---|
+| pasture | 2 / 1.5 / 1 | 2.0 / 1.5 / 1.0 |
+| daily_spread | 1 / 0.5 / 0.1 | 1.0 / 0.5 / 0.1 |
+| solid_storage | 5 / 4 / 2 | 5.0 / 4.0 / 2.0 |
+| dry_lot | 2 / 1.5 / 1 | 2.0 / 1.5 / 1.0 |
+| deep_bedding | 80 / 39 / 17 | 80 / 39 / 17 |
+| liquid_slurry | 50 / 24 / 10 | 50 / 24 / 10 |
+| lagoon | 80 / 77 / 66 | 80 / 77 / 66 |
+| **composting** | **0.5 / 0.5 / 0.5** | **0.5 / 0.5 / 0.5, static pile** |
+| aerobic_treatment | 0 / 0 / 0 | 0 / 0 / 0 |
+| burned_for_fuel | 10 / 10 / 10 | 10 / 10 / 10 |
+
+The two exceptions are `solid_storage_covered`, which has no 2006 row, and `anaerobic_digester`, for which 2006 gives only "0 to 100%, calculate with Formula 1".
+
+So the Static Pile variant is consistent across all three coefficient families: MCF from 2006, EF3 and the nitrogen fractions from 2019R, because 2006 publishes neither at variant resolution. Only the EDITION differs between families, which is the documented tool-wide convention, the same one that holds pasture on 2006.
+
+A 2019R user does receive 0.5 where 2019R gives 1.00 to 2.50. That is part of the same declared MCF basis and is disclosed with it. Verdict corrected to `CONFIRMED`; the four review-table proposals are withdrawn.
+
+**What went wrong in my reasoning:** I checked the value against the table the row's OTHER coefficients came from, rather than against the table the tool declares for that coefficient family. Having just spent the week on variant mixing, I read a second instance into a case that was consistent.
+
+## 2. Anaerobic digester volatilisation: 0.05 was the wrong end of the range, and the range was not the point
+
+Table 10.22 gives Anaerobic digester as a bare range, **0.05 to 0.50**, with no central value. I first read this as "our upper bound of 0.08 should be 0.50". Footnote 3 says something more specific:
+
+> *"Nitrogen losses from digestate storage strongly depend on the digestate composition and on the storage cover. Digestate with a low dry matter content and no cover can loose up to 0.5 of nitrogen. The lower range of 0.05 losses is valid for digestate with a high dry matter content **and a cover**. ... It is advised to **use the liquid slurry without cover for uncovered digestate**."*
+
+This row declares **open storage**, and its MCF comes from the Table 10A.11 "High quality biogas digester, open storage" row. So 0.05, the covered figure, was the wrong end of the range for the variant the row models, and IPCC names the substitute explicitly.
+
+Following footnote 3, the value is the Liquid/Slurry **without** natural crust cover, Other Cattle figure: **0.48 (0.15 - 0.60)**, replacing 0.05 (0.02 - 0.08). Roughly ten times, not the two times the bound alone would have given.
+
+Measured on a 100,000-head herd sending all manure through an open-storage digester: indirect manure N2O **4.94 to 47.38 t/yr**, total CO2e +5.5%.
+
+This is the same variant-mixing class again: the MCF followed open storage and the nitrogen fraction followed covered storage.
+
+## 3. MW: the value stands, the citation does not
+
+`MW` cited `Table 10A.2`. That table has no mature-weight column, and neither does 10A.1. IPCC publishes no default for mature weight anywhere; it appears in Equation 10.6 only as an input. Review round 7 item 3 listed "300 kg as the reference MW" among the values the reviewer could not find in the guidelines. The companion value on that list, 400 kg BW, was fixed at the time. This citation was not.
+
+The **value** is fine. Eq 10.6 footnote 4 explicitly allows mature weight to be read as "target weight related to stage of growth", which is how the per-sub-category values are set, and they are coherent: every BW sits below its MW, with ratios running from 0.17 for calves to 0.92 for mature cows. MW also enters only the growth term, which is skipped when weight gain is zero, so it has no effect at all on the four mature sub-categories.
+
+Citation removed, the definition now states plainly that it is a project assumption and cites footnote 4 for the reading, and the verdict is `NO_IPCC_DEFAULT`.

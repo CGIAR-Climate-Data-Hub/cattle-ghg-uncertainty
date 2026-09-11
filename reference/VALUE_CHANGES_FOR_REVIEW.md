@@ -12,7 +12,7 @@ The **before** column is the value as it stood at commit `fbfa1bc` (2026-07-10),
 
 | status | count | meaning |
 |---|---|---|
-| `APPLIED` | 74 | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |
+| `APPLIED` | 76 | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |
 | `PROPOSED` | 3 | We think it is wrong, but a numbered review round adjudicated it, so it has **not** been changed. Your call. |
 | `OPEN` | 6 | Differs from IPCC with no recorded reason and no review history. A judgement call we did not want to take alone. |
 | `APPLIED_OVERTURNS_REVIEW` | 1 | **Changed, and it reverses a value a review round agreed.** Read these first. |
@@ -29,7 +29,7 @@ The one thing in this document that most needs a second opinion.
 |---|---|---|---|---|---|---|
 | PARAM_CATALOGUE | Milk | ipcc_default | 3.5 | 1.2 | R8 p7 | Changed from 3.5 to 1.2 by the low-productivity basis decision of 2026-09-11. 3.5 was the Africa AGGREGATE row of Table 10A.1, a population-weighted average of the high (5.8) and low (1.2) productivity systems; 1.2 is the low-productivity row. Review round 8 page 7 agreed 3.5 against a previous unsourced 4.0, and that was right FOR THE AGGREGATE ROW. What changed is the basis, not the reading: the productivity question does not appear to have been put to the reviewer. Reverting is a single cell in the master. |
 
-## 1. Already applied (74)
+## 1. Already applied (76)
 
 Changed since 2026-07-10. Each cites the IPCC table it was read from.
 
@@ -80,6 +80,8 @@ Changed since 2026-07-10. Each cites the IPCC table it was read from.
 | MMS_DEFAULTS | solid_storage_covered | mcf_temperate | 2 | 4 | manure CH4 | 2019R V4 Ch10 Table 10.17 (Updated), Solid storage - Covered/compacted: 2.00 / 4.00 / 5.00 |
 | MMS_DEFAULTS | solid_storage_covered | mcf_tropical | 4 | 5 | manure CH4 | 2019R V4 Ch10 Table 10.17 (Updated), Solid storage - Covered/compacted: 2.00 / 4.00 / 5.00 |
 | MMS_DEFAULTS | solid_storage_covered | mcf_tropical_dry | 4 | 5 | manure CH4 | Mirrors mcf_tropical on every system. The 2019 Refinement splits ten climate zones including Tropical Dry, which the tool's four-band model does not resolve; the tropical value is used for both |
+| MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas | 0.05 | 0.48 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central, and footnote 3 tells you which end applies: 'The lower range of 0.05 losses is valid for digestate with a high dry matter content AND A COVER', and 'It is advised to use the liquid slurry without cover for uncovered digestate'. This row declares OPEN STORAGE, and its MCF comes from the Table 10A.11 open-storage row, so the covered figure was the wrong end of the range. Following footnote 3, the value is the Liquid/Slurry without natural crust cover, Other Cattle figure: 0.48 (0.15-0.60). It was previously 0.05 (0.02-0.08), roughly ten times too low and with a sampled range sitting entirely below IPCC's floor |
+| MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas_low | 0.02 | 0.15 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central, and footnote 3 tells you which end applies: 'The lower range of 0.05 losses is valid for digestate with a high dry matter content AND A COVER', and 'It is advised to use the liquid slurry without cover for uncovered digestate'. This row declares OPEN STORAGE, and its MCF comes from the Table 10A.11 open-storage row, so the covered figure was the wrong end of the range. Following footnote 3, the value is the Liquid/Slurry without natural crust cover, Other Cattle figure: 0.48 (0.15-0.60). It was previously 0.05 (0.02-0.08), roughly ten times too low and with a sampled range sitting entirely below IPCC's floor |
 | MMS_FRAC_DEFAULTS_2019 | composting | frac_gas_high | 0.98 | 0.7 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98. Composting Static Pile: 0.65 (0.14-0.70), leach 0.06 |
 | MMS_FRAC_DEFAULTS_2019 | composting | frac_gas_low | 0.33 | 0.14 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98. Composting Static Pile: 0.65 (0.14-0.70), leach 0.06 |
 | MMS_FRAC_DEFAULTS_2019 | daily_spread | frac_gas_high | 0.1 | 0.6 | indirect N2O (volatilisation) | 2019R V4 Ch10 Table 10.22 (Updated), Other Cattle column, pp.10.97-98. Daily spread: 0.07 (0.05-0.60), leach 0 |
@@ -130,8 +132,8 @@ Differs from IPCC with no recorded reason. These would move a reported number. W
 | MMS_DEFAULTS | composting | mcf_temperate | 1 | 0.5 | 2.0 | manure CH4 | See mcf_tropical: the MCF is the only coefficient on this row still reading the other edition's variant. |
 | MMS_DEFAULTS | composting | mcf_tropical | 1.5 | 0.5 | 2.5 | manure CH4 | The row declares the Static Pile variant and its EF3 (0.010) and Frac (0.65) both follow it, but 0.5 is the 2019R In-vessel figure. 2019R Table 10.17 gives Composting - Static pile (Forced aeration) 1.00 cool / 2.00 temperate / 2.50 warm. Correct as-is under 2006, where static pile is 0.5. |
 | MMS_DEFAULTS | composting | mcf_tropical_dry | 1.5 | 0.5 | 2.5 | manure CH4 | See mcf_tropical. This column mirrors mcf_tropical on every system, so it moves with it. |
-| MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas_high | 0.08 | 0.08 | 0.50 | indirect N2O (volatilisation) | Table 10.22 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central. The tool takes 0.05 as the central and samples 0.02 to 0.08, so its whole range sits at or below IPCC's floor and its ceiling is six times too low. |
-| PARAM_CATALOGUE | MW | ipcc_ref | Table 10A.2 | Table 10A.2 | (none) | gross energy, so enteric CH4 + manure CH4 | Cites Table 10A.2, which has no mature-weight column; neither does Table 10A.1. IPCC publishes no default for mature weight. Review round 7 item 3 raised exactly this; the companion value (400 kg BW) was fixed and this citation was not. |
+| MMS_FRAC_DEFAULTS_2019 | anaerobic_digester | frac_gas_high | 0.08 | 0.6 | 0.50 | indirect N2O (volatilisation) | Table 10.22 gives Anaerobic digester as a bare range 0.05 to 0.50 with no central. The tool takes 0.05 as the central and samples 0.02 to 0.08, so its whole range sits at or below IPCC's floor and its ceiling is six times too low. |
+| PARAM_CATALOGUE | MW | ipcc_ref | Table 10A.2 |  | (none) | gross energy, so enteric CH4 + manure CH4 | Cites Table 10A.2, which has no mature-weight column; neither does Table 10A.1. IPCC publishes no default for mature weight. Review round 7 item 3 raised exactly this; the companion value (400 kg BW) was fixed and this citation was not. |
 
 ---
 

@@ -42,7 +42,7 @@ All parameter codes are case-sensitive.
 |------|------|------|------|--------------|--------------|--------------|----------|------------------|------------|
 | `N` | core | activity_data | head |  | 10% | normal | — | cattle_pop | Number of animals in this sub-category |
 | `BW` | core | coefficient | kg | 270 | 15% | normal | Table 10A.2 | W, live_weight | Average live body weight of the animals |
-| `MW` | core | coefficient | kg | 300 | 10% | normal | Table 10A.2 | mature_weight | Mature (adult) body weight of the animals |
+| `MW` | core | coefficient | kg | 300 | 10% | normal | — | mature_weight | Mature body weight of an adult animal in moderate body condition, kg. PROJECT ASSUMPTION, not an IPCC default: IPCC publishes no mature-weight table. Enters only Eq 10.6, the growth term, so it has no effect where weight gain is zero. Eq 10.6 footnote 4 allows it to be read as the target weight for the animal stage of growth, which is how the per-sub-category values are set. |
 | `WG` | core | coefficient | kg/day | 0 | 30% | pert | Table 10A.1 | weight_gain | Average daily weight gain — set 0 for non-growing (adult) animals |
 | `Milk` | core | coefficient | kg/head/day | 1.2 | 20% | normal | — | milk_yield | Average daily milk yield per head, calculated as total annual production divided by 365 (IPCC Vol.4 Ch.10). This is already averaged across the whole year including the dry period, so do NOT scale it by the share of the herd that is lactating or calving. Set 0 for sub-categories that do not produce milk. |
 | `Fat` | core | coefficient | % | 4.3 | 10% | normal | — | milk_fat | Fat content of milk (% by weight) |

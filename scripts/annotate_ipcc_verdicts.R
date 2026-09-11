@@ -60,7 +60,7 @@ A2G <- "2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108"
 # PARAM_CATALOGUE ipcc_default
 cat_default <- list(
   BW = c("CONFIRMED", paste0(A1_LOW, ": Weight 270 kg. ", BASIS_NOTE)),
-  MW = c("NOT_IPCC", "Neither Table 10A.1 nor Table 10A.2 has a mature-weight column; the cited table does not contain this value. Reviewer R7 #3 listed 300 kg MW as unfindable in IPCC"),
+  MW = c("NO_IPCC_DEFAULT", "Neither Table 10A.1 nor Table 10A.2 has a mature-weight column; the cited table does not contain this value. Reviewer R7 #3 listed 300 kg MW as unfindable in IPCC"),
   WG = c("CONFIRMED", paste0(T10A1, ": weight gain 0 for every dairy row")),
   Milk = c("CONFIRMED", paste0(A1_LOW, ": milk yield 1.2 kg/day. ", BASIS_NOTE, " The previous 3.5 was the Africa AGGREGATE row, a population-weighted average of the high (5.8) and low (1.2) productivity systems per footnote 4. Changing it overturns the value agreed at review round 8 page 7, which was right for the aggregate row; the basis, not the reading, is what changed.")),
   Fat = c("CONFIRMED", paste0(A1_LOW, ": fat content 4.3%. Identical in the aggregate, high and low productivity rows, so the basis choice cannot move it. Agreed at review round 8 page 7 and unaffected.")),
@@ -135,7 +135,7 @@ mcf <- list(
   deep_bedding = c("CONFIRMED", paste0(T1017_06, ", Cattle and Swine deep bedding > 1 month: 17 / 39 / 80. ", BANDS)),
   liquid_slurry = c("CONFIRMED", paste0(T1017_06, ", Liquid/Slurry with natural crust cover: 10 / 24 / 50. ", BANDS)),
   lagoon = c("CONFIRMED", paste0(T1017_06, ", Uncovered anaerobic lagoon: 66 / 77 / 80. ", BANDS)),
-  composting = c("DEVIATION_OPEN", paste0("0.5 is the 2006 Table 10.17 Composting - Static pile value, and also the 2019R In-vessel value. ", T1017_19, " gives Composting - Static pile (Forced aeration) 1.00 / 2.00 / 2.50. The row declares the Static Pile variant and its EF3 and Frac both follow Static Pile under 2019R, so the MCF is the one coefficient still on the other edition's reading")),
+  composting = c("CONFIRMED", paste0(T1017_06, ", Composting - Static pile: 0.5 / 0.5 / 0.5, marked 'Not temperature dependant'. This was briefly recorded as a DEVIATION_OPEN on the grounds that 2019R gives Static pile (Forced aeration) 1.00 / 2.00 / 2.50 and 0.5 is the 2019R In-vessel figure. That reading was WRONG: the tool's declared MCF basis is the 2006 table, where static pile IS 0.5, and 10 of the 12 systems read their MCF from it. The variant is consistent across all three coefficient families; only the edition differs between families, which is the documented tool-wide convention. A 2019R user does get 0.5 rather than 1.00 to 2.50, and that is part of the same documented MCF basis, alongside pasture")),
   anaerobic_digester = c("CONFIRMED", "2019R V4 Ch10 Table 10A.11, high quality biogas digester with open storage: 3.55 cold / 4.38 temperate / 4.59 warm. The 2006 table gives only a 0 to 100% range requiring Formula 1"),
   aerobic_treatment = c("CONFIRMED", paste0(T1017_06, ", Aerobic treatment: 0 / 0 / 0")),
   burned_for_fuel = c("CONFIRMED", paste0(T1017_06, ", Burned for fuel: 10 / 10 / 10")))
@@ -202,8 +202,8 @@ for (k in c("solid_storage", "composting"))
         "IPCC publishes the leaching fraction for this system as a point value with no range. The tool applies a +/- 50% band so the parameter can be sampled")
 # Anaerobic digester: IPCC gives a bare range, no central.
 for (f in c("frac_gas", "frac_gas_low", "frac_gas_high"))
-  set("MMS_FRAC_DEFAULTS_2019", "anaerobic_digester", f, "DEVIATION_OPEN",
-      paste0(T1022, " gives Anaerobic digester as a bare range 0.05 to 0.50 with no central value. Footnote 3 assigns 0.05 to high-dry-matter covered digestate and up to 0.50 to uncovered. The tool takes 0.05 as the central and then applies bounds 0.02 to 0.08, so its whole sampled range sits at or below IPCC's floor and its upper bound is six times below IPCC's ceiling"))
+  set("MMS_FRAC_DEFAULTS_2019", "anaerobic_digester", f, "CONFIRMED",
+      paste0(T1022, " gives Anaerobic digester as a bare range 0.05 to 0.50 with no central, and footnote 3 tells you which end applies: 'The lower range of 0.05 losses is valid for digestate with a high dry matter content AND A COVER', and 'It is advised to use the liquid slurry without cover for uncovered digestate'. This row declares OPEN STORAGE, and its MCF comes from the Table 10A.11 open-storage row, so the covered figure was the wrong end of the range. Following footnote 3, the value is the Liquid/Slurry without natural crust cover, Other Cattle figure: 0.48 (0.15-0.60). It was previously 0.05 (0.02-0.08), roughly ten times too low and with a sampled range sitting entirely below IPCC's floor"))
 set("MMS_FRAC_DEFAULTS_2019", "anaerobic_digester", "frac_leach", "CONFIRMED",
     paste0(T1022, ", Anaerobic digester: leach 0"))
 for (f in c("frac_leach_low", "frac_leach_high"))

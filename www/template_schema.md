@@ -125,7 +125,7 @@ Use these when filling Frac_GasMS_pct and Frac_LeachMS_pct.
 | `dry_lot` | 0.3 / 0.2 / 0.5 | 0.035 / 0 / 0.07 |
 | `deep_bedding` | 0.25 / 0.1 / 0.3 | 0.035 / 0 / 0.07 |
 | `liquid_slurry` | 0.3 / 0.09 / 0.36 | 0 / 0 / 0 |
-| `anaerobic_digester` | 0.05 / 0.02 / 0.08 | 0 / 0 / 0 |
+| `anaerobic_digester` | 0.48 / 0.15 / 0.6 | 0 / 0 / 0 |
 | `composting` | 0.65 / 0.14 / 0.7 | 0.06 / 0.03 / 0.09 |
 | `aerobic_treatment` | 0.85 / 0.27 / 1 | 0 / 0 / 0 |
 | `lagoon` | 0.35 / 0.2 / 0.8 | 0 / 0 / 0 |

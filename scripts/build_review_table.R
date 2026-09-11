@@ -89,6 +89,16 @@ PROPOSALS <- rbind(
   data.frame(object = "PARAM_CATALOGUE", key = "Milk", field = "ipcc_default",
     proposed = "", status = "APPLIED_OVERTURNS_REVIEW",
     why = "Changed from 3.5 to 1.2 by the low-productivity basis decision of 2026-09-11. 3.5 was the Africa AGGREGATE row of Table 10A.1, a population-weighted average of the high (5.8) and low (1.2) productivity systems; 1.2 is the low-productivity row. Review round 8 page 7 agreed 3.5 against a previous unsourced 4.0, and that was right FOR THE AGGREGATE ROW. What changed is the basis, not the reading: the productivity question does not appear to have been put to the reviewer. Reverting is a single cell in the master."),
+  # The four composting MCF proposals were WITHDRAWN. They rested on
+  # comparing 0.5 against the 2019 Refinement, but the tool's declared MCF
+  # basis is the 2006 table, where Composting - Static pile IS 0.5, and ten
+  # of the twelve systems read their MCF from it. The value is correct.
+  #
+  # The anaerobic digester and MW proposals were APPLIED, so they now appear
+  # automatically as changes rather than as proposals.
+  data.frame(object = "PARAM_CATALOGUE", key = "Milk", field = "ipcc_default",
+    proposed = "", status = "APPLIED_OVERTURNS_REVIEW",
+    why = "Changed from 3.5 to 1.2 by the low-productivity basis decision of 2026-09-11. 3.5 was the Africa AGGREGATE row of Table 10A.1, a population-weighted average of the high (5.8) and low (1.2) productivity systems; 1.2 is the low-productivity row. Review round 8 page 7 agreed 3.5 against a previous unsourced 4.0, and that was right FOR THE AGGREGATE ROW. What changed is the basis, not the reading: the productivity question does not appear to have been put to the reviewer. Reverting is a single cell in the master."),
   data.frame(object = "MMS_DEFAULTS", key = "composting", field = "mcf_tropical",
     proposed = "2.5", status = "OPEN",
     why = "The row declares the Static Pile variant and its EF3 (0.010) and Frac (0.65) both follow it, but 0.5 is the 2019R In-vessel figure. 2019R Table 10.17 gives Composting - Static pile (Forced aeration) 1.00 cool / 2.00 temperate / 2.50 warm. Correct as-is under 2006, where static pile is 0.5."),
