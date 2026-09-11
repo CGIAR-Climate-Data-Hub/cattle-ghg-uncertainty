@@ -72,14 +72,16 @@ ghg_emissions <- function(
   )
   direct_n2o_prp_head <- calc_direct_n2o_prp(Nex, pct_pasture, EF3_PRP)
   # Andreas 2026-05 #10: prefer PRP-specific Frac defaults (Table 11.3) when
-  # supplied; fall back to the function defaults (0.21 / 0.30) if the caller
-  # passed NULL.
-  prp_fg <- if (!is.null(Frac_GASM_PRP))  Frac_GASM_PRP  else 0.21
+  # supplied; fall back to the CATALOGUE if the caller passed NULL. This
+  # comment used to name 0.21 / 0.30 as the fallbacks, and 0.30 was the 2006
+  # figure that had not followed the move to the 2019R wet-climate 0.24.
+  prp_fg <- if (!is.null(Frac_GASM_PRP))  Frac_GASM_PRP  else .cat_default("Frac_GASM_PRP")
   # IPCC 2019R Vol.4 Ch.11 Table 11.3: Frac_LEACH-(H) = 0.24 (wet climate);
-  # dry-climate default is 0. 2006 default was 0.30. Align all three default
-  # sites in the codebase on 0.24 — runs targeting 2006 must supply the
-  # value via the Parameters template explicitly.
-  prp_fl <- if (!is.null(Frac_LEACH_PRP)) Frac_LEACH_PRP else 0.24
+  # dry-climate default is 0, 2006 default was 0.30. Every default site now
+  # reads the catalogue instead of restating it, which is what finally made
+  # the four sites agree. Runs targeting 2006 must supply the value through
+  # the Parameters template.
+  prp_fl <- if (!is.null(Frac_LEACH_PRP)) Frac_LEACH_PRP else .cat_default("Frac_LEACH_PRP")
   indirect_n2o_prp_head <- calc_indirect_n2o_prp(
     Nex, pct_pasture,
     Frac_GASM_PRP  = prp_fg, EF4 = EF4,
@@ -131,8 +133,10 @@ ghg_emissions_vec <- function(
   # (IPCC 2019 Table 11.3). NULL = broadcast a constant from IPCC defaults.
   Frac_GASM_PRP  = NULL,
   Frac_LEACH_PRP = NULL,
-  # Andreas 2026-05 follow-up: MilkPR (milk protein %, IPCC 2006 Table 10.11)
-  # threaded through to calc_n_excretion. NULL/scalar/vector all supported.
+  # Andreas 2026-05 follow-up: MilkPR (milk protein %) threaded through to
+  # calc_n_excretion. NULL/scalar/vector all supported; NULL reads the
+  # catalogue below. Cited to "IPCC 2006 Table 10.11" here until 2026-09,
+  # which is the Tier 1 enteric EF table and has no milk protein column.
   MilkPR = NULL,
   # Andreas 2026-05 follow-up (C4 / C6): per-iteration per-MMS uncertainty
   # matrices (n_iter × n_MMS). When supplied, the named per-MMS vector for
@@ -157,21 +161,29 @@ ghg_emissions_vec <- function(
   # The scalar ghg_emissions() and all calc_*() helpers are intentionally left
   # untouched — they remain the reference the audit (deterministic golden case)
   # and the equivalence test check against. This function reproduces their
-  # output bit-for-bit, including operation order and the historical broadcast
-  # defaults (e.g. Frac_LEACH_PRP -> 0.30 when the caller passes NULL; the app
-  # always supplies it via get_param() so that path is never hit in practice).
+  # output bit-for-bit.
+  #
+  # The NULL-argument fallbacks below did NOT reproduce it. They were written
+  # as literals described as "historical broadcast defaults ... preserved
+  # exactly", and the scalar path then moved without them: it aligned
+  # Frac_LEACH_PRP on the 2019R wet-climate 0.24 while this kept the 2006
+  # value of 0.30, and MilkPR moved to 3.6 while this kept 3.3. The two
+  # engines disagreed on the same input. It never reached a result, because
+  # the app supplies both through get_param(), but "never hit in practice"
+  # was the reason nobody checked it for four months.
+  #
+  # Both engines now read the catalogue, so they cannot diverge again.
   n <- length(cattle_pop)
 
-  # Broadcast scalar / NULL arguments to length n (behaviour preserved exactly).
   .bcast <- function(x, default) {
     if (is.null(x)) rep(default, n)
     else if (length(x) == 1L) rep(x, n)
     else x
   }
-  prp_fg_vec <- .bcast(Frac_GASM_PRP,  0.21)
-  prp_fl_vec <- .bcast(Frac_LEACH_PRP, 0.30)
-  milkpr_vec <- .bcast(MilkPR, 3.3)
-  tw_vec     <- .bcast(Tw, 20)
+  prp_fg_vec <- .bcast(Frac_GASM_PRP,  .cat_default("Frac_GASM_PRP"))
+  prp_fl_vec <- .bcast(Frac_LEACH_PRP, .cat_default("Frac_LEACH_PRP"))
+  milkpr_vec <- .bcast(MilkPR, .cat_default("MilkPR"))
+  tw_vec     <- .bcast(Tw, .cat_default("Tw"))
 
   # Per-MMS lookup -> length-n vector for MMS `key`, matching the scalar engine's
   # .row_or_scalar(mat, scalar_vec, i)[key] semantics exactly: sample column when

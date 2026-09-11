@@ -387,7 +387,7 @@ After a successful upload, a green notification confirms how many parameters wer
 \begin{itemize}
   \item Still load and display all parameters that \textit{were} supplied — you can review them immediately in Tab 2 and Tab 3.
   \item Automatically fill in missing parameters using IPCC default values (see the "IPCC default" column in Table \ref{tab:params}).
-  \item Show a \textbf{yellow warning notification} listing exactly which parameters were auto-filled and with what values (e.g. "\textit{3 parameters auto-filled from IPCC defaults: Ym = 6.5, Bo = 0.10, DE = 55.0}").
+  \item Show a \textbf{yellow warning notification} listing exactly which parameters were auto-filled and with what values (e.g. "\textit{3 parameters auto-filled from IPCC defaults: Ym = 6.5, Bo = 0.13, DE = 51.0}").
   \item Flag those parameters as \textbf{Missing} (purple/grey) in the QA/QC tab (Tab 2).
 \end{itemize}
 You should review whether the IPCC defaults are appropriate for your country context and, where necessary, revise any auto-filled values before your final simulation run.

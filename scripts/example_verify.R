@@ -28,15 +28,18 @@ run_example <- function(spec_fn, label) {
   sg <- unique(group_key)
   if (length(sg) != 1L) stop("Expected single group for example")
 
-  # No manure data on the examples — falls back to default MMS (70/30
-  # pasture/solid_storage). Mirrors app_server.R's fall-through branch.
+  # No manure data on the examples, so the run falls back to the default MMS
+  # set. This said it mirrored app_server.R's fall-through branch and did so
+  # by retyping the numbers, which stopped being true the moment that branch
+  # was corrected. It now calls the same function the app calls.
+  fb <- default_mms_fallback()
   systems_data <- list()
   systems_data[[sg]] <- list(
     param_specs = specs, corr_matrix = NULL, ef_corr_matrix = NULL,
     unified_corr_matrix = NULL,
-    mms_fractions = c(pasture = 0.70, solid_storage = 0.30),
-    mcf_values    = c(pasture = 0.015, solid_storage = 0.050),
-    ef3_values    = c(pasture = 0.020, solid_storage = 0.005))
+    mms_fractions = fb$fractions,
+    mcf_values    = fb$mcf,
+    ef3_values    = fb$ef3)
 
   sim <- run_inventory_simulation(
     systems_data, n_iter = 5000L, gwp = "AR5", seed = 42L,

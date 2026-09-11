@@ -1494,9 +1494,13 @@ app_server <- function(input, output, session) {
 
           systems_data <- list()
 
-          default_mms_fracs <- c(pasture = 0.70, solid_storage = 0.30)
-          default_mcf_vals  <- c(pasture = 0.015, solid_storage = 0.050)
-          default_ef3_vals  <- c(pasture = 0.020, solid_storage = 0.005)
+          # Used when a group has no usable Manure_Management row. Shared with
+          # trend_tab.R, scripts/audit.R and scripts/example_verify.R, which
+          # all used to keep their own retyped copy of these numbers.
+          .mms_fb <- default_mms_fallback()
+          default_mms_fracs <- .mms_fb$fractions
+          default_mcf_vals  <- .mms_fb$mcf
+          default_ef3_vals  <- .mms_fb$ef3
 
           for (sg in sys_groups) {
             sys_specs <- specs[group_key == sg, ]
@@ -1532,10 +1536,14 @@ app_server <- function(input, output, session) {
                 mms_fracs <- mms_fracs[!is.na(mms_fracs)]
                 mcf_vals  <- mcf_vals[names(mms_fracs)]
                 ef3_vals  <- ef3_vals[names(mms_fracs)]
-                # Replace any leftover NAs in MCF/EF3 with defaults rather than
-                # crashing the simulation
-                mcf_vals[is.na(mcf_vals)] <- 0.015
-                ef3_vals[is.na(ef3_vals)] <- 0.005
+                # Replace any leftover NAs in MCF/EF3 with THAT SYSTEM's own
+                # default rather than crashing. This used to substitute 0.015
+                # and 0.005 for every system alike, which are pasture's
+                # temperate MCF and the superseded solid-storage EF3: a blank
+                # MCF on an uncovered lagoon became 1.5% where Table 10.17
+                # gives 77%.
+                mcf_vals <- fill_mms_blanks(mcf_vals, "mcf")
+                ef3_vals <- fill_mms_blanks(ef3_vals, "ef3")
 
                 # Round 7 R1.13: per-MMS Frac_GasMS / Frac_LeachMS columns.
                 if ("Frac_GasMS_pct" %in% names(mms_rows)) {

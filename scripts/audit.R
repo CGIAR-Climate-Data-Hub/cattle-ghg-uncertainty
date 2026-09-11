@@ -1675,12 +1675,16 @@ section_F <- function() {
           mcf_vals <- setNames(mcf, mms_rows$mms_type)
           ef3_vals <- setNames(ef3, mms_rows$mms_type)
           mms_fracs <- mms_fracs[!is.na(mms_fracs)]
-          mcf_vals  <- mcf_vals[names(mms_fracs)]; mcf_vals[is.na(mcf_vals)] <- 0.015
-          ef3_vals  <- ef3_vals[names(mms_fracs)]; ef3_vals[is.na(ef3_vals)] <- 0.005
+          # Per-system blank fill and the no-rows fallback, from the same
+          # functions app_server.R uses. This block used to retype both, so
+          # the audit reproduced a behaviour the app no longer had.
+          mcf_vals  <- fill_mms_blanks(mcf_vals[names(mms_fracs)], "mcf")
+          ef3_vals  <- fill_mms_blanks(ef3_vals[names(mms_fracs)], "ef3")
         } else {
-          mms_fracs <- c(pasture = 0.70, solid_storage = 0.30)
-          mcf_vals  <- c(pasture = 0.015, solid_storage = 0.050)
-          ef3_vals  <- c(pasture = 0.020, solid_storage = 0.005)
+          .fb <- default_mms_fallback()
+          mms_fracs <- .fb$fractions
+          mcf_vals  <- .fb$mcf
+          ef3_vals  <- .fb$ef3
         }
         systems_data_z[[sg]] <- list(
           param_specs = sys_specs, corr_matrix = NULL, ef_corr_matrix = NULL,
@@ -1745,9 +1749,9 @@ section_F <- function() {
     sys_data[[sg]] <- list(
       param_specs = specs, corr_matrix = NULL, ef_corr_matrix = NULL,
       unified_corr_matrix = NULL,
-      mms_fractions = c(pasture = 0.70, solid_storage = 0.30),
-      mcf_values    = c(pasture = 0.015, solid_storage = 0.050),
-      ef3_values    = c(pasture = 0.020, solid_storage = 0.005))
+      mms_fractions = default_mms_fallback()$fractions,
+      mcf_values    = default_mms_fallback()$mcf,
+      ef3_values    = default_mms_fallback()$ef3)
     sim_e <- tryCatch(
       run_inventory_simulation(sys_data, n_iter = 2000L, gwp = "AR5",
                                 seed = 42L, pct_pregnant = 1,
@@ -2881,6 +2885,51 @@ section_F <- function() {
                             p, fl, p))
       }
     }
+    # Third hiding place, found by scripts/sweep_param_values.R after the
+    # first two were closed: ghg_emissions_vec() broadcasts its NULL
+    # arguments through .bcast(x, <literal>). Those literals were described
+    # in the comment above them as "historical ... preserved exactly", and
+    # they had stopped matching the scalar engine beside them: 0.30 for
+    # Frac_LEACH_PRP against the scalar's 0.24, and MilkPR 3.3 against 3.6.
+    # Two engines, same input, different answer. Same rule as everywhere
+    # else: read the catalogue or declare the literal.
+    s <- readLines("R/calc_ghg_master.R", warn = FALSE)
+    s <- s[!grepl("^\\s*#", s)]
+    bc <- grep("\\.bcast\\(", s, value = TRUE)
+    for (ln in bc) {
+      if (grepl("function", ln)) next                  # the definition itself
+      if (grepl("\\.bcast\\([^,]+,\\s*[0-9.]+\\s*\\)", ln))
+        f <- c(f, sprintf("a .bcast() fallback in ghg_emissions_vec uses a literal, not the catalogue: %s",
+                          trimws(ln)))
+    }
+    # Fourth: the app's no-manure-sheet fallback and the trend tab both
+    # filled MCF and EF3 from their own literals. They carried the
+    # superseded EF3 0.005 for solid storage, and an MCF pair drawn from two
+    # different climate zones. Both now call mms_default()/mms_mcf_fraction().
+    #
+    # Match on the VALUE position, not on "contains a digit anywhere": the
+    # first version of this rule flagged the fix itself, because
+    # mms_default("pasture", "ef3") has a 3 in the field name. And join the
+    # continuation lines, because the call spans two.
+    for (fl in c("R/app_server.R", "R/trend_tab.R")) {
+      s <- readLines(fl, warn = FALSE)
+      s <- s[!grepl("^\\s*#", s)]
+      starts <- grep("(mcf_values|ef3_values|default_mcf_vals|default_ef3_vals)\\s*(<-|=)\\s*c\\(",
+                     s)
+      for (st in starts) {
+        expr <- s[st]
+        k <- st
+        # accumulate until the parentheses balance
+        while (k < length(s) &&
+               nchar(gsub("[^(]", "", expr)) > nchar(gsub("[^)]", "", expr))) {
+          k <- k + 1
+          expr <- paste(expr, trimws(s[k]))
+        }
+        if (grepl("=\\s*[0-9]", expr))
+          f <- c(f, sprintf("%s fills a manure default from a literal instead of mms_default(): %s",
+                            fl, trimws(substr(expr, 1, 90))))
+      }
+    }
     f
   }, error = function(e) conditionMessage(e))
   gapfill_lit_ok <- length(gapfill_lit_fail) == 0L
@@ -2892,6 +2941,123 @@ section_F <- function() {
                        length(ENGINE_LITERALS),
                        paste(names(ENGINE_LITERALS), collapse = ", "))
              else paste(utils::head(gapfill_lit_fail, 4), collapse = "; "))
+
+
+  # F44 -- no user-facing surface states a value the tool has moved away from.
+  #
+  # The cross-surface matrix asks "does surface S carry value V?" for the
+  # values and surfaces it knows about. It cannot see a sentence that states
+  # a default in passing, and that is where the rot was:
+  #
+  #   mapping_examples.md told the translator to fill pct_pregnant, CP and
+  #   MilkPR with "0.60, 10.0, 3.3". All three had moved four months earlier.
+  #   The file is not a matrix surface, so nothing looked.
+  #
+  # This runs the discovery sweep's high-precision half over the prompt and
+  # guide surfaces: for every parameter, is its JULY value present on a line
+  # that names it, while its CURRENT value is not? The full sweep across all
+  # 121 files is scripts/sweep_param_values.R; this is the gated subset.
+  #
+  # ALLOW holds the hits that are correct in context, each with its reason.
+  # A hit that is not on this list fails the build.
+  SWEEP_FILES <- c(
+    "translator_prompts/param_catalogue.md",
+    "translator_prompts/template_schema.md",
+    "translator_prompts/mapping_examples.md",
+    "translator_prompts/worked_example.md",
+    "translator_prompts/system_instructions.md",
+    "translator_prompts/questionnaire.md",
+    "translator_prompts/getting_started.md",
+    "doc/methodology.Rmd", "doc/user_guide.Rmd")
+  ALLOW <- list(
+    list(file = "translator_prompts/param_catalogue.md", key = "Milk",
+         why = "the declared-basis block names the aggregate row (Milk 3.5) as the alternative NOT chosen"),
+    list(file = "translator_prompts/mapping_examples.md", key = "dairy_cows",
+         why = "raw input data in a worked example, mirroring the Country X fixture, not a default"),
+    list(file = "translator_prompts/mapping_examples.md", key = "pasture",
+         why = "MMS allocation percentages, not an MCF"),
+    list(file = "translator_prompts/mapping_examples.md", key = "CP",
+         why = "the sentence now names the catalogue as the source and quotes the current 9.6"),
+    list(file = "translator_prompts/questionnaire.md", key = "liquid_slurry",
+         why = "MMS allocation percentages, not an MCF"),
+    list(file = "translator_prompts/system_instructions.md", key = "CP",
+         why = "'the 10 parameters the app correlates' is a count, not CP"),
+    list(file = "translator_prompts/template_schema.md", key = "CP",
+         why = "same count of correlated parameters"),
+    list(file = "translator_prompts/template_schema.md", key = "daily_spread",
+         why = "0.1 in that row is the boreal MCF column, not frac_gas"),
+    list(file = "translator_prompts/getting_started.md", key = "dairy_cows",
+         why = "a hypothetical user correcting a unit conversion, not a default"),
+    list(file = "doc/methodology.Rmd", key = "pasture",
+         why = "prose mentioning pasture near an unrelated number"),
+    list(file = "doc/methodology.Rmd", key = "DE",
+         why = "IPCC's own published DE range for crop by-products, 45-55%"),
+    list(file = "doc/methodology.Rmd", key = "pct_pregnant",
+         why = "the correlation derivation note: the 0.60 there is the old Cfi-Ca CORRELATION, and pct_pregnant is named later on the same long line"),
+    list(file = "doc/user_guide.Rmd", key = "pasture",
+         why = "the CRT category table, 3.D.1.c"),
+    list(file = "doc/user_guide.Rmd", key = "DE",
+         why = "IPCC's own published DE range in the auto-fill explanation"))
+
+  sweep_fail <- tryCatch({
+    f <- character(0)
+    Mm <- utils::read.csv("reference/defaults_master.csv", stringsAsFactors = FALSE,
+                          na.strings = "<NA>", colClasses = "character")
+    if (!file.exists("reference/baseline_defaults.csv")) {
+      f <- "reference/baseline_defaults.csv is missing; the July baseline is what makes a value 'stale'"
+    } else {
+      Bb <- utils::read.csv("reference/baseline_defaults.csv", stringsAsFactors = FALSE,
+                            na.strings = "<NA>", colClasses = "character")
+      nm <- function(v) suppressWarnings(as.numeric(v))
+      Vv <- Mm[!is.na(nm(Mm$value)) & Mm$ipcc_verdict != "META", ]
+      kk <- function(d) paste(d$object, d$key, d$field, sep = "\r")
+      Bb$k <- kk(Bb); Vv$k <- kk(Vv)
+      Vv$july <- nm(Bb$value[match(Vv$k, Bb$k)])
+      Vv$now  <- nm(Vv$value)
+      Vv <- Vv[!is.na(Vv$july) & abs(Vv$july - Vv$now) > 1e-9, ]
+      allowed <- function(fl, key)
+        any(vapply(ALLOW, function(a) a$file == fl && a$key == key, logical(1)))
+      for (fl in SWEEP_FILES) {
+        if (!file.exists(fl)) next
+        txt <- readLines(fl, warn = FALSE)
+        # LaTeX writes an underscore as "\_", so a bare "pct_pregnant"
+        # pattern never matches "pct\_pregnant" and every parameter with an
+        # underscore in its name is invisible in the .Rmd guides. That is
+        # the third time this exact blindness has been found: first in the
+        # doc_rmd extractor, then in the pregnancy extractor, now here. The
+        # first version of THIS check passed against a user guide put back
+        # to pct_pregnant 0.60. Unwrap and de-escape before matching.
+        txt <- gsub("\\\\", "", gsub("\\\\texttt\\{([^}]*)\\}", "\\1", txt))
+        for (i in seq_len(nrow(Vv))) {
+          tok <- Vv$key[i]
+          pat <- paste0("(?<![A-Za-z0-9_])",
+                        gsub("([.|()^{}+$*?\\[\\]])", "\\\\\\1", tok),
+                        "(?![A-Za-z0-9_])")
+          for (ln in grep(pat, txt, perl = TRUE)) {
+            ns <- nm(unlist(regmatches(txt[ln],
+                     gregexpr("[0-9]+(?:[.][0-9]+)?", txt[ln], perl = TRUE))))
+            ns <- ns[!is.na(ns)]
+            if (!length(ns)) next
+            if (any(abs(ns - Vv$now[i]) < 1e-9)) next            # current value present
+            if (!any(abs(ns - Vv$july[i]) < 1e-9)) next          # July value absent
+            if (allowed(fl, tok)) next
+            f <- c(f, sprintf("%s:%d states %s for %s/%s, which moved to %s",
+                              fl, ln, format(Vv$july[i]), Vv$object[i],
+                              Vv$key[i], format(Vv$now[i])))
+          }
+        }
+      }
+    }
+    unique(f)
+  }, error = function(e) conditionMessage(e))
+  sweep_ok <- length(sweep_fail) == 0L
+  check_bool("F44", "F",
+             "No prompt or guide surface states a superseded value",
+             sweep_ok,
+             notes = if (sweep_ok)
+               sprintf("%d user-facing surfaces swept for every value that moved since the July baseline; %d hits are allow-listed with a reason and nothing else states an old value",
+                       length(SWEEP_FILES), length(ALLOW))
+             else paste(utils::head(sweep_fail, 4), collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

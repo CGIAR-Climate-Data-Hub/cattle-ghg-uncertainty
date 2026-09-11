@@ -12,15 +12,14 @@
 # (Vol.4 Ch.11) nitrogen pathways -- a distinction that caused a real bug.
 #
 # ITS NUMBERS ARE STALE and in several places contradict values that were
-# verified at source and agreed in review during 2026-06. Known divergences
-# from what the app actually uses:
+# verified at source. This header used to list the divergences one by one,
+# which meant a dead object's documentation had to be maintained every time
+# a live value moved; it did not get maintained, and by September 2026 the
+# list of divergences was itself out of date (it still gave Milk as 3.5 and
+# pct_pregnant as 0.85/0.50). Do not restate values here.
 #
-#   milk_yield  4.0    -> PARAM_CATALOGUE Milk        3.5  (Annex Table 10A.1)
-#   milk_fat    4.0    -> PARAM_CATALOGUE Fat         4.3  (Annex Table 10A.1)
-#   EF3_PRP     0.004  -> PARAM_CATALOGUE           0.006  (wet climate)
-#   EF4         0.010  -> PARAM_CATALOGUE           0.014  (wet climate)
-#   pct_pregnant 0.60  -> PCT_PREGNANT_BY_SUBCAT 0.85/0.50
-#   Cfi growing_males 0.370 -> CFI_BY_SUBCAT       0.322  (verified 2026-06-16)
+# For what the app actually uses, and where each value comes from, read
+# reference/ALL_VALUES.md, or reference/defaults_master.csv directly.
 #
 # The authoritative objects are PARAM_CATALOGUE (R/utils_template.R),
 # MMS_DEFAULTS, MMS_FRAC_DEFAULTS_2019, the *_BY_SUBCAT lists below, and
@@ -160,6 +159,68 @@ get_regional_default <- function(parameter, region = "global") {
     IPCC_DEFAULTS_BY_REGION$region == region, , drop = FALSE]
   if (nrow(hit) == 0) return(NA_real_)
   hit$default_val[1]
+}
+
+## One manure-system default, read from the master.
+##
+## Added 2026-09-11. Three places filled a manure default for the user and all
+## three did it with their own literals: run_mc_simulation(), the app's
+## no-manure-sheet fallback in app_server.R, and the trend tab. They had drifted
+## apart. app_server and trend_tab both used EF3 solid_storage = 0.005, which is
+## the superseded figure (Table 10.21 gives 0.010), and both paired a TEMPERATE
+## pasture MCF of 1.5 with a TROPICAL solid-storage MCF of 5.0, so a single
+## fallback spanned two climate zones.
+##
+## The climate argument is explicit for that reason: tropical is the tool-wide
+## assumption wherever the tool fills an MCF the user did not supply, and it is
+## now stated at the call site rather than implied by a number.
+mms_default <- function(id, field) {
+  v <- MMS_DEFAULTS[[field]][MMS_DEFAULTS$id == id]
+  if (!length(v) || is.na(v[1])) NA_real_ else as.numeric(v[1])
+}
+## MCF is stored as a percentage and consumed as a fraction.
+mms_mcf_fraction <- function(id, climate = "tropical")
+  mms_default(id, paste0("mcf_", climate)) / 100
+
+## The set used when a group has no usable Manure_Management row at all.
+## app_server.R, trend_tab.R, scripts/audit.R and scripts/example_verify.R
+## each held their own copy of this; example_verify.R's comment even said it
+## "mirrors app_server.R's fall-through branch", which it did by retyping the
+## numbers. They are one function now, so the mirror is real.
+##
+## The 70/30 split is a project assumption and stays a literal. The
+## coefficients are IPCC values and are read.
+default_mms_fallback <- function() {
+  ids <- c("pasture", "solid_storage")
+  list(
+    fractions = c(pasture = 0.70, solid_storage = 0.30),
+    mcf = stats::setNames(vapply(ids, mms_mcf_fraction, numeric(1)), ids),
+    ef3 = stats::setNames(vapply(ids, mms_default, numeric(1), "ef3"), ids))
+}
+
+## Fill blank MCF / EF3 cells from the master, PER SYSTEM.
+##
+## The app used to fill any missing MCF with 0.015 and any missing EF3 with
+## 0.005 regardless of which system the row was for. Those are pasture's
+## temperate MCF and the superseded solid-storage EF3, so a user who left the
+## MCF cell blank on an uncovered anaerobic lagoon was given 1.5% where Table
+## 10.17 gives 77%, understating that system's manure CH4 by a factor of 50.
+## A blank cell should take that system's own default, not another system's.
+fill_mms_blanks <- function(v, field = c("mcf", "ef3"), climate = "tropical") {
+  field <- match.arg(field)
+  i <- which(is.na(v))
+  if (!length(i) || is.null(names(v))) return(v)
+  for (k in i) {
+    id <- names(v)[k]
+    d <- if (field == "mcf") mms_mcf_fraction(id, climate)
+         else mms_default(id, "ef3")
+    if (is.na(d)) {
+      warning("no ", field, " default for manure system '", id,
+              "'; leaving it blank rather than substituting another system's",
+              call. = FALSE)
+    } else v[k] <- d
+  }
+  v
 }
 
 ## G1: helper to filter MMS_DEFAULTS by IPCC version string ("2006" or "2019_refinement")

@@ -31,7 +31,7 @@ Country X    2022   dairy_cows     500000       275              300            
 | `ym_pct` | → `Ym` | `Ym_pct` is in PARAM_ALIASES |
 | `bo_m3` | → `Bo` | unit m³/kg VS implied |
 
-**Missing core parameters** (per catalogue, tier = core): `Fat` (yes, present), `pct_pregnant`, `CP`, `MilkPR` — fill with IPCC defaults: 0.60, 10.0, 3.3.
+**Missing core parameters** (per catalogue, tier = core): `Fat` (yes, present), `pct_pregnant`, `CP`, `MilkPR` — fill with the IPCC defaults **from the catalogue table in `param_catalogue.md`**, which for these three are 0.52, 9.6 and 3.6. Read them from that table rather than from this sentence: it carried 0.60, 10.0 and 3.3 for four months after the catalogue moved.
 
 **Advanced parameters not in user file:** `Cfi`, `Ca`, `C`, `Cp`, `hours`, `ASH`, `UE`, `EF3_PRP`, `EF4`, `EF5`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`, `Tw` — fill from catalogue defaults; mark `data_source = "ipcc_default"`. (The managed-storage manure-N₂O quantities — direct EF3, Frac_GasMS, Frac_LeachMS — are NOT Parameters rows; they go per-MMS in Manure_Management.)
 

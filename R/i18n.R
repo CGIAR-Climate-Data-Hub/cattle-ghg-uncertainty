@@ -1664,11 +1664,11 @@ qa_msg <- function(key, ...) {
   Bo           = "Capacité maximale de production de CH₄ du fumier (IPCC Tableau 10.16)",
   ASH          = "Teneur en cendres du fumier — valeur IPCC par défaut 0,08 (note de bas de page Éq 10.24)",
   UE           = "Énergie urinaire en fraction de l'énergie brute — valeur IPCC par défaut 0,04 (note de bas de page Éq 10.24)",
-  EF3_PRP      = "Facteur d'émission N₂O pour les excréments/urine au pâturage (IPCC Vol.4 Ch.11 Tableau 11.1). 2019R EF3_PRP,CPP pour bovins/volailles/porcs : agrégé 0,004 ; climat humide 0,006 ; climat sec 0,002. 2006 = 0,02.",
-  EF4          = "FE N₂O pour le dépôt atmosphérique d'azote (IPCC Vol.4 Ch.11 Tableau 11.3). 2019R agrégé EF4 = 0,010 (plage 0,002-0,018) ; climat humide 0,014 ; climat sec 0,005. 2006 = 0,010.",
+  EF3_PRP      = "Facteur d'émission N₂O pour les excréments/urine au pâturage (IPCC Vol.4 Ch.11 Tableau 11.1). Valeur utilisée par l'outil : 0,006 (2019R EF3_PRP,CPP bovins/volailles/porcs, climat humide). Autres options : agrégé 0,004 ; climat sec 0,002 ; 2006 = 0,02.",
+  EF4          = "FE N₂O pour le dépôt atmosphérique d'azote (IPCC Vol.4 Ch.11 Tableau 11.3). Valeur utilisée par l'outil : 0,014 (2019R, climat humide, plage 0,011-0,017). Autres options : agrégé 0,010 ; climat sec 0,005 ; 2006 = 0,010.",
   EF5          = "FE N₂O pour le lessivage/ruissellement d'azote (IPCC Vol.4 Ch.11 Tableau 11.3). 2019R EF5 = 0,011 (plage 0,000-0,020), sans désagrégation climatique. 2006 = 0,0075.",
   Frac_GASM_PRP = "Fraction d'azote volatilisée à partir des excréments/urine au pâturage (IPCC Vol.4 Ch.11 Tableau 11.3, FracGASM). 2019R = 0,21 (plage 0,00-0,31) ; 2006 = 0,20.",
-  Frac_LEACH_PRP = "Fraction d'azote lessivée à partir du dépôt au pâturage (IPCC Vol.4 Ch.11 Tableau 11.3, FracLEACH-(H), climats humides uniquement). 2019R = 0,24 (plage 0,01-0,73) ; 2006 = 0,30 ; en climats secs = 0.",
+  Frac_LEACH_PRP = "Fraction d'azote lessivée à partir du dépôt au pâturage (IPCC Vol.4 Ch.11 Tableau 11.3, FracLEACH-(H)). Valeur utilisée par l'outil : 0,24 (2019R, climat humide, plage 0,01-0,73). Autres options : climat sec = 0 ; 2006 = 0,30.",
   MilkPR       = "Teneur en protéines du lait — alimente le terme N du lait dans l'Éq IPCC Vol.4 Ch.10 10.33 (rétention d'azote pour les bovins, où la conversion 6,38 protéine-laitière-vers-N est définie)",
   Tw           = "Température moyenne quotidienne en hiver (°C) — ajustement Cfi climat froid selon IPCC Vol.4 Ch.10 Éq 10.2 (modifie Cfi de l'Éq 10.3). Laisser vide ou fixer 20 pour désactiver l'ajustement"
 )

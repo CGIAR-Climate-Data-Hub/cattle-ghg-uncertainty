@@ -223,9 +223,10 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
     sys <- list(
       param_specs    = ps,
       corr_matrix    = NULL,
-      mms_fractions  = c(pasture = 0.70, solid_storage = 0.30),
-      mcf_values     = c(pasture = 0.015, solid_storage = 0.050),
-      ef3_values     = c(pasture = 0.020, solid_storage = 0.005),
+      # The same fallback the app uses, from the one function that defines it.
+      mms_fractions  = default_mms_fallback()$fractions,
+      mcf_values     = default_mms_fallback()$mcf,
+      ef3_values     = default_mms_fallback()$ef3,
       ef_corr_matrix = NULL,
       pre_sampled_coefficients = pre_coef
     )

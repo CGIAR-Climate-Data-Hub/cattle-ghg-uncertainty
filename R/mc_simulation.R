@@ -68,15 +68,14 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
   # equal the temperate pasture value; it is now read, and the climate is
   # stated rather than implied. Tropical is the tool-wide assumption
   # wherever it fills an MCF for the user, so it is used here as well.
-  .mms_default <- function(id, field) {
-    v <- MMS_DEFAULTS[[field]][MMS_DEFAULTS$id == id]
-    if (!length(v) || is.na(v[1])) NA_real_ else as.numeric(v[1])
-  }
+  # mms_default() / mms_mcf_fraction() live in utils_ipcc_defaults.R so that
+  # this path, the app's no-manure-sheet fallback and the trend tab cannot
+  # drift apart again; they had.
   if (is.null(mms_fractions)) mms_fractions <- c(pasture = 1.0)
   if (is.null(mcf_values))
-    mcf_values <- c(pasture = .mms_default("pasture", "mcf_tropical") / 100)
+    mcf_values <- c(pasture = mms_mcf_fraction("pasture"))
   if (is.null(ef3_values))
-    ef3_values <- c(pasture = .mms_default("pasture", "ef3"))
+    ef3_values <- c(pasture = mms_default("pasture", "ef3"))
 
   # C1: parameter names IPCC-aligned (DE, CP, Ym, ASH, Frac_GASMS, Frac_LEACH_H).
   # get_param() falls back to legacy names so old templates still work.

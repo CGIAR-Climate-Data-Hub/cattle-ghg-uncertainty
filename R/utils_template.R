@@ -1702,10 +1702,15 @@ parse_uploaded_template <- function(path) {
   # Fill lower/upper from lower_bound/upper_bound overrides or uncertainty_pct
   params <- fill_bounds(params)
 
-  # Ensure Bo default in manure sheet
+  # Ensure Bo default in manure sheet. This was a hardcoded 0.10, which is
+  # the 2006 Africa figure; the catalogue moved to the 2019R "Other regions,
+  # low productivity" 0.13 in the May 2026 alignment and this did not follow,
+  # so a manure sheet with no Bo column was written with a value 23% below
+  # the one the Parameters sheet and both guides quote.
   if (!is.null(manure) && nrow(manure) > 0) {
-    if (!"Bo" %in% names(manure)) manure$Bo <- 0.10
-    manure$Bo[is.na(manure$Bo)] <- 0.10
+    .bo <- .cat_default("Bo")
+    if (!"Bo" %in% names(manure)) manure$Bo <- .bo
+    manure$Bo[is.na(manure$Bo)] <- .bo
     # Ensure numeric — fraction_pct was missing from this list which caused
     # "non-numeric argument to binary operator" when systems_data tried to do
     # `mms_rows$fraction_pct / 100` after upload.

@@ -157,6 +157,13 @@ knowledge/
 CLAUDE.local.md
 doc/*.log
 
+# 2026-09: scripts/sweep_param_values.R writes a 12,000-row triage list. It
+# is a working artefact for a human to read once, not a deliverable, and it
+# is noisy enough that committing it would bury the real reports. The script
+# is tracked; its output is not. The gated subset of the same check lives in
+# the audit as F44.
+reference/PARAM_SWEEP.csv
+
 # 2026-09: documents received from named individuals. The reviewer rules
 # above match by FILENAME, so a new file dropped in this folder under any
 # other name would not be caught and `git add -A` would publish it. Ignore
