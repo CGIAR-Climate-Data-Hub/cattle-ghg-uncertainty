@@ -34,15 +34,11 @@ All parameter codes are case-sensitive.
 
 ## Asymmetric (non-symmetric) bounds
 
-param_catalogue.md. The bounds TABLE that follows is generated from
-
 These parameters use absolute IPCC-derived lower/upper bounds rather than a symmetric ±% around the central value.
 
-Values below are the **IPCC 2019 Refinement Vol.4 Ch.11 Tables 11.1 (EF3_PRP) and 11.3 (EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP)** for the **wet climate** classification, since most users of this tool (SSA, South/Southeast Asia, Latin America smallholder + commercial systems) operate in wet climates. Dry-climate values (lower EF3_PRP ≈ 0.002, Frac_LEACH_PRP ≈ 0) are documented in the description column above. For an arid-country inventory the user can edit these five bounds in the Parameters sheet before uploading.
+The values below are the IPCC 2019 Refinement Vol.4 Ch.11 figures (Table 11.1 for EF3_PRP; Table 11.3 for EF4, EF5, Frac_GASM_PRP and Frac_LEACH_PRP) for the **wet climate** classification, because most users of this tool operate in wet climates (sub-Saharan Africa, South and Southeast Asia, Latin American smallholder and commercial systems). The dry-climate alternatives are lower (EF3_PRP about 0.002, and Frac_LEACH_PRP effectively zero where evapotranspiration exceeds precipitation). For an arid-country inventory the user can edit these five bounds in the Parameters sheet before uploading; flag the choice in section D if the country is clearly arid.
 
-Central values and ranges verified 2026-06-15 directly against the IPCC 2019 Refinement source text (Vol.4 Ch.11 Table 11.1 EF3PRP,CPP wet = 0.006, range 0.000–0.027; Table 11.3 EF4 wet = 0.014, range 0.011–0.017; EF5 = 0.011, range 0.000–0.020; FracGASM = 0.21, range 0.00–0.31; FracLEACH-(H) = 0.24, range 0.01–0.73).
-
-Three lower bounds (`EF3_PRP`, `EF5`, `Frac_GASM_PRP`) are bumped from the strict-IPCC 0 to a small positive number (0.0005, 0.0005, 0.005) because PERT and lognormal distributions break or produce extreme samples when the lower bound is exactly 0. The bumped values are tiny enough that the IPCC sense is preserved.
+Three of the lower bounds are deliberately set to a small positive number rather than the strict IPCC zero, because PERT and lognormal distributions break or produce extreme samples at an exact-zero lower bound. The bumped values are small enough that the IPCC sense is preserved. Do not "correct" them back to zero.
 
 | code | lower | central | upper |
 |------|-------|---------|-------|
@@ -54,9 +50,7 @@ Three lower bounds (`EF3_PRP`, `EF5`, `Frac_GASM_PRP`) are bumped from the stric
 
 ## Sex- and physiology-specific coefficient overrides
 
-section. The TABLE that follows is generated from CFI_BY_SUBCAT and
-
-The `ipcc_default` column above lists the **lactating-female** value because that's the most common case. For other sub-categories you MUST override these three coefficients (`Cfi`, `Ca`, `C`) according to IPCC Vol.4 Ch.10 Tables 10.4 / 10.5 / Eq 10.6. Do NOT use 0.8 for every C, do NOT use 0.386 for every Cfi.
+The `IPCC default` column in the catalogue above lists the **lactating-female** value, because that is the most common case. For every other sub-category you MUST override `Cfi` and `C` using the table below, which is generated directly from the app's own resolver. Do not reuse the lactating-cow `Cfi` for non-dairy animals, and do not use the female `C` for males. `Ca` is handled separately: it depends on the feeding situation, not on the sub-category.
 
 | sub-category | Cfi (Table 10.4) | C (Eq 10.6) | notes |
 |---|---|---|---|
@@ -65,18 +59,18 @@ The `ipcc_default` column above lists the **lactating-female** value because tha
 | `bulls` | 0.37 | 1.2 |  |
 | `oxen` | 0.322 | 1 |  |
 | `heifers` | 0.322 | 0.8 |  |
-| `growing_males` | 0.322 | 1 | NOTE: the controlled-vocab code `growing_males` is genuinely ambiguous — different countries use the term for both castrate steers (C=1.0) and intact pre-castration bulls (C=1.2). If a source file's "growing males" entry has C=1.2 in its Coefficients sheet, that means the inventory team treats them as intact — honor the file value with `data_source = user_file`. If the file is silent on C, default to 1.0 (castrate-steer assumption) and surface this in section D as a clarifying question. |
-| `calves_female` | 0.322 | 0.8 | = pooled-calves IPCC default; only drop to 0.8 if the file genuinely sex-disaggregates post-weaning female-calf growth as heifer-track |
-| `calves_male` | 0.322 | 1 | = pooled-calves IPCC default; rises to 1.2 only on the intact-bull development path post-puberty, and DROPS to 1.0 / steer if castrated — castration LOWERS C, it does not raise it |
+| `growing_males` | 0.322 | 1 | Genuinely ambiguous across countries: the term is used for both castrate steers and intact pre-castration bulls, which take different IPCC Eq 10.6 coefficients. The app assumes castrate. If the source file's Coefficients sheet gives the intact-bull value instead, that means the inventory team treats them as intact, so honour the file value with `data_source = user_file` and note it. If the file is silent, keep the generated value and surface the assumption in section D. |
+| `calves_female` | 0.322 | 0.8 | Takes the female Eq 10.6 coefficient, on the heifer-replacement track. Some inventories do not sex-disaggregate calves at all and report a single pooled calf growth coefficient; if the source file does that, say so in section D rather than splitting it yourself. |
+| `calves_male` | 0.322 | 1 | Takes the castrate Eq 10.6 coefficient. It rises to the intact-bull value only on the breeding-bull development path after puberty. Note the direction: castration LOWERS the growth coefficient, it does not raise it, so a file showing a higher value for castrated males than for intact ones has the two swapped. |
 | `feedlot_cattle` | 0.322 | 1 |  |
 
 `Ca` is not per-sub-category: it depends on the feeding situation (IPCC Table 10.5).
 
 Values: stall_fed = 0; pasture_flat = 0.17; pasture_hilly = 0.36.
 
-**The C-coefficient (growth coefficient) is the one most commonly missed.** When applying a sub-category-specific value (`bulls` → 1.2, `oxen`/`growing_males` → 1.0), keep `data_source = "ipcc_default"` (the sex-specific value is itself an IPCC default) and call out the deliberate override in your end-of-run summary so the user can spot-check it in the QA tab.
+**The C-coefficient (growth coefficient) is the one most commonly missed.** When applying a sub-category-specific value, keep `data_source = "ipcc_default"` (the sex-specific value is itself an IPCC default) and call out the deliberate override in your end-of-run summary so the user can spot-check it in the QA tab.
 
-For `Ca` specifically: pick the row based on the feeding situation the user describes — stall-fed (intensive) sits around 0.0–0.17, grazing on flat pasture around 0.17, grazing on hilly pasture around 0.36, working oxen up to 0.50. If the user doesn't specify, use 0.17 (grazing) for smallholder/extensive systems and 0.36 (stall-fed) for confined dairy systems.
+For `Ca`, pick the value from the feeding-situation list above based on what the user describes, not on the sub-category: animals confined to a small area take the stall-fed value, animals on flat pasture the grazing value, and animals on open range or hilly terrain the highest value. If the user does not specify, assume grazing for smallholder and extensive systems, and stall-fed for confined dairy. Working oxen expend more energy than grazing animals; IPCC Table 10.5 gives no separate cattle value for draught work, so if the user reports heavy draught use, raise it in section D rather than inventing a coefficient.
 
 ## Tier meaning
 

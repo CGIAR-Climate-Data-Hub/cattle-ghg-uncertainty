@@ -60,6 +60,8 @@ docs/meeting_*_todo.md
 
 # Auto-regenerated outputs — no need to commit
 AUDIT_REPORT.md
+DEFAULTS_MATRIX.md
+DEFAULTS_MATRIX.csv
 TECHNICAL_SUMMARY.md
 docs/correlations.md
 translator_prompts/getting_started.docx

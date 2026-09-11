@@ -853,29 +853,22 @@ generate_template_openxlsx <- function(filepath, include_example,
   DATA_START <- 4   # first data row
 
   # Example values: hypothetical Country X activity data + IPCC defaults
-  # Blank template: activity data blank, EFs pre-filled with IPCC defaults
-  # Example values mirror the PARAM_CATALOGUE order; keep lengths == nrow(PARAM_CATALOGUE).
-  ex_values <- c(500000, 275, 300, 0.10, 3.5, 4.3, 0.60, 55,
-                 0.386, 0.17, 0.8, 0.10, 0, 10,
-                 6.5, 0.13, 0.08, 0.04,   # Ym, Bo (2019R "Other regions" cattle), ASH, UE
-                 # IPCC alignment audit (2026-05): verified against
-                 # Vol.4 Ch.11 Tables 11.1 / 11.3. Andreas 2026-05-27: the
-                 # managed-storage (MS) manure-N2O params (EF3_S, Frac_GASMS,
-                 # Frac_LEACH_H) moved out of the Parameters sheet — they are
-                 # specified per-MMS in the Manure_Management tab.
-                 #   EF3_PRP,CPP aggregated 2019R = 0.004 (2006 = 0.02)
-                 #   EF4 aggregated 2019R = 0.010 (2006 = 0.010; wet 0.014, dry 0.005)
-                 #   EF5         2019R = 0.011 (2006 = 0.0075)
-                 #   FracLEACH-(H) PRP-side 2019R wet = 0.24 (2006 = 0.30; dry = 0)
-                 0.004, 0.010, 0.011,        # EF3_PRP, EF4, EF5
-                 0.21, 0.24,                 # Frac_GASM_PRP, Frac_LEACH_PRP
-                 3.3, 20)                    # MilkPR, Tw
-  # Example uncertainties — asymmetric parameters use IPCC 2006/2019 bounds (lower/upper pre-filled).
-  # NA = asymmetric parameter; lower_bound/upper_bound are pre-filled from catalogue instead.
-  ex_unc <- c(10,15,10,30,20,10,20,15, 30,30,30,10,20,15, 8,20,25,25,
-              NA,NA,NA,              # EF3_PRP, EF4, EF5 (IPCC bounds)
-              NA,NA,                 # Frac_GASM_PRP, Frac_LEACH_PRP (IPCC 2019 Table 11.3 bounds)
-              10, 25)                # MilkPR, Tw
+  # Example column, DERIVED from PARAM_CATALOGUE rather than hardcoded.
+  #
+  # This was a parallel hardcoded vector for a long time and it drifted three
+  # times without anyone noticing, because nothing compared it to the
+  # catalogue: it still carried EF3_PRP 0.004 and EF4 0.010 (the aggregated
+  # values, superseded by the wet-climate figures on 2026-06-16), Ym +-8%
+  # (superseded 2026-06-15) and Bo +-20% (superseded 2026-09-10). The example
+  # template is a user-facing download (app_server.R:870), so those stale
+  # numbers were shipped as a worked example of "the IPCC defaults".
+  #
+  # Only the genuinely example-specific entries are overridden below. Anything
+  # that is simply the catalogue default now comes from the catalogue.
+  ex_values <- PARAM_CATALOGUE$ipcc_default
+  ex_values[PARAM_CATALOGUE$parameter == "N"]  <- 500000  # illustrative herd
+  ex_values[PARAM_CATALOGUE$parameter == "WG"] <- 0.10    # illustrative gain
+  ex_unc <- PARAM_CATALOGUE$suggested_uncertainty_pct
 
   for (i in seq_len(n_params)) {
     r <- DATA_START + i - 1
@@ -1582,12 +1575,15 @@ generate_template_openxlsx <- function(filepath, include_example,
 # FALLBACK — basic writexl version (no dropdowns)
 # ===========================================================================
 generate_template_basic <- function(filepath, include_example) {
-  ex_values <- c(500000, 275, 300, 0.10, 3.5, 4.3, 0.60, 55,
-                 0.386, 0.17, 0.8, 0.10, 0, 10,
-                 6.5, 0.13, 0.08, 0.04,   # Ym, Bo (2019R "Other regions" cattle), ASH, UE
-                 0.02, 0.005, 0.20, 0.010, 0.0075, 0.02,
-                 0.21, 0.30,
-                 3.3, 20)
+  # Derived from the catalogue, as in generate_template_openxlsx. The previous
+  # hardcoded vector had 28 entries against a 25-row catalogue, a leftover from
+  # before EF3_S / Frac_GASMS / Frac_LEACH_H were removed, so this whole branch
+  # errored with "arguments imply differing number of rows: 1, 25, 28". It also
+  # carried EF5 0.0075 (the 2006 value) and Frac_LEACH_PRP 0.30, which reviewer
+  # item R7 #1 had standardised to the 2019R wet-climate 0.24.
+  ex_values <- PARAM_CATALOGUE$ipcc_default
+  ex_values[PARAM_CATALOGUE$parameter == "N"]  <- 500000
+  ex_values[PARAM_CATALOGUE$parameter == "WG"] <- 0.10
   params <- if (include_example) {
     data.frame(
       cattle_type="dairy",

@@ -62,11 +62,33 @@ NPAR <- nrow(pc)
 # regeneration cannot reintroduce a stale value. A missing partial is a hard
 # error, so a deleted file fails the build instead of silently shrinking the
 # prompt the model receives.
+# Strip HTML comments as BLOCKS. The first version of this filtered per line
+# ("starts with <!--" OR "ends with -->"), which kept every MIDDLE line of a
+# multi-line comment. Two such lines were emitted into param_catalogue.md as
+# the lead line of a section and shipped in translator_kit.zip. A 4-line
+# comment would have leaked 2. Do not simplify this back to a line filter.
+.strip_html_comments <- function(txt) {
+  keep <- rep(TRUE, length(txt)); inside <- FALSE
+  for (i in seq_along(txt)) {
+    opens  <- grepl("<!--", txt[i], fixed = TRUE)
+    closes <- grepl("-->",  txt[i], fixed = TRUE)
+    if (inside) {
+      keep[i] <- FALSE
+      if (closes) inside <- FALSE
+    } else if (opens) {
+      keep[i] <- FALSE
+      if (!closes) inside <- TRUE
+    }
+  }
+  if (inside) stop("unterminated HTML comment in a prompt partial", call. = FALSE)
+  txt[keep]
+}
+
 partial <- function(name) {
   f <- file.path(out_dir, "partials", paste0(name, ".md"))
   if (!file.exists(f)) stop("missing prompt partial: ", f, call. = FALSE)
-  txt <- readLines(f, warn = FALSE, encoding = "UTF-8")
-  trimws(paste(txt[!grepl("^<!--", txt) & !grepl("-->$", txt)], collapse = "
+  txt <- .strip_html_comments(readLines(f, warn = FALSE, encoding = "UTF-8"))
+  trimws(paste(txt, collapse = "
 "))
 }
 
@@ -75,7 +97,12 @@ partial <- function(name) {
   if (!file.exists(f)) {
     if (required) stop("missing prompt partial: ", f, call. = FALSE) else return(list())
   }
-  ln <- readLines(f, warn = FALSE, encoding = "UTF-8")
+  # Comment-strip here too: a <!-- --> inside a keyed section would otherwise
+  # be emitted verbatim into a markdown table cell.
+  ln <- .strip_html_comments(readLines(f, warn = FALSE, encoding = "UTF-8"))
+  # Paragraphs are joined with a single space deliberately: every consumer of
+  # a keyed partial renders it into ONE markdown table cell, where a newline
+  # would break the table.
   idx <- grep("^## ", ln); out <- list()
   for (k in seq_along(idx)) {
     key <- sub("^## ", "", ln[idx[k]])
@@ -161,7 +188,7 @@ for (sc in ANIMAL_SUBCATEGORIES) {
   lines <- c(lines, sprintf("| `%s` | %s | %s | %s |", sc,
     if (is.null(cfi)) "—" else fmt_num(cfi),
     if (is.null(cg))  "—" else fmt_num(cg),
-    if (!is.null(.rownotes[[sc]])) .rownotes[[sc]] else ""))
+    if (!is.null(.rownotes[[sc]])) gsub("\\|", "\\\\|", .rownotes[[sc]]) else ""))
 }
 lines <- c(lines, "",
   "`Ca` is not per-sub-category: it depends on the feeding situation (IPCC Table 10.5).",
