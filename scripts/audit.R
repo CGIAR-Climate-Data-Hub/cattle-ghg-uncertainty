@@ -2337,6 +2337,70 @@ section_F <- function() {
                        nrow(DEFAULT_BASIS))
              else paste(utils::head(basis_fail, 4), collapse = "; "))
 
+  # F38 -- the QA benchmark must not warn about the tool's own defaults.
+  #
+  # Review round 7 item 3 was "~20 spurious QA warnings", the reviewer's
+  # reason being that the tab "cited IPCC default values that I could not
+  # find in the IPCC guidelines". The fix then narrowed the check to BW and
+  # left BW itself comparing every sub-category against one adult number:
+  # the tool's own 60 kg calf default came out 78% adrift and warned, and a
+  # compiler entering IPCC's published Africa weights was warned about
+  # Calves on forage (82 kg).
+  #
+  # Two directions are asserted, because a benchmark that never fires is as
+  # useless as one that always does.
+  bench_fail <- tryCatch({
+    f <- character(0)
+    mk <- function(sc, ct, mu) data.frame(
+      cattle_type = ct, aggregation_level = "n", sub_category = sc,
+      parameter = "BW", mean = mu, lower = NA_real_, upper = NA_real_,
+      uncertainty_pct = 15, distribution = "normal",
+      param_type = "activity_data", stringsAsFactors = FALSE)
+    verdict <- function(d) {
+      q <- run_qaqc(d, region = "africa")
+      q$status[q$check == "benchmark_deviation"]
+    }
+    # (a) every one of the tool's own defaults must pass
+    for (sc in ANIMAL_SUBCATEGORIES) {
+      ct <- if (sc == "dairy_cows") "dairy" else "other"
+      v  <- resolve_subcat_default(sc, "BW")$value
+      st <- verdict(mk(sc, ct, v))
+      if (!identical(st, "pass"))
+        f <- c(f, sprintf("%s at its own default %s: %s", sc, v,
+                          paste(st, collapse = "/")))
+    }
+    # (b) IPCC's own published Africa weights must not be flagged
+    for (x in list(c("Calves on forage", 82), c("Growing/Replacement", 204),
+                   c("Draft Bullocks", 340), c("Mature Females - grazing", 275))) {
+      st <- verdict(mk(x[1], "other", as.numeric(x[2])))
+      if (!identical(st, "pass"))
+        f <- c(f, sprintf("IPCC Annex 10A.2 '%s' (%s kg) flagged: %s",
+                          x[1], x[2], paste(st, collapse = "/")))
+    }
+    # (c) a genuine outlier must still be caught
+    if (identical(verdict(mk("calves", "other", 600)), "pass"))
+      f <- c(f, "a 600 kg calf passed the benchmark")
+    if (identical(verdict(mk("dairy_cows", "dairy", 1400)), "pass"))
+      f <- c(f, "a 1400 kg dairy cow passed the benchmark")
+    # (d) the citation must name what was actually compared against
+    r <- .bench_reference("BW", "dairy_cows", "dairy", "africa")
+    if (!isTRUE(all.equal(r$value,
+          resolve_subcat_default("dairy_cows", "BW")$value)))
+      f <- c(f, "dairy_cows benchmark does not equal its own resolved default")
+    rd <- .bench_reference("BW", "DINT_unmatched", "dairy", "africa")
+    rn <- .bench_reference("BW", "DINT_unmatched", "other", "africa")
+    if (isTRUE(all.equal(rd$value, rn$value)))
+      f <- c(f, "the dairy/non-dairy fallback returns the same number for both, so cattle_type only changes the wording")
+    f
+  }, error = function(e) conditionMessage(e))
+  bench_ok <- length(bench_fail) == 0L
+  check_bool("F38", "F",
+             "QA benchmark is per sub-category and does not flag the tool's own defaults",
+             bench_ok,
+             notes = if (bench_ok)
+               "9 sub-categories at their own defaults pass; IPCC Annex 10A.2 Africa weights pass; 600 kg calf and 1400 kg cow still caught; dairy and non-dairy fallbacks return different numbers"
+             else paste(utils::head(bench_fail, 4), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

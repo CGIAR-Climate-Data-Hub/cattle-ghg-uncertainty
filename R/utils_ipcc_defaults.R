@@ -132,15 +132,23 @@ MMS_DEFAULTS <- .master_wide("MMS_DEFAULTS", "id")
 ## system × animal sub-category). 2019R further splits each region into low-
 ## and high-productivity systems. That is a much larger data-entry job
 ## (deferred — see plan).
-IPCC_DEFAULTS_BY_REGION <- data.frame(
-  parameter   = rep("BW", 6),
-  region      = c("africa","asia","europe","americas","oceania","global"),
-  default_val = c(
-    # BW (kg) — IPCC Vol.4 Ch.10 Annex Tables 10A.1 / 10A.2 / 10A.3
-    # illustrative regional midpoints across sub-categories.
-    275, 350, 600, 500, 500, 400),
-  stringsAsFactors = FALSE
-)
+# Built from reference/defaults_master.csv, like every other default.
+#
+# This object was MISSED by the master migration: the export wrote its rows
+# to the CSV and the literal stayed here, so the master's copy was
+# decorative and the two could have drifted without anything noticing.
+# scripts/verify_defaults.R could not have caught it either, because it
+# generates its row universe from the R objects, so the literal was being
+# checked against itself. Found when a new column added to the master did
+# not appear in the loaded object.
+#
+# default_val       Annex 10A.2, non-dairy cattle
+# default_val_dairy Annex 10A.1, dairy cattle, low-productivity row where
+#                   that table splits. Used only as the QA benchmark for a
+#                   dairy herd whose sub_category cannot be recognised.
+IPCC_DEFAULTS_BY_REGION <- .master_wide("IPCC_DEFAULTS_BY_REGION", "region")
+IPCC_DEFAULTS_BY_REGION <- IPCC_DEFAULTS_BY_REGION[
+  , c("parameter", "region", "default_val", "default_val_dairy")]
 
 # Lookup: returns region-specific default or NA
 get_regional_default <- function(parameter, region = "global") {

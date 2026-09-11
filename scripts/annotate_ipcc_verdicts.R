@@ -331,6 +331,22 @@ for (k in names(reg)) {
   set("IPCC_DEFAULTS_BY_REGION", k, "parameter", "META", "Names the parameter the benchmark applies to")
 }
 
+# The dairy column. Table 10A.1, low-productivity row where that table
+# splits, matching the declared basis. It exists because the QA benchmark
+# message branched on cattle_type while comparing every herd against the
+# same non-dairy number, which is review round 7 item 3 unresolved: the tab
+# cited a table it was not reading.
+reg_dairy <- list(
+  africa   = c("CONFIRMED", "2019R V4 Ch10 Table 10A.1 (New), Africa Low productivity systems: 270 kg (aggregate 260, high productivity 250)"),
+  asia     = c("CONFIRMED", "2019R V4 Ch10 Table 10A.1 (New), Asia Low productivity systems: 355 kg (aggregate 386, high productivity 485)"),
+  europe   = c("CONFIRMED", "2019R V4 Ch10 Table 10A.1 (New), Western Europe: 600 kg. Eastern Europe is 550; no productivity split is published for either"),
+  americas = c("CONFIRMED", "2019R V4 Ch10 Table 10A.1 (New), Latin America Low productivity systems: 500 kg (aggregate 508, high 520). North America is 650"),
+  oceania  = c("CONFIRMED", "2019R V4 Ch10 Table 10A.1 (New), Oceania: 488 kg; no productivity split published"),
+  global   = c("NO_IPCC_DEFAULT", "Table 10A.1 has no global row. 400 kg is a project benchmark carried over from the non-dairy column"))
+for (k in names(reg_dairy))
+  set("IPCC_DEFAULTS_BY_REGION", k, "default_val_dairy",
+      reg_dairy[[k]][1], reg_dairy[[k]][2])
+
 gwp <- list(AR4.CH4 = "25", AR4.N2O = "298", AR5.CH4 = "28", AR5.N2O = "265",
             AR6.CH4 = "27 (non-fossil methane, 100-year)", AR6.N2O = "273")
 for (k in names(gwp))

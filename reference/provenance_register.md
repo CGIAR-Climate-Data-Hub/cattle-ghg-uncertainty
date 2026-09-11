@@ -982,3 +982,50 @@ F35 had asserted that every sub-category carried the *catalogue* DE. That was tr
 ## Still open after this decision
 
 The basis choice does not settle the `BW` and `WG` roundings of finding 2.7: `bulls` 350 against the table's 340, `oxen` 300 against 340, `heifers` 200 against 204, `calves` 60 against 82, `feedlot` 250 against 460. Those are separate from the productivity question and remain open.
+
+---
+
+# The QA benchmark check, 2026-09-11
+
+## What it does
+
+The QA/QC tab runs five checks. Four are value sanity: bounds ordering, non-negative bounds, valid ranges for digestibility, Ym and fractions, and distribution suitability. The fifth compares the user's value against an IPCC reference and warns above 50% deviation, fails above 200%.
+
+That fifth check runs on **`BW` only**. Review round 7 item 3 cut it back to one parameter after the reviewer reported roughly twenty spurious warnings, his reason being that for BW, MW and Milk the explanation "cited IPCC default values that I could not find in the IPCC guidelines". The response conceded that the code's own comments had admitted those were heuristic mid-points. An earlier round had already forced Monni-2007 benchmark references down to an informational severity on the same principle: a benchmark has to be traceable to the guidelines.
+
+## What was still wrong
+
+The narrowing fixed MW, Milk, DE, Ym and Bo. It did not fix BW, and left three faults.
+
+**Every sub-category was measured against one adult number.** There was no sub-category in the lookup at all. Running the tool's own per-sub-category defaults through the check produced warnings on its own calf value: 60 kg against a benchmark of 275 is 78% adrift. A compiler entering IPCC's published Annex 10A.2 Africa weights was warned about Calves on forage (82 kg) and Mature Males (540 kg). The tool was flagging correct values, which trains people to ignore the tab.
+
+**The message named a table it was not reading.** For a dairy herd the text said "Annex Table 10A.1 (dairy cows, continental)" while comparing against 275, which is the Table 10A.2 non-dairy grazing weight and appears nowhere in 10A.1. The `cattle_type` branch changed the wording only. That is review round 7 item 3 verbatim, still live on the one parameter that survived the cut.
+
+**The reference had desynchronised from the catalogue.** The low-productivity decision moved `BW` to 270 while the benchmark stayed at 275. Both claimed to be the Africa reference weight.
+
+## What changed
+
+A recognised sub-category is now benchmarked against **its own resolved default**, which is Annex 10A.2 row by row and citable. Only an unrecognised sub-category falls back to the continental benchmark, and that table now carries a real `default_val_dairy` column (Table 10A.1, low-productivity row where the table splits: africa 270, asia 355, europe 600, americas 500, oceania 488) so `cattle_type` selects a number rather than a phrase.
+
+Sub-category name matching is fuzzy and is deliberately confined to `R/utils_qaqc.R`. A guessed animal class is acceptable for deciding whether to show a warning and is not acceptable for choosing a number that enters an emission estimate; `resolve_subcat_default()` still takes exact keys only.
+
+Result:
+
+| input | before | after |
+|---|---|---|
+| the tool's own 60 kg calf default | WARN, 78% adrift | pass |
+| IPCC Annex 10A.2 Calves on forage, 82 kg | WARN | pass |
+| IPCC Annex 10A.2 Growing/Replacement, 204 kg | pass | pass |
+| a 600 kg calf | FAIL | FAIL |
+| a 1400 kg dairy cow | FAIL | FAIL |
+| a 30 kg cow | WARN | WARN |
+
+One warning remains and is correct: Annex 10A.2 Mature Males at 540 kg against the tool's `bulls` default of 350. IPCC's Africa block has two adult-male rows, Mature Males 540 and Bulls - Grazing 340, and the tool has one category sitting near the grazing row. The warning reports a real difference in animal class rather than a false positive, though it is a reminder that the single `bulls` category does not cover both rows.
+
+## A single-source-of-truth violation found on the way
+
+`IPCC_DEFAULTS_BY_REGION` had **never been migrated to the master**. The export wrote its rows to `reference/defaults_master.csv` and the hand-written literal stayed in `R/utils_ipcc_defaults.R`, so the master's copy was decorative and the two could have drifted with nothing noticing.
+
+`scripts/verify_defaults.R` could not have caught it: the matrix generates its row universe from the R objects, so the literal was being compared against itself. It surfaced only because a new column added to the master failed to appear in the loaded object. Now built by `.master_wide()` like everything else.
+
+That is worth remembering as a limit of the matrix. It proves the surfaces agree with the R constants; it cannot prove the R constants come from the master. Audit check F32 asserts the master loads and rebuilds the main objects, but it does not enumerate every object, and this one slipped between the two.

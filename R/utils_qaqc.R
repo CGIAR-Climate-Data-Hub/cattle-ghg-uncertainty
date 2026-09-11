@@ -26,6 +26,89 @@ FRACTION_PARAMS   <- c("pct_pregnant", "ASH", "UE",
 ## in utils_ipcc_defaults.R.
 BENCHMARK_ELIGIBLE_PARAMS <- c("BW")
 
+# ---------------------------------------------------------------------------
+# BENCHMARK REFERENCE
+#
+# Review round 7 item 3 was "~20 spurious QA warnings", because "the
+# explanation cited IPCC default values that I could not find in the IPCC
+# guidelines". The fix then narrowed the check to BW. It did not fix BW.
+#
+# Every sub-category was still measured against ONE adult number, so the tool
+# warned about values it had supplied itself (its own calf default of 60 kg
+# came out 78% from the 275 benchmark), and warned a compiler who entered
+# IPCC's own Annex 10A.2 Africa weights: Calves on forage 82 and Mature Males
+# 540 both flagged. And the message for a dairy herd cited Table 10A.1 while
+# comparing against 275, a number that appears nowhere in 10A.1. That is the
+# round 7 complaint verbatim, still live on the one parameter that survived.
+#
+# So: a recognised sub-category is benchmarked against its OWN resolved
+# default, which is Annex 10A.2 row by row and citable. Only an unrecognised
+# one falls back to the continental benchmark, which now carries a real dairy
+# value instead of branching the wording alone.
+#
+# The name matching below is FUZZY, and is confined to this file on purpose.
+# A guessed animal class is acceptable for deciding whether to show a warning
+# and is not acceptable for choosing a number that enters an emission
+# estimate. resolve_subcat_default() takes exact keys and keeps it that way.
+.BENCH_SUBCAT_SYNONYMS <- c(
+  # legacy five-term vocabulary and common free text
+  cow = "other_cows", cows = "other_cows",
+  dairycow = "dairy_cows", dairycows = "dairy_cows", dairy = "dairy_cows",
+  lactatingcows = "dairy_cows", milkingcows = "dairy_cows",
+  othercow = "other_cows", othercows = "other_cows",
+  drycows = "other_cows", suckler = "other_cows", sucklercows = "other_cows",
+  heifer = "heifers", replacementheifers = "heifers",
+  bull = "bulls", adultmales = "bulls", maturemales = "bulls",
+  breedingbulls = "bulls",
+  ox = "oxen", draught = "oxen", draft = "oxen", draftbullocks = "oxen",
+  draughtcattle = "oxen", bullocks = "oxen",
+  steer = "growing_males", steers = "growing_males",
+  growingmales = "growing_males", growingreplacement = "growing_males",
+  calf = "calves_female", calves = "calves_female",
+  calvesonforage = "calves_female",
+  feedlot = "feedlot_cattle", feedlotcattle = "feedlot_cattle")
+
+.bench_subcat <- function(sub_category, cattle_type = "") {
+  if (is.null(sub_category) || is.na(sub_category)) return(NA_character_)
+  k <- tolower(trimws(as.character(sub_category)))
+  if (k %in% ANIMAL_SUBCATEGORIES) return(k)
+  k2 <- gsub("[^a-z0-9]", "", k)
+  if (k2 %in% gsub("[^a-z0-9]", "", ANIMAL_SUBCATEGORIES))
+    return(ANIMAL_SUBCATEGORIES[gsub("[^a-z0-9]", "", ANIMAL_SUBCATEGORIES) == k2][1])
+  # [[ ]] on a named character vector ERRORS for an absent name rather than
+  # returning NULL, and an unrecognised sub-category is the common case.
+  if (!k2 %in% names(.BENCH_SUBCAT_SYNONYMS)) return(NA_character_)
+  hit <- unname(.BENCH_SUBCAT_SYNONYMS[[k2]])
+  # "cows" alone is the one genuinely ambiguous term; cattle_type settles it.
+  if (hit == "other_cows" && grepl("dairy", tolower(cattle_type))) hit <- "dairy_cows"
+  hit
+}
+
+# Returns the value to benchmark against and a citation a reader can look up.
+.bench_reference <- function(parameter, sub_category, cattle_type, region) {
+  sc <- .bench_subcat(sub_category, cattle_type)
+  if (!is.na(sc)) {
+    v <- tryCatch(resolve_subcat_default(sc, parameter)$value,
+                  error = function(e) NA_real_)
+    if (!is.na(v))
+      return(list(value = as.numeric(v), source = sprintf(
+        "the tool's IPCC default for sub-category '%s' (Vol.4 Ch.10 Annex Table 10A.1/10A.2, Africa, low productivity)", sc)))
+  }
+  is_dairy <- grepl("dairy", tolower(cattle_type))
+  reg <- if (is.null(region) || is.na(region)) "global" else tolower(trimws(region))
+  if (!reg %in% IPCC_DEFAULTS_BY_REGION$region) reg <- "global"
+  row <- IPCC_DEFAULTS_BY_REGION[IPCC_DEFAULTS_BY_REGION$region == reg &
+                                 IPCC_DEFAULTS_BY_REGION$parameter == parameter, ,
+                                 drop = FALSE]
+  if (!nrow(row)) return(list(value = NA_real_, source = ""))
+  if (is_dairy && "default_val_dairy" %in% names(row) &&
+      !is.na(row$default_val_dairy[1]))
+    return(list(value = as.numeric(row$default_val_dairy[1]), source = sprintf(
+      "IPCC Vol.4 Ch.10 Annex Table 10A.1 (dairy cattle) for region '%s'", reg)))
+  list(value = as.numeric(row$default_val[1]), source = sprintf(
+    "IPCC Vol.4 Ch.10 Annex Table 10A.2 (non-dairy cattle) for region '%s'", reg))
+}
+
 # IPCC alignment audit (2026-05): for parameters whose IPCC default depends
 # on a contextual choice the inventory compiler should make (climate zone,
 # production system, animal class), the auto-fill notification appends an
@@ -304,21 +387,23 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     # are still used for template auto-fill, just not for deviation
     # flagging here.
     # ------------------------------------------------------------------
+    if (p %in% BENCHMARK_ELIGIBLE_PARAMS && !is.na(mu)) {
+      # Benchmark against the animal class, not against one adult number.
+      # See the .bench_reference() comment: the message used to name a table
+      # it was not reading, and every sub-category was measured against the
+      # same figure, so the tab warned about the tool's own calf default and
+      # about IPCC's own published weights.
+      ct <- if ("cattle_type" %in% names(ps))
+              tolower(trimws(as.character(ps$cattle_type[i]))) else ""
+      sc_i <- if ("sub_category" %in% names(ps))
+                as.character(ps$sub_category[i]) else NA_character_
+      bench <- .bench_reference(p, sc_i, ct, region)
+      ipcc_def <- bench$value
+      ref_str  <- bench$source
+    }
     if (p %in% BENCHMARK_ELIGIBLE_PARAMS &&
         !is.na(ipcc_def) && ipcc_def != 0 && !is.na(mu)) {
       pct_dev <- abs(mu - ipcc_def) / abs(ipcc_def) * 100
-      # IPCC reference depends on cattle_type for BW. Default reference is
-      # 10A.2 (non-dairy cattle); dairy cows use 10A.1; buffalo use 10A.3.
-      ct <- if ("cattle_type" %in% names(ps)) tolower(trimws(as.character(ps$cattle_type[i])))
-            else ""
-      ipcc_ref_msg <- if (p == "BW") {
-        if (grepl("dairy", ct)) "IPCC Vol.4 Ch.10 Annex Table 10A.1 (dairy cows, continental)"
-        else if (grepl("buffalo", ct)) "IPCC Vol.4 Ch.10 Annex Table 10A.3 (buffalo, continental)"
-        else "IPCC Vol.4 Ch.10 Annex Table 10A.2 (non-dairy cattle, continental)"
-      } else "IPCC guideline default"
-      region_str <- if (!is.na(region) && nzchar(region) && region != "global")
-                      sprintf(" for region '%s'", region) else ""
-      ref_str <- sprintf("%s%s", ipcc_ref_msg, region_str)
       if (pct_dev > 200) {
         add(grp, p, "benchmark_deviation", "fail",
             qa_msg("bench_fail", mu, pct_dev, ref_str, ipcc_def))

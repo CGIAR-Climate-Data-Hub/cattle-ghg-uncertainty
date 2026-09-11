@@ -4,20 +4,20 @@ Generated 2026-09-11 from `reference/defaults_master.csv` by `scripts/build_defa
 
 This is the single authority for every IPCC default the app ships. `R/load_defaults.R` builds `PARAM_CATALOGUE`, `MMS_DEFAULTS`, `MMS_FRAC_DEFAULTS_2019` and the per-sub-category lists from the CSV at start-up, and every other surface (the Excel template, the translator prompts, the published guides) derives from those objects. `scripts/verify_defaults.R` checks all 14 surfaces against it and runs in CI.
 
-- 633 value rows across 16 objects
-- 57 rows carry a review provenance reference
+- 639 value rows across 16 objects
+- 63 rows carry a review provenance reference
 
 ## IPCC verification status
 
-All 289 numeric values below were checked one at a time against the IPCC source text on 2026-09-11. Each carries its verdict and the exact table it was read from, in the `ipcc_verdict` and `ipcc_source` columns of the CSV. Audit check F33 fails the build if a value is ever added without one.
+All 295 numeric values below were checked one at a time against the IPCC source text on 2026-09-11. Each carries its verdict and the exact table it was read from, in the `ipcc_verdict` and `ipcc_source` columns of the CSV. Audit check F33 fails the build if a value is ever added without one.
 
 | verdict | meaning | values |
 |---|---|---|
-| `CONFIRMED` | read at the cited IPCC table or equation | 204 |
+| `CONFIRMED` | read at the cited IPCC table or equation | 209 |
 | `DEVIATION_DOCUMENTED` | differs from IPCC deliberately, reason on record | 23 |
 | `DEVIATION_OPEN` | differs from IPCC with no recorded reason; needs a decision | 21 |
 | `NOT_IPCC` | a non-IPCC source or a project assumption | 20 |
-| `NO_IPCC_DEFAULT` | IPCC publishes no default for this quantity | 11 |
+| `NO_IPCC_DEFAULT` | IPCC publishes no default for this quantity | 12 |
 | `INTERPRETED` | a defensible reading of an IPCC category label, not a quotation | 6 |
 | `META` | not a shipped value | 4 |
 
@@ -384,19 +384,19 @@ What the app actually fills in, from `resolve_subcat_default()`: the generic def
 
 The only parameter with a defensible continental IPCC lookup; the other benchmarks were withdrawn after review because their sources could not be found in the guidelines.
 
-| parameter | region | default_val |
-|---|---|---|
-| BW | africa | 275 |
-| BW | asia | 350 |
-| BW | europe | 600 |
-| BW | americas | 500 |
-| BW | oceania | 500 |
-| BW | global | 400 |
+| parameter | region | default_val | default_val_dairy |
+|---|---|---|---|
+| BW | africa | 275 | 270 |
+| BW | asia | 350 | 355 |
+| BW | europe | 600 | 600 |
+| BW | americas | 500 | 500 |
+| BW | oceania | 500 | 488 |
+| BW | global | 400 | 400 |
 
 
 ## Values that differ from IPCC with no recorded reason
 
-21 of the 289 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
+21 of the 295 numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.
 
 | object | key | field | value | what IPCC says |
 |---|---|---|---|---|
@@ -717,3 +717,9 @@ Every numeric value with its verdict and source, in master order.
 | GWP_VALUES | AR5.N2O | value | 265 | `CONFIRMED` | IPCC AR5 WGI, 100-year GWP: 265. Confirmed against the published Assessment Report value; the AR volumes are not in reference/, so this is not a local-source read |
 | GWP_VALUES | AR6.CH4 | value | 27 | `CONFIRMED` | IPCC AR6 WGI, 100-year GWP: 27 (non-fossil methane, 100-year). Confirmed against the published Assessment Report value; the AR volumes are not in reference/, so this is not a local-source read |
 | GWP_VALUES | AR6.N2O | value | 273 | `CONFIRMED` | IPCC AR6 WGI, 100-year GWP: 273. Confirmed against the published Assessment Report value; the AR volumes are not in reference/, so this is not a local-source read |
+| IPCC_DEFAULTS_BY_REGION | africa | default_val_dairy | 270 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Africa Low productivity systems: 270 kg (aggregate 260, high productivity 250) |
+| IPCC_DEFAULTS_BY_REGION | asia | default_val_dairy | 355 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Asia Low productivity systems: 355 kg (aggregate 386, high productivity 485) |
+| IPCC_DEFAULTS_BY_REGION | europe | default_val_dairy | 600 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Western Europe: 600 kg. Eastern Europe is 550; no productivity split is published for either |
+| IPCC_DEFAULTS_BY_REGION | americas | default_val_dairy | 500 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Latin America Low productivity systems: 500 kg (aggregate 508, high 520). North America is 650 |
+| IPCC_DEFAULTS_BY_REGION | oceania | default_val_dairy | 488 | `CONFIRMED` | 2019R V4 Ch10 Table 10A.1 (New), Oceania: 488 kg; no productivity split published |
+| IPCC_DEFAULTS_BY_REGION | global | default_val_dairy | 400 | `NO_IPCC_DEFAULT` | Table 10A.1 has no global row. 400 kg is a project benchmark carried over from the non-dairy column |

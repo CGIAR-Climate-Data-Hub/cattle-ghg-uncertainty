@@ -12,7 +12,7 @@ The **before** column is the value as it stood at commit `fbfa1bc` (2026-07-10),
 
 | status | count | meaning |
 |---|---|---|
-| `APPLIED` | 68 | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |
+| `APPLIED` | 74 | Already changed. The IPCC basis was unambiguous and no review round had ruled on the value. Please endorse, or object. |
 | `PROPOSED` | 3 | We think it is wrong, but a numbered review round adjudicated it, so it has **not** been changed. Your call. |
 | `OPEN` | 6 | Differs from IPCC with no recorded reason and no review history. A judgement call we did not want to take alone. |
 | `APPLIED_OVERTURNS_REVIEW` | 1 | **Changed, and it reverses a value a review round agreed.** Read these first. |
@@ -29,7 +29,7 @@ The one thing in this document that most needs a second opinion.
 |---|---|---|---|---|---|---|
 | PARAM_CATALOGUE | Milk | ipcc_default | 3.5 | 1.2 | R8 p7 | Changed from 3.5 to 1.2 by the low-productivity basis decision of 2026-09-11. 3.5 was the Africa AGGREGATE row of Table 10A.1, a population-weighted average of the high (5.8) and low (1.2) productivity systems; 1.2 is the low-productivity row. Review round 8 page 7 agreed 3.5 against a previous unsourced 4.0, and that was right FOR THE AGGREGATE ROW. What changed is the basis, not the reading: the productivity question does not appear to have been put to the reviewer. Reverting is a single cell in the master. |
 
-## 1. Already applied (68)
+## 1. Already applied (74)
 
 Changed since 2026-07-10. Each cites the IPCC table it was read from.
 
@@ -50,6 +50,12 @@ Changed since 2026-07-10. Each cites the IPCC table it was read from.
 | DE_BY_SUBCAT | heifers | value | 55 | 59 | gross energy and N excretion | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Growing/Replacement: digestibility of feed 59% |
 | DE_BY_SUBCAT | other_cows | value | 55 | 58 | gross energy and N excretion | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Mature Females - grazing, Large Areas: digestibility of feed 58% |
 | DE_BY_SUBCAT | oxen | value | 55 | 58 | gross energy and N excretion | 2019R V4 Ch10 Table 10A.2 (New), Africa block, p.10.108, Draft Bullocks: digestibility of feed 58% |
+| IPCC_DEFAULTS_BY_REGION | africa | default_val_dairy |  | 270 | QA benchmark only, not a calculation input | 2019R V4 Ch10 Table 10A.1 (New), Africa Low productivity systems: 270 kg (aggregate 260, high productivity 250) |
+| IPCC_DEFAULTS_BY_REGION | americas | default_val_dairy |  | 500 | QA benchmark only, not a calculation input | 2019R V4 Ch10 Table 10A.1 (New), Latin America Low productivity systems: 500 kg (aggregate 508, high 520). North America is 650 |
+| IPCC_DEFAULTS_BY_REGION | asia | default_val_dairy |  | 355 | QA benchmark only, not a calculation input | 2019R V4 Ch10 Table 10A.1 (New), Asia Low productivity systems: 355 kg (aggregate 386, high productivity 485) |
+| IPCC_DEFAULTS_BY_REGION | europe | default_val_dairy |  | 600 | QA benchmark only, not a calculation input | 2019R V4 Ch10 Table 10A.1 (New), Western Europe: 600 kg. Eastern Europe is 550; no productivity split is published for either |
+| IPCC_DEFAULTS_BY_REGION | global | default_val_dairy |  | 400 | QA benchmark only, not a calculation input | Table 10A.1 has no global row. 400 kg is a project benchmark carried over from the non-dairy column |
+| IPCC_DEFAULTS_BY_REGION | oceania | default_val_dairy |  | 488 | QA benchmark only, not a calculation input | 2019R V4 Ch10 Table 10A.1 (New), Oceania: 488 kg; no productivity split published |
 | LW_BY_SUBCAT | dairy_cows | value | 275 | 270 | gross energy, so enteric CH4 + manure CH4 + N excretion | Table 10A.1 gives Africa DAIRY weight 260 kg. The 275 used here is the Table 10A.2 non-dairy grazing weight, so the dairy sub-category carries a non-dairy figure |
 | MMS_DEFAULTS | anaerobic_digester | mcf_boreal | 1 | 3.55 | manure CH4 | 2019R V4 Ch10 Table 10A.11, high quality biogas digester with open storage: 3.55 cold / 4.38 temperate / 4.59 warm. The 2006 table gives only a 0 to 100% range requiring Formula 1 |
 | MMS_DEFAULTS | anaerobic_digester | mcf_temperate | 1 | 4.38 | manure CH4 | 2019R V4 Ch10 Table 10A.11, high quality biogas digester with open storage: 3.55 cold / 4.38 temperate / 4.59 warm. The 2006 table gives only a 0 to 100% range requiring Formula 1 |
