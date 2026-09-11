@@ -77,19 +77,31 @@ out <- c(out, "",
   "The `DEVIATION_OPEN` rows are the ones that would move a reported number if resolved. They are listed in full at the end of this document and discussed in `reference/provenance_register.md`.",
   "")
 
-out <- c(out, "## What the defaults assume", "",
-  "Every value in this document is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. Those choices are the declared basis, held in the master as `DEFAULT_BASIS` and rendered into the app's Definitions tab, both published guides, the Excel template and the translator prompt from this one place.", "",
-  "| choice | this tool uses | IPCC also publishes | affects | IPCC source | why |",
-  "|---|---|---|---|---|---|")
-for (i in seq_len(nrow(DEFAULT_BASIS))) {
-  lb <- DEFAULT_BASIS_LABELS[[DEFAULT_BASIS$dimension[i]]]
-  out <- c(out, sprintf("| **%s** | %s | %s | `%s` | %s | %s |",
-    if (is.null(lb)) DEFAULT_BASIS$dimension[i] else lb,
-    fmt(DEFAULT_BASIS$chosen[i]), fmt(DEFAULT_BASIS$alternatives[i]),
-    gsub(" ", "`, `", DEFAULT_BASIS$governs[i], fixed = TRUE),
-    fmt(DEFAULT_BASIS$ipcc_source[i]), fmt(DEFAULT_BASIS$why[i])))
+# This document is the INTERNAL reference, so it shows both scopes. The
+# user-facing surfaces show tool-wide rows only, because a fallback the
+# resolver already varies is not an assumption and saying otherwise
+# understates the tool.
+.basis_rows <- function(d) {
+  vapply(seq_len(nrow(d)), function(i)
+    sprintf("| **%s** | %s | %s | `%s` | %s | %s |",
+      basis_dimension_label(d$dimension[i]),
+      fmt(d$chosen[i]), fmt(d$alternatives[i]),
+      gsub(" ", "`, `", d$governs[i], fixed = TRUE),
+      fmt(d$ipcc_source[i]), fmt(d$why[i])), character(1))
 }
-out <- c(out, "",
+.hdr <- c("| choice | this tool uses | IPCC also publishes | affects | IPCC source | why |",
+          "|---|---|---|---|---|---|")
+.tw <- basis_tool_wide()
+.rs <- DEFAULT_BASIS[DEFAULT_BASIS$scope != "tool_wide", , drop = FALSE]
+
+out <- c(out, "## What the defaults assume", "",
+  "Every value in this document is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. Those choices are the declared basis, held in the master as `DEFAULT_BASIS` and rendered from this one place into the app's Definitions tab, both published guides, the Excel template and the translator prompt.", "",
+  sprintf("### Tool-wide assumptions (%d)", nrow(.tw)), "",
+  "A compiler cannot vary these from their data, so these are the only ones shown on user-facing surfaces.", "",
+  .hdr, .basis_rows(.tw), "",
+  sprintf("### Resolved, not assumed (%d) -- internal record only", nrow(.rs)), "",
+  "**These are deliberately NOT shown to users as assumptions.** The tool works them out rather than assuming them, so presenting them alongside the rows above would misdescribe it. Kept here so the distinction itself is on the record.", "",
+  .hdr, .basis_rows(.rs), "",
   "`MCF`, `EF3` and `FRAC` in the affects column are the per-manure-system coefficient families rather than catalogue parameters.", "")
 
 out <- c(out, "## Parameter catalogue", "",

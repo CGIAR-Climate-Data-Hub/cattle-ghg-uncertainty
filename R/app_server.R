@@ -2913,10 +2913,12 @@ app_server <- function(input, output, session) {
   # The declared basis: which IPCC row each family of defaults comes from.
   # Rendered straight from DEFAULT_BASIS so it cannot drift from the values.
   output$basis_table <- DT::renderDT({
-    b <- DEFAULT_BASIS
-    lbl <- DEFAULT_BASIS_LABELS[b$dimension]
+    # Tool-wide rows ONLY. Lactation state and the guidelines edition are
+    # resolved rather than assumed (per sub-category, and by the compiler's
+    # own metadata choice), so listing them here would misdescribe the tool.
+    b <- basis_tool_wide()
     d <- data.frame(
-      dimension    = ifelse(is.na(lbl), b$dimension, lbl),
+      dimension    = basis_dimension_label(b$dimension),
       chosen       = b$chosen,
       alternatives = b$alternatives,
       governs      = gsub(" ", ", ", b$governs, fixed = TRUE),

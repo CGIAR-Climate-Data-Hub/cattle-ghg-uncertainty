@@ -27,14 +27,17 @@ lines <- c(
 "\\midrule",
 "\\endhead")
 
-for (i in seq_len(nrow(DEFAULT_BASIS))) {
-  lb <- DEFAULT_BASIS_LABELS[[DEFAULT_BASIS$dimension[i]]]
-  if (is.null(lb)) lb <- DEFAULT_BASIS$dimension[i]
-  gov <- gsub(" ", ", ", DEFAULT_BASIS$governs[i], fixed = TRUE)
+# Tool-wide rows ONLY. Lactation state and the guidelines edition are
+# resolved rather than assumed, the first per sub-category and the second by
+# the compiler's own metadata choice, so listing them as assumptions would
+# misdescribe the tool. See basis_tool_wide().
+B <- basis_tool_wide()
+for (i in seq_len(nrow(B))) {
+  gov <- gsub(" ", ", ", B$governs[i], fixed = TRUE)
   lines <- c(lines, sprintf(
     "\\textbf{%s} & %s & %s & \\texttt{%s}. %s \\\\ \\addlinespace[2pt]",
-    esc(lb), esc(DEFAULT_BASIS$chosen[i]), esc(DEFAULT_BASIS$alternatives[i]),
-    esc(gov), esc(DEFAULT_BASIS$why[i])))
+    esc(basis_dimension_label(B$dimension[i])), esc(B$chosen[i]),
+    esc(B$alternatives[i]), esc(gov), esc(B$why[i])))
 }
 
 lines <- c(lines,

@@ -141,15 +141,16 @@ basis_lines <- c(
   "",
   "| choice | this tool uses | IPCC also publishes | affects | why, and what to do otherwise |",
   "|---|---|---|---|---|")
-for (i in seq_len(nrow(DEFAULT_BASIS))) {
-  lb <- DEFAULT_BASIS_LABELS[[DEFAULT_BASIS$dimension[i]]]
+B_TW <- basis_tool_wide()   # tool-wide rows only; see basis_tool_wide()
+for (i in seq_len(nrow(B_TW))) {
+  lb <- DEFAULT_BASIS_LABELS[[B_TW$dimension[i]]]
   # fixed = TRUE: a literal pipe would split the markdown table cell.
   esc_ <- function(x) gsub("|", "\\|", x, fixed = TRUE)
   basis_lines <- c(basis_lines, sprintf("| **%s** | %s | %s | `%s` | %s |",
-    if (is.null(lb)) DEFAULT_BASIS$dimension[i] else lb,
-    esc_(DEFAULT_BASIS$chosen[i]), esc_(DEFAULT_BASIS$alternatives[i]),
-    gsub(" ", "`, `", DEFAULT_BASIS$governs[i], fixed = TRUE),
-    esc_(DEFAULT_BASIS$why[i])))
+    if (is.null(lb)) B_TW$dimension[i] else lb,
+    esc_(B_TW$chosen[i]), esc_(B_TW$alternatives[i]),
+    gsub(" ", "`, `", B_TW$governs[i], fixed = TRUE),
+    esc_(B_TW$why[i])))
 }
 basis_lines <- c(basis_lines, "",
   "### Which IPCC variant each manure system models",

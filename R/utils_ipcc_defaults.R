@@ -505,25 +505,59 @@ DEFAULT_BASIS_LABELS <- c(
   guidelines_edition    = "Guidelines edition",
   species               = "Species")
 
-# Which basis choices govern a given parameter. `governs` lists parameter
-# codes plus three family tokens: MCF, EF3 and FRAC for the per-manure-system
-# coefficients, which are not PARAM_CATALOGUE parameters.
+# ONLY the tool-wide rows go in front of users.
+#
+# `scope` separates assumptions the compiler cannot vary from their data
+# from generic fallbacks the tool already resolves. Lactation state is the
+# clearest of the second kind: the resolver gives dairy cows Cfi 0.386 and
+# everything else 0.322 or 0.370, so the tool does not assume lactating, it
+# works it out. Presenting that as an assumption understates the tool and
+# misleads the reader, so user-facing surfaces render tool-wide rows only.
+# The full table, both scopes, stays in reference/DEFAULTS_MASTER.md.
+basis_tool_wide <- function()
+  DEFAULT_BASIS[DEFAULT_BASIS$scope == "tool_wide", , drop = FALSE]
+
+basis_dimension_label <- function(dimension) {
+  lb <- DEFAULT_BASIS_LABELS[dimension]
+  unname(ifelse(is.na(lb), dimension, lb))
+}
+
+# Which TOOL-WIDE basis choices govern a given parameter. `governs` lists
+# parameter codes plus three family tokens: MCF, EF3 and FRAC for the
+# per-manure-system coefficients, which are not catalogue parameters.
 basis_for <- function(parameter) {
-  hits <- vapply(DEFAULT_BASIS$governs, function(g)
+  d <- basis_tool_wide()
+  hits <- vapply(d$governs, function(g)
     parameter %in% strsplit(g, " ", fixed = TRUE)[[1]], logical(1))
   if (!any(hits)) return(character(0))
-  d <- DEFAULT_BASIS[hits, , drop = FALSE]
-  stats::setNames(d$chosen,
-                  ifelse(is.na(DEFAULT_BASIS_LABELS[d$dimension]),
-                         d$dimension, DEFAULT_BASIS_LABELS[d$dimension]))
+  d <- d[hits, , drop = FALSE]
+  stats::setNames(d$chosen, basis_dimension_label(d$dimension))
+}
+
+# Does the resolver give this parameter a different value for at least one
+# sub-category? Derived by asking the resolver rather than by keeping a list
+# beside it, so the two cannot drift apart.
+basis_is_resolved <- function(parameter) {
+  gen <- PARAM_CATALOGUE$ipcc_default[PARAM_CATALOGUE$parameter == parameter]
+  if (!length(gen)) return(FALSE)
+  vals <- vapply(ANIMAL_SUBCATEGORIES, function(sc) {
+    r <- tryCatch(resolve_subcat_default(sc, parameter), error = function(e) NULL)
+    if (is.null(r) || is.null(r$value)) NA_real_ else as.numeric(r$value)
+  }, numeric(1))
+  any(!is.na(vals) & (is.na(gen) | abs(vals - gen) > 1e-12))
 }
 
 # One-line summary for a parameter, for the Definitions tab and the guides.
-# Empty when no dimension governs it, which is correct for N and Tw.
+# Tool-wide choices only; a parameter the resolver varies is marked as such
+# rather than left blank, so an empty cell means "no assumption applies"
+# instead of "we did not say".
 basis_label <- function(parameter) {
   b <- basis_for(parameter)
-  if (!length(b)) return("")
-  paste(sprintf("%s: %s", names(b), b), collapse = "; ")
+  out <- if (length(b)) paste(sprintf("%s: %s", names(b), b), collapse = "; ") else ""
+  if (isTRUE(basis_is_resolved(parameter)))
+    out <- if (nzchar(out)) paste0(out, "; resolved per sub-category")
+           else "Resolved per sub-category"
+  out
 }
 
 # ==========================================================================

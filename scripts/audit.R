@@ -2274,9 +2274,40 @@ section_F <- function() {
     if (!exists("DEFAULT_BASIS") || nrow(DEFAULT_BASIS) < 10L)
       f <- c(f, "DEFAULT_BASIS missing or short")
     # every dimension must say what it governs and why
-    for (cl in c("chosen", "alternatives", "ipcc_source", "governs", "why"))
+    for (cl in c("chosen", "alternatives", "ipcc_source", "governs", "why",
+                 "scope"))
       if (any(!nzchar(DEFAULT_BASIS[[cl]])))
         f <- c(f, sprintf("DEFAULT_BASIS has an empty %s", cl))
+    if (!all(DEFAULT_BASIS$scope %in% c("tool_wide", "resolved")))
+      f <- c(f, "DEFAULT_BASIS has a scope outside tool_wide/resolved")
+    # A fallback the resolver already varies is not an assumption. Showing
+    # one to a user as though it were understates the tool: lactation state
+    # was listed that way, while resolve_subcat_default() gives dairy cows
+    # Cfi 0.386 and everything else 0.322 or 0.370. User-facing surfaces
+    # must carry the tool-wide rows and NOT the resolved ones.
+    # The scoping is asserted explicitly, not derived, because the
+    # distinction is semantic. "Does the value vary by sub-category" does
+    # NOT separate the two: geography is Africa for every sub-category even
+    # though each takes a different weight from the Africa block, whereas
+    # lactation state genuinely differs, dairy cows being lactating and
+    # heifers not. Only a person can tell those apart, so this is a
+    # regression guard on a judgement, which is what it looks like.
+    EXPECT_RESOLVED <- c("lactation_state", "guidelines_edition")
+    got_resolved <- sort(DEFAULT_BASIS$dimension[DEFAULT_BASIS$scope != "tool_wide"])
+    if (!identical(got_resolved, sort(EXPECT_RESOLVED)))
+      f <- c(f, sprintf("scope=resolved should be {%s} but is {%s}",
+                        paste(sort(EXPECT_RESOLVED), collapse = ", "),
+                        paste(got_resolved, collapse = ", ")))
+    resolved <- DEFAULT_BASIS[DEFAULT_BASIS$scope != "tool_wide", , drop = FALSE]
+    for (sf in c("doc/_basis_block.tex",
+                 "translator_prompts/param_catalogue.md")) {
+      if (!file.exists(sf)) next
+      txt <- paste(readLines(sf, warn = FALSE, encoding = "UTF-8"), collapse = " ")
+      for (k in seq_len(nrow(resolved)))
+        if (grepl(resolved$chosen[k], txt, fixed = TRUE))
+          f <- c(f, sprintf("%s presents the resolved choice '%s' as a tool-wide assumption",
+                            basename(sf), resolved$dimension[k]))
+    }
     # the four choices a user is most likely to be caught out by
     probes <- c("Low productivity", "Wet", "Africa")
     surfaces <- c("doc/_basis_block.tex",

@@ -1269,16 +1269,17 @@ generate_template_openxlsx <- function(filepath, include_example,
     list(title="WHAT THE DEFAULTS ASSUME — read this before accepting any pre-filled value",
          cols=c("choice","this tool uses","IPCC also publishes","affects",
                 "IPCC source","why, and what to do otherwise"),
-         data=data.frame(
-           choice=unname(ifelse(is.na(DEFAULT_BASIS_LABELS[DEFAULT_BASIS$dimension]),
-                                DEFAULT_BASIS$dimension,
-                                DEFAULT_BASIS_LABELS[DEFAULT_BASIS$dimension])),
-           chosen=DEFAULT_BASIS$chosen,
-           alternatives=DEFAULT_BASIS$alternatives,
-           governs=gsub(" ", ", ", DEFAULT_BASIS$governs, fixed=TRUE),
-           source=DEFAULT_BASIS$ipcc_source,
-           why=DEFAULT_BASIS$why,
-           stringsAsFactors=FALSE)),
+         # Tool-wide rows only: basis_tool_wide(). Lactation state and the
+         # guidelines edition are resolved, not assumed, so they are not
+         # presented to a compiler as assumptions.
+         data=local({ b <- basis_tool_wide(); data.frame(
+           choice=basis_dimension_label(b$dimension),
+           chosen=b$chosen,
+           alternatives=b$alternatives,
+           governs=gsub(" ", ", ", b$governs, fixed=TRUE),
+           source=b$ipcc_source,
+           why=b$why,
+           stringsAsFactors=FALSE) })),
 
     list(title="IPCC variant each manure system models  [every coefficient on a row comes from THIS variant]",
          cols=c("mms_type","IPCC variant modelled"),
