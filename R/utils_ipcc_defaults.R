@@ -349,10 +349,20 @@ SUBCAT_LABELS <- c(cows = "Dairy Cows", heifers = "Heifers (>1yr)",
 # ==========================================================================
 
 # Livestock species (IPCC Ch 10 scope). Cattle is the primary focus.
-SPECIES_OPTIONS <- c("cattle_dairy", "cattle_non_dairy", "buffalo")
+# cattle_mixed is load-bearing, not decorative. The translator post-processor
+# (chat_ui.R ~1726) strips dairy_cows from a cattle_dairy=FALSE inventory and
+# strips non-dairy sub-cats from a cattle_dairy one; it fires only on those two
+# exact strings, so a mixed herd needs a third value to fall through unstripped.
+# The prompt has instructed models to emit it since June, but it was never
+# declared here, so it appeared in no dropdown and no vocabulary. Declaring it
+# does not change the stripping behaviour; it makes the existing behaviour
+# legible and lets a hand-filled template express a mixed herd too.
+SPECIES_OPTIONS <- c("cattle_dairy", "cattle_non_dairy", "cattle_mixed",
+                     "buffalo")
 SPECIES_LABELS <- c(
   cattle_dairy = "Cattle - Dairy",
   cattle_non_dairy = "Cattle - Non-Dairy (Beef/Other)",
+  cattle_mixed = "Cattle - Mixed (dairy and non-dairy in one inventory)",
   buffalo = "Buffalo"
 )
 
@@ -721,9 +731,22 @@ generate_country_y_timeseries <- function() {
 # Typical for a smallholder dairy in tropical Africa: half the manure
 # deposited on pasture during grazing, the rest split between solid kraal
 # storage (most), liquid slurry (washing into pits), and a small share to
-# anaerobic-digester biogas (an increasingly common practice). Per-MMS MCF
-# / EF3 / Frac_GasMS / Frac_LeachMS follow IPCC 2019 Refinement Vol.4 Ch.10
-# Tables 10.17, 10.21, 10.22, 10.23 (warm/tropical climate). Uncertainty
+# anaerobic-digester biogas (an increasingly common practice).
+#
+# These are illustrative COUNTRY-SPECIFIC values, not a restatement of the
+# IPCC defaults: the point of the example is a country whose own measurements
+# differ from the defaults, which is also what exercises the QA/QC imputed
+# flags. The previous comment claimed they "follow" Tables 10.17/10.21/10.22/
+# 10.23, which was wrong three ways: solid_storage EF3 was the superseded
+# 0.005, solid_storage MCF was the temperate 4.0 inside a warm/tropical
+# example, and 10.23 is the N2:N2O ratio table, not leaching.
+#
+# Where a value is deliberately country-specific it must still be physically
+# reachable for the declared MMS variant. liquid_slurry now models WITH a
+# natural crust (MMS_DEFAULTS$ipcc_variant), whose gradient tops out at 50%,
+# so the old MCF 71 (a without-crust value, 26 C) is no longer reachable for
+# this mms_type and becomes 44, the WITH-crust value at the same 26 C.
+# Uncertainty
 # bounds added on fraction_pct, MCF, and EF3 so the per-MMS sampling code
 # path is exercised and MMS allocation surfaces in the sensitivity tornado.
 generate_country_x_manure <- function() {
@@ -737,11 +760,11 @@ generate_country_x_manure <- function() {
     lower_fraction        = c(40, 25, 10, 2),
     upper_fraction        = c(60, 35, 20, 8),
     distribution_fraction = rep("pert", 4),
-    MCF_pct               = c(1.5, 4.0, 71.0, 10.0),
-    lower_mcf             = c(1.0, 2.0, 50.0, 5.0),
-    upper_mcf             = c(2.0, 8.0, 80.0, 20.0),
+    MCF_pct               = c(2.0, 5.0, 44.0, 4.59),
+    lower_mcf             = c(1.5, 4.0, 31.0, 3.55),
+    upper_mcf             = c(2.5, 6.0, 50.0, 5.50),
     distribution_mcf      = rep("pert", 4),
-    EF3                   = c(0.020, 0.005, 0.005, 0.0006),
+    EF3                   = c(0.020, 0.010, 0.005, 0.0006),
     lower_ef3             = c(0.007, 0.0025, 0.0025, 0.0003),
     upper_ef3             = c(0.060, 0.0250, 0.0250, 0.0015),
     distribution_ef3      = rep("pert", 4),
@@ -765,11 +788,14 @@ generate_country_y_manure <- function() {
     lower_fraction        = c(80,  5),
     upper_fraction        = c(95, 20),
     distribution_fraction = rep("pert", 2),
-    MCF_pct               = c(1.5, 4.0),
-    lower_mcf             = c(1.0, 2.0),
-    upper_mcf             = c(2.0, 8.0),
+    # Warm/tropical rangeland: pasture 2.0 and solid_storage 5.0 are the
+    # Warm-band values (2006 Table 10.17). Previously 1.5 / 4.0, which are
+    # the Temperate cells, inside an example described as extensive tropical.
+    MCF_pct               = c(2.0, 5.0),
+    lower_mcf             = c(1.5, 4.0),
+    upper_mcf             = c(2.5, 6.0),
     distribution_mcf      = rep("pert", 2),
-    EF3                   = c(0.020, 0.005),
+    EF3                   = c(0.020, 0.010),
     lower_ef3             = c(0.007, 0.0025),
     upper_ef3             = c(0.060, 0.0250),
     distribution_ef3      = rep("pert", 2),

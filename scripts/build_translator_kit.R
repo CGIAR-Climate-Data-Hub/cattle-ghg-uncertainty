@@ -397,6 +397,92 @@ lines <- c(lines, "",
 )
 
 writeLines(lines, file.path(out_dir, "template_schema.md"), useBytes = TRUE)
+
+# ---------------------------------------------------------------------------
+# 2b. worked_example.md -- GENERATED.
+#
+# This is 5th in the assembled prompt and is the shape template the model
+# copies most literally, which is why its defects mattered: the hand-written
+# version tagged 17 of 50 rows `activity_data` against a rule the same prompt
+# states ("N only"), asserted that wrong rule outright in its closing notes,
+# and carried superseded values (EF3_PRP 0.02, solid_storage EF3 0.005,
+# Frac_GasMS 30, a lagoon MCF matching no IPCC cell, Ym +-10).
+#
+# Every coefficient now comes from resolve_subcat_default() and the MMS
+# tables, so the example cannot contradict the catalogue it sits next to.
+# Only the genuinely user-supplied values are literals, listed here.
+# ---------------------------------------------------------------------------
+.WE_SUBCATS <- c("dairy_cows", "heifers")
+.WE_USER <- list(                       # country data a user would supply
+  dairy_cows = c(N = 12000, BW = 420, MW = 450, Milk = 8.5, Fat = 4.0,
+                 DE = 62, CP = 14),
+  heifers    = c(N = 3000,  BW = 250, MW = 450, DE = 58, CP = 12))
+.WE_MMS <- list(
+  dairy_cows = c(pasture = 30, solid_storage = 50, daily_spread = 15,
+                 liquid_slurry = 5),
+  heifers    = c(pasture = 70, solid_storage = 25, daily_spread = 5))
+
+.we_num <- function(x) {
+  if (is.na(x)) return("null")
+  trimws(format(x, scientific = FALSE, trim = TRUE, drop0trailing = TRUE))
+}
+we <- c("# Worked example -- complete template-ready JSON for a small inventory",
+        "", partial("worked_example_intro"), "",
+        sprintf("This example has %d sub-categories, so %d x %d = %d parameter rows. An inventory with 8 sub-categories would need 8 x %d = %d.",
+                length(.WE_SUBCATS), length(.WE_SUBCATS), NPAR,
+                length(.WE_SUBCATS) * NPAR, NPAR, 8 * NPAR),
+        "", "```template-ready", "{",
+        '  "inventory_metadata": {',
+        '    "country": "Country Z", "year": 2023, "species": "cattle_dairy",',
+        '    "ipcc_version": "2019_refinement", "prepared_by": "National Inventory Team"',
+        "  },", '  "parameters": [')
+prow <- character(0)
+for (sc in .WE_SUBCATS) {
+  usr <- .WE_USER[[sc]]
+  for (prm in pc$parameter) {
+    rs <- resolve_subcat_default(sc, prm, ipcc_version)
+    is_user <- prm %in% names(usr)
+    val  <- if (is_user) usr[[prm]] else if (!is.null(rs)) rs$value else NA_real_
+    dist <- if (!is.null(rs)) rs$distribution else
+              pc$suggested_distribution[pc$parameter == prm]
+    lo <- if (!is.null(rs)) rs$lower else pc$suggested_lower_bound[pc$parameter == prm]
+    hi <- if (!is.null(rs)) rs$upper else pc$suggested_upper_bound[pc$parameter == prm]
+    unc <- if (!is.null(rs)) rs$uncertainty_pct else
+             pc$suggested_uncertainty_pct[pc$parameter == prm]
+    asym <- is.na(unc) && !is.na(lo) && !is.na(hi)
+    spread <- if (asym) sprintf('"lower": %s, "upper": %s', .we_num(lo), .we_num(hi))
+              else sprintf('"uncertainty_pct": %s', .we_num(unc))
+    prow <- c(prow, sprintf(
+      '    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "%s", "parameter": "%s", "mean": %s, %s, "distribution": "%s", "param_type": "%s"}',
+      sc, prm, .we_num(val), spread, dist,
+      pc$param_type[pc$parameter == prm]))
+  }
+}
+we <- c(we, paste0(prow, c(rep(",", length(prow) - 1), "")),
+        "  ],", '  "manure_management": [')
+mrow <- character(0)
+for (sc in .WE_SUBCATS) {
+  alloc <- .WE_MMS[[sc]]
+  for (id in names(alloc)) {
+    row <- MMS_DEFAULTS[MMS_DEFAULTS$id == id, ]
+    fr  <- mms_frac_defaults_2019(id)
+    mrow <- c(mrow, sprintf(
+      '    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "%s", "mms_type": "%s", "fraction_pct": %s, "MCF_pct": %s, "EF3": %s, "Frac_GasMS_pct": %s, "Frac_LeachMS_pct": %s}',
+      sc, id, .we_num(unname(alloc[[id]])), .we_num(row$mcf_tropical),
+      .we_num(row$ef3), .we_num(fr$frac_gas * 100),
+      .we_num(fr$frac_leach * 100)))
+  }
+}
+we <- c(we, paste0(mrow, c(rep(",", length(mrow) - 1), "")),
+        "  ],", '  "parameter_timeseries": []', "}", "```", "",
+        partial("worked_example_outro"))
+stopifnot(!is.null(jsonlite::fromJSON(paste(
+  we[(which(we == "```template-ready") + 1):(which(we == "```") - 1)],
+  collapse = "
+"))))
+writeLines(we, file.path(out_dir, "worked_example.md"), useBytes = TRUE)
+message("✓ wrote worked_example.md (", length(.WE_SUBCATS), " sub-cats x ",
+        NPAR, " params)")
 message("✓ wrote template_schema.md")
 
 # ---------------------------------------------------------------------------

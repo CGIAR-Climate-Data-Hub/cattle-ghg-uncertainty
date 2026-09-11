@@ -536,7 +536,9 @@ generate_template_openxlsx <- function(filepath, include_example,
   }
 
   # ── vocabulary lists (used by multiple sheets) ────────────────────────────
-  V_SPECIES   <- c("cattle_dairy","cattle_non_dairy","buffalo")
+  # Derived, not hardcoded: this was a fourth copy of the species list and it
+  # silently omitted cattle_mixed, which the translator emits.
+  V_SPECIES   <- SPECIES_OPTIONS
   V_IPCCVER   <- c("2006","2019_refinement")
   V_DIST      <- c("normal","posnorm","lognormal","beta",
                    "triangular","pert","uniform","constant","tnorm_0_1")
@@ -1417,9 +1419,13 @@ generate_template_openxlsx <- function(filepath, include_example,
     list(title="species (Inventory_Metadata dropdown)",
          cols=c("term","label","used_in"),
          data=data.frame(
+           # Labels and row count both derived from SPECIES_LABELS: this table
+           # hardcoded three labels against a species list that has since
+           # gained cattle_mixed, which errored with "differing number of
+           # rows: 4, 3".
            term=V_SPECIES,
-           label=c("Cattle — dairy breeds","Cattle — non-dairy / beef / multipurpose","Buffalo"),
-           used_in=rep("Inventory_Metadata.species", 3),
+           label=unname(SPECIES_LABELS[V_SPECIES]),
+           used_in=rep("Inventory_Metadata.species", length(V_SPECIES)),
            stringsAsFactors=FALSE)),
 
     list(title="IPCC Table 10.17 — MCF (%) by climate zone  [enter values into Manure_Management sheet]",

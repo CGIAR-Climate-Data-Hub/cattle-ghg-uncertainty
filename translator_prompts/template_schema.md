@@ -24,7 +24,7 @@ Transposed (label/value) layout. Column A is the label, column B is the value.
 | country | (free text) | e.g. `Zimbabwe`. Used in the report header. |
 | region | one of: africa / asia / europe / americas / oceania / global | Continental region — drives the BW deviation benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2/10A.3). Dropdown-constrained in the latest template. Legacy uploads with only a single free-text country cell are auto-mapped by the parser. |
 | inventory_year | (integer) | e.g. `2022` |
-| species | one of: cattle_dairy / cattle_non_dairy / buffalo | controlled vocabulary |
+| species | one of: cattle_dairy / cattle_non_dairy / cattle_mixed / buffalo | controlled vocabulary |
 | ipcc_version | one of: 2006 / 2019_refinement | drives MMS list filtering |
 | prepared_by | (free text) | name / institution |
 | notes | (free text) | optional |

@@ -96,8 +96,6 @@ Tick one:
 
 **IPCC equation coefficients** (rarely measured locally — leave unticked unless your country has a published value):
 - [ ] `Cfi`, `Ca`, `C`, `Cp`, `Ym`, `Bo`, `ASH`, `UE`
-- [ ] N₂O emission factors (`EF3_PRP`, `EF3_S`, `EF4`, `EF5`)
-- [ ] Volatilisation/leaching fractions (`Frac_GASMS`, `Frac_LEACH_H`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`)
 
 ## 6. Where do your uncertainty estimates come from?
 
