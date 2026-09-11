@@ -56,39 +56,58 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
   samples <- .bind_mms_to_samples(samples, frac_leach_samples, "Frac_LeachMS")
   samples <- .bind_mms_to_samples(samples, mms_fraction_samples, "fraction")
 
-  get_param <- function(name, default = 0) {
-    if (name %in% names(samples)) samples[[name]] else rep(default, n_iter)
+  # default = NULL means "take it from the master". An explicit value is
+  # only passed where a zero is a deliberate safety choice, and each of
+  # those says why at the call site.
+  get_param <- function(name, default = NULL) {
+    if (name %in% names(samples)) return(samples[[name]])
+    rep(if (is.null(default)) .cat_default(name) else default, n_iter)
   }
 
+  # MMS fallbacks from the master too. The MCF literal of 0.015 happened to
+  # equal the temperate pasture value; it is now read, and the climate is
+  # stated rather than implied. Tropical is the tool-wide assumption
+  # wherever it fills an MCF for the user, so it is used here as well.
+  .mms_default <- function(id, field) {
+    v <- MMS_DEFAULTS[[field]][MMS_DEFAULTS$id == id]
+    if (!length(v) || is.na(v[1])) NA_real_ else as.numeric(v[1])
+  }
   if (is.null(mms_fractions)) mms_fractions <- c(pasture = 1.0)
-  if (is.null(mcf_values)) mcf_values <- c(pasture = 0.015)
-  if (is.null(ef3_values)) ef3_values <- c(pasture = 0.02)
+  if (is.null(mcf_values))
+    mcf_values <- c(pasture = .mms_default("pasture", "mcf_tropical") / 100)
+  if (is.null(ef3_values))
+    ef3_values <- c(pasture = .mms_default("pasture", "ef3"))
 
   # C1: parameter names IPCC-aligned (DE, CP, Ym, ASH, Frac_GASMS, Frac_LEACH_H).
   # get_param() falls back to legacy names so old templates still work.
-  get_param_alt <- function(new_name, old_name, default = 0) {
-    if (new_name %in% names(samples)) samples[[new_name]]
-    else if (old_name %in% names(samples)) samples[[old_name]]
-    else rep(default, n_iter)
+  get_param_alt <- function(new_name, old_name, default = NULL) {
+    if (new_name %in% names(samples)) return(samples[[new_name]])
+    if (old_name %in% names(samples)) return(samples[[old_name]])
+    rep(if (is.null(default)) .cat_default(new_name) else default, n_iter)
   }
 
   # R1.6: full IPCC variable rename — look up new IPCC names first, fall back to legacy
   results <- ghg_emissions_vec(
+    # 0 rather than the master: no animals is safer than an invented herd.
     cattle_pop    = get_param_alt("N",       "cattle_pop",    0),
-    live_weight   = get_param_alt("BW",      "live_weight",   275),
-    weight_gain   = get_param_alt("WG",      "weight_gain",   0),
-    mature_weight = get_param_alt("MW",      "mature_weight", 300),
+    live_weight   = get_param_alt("BW",      "live_weight"),
+    weight_gain   = get_param_alt("WG",      "weight_gain"),
+    mature_weight = get_param_alt("MW",      "mature_weight"),
+    # 0 rather than the master: the engine cannot see the sub-category, and
+    # an absent Milk row most likely means the group does not lactate.
+    # Filling the catalogue 1.2 would add lactation energy to every one.
     milk_yield    = get_param_alt("Milk",    "milk_yield",    0),
-    milk_fat      = get_param_alt("Fat",     "milk_fat",      4),
+    milk_fat      = get_param_alt("Fat",     "milk_fat"),
+    # 0 rather than the master: absent means no draught work.
     hours         = get_param("hours", 0),
-    DE            = get_param_alt("DE",      "DE_pct",        55),
-    Cfi           = get_param("Cfi", 0.322),
-    Ca            = get_param("Ca", 0.17),
-    C_growth      = get_param_alt("C",       "C_growth",      0.8),
-    Cp            = get_param("Cp", 0.10),
-    Ym            = get_param_alt("Ym",      "Ym_pct",        6.5),
-    Bo            = get_param("Bo", 0.10),
-    ASH           = get_param_alt("ASH",     "ash",           0.08),
+    DE            = get_param_alt("DE",      "DE_pct"),
+    Cfi           = get_param("Cfi"),
+    Ca            = get_param("Ca"),
+    C_growth      = get_param_alt("C",       "C_growth"),
+    Cp            = get_param("Cp"),
+    Ym            = get_param_alt("Ym",      "Ym_pct"),
+    Bo            = get_param("Bo"),
+    ASH           = get_param_alt("ASH",     "ash"),
     UE            = get_param("UE", 0.04),
     CP            = get_param_alt("CP",      "CP_pct",        10),
     mms_fractions = mms_fractions,

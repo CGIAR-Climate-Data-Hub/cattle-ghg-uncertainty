@@ -1029,3 +1029,56 @@ One warning remains and is correct: Annex 10A.2 Mature Males at 540 kg against t
 `scripts/verify_defaults.R` could not have caught it: the matrix generates its row universe from the R objects, so the literal was being compared against itself. It surfaced only because a new column added to the master failed to appear in the loaded object. Now built by `.master_wide()` like everything else.
 
 That is worth remembering as a limit of the matrix. It proves the surfaces agree with the R constants; it cannot prove the R constants come from the master. Audit check F32 asserts the master loads and rebuilds the main objects, but it does not enumerate every object, and this one slipped between the two.
+
+---
+
+# Gap-fill: one source for a missing value, 2026-09-11
+
+## The principle
+
+A value the user does not supply is filled from `reference/defaults_master.csv`. Where the master's value is IPCC-sourced that is an IPCC default; where IPCC publishes nothing, which is the case for mature weight, winter temperature, replacement-heifer pregnancy and most of the suggested uncertainties, the master still supplies the number but it must be labelled a project assumption rather than an IPCC default. There is one place any of it comes from.
+
+That held on the template, the translator writer and the published guides. It did not hold in the engine.
+
+## What was wrong
+
+`get_param_alt()` in `R/mc_simulation.R` carried a literal default per parameter, used when a row is absent from the upload entirely, which is exactly the gap-fill case. Eight had drifted from the master:
+
+| parameter | engine gave | master says |
+|---|---|---|
+| Bo | 0.10 | 0.13 |
+| Cfi | 0.322 | 0.386 |
+| EF3_PRP | 0.004 | 0.006 |
+| EF4 | 0.010 | 0.014 |
+| BW | 275 | 270 |
+| Milk | 0 | 1.2 |
+| Fat | 4 | 4.3 |
+| DE | 55 | 51 |
+
+`Bo` 0.10 is the 2006 Africa value, superseded in June 2026. `Cfi` 0.322 is the non-lactating value where the catalogue holds the lactating one. `EF4` 0.010 is the climate-aggregated value where the catalogue holds wet-climate. The last four were left behind by the low-productivity decision.
+
+The same pattern sat in the `calc_*` signature defaults: `calc_direct_n2o_prp(EF3_PRP = 0.004)`, `calc_indirect_n2o_mm(EF4 = 0.010, ...)`, and the MMS fallbacks in `run_mc_simulation()`.
+
+**Two of these were on the allow-list**, justified as "bites only when the row is absent entirely". That is the gap-fill path, so the allow-list was excusing the case it should have flagged. Both entries have been removed rather than re-worded. An allow-list entry that explains why a divergence does not matter is a claim, and this one was false.
+
+## What changed
+
+`.cat_default(parameter)` in `R/load_defaults.R` is now the single accessor, and every fallback reads it. `NA` in the catalogue, which is only `N`, returns 0.
+
+Three call sites keep an explicit 0 and each says why:
+
+- `N`: no animals is safer than an invented herd.
+- `Milk`: the engine cannot see the sub-category, and an absent Milk row most likely means the group does not lactate. Filling the catalogue's 1.2 would add lactation energy to every such group.
+- `hours`: absent means no draught work.
+
+The MMS fallbacks now read `MMS_DEFAULTS` as well. The old pasture MCF literal of 0.015 happened to equal the temperate value; the climate is now stated rather than implied, and tropical is used, matching the tool-wide assumption applied wherever the tool fills an MCF.
+
+## Why the matrix could not have caught this
+
+`scripts/verify_defaults.R` compares surfaces against the R constants. These fallbacks are neither: they live in a function signature and a lookup default, invisible to a check built from `PARAM_CATALOGUE`. F39 proves the objects derive from the master and says nothing about code paths that never consult the objects.
+
+F40 closes it by running the engine rather than reading a table. `Bo` is omitted from the inputs, doubled in a temp copy of the master, and the simulated manure CH4 must double. Anything that reintroduces a literal breaks it.
+
+That check needed two attempts. The first called `ghg_emissions_vec()` directly, which skips `get_param()` altogether, so it passed against a deliberately reinstated `get_param("Bo", 0.10)`. Routed through `run_mc_simulation()` it fails with "doubling Bo in the master did not double manure CH4 (3.266008 -> 3.266008)".
+
+That is now the fourth check in this audit that had to be watched failing before it could be trusted, after F34, F35/F36 and the first `qaqc_hints` extractor. The rule has earned its place: a check that has never been seen to fail is not evidence.

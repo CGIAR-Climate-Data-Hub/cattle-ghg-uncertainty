@@ -41,16 +41,22 @@ TOL <- 1e-9
 # in the report so it can be re-read rather than forgotten. Anything NOT here
 # and not MATCH is a defect until proven otherwise.
 # ---------------------------------------------------------------------------
+# The two engine_fallback entries that used to sit here have been REMOVED,
+# not re-justified. They excused mc_simulation.R carrying its own Bo=0.10
+# and Cfi=0.322 "because it bites only when the row is absent entirely",
+# which is precisely the gap-fill path those values exist to serve. Eight
+# such literals had drifted from the master by the time anyone looked. The
+# engine now reads .cat_default() and audit check F40 proves it by doubling
+# a value in the master and requiring the simulated result to double.
+#
+# The lesson is worth keeping: an allow-list entry that explains why a
+# divergence does not matter is a claim, and this one was false.
 ALLOW <- data.frame(
-  object = c("PARAM_CATALOGUE", "PARAM_CATALOGUE",
-             "PARAM_CATALOGUE", "PARAM_CATALOGUE"),
-  key    = c("Bo", "Cfi", "N", "WG"),
-  field  = c("ipcc_default", "ipcc_default", "ipcc_default", "ipcc_default"),
-  surface = c("engine_fallback", "engine_fallback",
-              "xlsx_parameters", "xlsx_parameters"),
+  object = c("PARAM_CATALOGUE", "PARAM_CATALOGUE"),
+  key    = c("N", "WG"),
+  field  = c("ipcc_default", "ipcc_default"),
+  surface = c("xlsx_parameters", "xlsx_parameters"),
   why = c(
-    "mc_simulation.R get_param_alt uses Bo=0.10; bites only when the row is absent entirely. Documented in knowledge/04-parameters.md",
-    "mc_simulation.R get_param_alt uses Cfi=0.322; bites only when the row is absent entirely",
     "Example template shows an illustrative herd of 500,000 head; the catalogue default for N is deliberately NA (the user must supply it)",
     "Example template shows an illustrative 0.10 kg/day gain for a dairy cow; the catalogue default is 0 (adults do not grow)"),
   stringsAsFactors = FALSE)

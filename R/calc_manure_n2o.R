@@ -82,8 +82,14 @@ calc_indirect_n2o_mm <- function(Nex, mms_fractions,
                                   # IPCC 2019 Refinement Vol.4 Ch.11 Table 11.3.
                                   # EF4: aggregated 0.010 (wet 0.014, dry 0.005); 2006 = 0.010.
                                   # EF5: 0.011 in 2019R (no climate disaggregation); 2006 = 0.0075.
-                                  EF4 = 0.010, EF5 = 0.011,
-                                  frac_gas   = 0.21,  # 2019R aggregated FracGASM (2006 = 0.20)
+                                  # From the master, never a literal: EF4
+                                  # sat at the aggregated 0.010 here while
+                                  # the catalogue held the wet-climate
+                                  # 0.014. Evaluated lazily, so the
+                                  # catalogue need not exist at source time.
+                                  EF4 = .cat_default("EF4"),
+                                  EF5 = .cat_default("EF5"),
+                                  frac_gas   = .cat_default("Frac_GASM_PRP"),
                                   frac_leach = 0.02) {
   total <- 0
   for (mms in names(mms_fractions)) {
@@ -117,7 +123,10 @@ calc_indirect_n2o_mm <- function(Nex, mms_fractions,
 #     wet climate                                    : 0.006 (range 0.000-0.027)
 #     dry climate                                    : 0.002 (range 0.000-0.007)
 # The unconditional default below is the aggregated 2019R value.
-calc_direct_n2o_prp <- function(Nex, pct_pasture, EF3_PRP = 0.004) {
+calc_direct_n2o_prp <- function(Nex, pct_pasture,
+                                # 0.004 was the climate-aggregated value;
+                                # the catalogue holds the wet-climate 0.006.
+                                EF3_PRP = .cat_default("EF3_PRP")) {
   N_prp <- Nex * pct_pasture
   N_prp * EF3_PRP * (44 / 28)
 }

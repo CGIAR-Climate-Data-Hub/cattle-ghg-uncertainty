@@ -2498,6 +2498,89 @@ section_F <- function() {
                "one cell per object perturbed in a temp master; a clean R process reported the perturbed value for every one, so none is a hand-written literal"
              else paste(utils::head(deriv_fail, 3), collapse = "; "))
 
+  # F40 -- a MISSING value is filled from the master, end to end.
+  #
+  # F39 proves the objects derive from the master. It says nothing about
+  # code paths that never consult them, and the engine had a whole family:
+  # get_param_alt() carried a literal per parameter for the case where a
+  # row is absent entirely, and eight had drifted. Bo fell back to 0.10, a
+  # 2006 value superseded in June, where the master says 0.13; Cfi to the
+  # non-lactating 0.322 where the catalogue holds 0.386; EF4 to the
+  # aggregated 0.010 where the catalogue holds the wet-climate 0.014. Two
+  # of them sat on the verify_defaults allow-list as "bites only when the
+  # row is absent entirely", which is precisely the gap-fill path.
+  #
+  # So this runs the ENGINE, not the objects: a deliberately incomplete
+  # input against a perturbed master, and the answer must move. Anything
+  # that reintroduces a literal breaks it.
+  gapfill_fail <- tryCatch({
+    m <- utils::read.csv(.DEFAULTS_MASTER_PATH, stringsAsFactors = FALSE,
+                         na.strings = "<NA>", colClasses = "character")
+    # Bo drives manure CH4 linearly and is the one that had actually drifted.
+    i <- which(m$object == "PARAM_CATALOGUE" & m$key == "Bo" &
+               m$field == "ipcc_default")
+    stopifnot(length(i) == 1)
+    m$value[i] <- "0.26"        # exactly double
+    tmp <- tempfile(fileext = ".csv")
+    on.exit(unlink(tmp), add = TRUE)
+    utils::write.csv(m, tmp, row.names = FALSE, na = "<NA>")
+    probe <- tempfile(fileext = ".R")
+    on.exit(unlink(probe), add = TRUE)
+    writeLines(c(
+      'suppressMessages(for (f in list.files("R", pattern = "[.]R$", full.names = TRUE))',
+      '  if (!grepl("^_", basename(f))) source(f))',
+      # Bo deliberately ABSENT from param_specs, so run_mc_simulation()
+      # must gap-fill it. Calling ghg_emissions_vec() directly skips
+      # get_param() entirely and tests nothing, which is how the first
+      # version of this check passed against a reinstated literal.
+      'ps <- data.frame(parameter = c("N", "BW", "DE"), mean = c(1000, 300, 55),',
+      '  uncertainty_pct = c(0, 0, 0), lower = NA_real_, upper = NA_real_,',
+      '  distribution = "constant", param_type = "activity_data",',
+      '  stringsAsFactors = FALSE)',
+      'r <- run_mc_simulation(ps, n_iter = 5L, seed = 1L,',
+      '  mms_fractions = c(solid_storage = 1),',
+      '  mcf_values = c(solid_storage = 0.04),',
+      '  ef3_values = c(solid_storage = 0.01))',
+      'cat("BO|", .cat_default("Bo"), "\n", sep = "")',
+      'cat("CH4|", mean(r$results$manure_ch4_total), "\n", sep = "")'), probe)
+    runp <- function(master) {
+      o <- Sys.getenv("GMH_DEFAULTS_MASTER", unset = NA)
+      Sys.setenv(GMH_DEFAULTS_MASTER = master)
+      out <- suppressWarnings(system2(file.path(R.home("bin"), "Rscript"),
+        c("--vanilla", shQuote(probe)), stdout = TRUE, stderr = TRUE))
+      if (is.na(o)) Sys.unsetenv("GMH_DEFAULTS_MASTER")
+      else Sys.setenv(GMH_DEFAULTS_MASTER = o)
+      g <- function(tag) {
+        ln <- out[startsWith(out, tag)]
+        if (!length(ln)) NA_real_
+        else suppressWarnings(as.numeric(sub(tag, "", ln[1], fixed = TRUE)))
+      }
+      c(bo = g("BO|"), ch4 = g("CH4|"))
+    }
+    base <- runp(.DEFAULTS_MASTER_PATH)
+    pert <- runp(tmp)
+    f <- character(0)
+    if (any(is.na(base)) || any(is.na(pert)))
+      f <- c(f, "the probe produced no result")
+    else {
+      if (!isTRUE(all.equal(unname(pert[["bo"]]), 2 * unname(base[["bo"]]))))
+        f <- c(f, sprintf("the Bo gap-fill did not follow the master (%s -> %s)",
+                          base[["bo"]], pert[["bo"]]))
+      if (!isTRUE(all.equal(unname(pert[["ch4"]]), 2 * unname(base[["ch4"]]),
+                            tolerance = 1e-6)))
+        f <- c(f, sprintf("doubling Bo in the master did not double manure CH4 (%s -> %s)",
+                          base[["ch4"]], pert[["ch4"]]))
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  gapfill_ok <- length(gapfill_fail) == 0L
+  check_bool("F40", "F",
+             "A missing value is gap-filled from the master, proven through the engine",
+             gapfill_ok,
+             notes = if (gapfill_ok)
+               "Bo omitted from the inputs and doubled in a temp master; the gap-fill and the resulting manure CH4 both doubled, so no literal is standing in for it"
+             else paste(utils::head(gapfill_fail, 3), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

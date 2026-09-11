@@ -5,7 +5,9 @@
 # C1: DE (was DE_pct), ASH (was ash) — IPCC software-aligned names.
 # Andreas 2026-05 audit follow-up: bounds checks. ASH and UE are fractions
 # in [0, 1]; out-of-range values silently produce wrong VS otherwise.
-calc_volatile_solids <- function(ge, DE, UE = 0.04, ASH = 0.08) {
+calc_volatile_solids <- function(ge, DE,
+                                 UE  = .cat_default("UE"),
+                                 ASH = .cat_default("ASH")) {
   if (!is.na(ASH) && (ASH < 0 || ASH >= 1))
     warning("ASH = ", ASH, " is outside [0, 1). Typical IPCC value is 0.08.")
   if (!is.na(UE)  && (UE  < 0 || UE  >  1))

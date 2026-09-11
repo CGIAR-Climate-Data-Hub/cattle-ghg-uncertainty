@@ -93,6 +93,27 @@
   if (all(is.na(n) == is.na(v))) n else v
 }
 
+# THE fallback value for a parameter, straight from the master.
+#
+# Every "what do we use when this is missing" default in the engine and the
+# calc_* signatures reads this. They used to carry their own literals, and
+# eight of them had drifted: the missing-row fallback gave Bo 0.10 where the
+# master says 0.13 (a 2006 value superseded in June), Cfi 0.322 where the
+# catalogue holds the lactating 0.386, EF4 0.010 where the catalogue holds
+# the wet-climate 0.014, and BW/Milk/Fat/DE were left behind by the
+# low-productivity change.
+#
+# Two of those sat on the verify_defaults allow-list, justified as "bites
+# only when the row is absent entirely". That is exactly the gap-fill path,
+# so the allow-list was excusing the case it should have flagged.
+#
+# NA in the catalogue means the user must supply it (only N), so 0 is
+# returned: no animals rather than an invented herd.
+.cat_default <- function(parameter) {
+  v <- PARAM_CATALOGUE$ipcc_default[PARAM_CATALOGUE$parameter == parameter]
+  if (!length(v) || is.na(v[1])) 0 else as.numeric(v[1])
+}
+
 # Pull a named vector (the *_BY_SUBCAT style lists) as a list, in order.
 .master_list <- function(object) {
   d <- .defaults_master[.defaults_master$object == object &
