@@ -2401,6 +2401,103 @@ section_F <- function() {
                "9 sub-categories at their own defaults pass; IPCC Annex 10A.2 Africa weights pass; 600 kg calf and 1400 kg cow still caught; dairy and non-dairy fallbacks return different numbers"
              else paste(utils::head(bench_fail, 4), collapse = "; "))
 
+  # F39 -- every object in the master is actually BUILT FROM the master.
+  #
+  # F32 asserts the master loads and the main objects have the right shape.
+  # That is not the same claim. IPCC_DEFAULTS_BY_REGION and GWP_VALUES were
+  # both written to the master by the export and then left as hand-written
+  # literals in R/, so the master's copies were decorative and the two could
+  # have drifted with nothing noticing.
+  #
+  # scripts/verify_defaults.R structurally cannot catch this: it generates
+  # its row universe FROM the R objects, so a literal is compared against
+  # itself and every surface agrees. The matrix proves the surfaces match
+  # the constants; it says nothing about where the constants came from.
+  #
+  # The only test that distinguishes "reads the master" from "happens to
+  # agree with it" is to change the master and watch the object move. One
+  # numeric cell per object is perturbed in a temp copy, a clean R process
+  # is pointed at it, and every object must report the perturbed value.
+  # A literal keeps the old one and fails.
+  deriv_fail <- tryCatch({
+    m <- utils::read.csv(.DEFAULTS_MASTER_PATH, stringsAsFactors = FALSE,
+                         na.strings = "<NA>", colClasses = "character")
+    num <- !is.na(suppressWarnings(as.numeric(m$value)))
+    objs <- unique(m$object[num])
+    # one perturbable cell per object, and the expression that reads it back
+    READBACK <- list(
+      PARAM_CATALOGUE        = 'PARAM_CATALOGUE$%s[PARAM_CATALOGUE$parameter == "%s"]',
+      MMS_DEFAULTS           = 'MMS_DEFAULTS$%s[MMS_DEFAULTS$id == "%s"]',
+      MMS_FRAC_DEFAULTS_2019 = 'MMS_FRAC_DEFAULTS_2019$%s[MMS_FRAC_DEFAULTS_2019$mms_type == "%s"]',
+      YM_BY_SUBCAT           = 'YM_BY_SUBCAT$%s[YM_BY_SUBCAT$sub_category == "%s"]',
+      IPCC_DEFAULTS_BY_REGION= 'IPCC_DEFAULTS_BY_REGION$%s[IPCC_DEFAULTS_BY_REGION$region == "%s"]',
+      GWP_VALUES             = 'GWP_VALUES[["%2$s"]]')
+    picks <- list(); pert <- m
+    for (o in objs) {
+      i <- which(m$object == o & num)[1]
+      old_v <- as.numeric(m$value[i])
+      new_v <- old_v + 7          # a value no default legitimately holds
+      pert$value[i] <- format(new_v, scientific = FALSE)
+      expr <- READBACK[[o]]
+      if (is.null(expr)) {
+        # the *_BY_SUBCAT lists and FEEDING_SITUATION_CA
+        expr <- sprintf('%s[["%%2$s"]]', o)
+      }
+      if (o == "GWP_VALUES") {
+        parts <- strsplit(m$key[i], ".", fixed = TRUE)[[1]]
+        code <- sprintf('GWP_VALUES[["%s"]][["%s"]]', parts[1], parts[2])
+      } else {
+        code <- sprintf(expr, m$field[i], m$key[i])
+      }
+      picks[[o]] <- list(code = code, want = new_v,
+                         cell = paste(o, m$key[i], m$field[i], sep = "/"))
+    }
+    tmp <- tempfile(fileext = ".csv")
+    on.exit(unlink(tmp), add = TRUE)
+    utils::write.csv(pert, tmp, row.names = FALSE, na = "<NA>")
+    probe <- tempfile(fileext = ".R")
+    on.exit(unlink(probe), add = TRUE)
+    writeLines(c(
+      'suppressMessages(for (f in list.files("R", pattern = "[.]R$", full.names = TRUE))',
+      '  if (!grepl("^_", basename(f))) source(f))',
+      unlist(lapply(names(picks), function(o) sprintf(
+        'cat("%s|", tryCatch(as.numeric(%s)[1], error = function(e) NA), "
+", sep = "")',
+        o, picks[[o]]$code)))), probe)
+    # Sys.setenv, NOT system2(env=): on Windows that argument is unsupported
+    # and the child silently produces no output, which read as "every object
+    # is a literal". The child inherits this process's environment instead.
+    .old_env <- Sys.getenv("GMH_DEFAULTS_MASTER", unset = NA)
+    Sys.setenv(GMH_DEFAULTS_MASTER = tmp)
+    out <- suppressWarnings(system2(
+      file.path(R.home("bin"), "Rscript"), c("--vanilla", shQuote(probe)),
+      stdout = TRUE, stderr = TRUE))
+    if (is.na(.old_env)) Sys.unsetenv("GMH_DEFAULTS_MASTER")
+    else Sys.setenv(GMH_DEFAULTS_MASTER = .old_env)
+    f <- character(0)
+    for (o in names(picks)) {
+      # startsWith/fixed rather than a regex: a pipe needs escaping and the
+      # object names are literals anyway.
+      tag <- paste0(o, "|")
+      ln  <- out[startsWith(out, tag)]
+      got <- if (length(ln))
+               suppressWarnings(as.numeric(sub(tag, "", ln[1], fixed = TRUE)))
+             else NA_real_
+      if (is.na(got) || abs(got - picks[[o]]$want) > 1e-9)
+        f <- c(f, sprintf("%s did not follow the master (%s: wanted %s, got %s)",
+                          o, picks[[o]]$cell, picks[[o]]$want, got))
+    }
+    if (!length(picks)) f <- c(f, "no objects tested")
+    f
+  }, error = function(e) conditionMessage(e))
+  deriv_ok <- length(deriv_fail) == 0L
+  check_bool("F39", "F",
+             "Every master object is built FROM the master, proven by perturbation",
+             deriv_ok,
+             notes = if (deriv_ok)
+               "one cell per object perturbed in a temp master; a clean R process reported the perturbed value for every one, so none is a hand-written literal"
+             else paste(utils::head(deriv_fail, 3), collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

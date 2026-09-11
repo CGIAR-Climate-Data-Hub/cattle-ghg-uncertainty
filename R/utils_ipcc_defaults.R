@@ -218,15 +218,29 @@ mms_frac_defaults_2019 <- function(mms_type) {
   hit
 }
 
-GWP_VALUES <- list(
-  AR4 = list(CH4 = 25,   N2O = 298),
-  AR5 = list(CH4 = 28,   N2O = 265),
-  # Andreas 2026-05 follow-up: AR6 CH4 corrected from 27.9 (not an IPCC value)
-  # to 27.0 — IPCC AR6 WG1 Table 7.15 gives CH4-fossil = 29.8 and
-  # CH4-non-fossil = 27.0. Cattle CH4 (enteric and manure) is biogenic /
-  # non-fossil, so 27.0 is the correct value. N2O = 273 unchanged.
-  AR6 = list(CH4 = 27.0, N2O = 273)
-)
+# Built from reference/defaults_master.csv, like every other default.
+#
+# This was the second object the master migration missed, after
+# IPCC_DEFAULTS_BY_REGION: the export wrote its rows to the CSV and the
+# literal stayed here, so the master's copy was decorative. Audit check F39
+# now proves derivation by perturbing the master and confirming every object
+# moves, which is the only test that distinguishes "reads the master" from
+# "happens to agree with it".
+#
+# Master keys are "<AR>.<gas>"; the app wants list(AR5 = list(CH4 =, N2O =)).
+#
+# The AR6 CH4 value is 27.0, corrected in the 2026-05 review follow-up from
+# 27.9, which is not an IPCC number. AR6 WG1 Table 7.15 gives CH4-fossil
+# 29.8 and CH4-non-fossil 27.0; cattle methane, enteric and manure alike, is
+# biogenic, so 27.0 is the right one. N2O 273 unchanged.
+GWP_VALUES <- local({
+  g <- .master_list("GWP_VALUES")
+  ar <- sub("[.].*$", "", names(g))
+  stats::setNames(lapply(unique(ar), function(a) {
+    k <- g[ar == a]
+    stats::setNames(as.list(unname(unlist(k))), sub("^.*[.]", "", names(k)))
+  }), unique(ar))
+})
 
 SUBCATS <- c("cows", "heifers", "adult_males", "growing_males", "calves")
 SUBCAT_LABELS <- c(cows = "Dairy Cows", heifers = "Heifers (>1yr)",

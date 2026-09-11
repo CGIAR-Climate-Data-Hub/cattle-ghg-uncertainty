@@ -28,7 +28,19 @@
 # anything uses them.
 # =============================================================================
 
-.DEFAULTS_MASTER_PATH <- "reference/defaults_master.csv"
+# The path is overridable ONLY so the derivation test can point a clean R
+# process at a perturbed copy of the master. Nothing in the app sets it.
+#
+# That test exists because two objects, IPCC_DEFAULTS_BY_REGION and
+# GWP_VALUES, were written to the master by the export and then kept as
+# hand-written literals here, so the master's copy of them was decorative
+# and the two could have drifted with nothing noticing.
+# scripts/verify_defaults.R cannot catch that: it builds its row universe
+# FROM the R objects, so a literal is compared against itself. Only
+# changing the master and watching the object move distinguishes "reads the
+# master" from "happens to agree with it". See audit check F39.
+.DEFAULTS_MASTER_PATH <- Sys.getenv("GMH_DEFAULTS_MASTER",
+                                    "reference/defaults_master.csv")
 
 .defaults_master <- local({
   p <- .DEFAULTS_MASTER_PATH
