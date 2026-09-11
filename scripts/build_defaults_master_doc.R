@@ -51,6 +51,32 @@ out <- c(
           sum(nzchar(M$review_round), na.rm = TRUE)),
   "")
 
+# --- verification summary --------------------------------------------------
+# Every numeric default was read back against the IPCC source text value by
+# value. The verdicts live on the master itself; this renders them so the
+# document a reader opens shows which values are quoted from IPCC and which
+# are not, rather than implying that all of them are.
+.numeric_row <- !is.na(suppressWarnings(as.numeric(M$value)))
+.vt <- table(M$ipcc_verdict[.numeric_row])
+.gloss <- c(
+  CONFIRMED = "read at the cited IPCC table or equation",
+  INTERPRETED = "a defensible reading of an IPCC category label, not a quotation",
+  DEVIATION_DOCUMENTED = "differs from IPCC deliberately, reason on record",
+  DEVIATION_OPEN = "differs from IPCC with no recorded reason; needs a decision",
+  NOT_IPCC = "a non-IPCC source or a project assumption",
+  NO_IPCC_DEFAULT = "IPCC publishes no default for this quantity",
+  META = "not a shipped value")
+out <- c(out, "## IPCC verification status", "",
+  sprintf("All %d numeric values below were checked one at a time against the IPCC source text on 2026-09-11. Each carries its verdict and the exact table it was read from, in the `ipcc_verdict` and `ipcc_source` columns of the CSV. Audit check F33 fails the build if a value is ever added without one.",
+          sum(.numeric_row)),
+  "",
+  "| verdict | meaning | values |", "|---|---|---|")
+for (v in names(sort(.vt, decreasing = TRUE)))
+  out <- c(out, sprintf("| `%s` | %s | %d |", v, .gloss[[v]], .vt[[v]]))
+out <- c(out, "",
+  "The `DEVIATION_OPEN` rows are the ones that would move a reported number if resolved. They are listed in full at the end of this document and discussed in `reference/provenance_register.md`.",
+  "")
+
 out <- c(out, "## Parameter catalogue", "",
   "The 25 parameters. `ipcc_default` is the generic value; where a sub-category overrides it, see the effective-values table below.", "",
   tbl(PARAM_CATALOGUE,
@@ -102,6 +128,28 @@ out <- c(out, "", "## Global warming potentials", "",
   "## Regional body-weight benchmark", "",
   "The only parameter with a defensible continental IPCC lookup; the other benchmarks were withdrawn after review because their sources could not be found in the guidelines.", "",
   tbl(IPCC_DEFAULTS_BY_REGION), "")
+
+# --- the open deviations, in full ------------------------------------------
+.open <- M[.numeric_row & M$ipcc_verdict == "DEVIATION_OPEN", ]
+out <- c(out, "", "## Values that differ from IPCC with no recorded reason", "",
+  sprintf("%d of the %d numeric values. Each is a live question, not a known-wrong number: some are roundings of an IPCC cell, some sit between two IPCC tables, and some have no IPCC basis at all. None has been changed on the strength of this pass alone, because several carry review provenance.",
+          nrow(.open), sum(.numeric_row)),
+  "",
+  "| object | key | field | value | what IPCC says |", "|---|---|---|---|---|")
+for (i in seq_len(nrow(.open)))
+  out <- c(out, sprintf("| %s | %s | %s | %s | %s |",
+                        .open$object[i], .open$key[i], .open$field[i],
+                        fmt(.open$value[i]), fmt(.open$ipcc_source[i])))
+out <- c(out, "",
+  "## Full verification record", "",
+  "Every numeric value with its verdict and source, in master order.", "",
+  "| object | key | field | value | verdict | source |", "|---|---|---|---|---|---|")
+.allv <- M[.numeric_row, ]
+for (i in seq_len(nrow(.allv)))
+  out <- c(out, sprintf("| %s | %s | %s | %s | `%s` | %s |",
+                        .allv$object[i], .allv$key[i], .allv$field[i],
+                        fmt(.allv$value[i]), .allv$ipcc_verdict[i],
+                        fmt(.allv$ipcc_source[i])))
 
 writeLines(out, "reference/DEFAULTS_MASTER.md", useBytes = TRUE)
 cat("wrote reference/DEFAULTS_MASTER.md (", length(out), " lines)\n", sep = "")

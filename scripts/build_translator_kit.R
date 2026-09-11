@@ -29,6 +29,14 @@ if (basename(getwd()) == "scripts") setwd("..")
 # -----------------------------------------------------------------------------
 
 suppressMessages({
+  # load_defaults.R MUST come first: it reads reference/defaults_master.csv and
+  # defines .master_wide()/.master_list(), which utils_template.R and
+  # utils_ipcc_defaults.R call at source time to build their constants. The app
+  # gets this free by sourcing R/ alphabetically; this script names its files,
+  # so it has to name this one too. Omitting it broke the generator silently
+  # when the master migration landed, and nothing caught it because the kit
+  # build was not in the audit. Audit check F34 now is.
+  source("R/load_defaults.R", local = FALSE)
   source("R/utils_template.R", local = FALSE)
   source("R/utils_validation.R", local = FALSE)
   source("R/utils_ipcc_defaults.R", local = FALSE)

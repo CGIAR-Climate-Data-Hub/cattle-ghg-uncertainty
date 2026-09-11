@@ -435,3 +435,154 @@ Ordered by confidence, not by size. Nothing here collides with a pinned or agree
 9. Relabel section 4 items as project assumptions and give `PCT_PREGNANT_BY_SUBCAT` a real source or an explicit assumption note. Its values are pinned by F30, so this is a labelling change only.
 
 Of items 1-6, only the composting EF3 choice and `dry_lot` MCF change an emission mean. Everything else changes reported uncertainty or documentation.
+
+---
+---
+
+# Complete value-by-value verification, 2026-09-11
+
+Second pass. Every one of the **249 numeric values** in `reference/defaults_master.csv` was read back against the IPCC source text, one at a time. The verdicts are not held in this document: they are written onto the master itself, in its `ipcc_verdict` and `ipcc_source` columns, so the single authority carries its own provenance. `reference/DEFAULTS_MASTER.md` renders them and audit check **F33** fails the build if a value is ever added without one.
+
+**What made this pass possible.** The first pass gave up on the Annex 10A tables and marked them `UNVERIFIABLE_FROM_TEXT`, because the text extraction scrambles their column order into unreadable runs of numbers. Reading those pages from the PDF directly resolved all of them. Every value previously parked as unverifiable now has a verdict.
+
+## Outcome
+
+| Verdict | Values | Meaning |
+|---|---|---|
+| `CONFIRMED` | 162 | read at the cited IPCC table or equation |
+| `DEVIATION_OPEN` | 27 | differs from IPCC with no recorded reason; needs a decision |
+| `DEVIATION_DOCUMENTED` | 23 | differs deliberately, reason on record |
+| `NOT_IPCC` | 21 | a non-IPCC source or a project assumption |
+| `NO_IPCC_DEFAULT` | 10 | IPCC publishes no default for this quantity |
+| `INTERPRETED` | 6 | a defensible reading of an IPCC category label, not a quotation |
+
+Nothing in this section has been changed in the code. These are findings for decision, and several sit on values with review provenance, so changing them silently is exactly what the escalation rule exists to prevent.
+
+## 1. Newly confirmed
+
+**Table 10A.11 independently confirms the anaerobic digester correction.** PDF page 139, "High quality biogas digester, open storage", reads 3.55% cold / 4.38% temperate / 4.59% warm: exactly the values adopted, and exactly the band mapping. The table's own headers are cold/temperate/warm, which also corroborates the Cool to boreal and Warm to tropical mapping used throughout.
+
+**The MCF band convention is real and consistent.** The 2006 Table 10.17 is per-degree-C, with nineteen columns. For every temperature-dependent system the tool reads the same three of them: boreal from the `<= 10` column, temperate from the `19` column, tropical from the `>= 28` column. Checked against all three such systems:
+
+| System | boreal | temperate | tropical | IPCC at <= 10 / 19 / >= 28 |
+|---|---|---|---|---|
+| Liquid/Slurry with natural crust cover | 10 | 24 | 50 | 10 / 24 / 50 |
+| Cattle and swine deep bedding > 1 month | 17 | 39 | 80 | 17 / 39 / 80 |
+| Uncovered anaerobic lagoon | 66 | 77 | 80 | 66 / 77 / 80 |
+
+Three systems agreeing on the same three columns is a convention, not three coincidences. It was undocumented until now, which is why those figures looked arbitrary. It is now recorded on every affected row.
+
+**Footnote 8 of Table 10A.2 settles the oxen question.** "Draft bullocks were all assumed to be castrates and CFi values were adjusted accordingly." The June 2026 decision to move oxen to the 0.322 steers row was not merely a defensible reading: it is what IPCC itself did with the same animal.
+
+**Equation 10.6 settles the growth coefficient.** "C = a coefficient with a value of 0.8 for females, 1.0 for castrates and 1.2 for bulls (NRC, 1996)." Six of the nine `C_GROWTH_BY_SUBCAT` entries are direct quotations. The three male growing categories are `INTERPRETED`, on the same castrate reading already applied to `Cfi`.
+
+**All five Chapter 11 parameters confirmed exactly, bounds included.** Table 11.3 gives EF4 wet 0.014 (0.011-0.017), EF5 0.011 (0.000-0.020), FracGASM 0.21 (0.00-0.31), FracLEACH-(H) 0.24 (0.01-0.73); Table 11.1 gives EF3PRP 0.006 (0.000-0.027). The only departures are the small positive floors the tool substitutes for IPCC's 0.000 lower bounds, because a zero lower bound is degenerate for the bounded distributions. That is documented on each row.
+
+**Table 10.22 confirmed line by line, and the variant harmonisation was right.** Every central and every published bound in `MMS_FRAC_DEFAULTS_2019` matches the "Other Cattle" column. Note that section 1.7 above, written before the harmonisation, records `liquid_slurry` volatilisation as 0.48. It is now **0.30 (0.09-0.36)**, the *with natural crust cover* figure, which is the variant the row declares and the variant its EF3 of 0.005 comes from. Section 1.7 is correct about the 0.48 cell; that cell is simply no longer the one this row uses.
+
+**Cp 0.10** at Table 10.7 (Updated), "Cattle and Buffalo 0.10". **Aerobic treatment MCF 0/0/0**, **Burned for fuel 10/10/10**, **Solid storage 2/4/5** and **Covered/compacted 2/4/5** all confirmed against both editions where both publish them.
+
+## 2. Findings that would move a reported number
+
+### 2.1 The catalogue mixes the dairy and non-dairy annex tables
+
+The generic defaults are drawn from two different IPCC tables describing two different animals, and three of them come from neither.
+
+| Parameter | Catalogue | Table 10A.1 Africa **dairy** | Table 10A.2 Africa **non-dairy grazing** |
+|---|---|---|---|
+| BW | 275 | 260 | **275** |
+| Milk | 3.5 | **3.5** | 1.2 |
+| Fat | 4.3 | **4.3** | 4.1 |
+| Ym | 6.5 | **6.5** | 7.0 |
+| CP | 10.0 | 8.7 | **10.0** |
+| MilkPR | 3.3 | 3.6 | 3.6 |
+| pct_pregnant | 0.60 | 0.54 | 0.54 |
+| DE | 55 | 51 | 58 |
+
+Both source rows are individually defensible. The combination describes no animal IPCC published. This is the same variant-mixing pattern already found and fixed in the manure systems, one level up: there the fix was to declare a variant per row and make every coefficient follow it.
+
+### 2.2 MilkPR 3.3 is supported by no reading
+
+Both candidate rows give protein content **3.6%**, and the tool's own documented route, %MilkPR = 1.9 + 0.4 x %Fat, gives **3.62** at Fat 4.3. The value 3.3 is what that formula returns for Fat **3.5**, which is what Fat held before it was corrected to 4.3 at review round 8. This is a leftover from that correction, not an interpretive choice. It is the clearest single defect in the pass.
+
+### 2.3 Ym is a per-category table applied as one number
+
+Table 10.12 (Updated) gives Ym by livestock category, and the tool ships a single 6.5 for every sub-category:
+
+| IPCC category | Ym | Tool | Effect |
+|---|---|---|---|
+| Dairy cows, low producing, DE <= 62 | **6.5** | 6.5 | correct |
+| Non-dairy and multi-purpose, > 75% forage, DE <= 62 | **7.0** | 6.5 | 7.7% low |
+| Feedlot, 0-15% forage, DE >= 72 | **4.0** | 6.5 | **63% high** |
+
+Every non-dairy row of Annex 10A.2, in every region, carries 7.0. This has the identical structure to the `Cfi` defect already fixed: IPCC publishes a per-category table, the tool holds one value, and there is no `YM_BY_SUBCAT` to override it. The feedlot case is the large one, and it runs the wrong way, overstating enteric methane. Note that a feedlot Ym of 4.0 is conditional on DE >= 72, so the `DE` default would have to become per-sub-category at the same time.
+
+### 2.4 Composting: the MCF is still on the other edition's reading
+
+The composting row declares the **Static Pile** variant, and that variant was chosen explicitly. Two of its three coefficient families follow it under the 2019 Refinement. The MCF does not.
+
+| Coefficient | Tool | Static Pile, 2019R | In-vessel, 2019R | Static pile, 2006 |
+|---|---|---|---|---|
+| EF3 | 0.010 | **0.010** | 0.006 | n/a |
+| Frac_GasMS | 0.65 (0.14-0.70) | **0.65 (0.14-0.70)** | 0.60 (0.12-0.65) | n/a |
+| MCF | 0.5 / 0.5 / 0.5 | 1.00 / 2.00 / 2.50 | **0.50** | **0.5 / 0.5 / 0.5** |
+
+The row is offered under both editions. Under 2006 the MCF is right. Under 2019R it is the in-vessel figure, and a 2019R user gets a composting MCF between two and five times too low. This is the last surviving instance of the variant-mixing class, and it is in the row that still needs reviewer confirmation.
+
+### 2.5 MW 300 carries an IPCC citation for a value IPCC does not publish
+
+`PARAM_CATALOGUE$MW` cites `Table 10A.2`. That table has no mature-weight column: its columns are weight, weight gain, feeding situation, milk yield, fat, protein, work hours, pregnant, digestibility, CP, Ym, population mix, EF, VS, Nex and N retention. Neither does Table 10A.1. Mature weight enters Equation 10.6 as an input, but IPCC publishes no default for it.
+
+Reviewer round 7 item #3 said exactly this: 300 kg MW was on his list of values he could not find in the guidelines. The companion value on that list, 400 kg BW for African dairy, was fixed. **MW kept its citation.** All nine `MW_BY_SUBCAT` entries are project assumptions and are now marked `NO_IPCC_DEFAULT`.
+
+### 2.6 The anaerobic digester volatilisation range sits below IPCC's floor
+
+Table 10.22 gives Anaerobic digester as a bare range, **0.05 to 0.50**, with no central value; footnote 3 assigns 0.05 to covered high-dry-matter digestate and up to 0.50 to uncovered. The tool takes 0.05 as the central and then samples 0.02 to 0.08 around it. Its entire sampled range therefore sits at or below IPCC's lower limit, and its upper bound is six times below IPCC's ceiling. Footnote 3 also advises using the uncovered liquid-slurry figure for uncovered digestate, which the tool does not do.
+
+### 2.7 Sub-category weights are roundings presented as transcriptions
+
+Against the Annex 10A.2 Africa column:
+
+| Sub-category | Tool | IPCC row |
+|---|---|---|
+| other_cows BW | 275 | Mature Females - grazing 275 (exact) |
+| bulls BW | 350 | Mature Males 540, Bulls - Grazing 340 |
+| oxen BW | 300 | Draft Bullocks 340 |
+| heifers, growing_males BW | 200 | Growing/Replacement 204 |
+| calves BW | 60 | Calves on forage 82 |
+| feedlot_cattle BW | 250 | no Africa row; North America 500, Latin America 460 |
+| heifers WG | 0.25 | Growing/Replacement 0.24 |
+| growing_males WG | 0.20 | Growing/Replacement 0.24 |
+| calves WG | 0.30 | Calves on forage 0.33 |
+| dairy_cows BW | 275 | Table 10A.1 Africa **dairy** is 260 |
+
+Most are roundings and harmless. Two are not: the calf weight is 27% below any published calf row, and the feedlot weight is half the lower of the two published feedlot weights. The `dairy_cows` entry is the mixing of 2.1 reappearing at sub-category level.
+
+### 2.8 Pregnancy rates are on a different regional basis from everything else
+
+`PCT_PREGNANT_BY_SUBCAT` gives cows 0.85 and heifers 0.50. Africa is 54% in both annex tables. The figure 85% is the **Eastern Europe** dairy rate. Every other default in the tool is African; this object is not.
+
+### 2.9 Two regional benchmarks match no row for their region
+
+| Region | Tool | IPCC |
+|---|---|---|
+| africa | 275 | Table 10A.2 Africa grazing 275 (exact) |
+| europe | 600 | Table 10A.1 Western Europe dairy 600 (exact) |
+| americas | 500 | Table 10A.1 Latin America low productivity 500 (exact) |
+| asia | 350 | Asia dairy 386, low productivity 355; non-dairy 376 / 305. The only published 350 is Indian subcontinent high-productivity dairy |
+| oceania | 500 | Oceania dairy 488; non-dairy 416 / 467. No 500 anywhere |
+| global | 400 | no global row exists in either table |
+
+This object survived review round 7 for BW only, after the other benchmarks were withdrawn. Two of the six still do not resolve.
+
+## 3. Correctly classified as non-IPCC
+
+The 20 `suggested_uncertainty_pct` values are Penman (2000) and Monni (2007), disclosed as such in the user guide. The one exception is `Bo` at 15%, which is published in the footer of Table 10.16A and is now marked `CONFIRMED`.
+
+`Tw` has no IPCC default and is correctly a project assumption. `GWP_VALUES` are correct against AR4 (25 / 298), AR5 (28 / 265) and AR6 (27 / 273, non-fossil methane), but the Assessment Reports are not in `reference/`, so those six are confirmed against the published figures rather than from a local source.
+
+## 4. What this pass did not do
+
+No value was changed. Of the 27 `DEVIATION_OPEN` rows, several carry review provenance: `Milk` 3.5 and `Fat` 4.3 were adjudicated at round 8 page 7, and the regional benchmark at round 7 item #3. Resolving 2.1, 2.3 or 2.4 would change reported emission means, and 2.3 would change them substantially for any inventory carrying feedlot cattle. Those are decisions to take deliberately, with the reviewer, not corrections to apply on the strength of a reading.
+
+The PERT mean-shift measurement (Part B) is still outstanding and is now larger than first estimated, because `deep_bedding` moved to 80 and `liquid_slurry` to 50 after that estimate was made.

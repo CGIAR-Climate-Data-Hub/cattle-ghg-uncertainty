@@ -796,9 +796,41 @@ for (sn in surf)
     sum(M[[sn]] == "INFO-DIFF"),
     sum(M[[sn]] == "absent"), sum(M[[sn]] == "n/a")))
 
+# --- IPCC verdict per row ---------------------------------------------------
+# The matrix answers "does every surface agree with the master?". It cannot
+# answer "is the master right?". That second question was settled by reading
+# each value against the IPCC text, and the answer lives on the master. Join
+# it in so one artifact carries both: agreement across surfaces, and agreement
+# with the source. A row can be MATCH on all fourteen surfaces and still be
+# DEVIATION_OPEN, which is precisely the failure mode the first pass missed.
+.mk <- function(o, k, f) paste(o, k, f, sep = "\r")
+.i <- match(.mk(M$object, M$key, M$field),
+            .mk(.defaults_master$object, .defaults_master$key,
+                .defaults_master$field))
+M$ipcc_verdict <- .defaults_master$ipcc_verdict[.i]
+M$ipcc_verdict[is.na(M$ipcc_verdict)] <- ""
+
+.vt <- table(M$ipcc_verdict[nzchar(M$ipcc_verdict)])
+out <- c(out, "", "## IPCC verdict (from the master, not from this run)", "",
+  "Surface agreement and source agreement are different questions. A row can read MATCH on every surface and still differ from IPCC: that means the tool is consistently wrong, which is harder to spot than an inconsistency, and is the class of defect this column exists to surface.",
+  "", "| verdict | cells |", "|---|---|")
+for (v in names(sort(.vt, decreasing = TRUE)))
+  out <- c(out, sprintf("| `%s` | %d |", v, .vt[[v]]))
+
+.op <- M[M$ipcc_verdict == "DEVIATION_OPEN", ]
+if (nrow(.op)) {
+  out <- c(out, "",
+    sprintf("%d cells differ from IPCC with no recorded reason. They are NOT defects of this matrix (they match across surfaces); they are open questions about the master itself, set out in `reference/provenance_register.md`.",
+            nrow(.op)),
+    "", "| object | key | field | value |", "|---|---|---|---|")
+  for (i in seq_len(nrow(.op)))
+    out <- c(out, sprintf("| %s | %s | %s | %s |", .op$object[i], .op$key[i],
+                          .op$field[i], .op$reference[i]))
+}
+
 writeLines(out, "DEFAULTS_MATRIX.md", useBytes = TRUE)
-write.csv(M[, c("object", "key", "field", "reference_n", "rv_round",
-                "rv_authority", surf)],
+write.csv(M[, c("object", "key", "field", "reference_n", "ipcc_verdict",
+                "rv_round", "rv_authority", surf)],
           "DEFAULTS_MATRIX.csv", row.names = FALSE)
 
 cat(sprintf("\n=== DEFAULTS MATRIX ===\ncells %d | surfaces %d | rows needing attention %d\n",

@@ -78,6 +78,23 @@ for (ar in names(GWP_VALUES)) for (g in names(GWP_VALUES[[ar]])) {
 
 M <- do.call(rbind, rows)
 dir.create("reference", showWarnings = FALSE)
+
+# Carry forward the IPCC verification verdicts if the master already has them.
+# They are research results that cannot be regenerated from the constants, so
+# a re-seed must not silently discard them. scripts/annotate_ipcc_verdicts.R
+# rewrites them from its own table; this only stops a re-seed being lossy.
+if (file.exists("reference/defaults_master.csv")) {
+  old <- utils::read.csv("reference/defaults_master.csv", stringsAsFactors = FALSE,
+                         na.strings = "<NA>", colClasses = "character")
+  if (all(c("ipcc_verdict", "ipcc_source") %in% names(old))) {
+    k <- function(d) paste(d$object, d$key, d$field, sep = "\r")
+    i <- match(k(M), k(old))
+    M$ipcc_verdict <- old$ipcc_verdict[i]
+    M$ipcc_source  <- old$ipcc_source[i]
+    cat(sprintf("  carried forward %d verdicts (%d rows had none)\n",
+                sum(!is.na(M$ipcc_verdict)), sum(is.na(M$ipcc_verdict))))
+  }
+}
 # NA and "" are different things here: PARAM_CATALOGUE$ipcc_ref is an empty
 # STRING for the four parameters with no IPCC reference, while ipcc_default is
 # a true NA for N. Writing both as "" would collapse them and the round trip

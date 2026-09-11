@@ -2104,6 +2104,84 @@ section_F <- function() {
                        nrow(.defaults_master))
                else "reference/defaults_master.csv missing, truncated, or rebuilt an object with the wrong shape/type")
 
+  # F33 -- every shipped numeric default carries an IPCC verification verdict.
+  # The whole master was read back against the IPCC source text value by value
+  # on 2026-09-11 and the outcome written into the ipcc_verdict/ipcc_source
+  # columns by scripts/annotate_ipcc_verdicts.R. A NEW default added later
+  # would arrive with no verdict, which is precisely the state that let
+  # unsourced values accumulate in the first place. This check makes an
+  # unverified value a build failure rather than something to notice later.
+  VERDICTS <- c("CONFIRMED", "INTERPRETED", "DEVIATION_DOCUMENTED",
+                "DEVIATION_OPEN", "NOT_IPCC", "NO_IPCC_DEFAULT", "META")
+  verdict_ok <- tryCatch({
+    m <- .defaults_master
+    stopifnot(all(c("ipcc_verdict", "ipcc_source") %in% names(m)))
+    numeric_row <- !is.na(suppressWarnings(as.numeric(m$value)))
+    bad_v <- numeric_row & (is.na(m$ipcc_verdict) |
+                            !m$ipcc_verdict %in% VERDICTS)
+    bad_s <- numeric_row & (is.na(m$ipcc_source) | !nzchar(m$ipcc_source))
+    verdict_gaps <<- m[bad_v | bad_s, c("object", "key", "field")]
+    n_num <<- sum(numeric_row)
+    !any(bad_v | bad_s)
+  }, error = function(e) { verdict_gaps <<- NULL; FALSE })
+  check_bool("F33", "F",
+             "Every numeric default in the master carries an IPCC verification verdict and source",
+             verdict_ok,
+             notes = if (verdict_ok)
+               sprintf("%d numeric values, all with a verdict from the allowed set", n_num)
+             else if (is.null(verdict_gaps))
+               "master has no ipcc_verdict/ipcc_source columns; run scripts/annotate_ipcc_verdicts.R"
+             else sprintf("%d value(s) with no verdict or no source, e.g. %s. Run scripts/annotate_ipcc_verdicts.R",
+                          nrow(verdict_gaps),
+                          paste(utils::head(apply(verdict_gaps, 1, paste, collapse = "/"), 3),
+                                collapse = "; ")))
+
+  # F34 -- the translator kit generator can still run. It does NOT source R/
+  # alphabetically the way the app does; it names three or four files
+  # explicitly, so a new load-order dependency in R/ breaks it without
+  # breaking anything else. That is not hypothetical: the defaults-master
+  # migration made utils_template.R call .master_wide() at source time, the
+  # generator did not name load_defaults.R, and the build died with "could not
+  # find function". Nothing caught it because the kit build is not in CI and
+  # the already-generated prompts still matched the master.
+  #
+  # Sourcing the generator's own file list, in its own order, reproduces the
+  # failure in about a second without rendering PDFs. The list is parsed from
+  # the script so the check cannot drift from it.
+  #
+  # This MUST run in a separate R process. The audit has already sourced all
+  # of R/ into its own global environment, so a new.env() inside this session
+  # finds .master_wide() through the parent chain and the check passes even
+  # with the dependency missing. That is not a hypothetical either: the first
+  # version of F34 did exactly that and reported PASS against the broken
+  # script. Only a clean process reproduces what `Rscript build_...` sees.
+  kit_ok <- tryCatch({
+    src <- readLines("scripts/build_translator_kit.R", warn = FALSE)
+    files <- regmatches(src, regexpr('source\\("R/[^"]+', src))
+    files <- sub('^source\\("', "", files)
+    stopifnot(length(files) >= 3)
+    kit_files <<- files
+    probe <- tempfile(fileext = ".R")
+    on.exit(unlink(probe), add = TRUE)
+    writeLines(c(
+      sprintf('source("%s")', files),
+      'stopifnot(is.data.frame(PARAM_CATALOGUE), nrow(PARAM_CATALOGUE) == 25L)',
+      'cat("KIT_SOURCE_ORDER_OK\\n")'), probe)
+    res <- suppressWarnings(system2(
+      file.path(R.home("bin"), "Rscript"), c("--vanilla", shQuote(probe)),
+      stdout = TRUE, stderr = TRUE))
+    kit_err <<- paste(utils::tail(res, 3), collapse = " | ")
+    any(grepl("KIT_SOURCE_ORDER_OK", res, fixed = TRUE))
+  }, error = function(err) { kit_err <<- conditionMessage(err); FALSE })
+  check_bool("F34", "F",
+             "Translator kit generator's declared source order still resolves",
+             kit_ok,
+             notes = if (kit_ok)
+               sprintf("sourced %s in the generator's own order; PARAM_CATALOGUE rebuilt with 25 rows",
+                       paste(basename(kit_files), collapse = ", "))
+             else sprintf("scripts/build_translator_kit.R cannot source its own file list: %s",
+                          if (exists("kit_err")) kit_err else "unknown error"))
+
   # F31 — sparse-overlay writer integration (the safety net). Writing a SPARSE
   # input (only the user's own rows + the MMS allocation) through
   # .translator_write_official_template must yield a COMPLETE template (every
