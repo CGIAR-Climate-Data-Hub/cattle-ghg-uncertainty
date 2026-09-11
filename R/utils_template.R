@@ -214,190 +214,24 @@ PARAM_ALIASES <- c(
 # PARAMETER CATALOGUE  (central source of truth for the Vocab sheet and
 #                        for pre-populating the Parameters sheet)
 # ---------------------------------------------------------------------------
-PARAM_CATALOGUE <- data.frame(
-  # R1.6: parameter names fully IPCC-aligned (per IPCC Inventory Software v2.95).
-  # Older names (cattle_pop, live_weight, DE_pct, etc.) are auto-renamed by
-  # parse_uploaded_template via PARAM_ALIASES so legacy templates still work.
-  # Andreas 2026-05-27 feedback: EF3_S, Frac_GASMS and Frac_LEACH_H were
-  # removed from the Parameters sheet. EF3_S was never consumed by the
-  # equation chain (direct MM N2O uses the per-MMS EF3 column from the
-  # Manure_Management tab); Frac_GASMS / Frac_LEACH_H are specified per-MMS
-  # in Manure_Management (Frac_GasMS_pct / Frac_LeachMS_pct) and only ever
-  # served as scalar fallbacks here. The scalar fallbacks in ghg_emissions_vec
-  # now resolve to the hardcoded IPCC 2019 defaults (0.21 / 0.02) via
-  # get_param_alt(), which is the correct behaviour. The PRP-side fractions
-  # (Frac_GASM_PRP / Frac_LEACH_PRP) and the indirect EFs (EF4 / EF5) and the
-  # PRP direct EF (EF3_PRP) remain — they have no per-MMS equivalent.
-  parameter = c(
-    "N","BW","MW","WG",
-    "Milk","Fat","pct_pregnant","DE",
-    "Cfi","Ca","C","Cp","hours","CP",
-    "Ym","Bo","ASH","UE",
-    "EF3_PRP","EF4","EF5",
-    "Frac_GASM_PRP","Frac_LEACH_PRP",
-    "MilkPR","Tw"),
-  definition = c(
-    "Number of animals in this sub-category",
-    "Average live body weight of the animals",
-    "Mature (adult) body weight of the animals",
-    "Average daily weight gain — set 0 for non-growing (adult) animals",
-    "Daily milk yield per lactating cow (not sub-category-average — the tool multiplies by pct_pregnant internally). Set 0 for sub-categories that do not lactate.",
-    "Fat content of milk (% by weight)",
-    "Fraction of females in this sub-category that are pregnant during the year, between 0 and 1 — includes pregnant heifers that have not yet calved. Weights Cpregnancy in IPCC Eq 10.13 (NEp) and the milk-N retention term in Eq 10.33; the tool also applies it as the lactation-weight in Eq 10.8 (NEl). For sub-categories where lactation and pregnancy populations differ, enter the pregnancy fraction.",
-    "Digestible energy as a percentage of gross energy — typical range 45-75%",
-    "Maintenance energy coefficient — depends on sex and lactation status (IPCC Table 10.4)",
-    "Activity coefficient for locomotion energy — depends on feeding situation (IPCC Table 10.5)",
-    "Growth coefficient for the NEg equation — depends on sex and physiological status (IPCC Eq 10.6)",
-    "Pregnancy coefficient — 0.10 for pregnant animals (IPCC Table 10.7)",
-    "Daily working hours (Eq. 10.11) — set 0 if animals do no work; relevant only where animals are used for traction/load",
-    "Crude protein (CP%) content of the diet — used to estimate nitrogen excretion",
-    "Methane conversion factor: % of gross energy in feed converted to methane (IPCC Table 10.12)",
-    "Maximum CH₄ producing capacity of manure (IPCC Table 10.16)",
-    "Ash content of manure — IPCC default 0.08 (Eq 10.24 footnote)",
-    "Urinary energy as fraction of gross energy — IPCC default 0.04 (Eq 10.24 footnote)",
-    "N₂O emission factor for dung/urine on pasture (IPCC Vol.4 Ch.11 Table 11.1). 2019R EF3_PRP,CPP for cattle/poultry/pigs: aggregated 0.004; wet climate 0.006; dry climate 0.002. 2006 = 0.02.",
-    "N₂O EF for atmospheric N deposition (IPCC Vol.4 Ch.11 Table 11.3). 2019R aggregated EF4 = 0.010 (range 0.002-0.018); wet climate 0.014; dry climate 0.005. 2006 = 0.010.",
-    "N₂O EF for N leaching/runoff (IPCC Vol.4 Ch.11 Table 11.3). 2019R EF5 = 0.011 (range 0.000-0.020), no climate disaggregation. 2006 = 0.0075.",
-    "Fraction of N volatilised from dung/urine on pasture (IPCC Vol.4 Ch.11 Table 11.3, FracGASM). 2019R = 0.21 (range 0.00-0.31); 2006 = 0.20.",
-    "Fraction of N leached from pasture deposition (IPCC Vol.4 Ch.11 Table 11.3, FracLEACH-(H), wet climates only). 2019R = 0.24 (range 0.01-0.73); 2006 = 0.30; in dry climates = 0.",
-    "Protein content of milk — feeds the milk-N term in IPCC Vol.4 Ch.10 Eq 10.33 (N retention for cattle, where the 6.38 milk-protein-to-N conversion is defined)",
-    "Mean daily temperature in winter (°C) — Cfi cold-climate adjustment per IPCC Vol.4 Ch.10 Eq 10.2 (modifies the Cfi from Eq 10.3). Leave blank or set 20 to disable adjustment"),
-  unit = c(
-    "head","kg","kg","kg/day","kg/head/day","%","fraction (0-1)","%",
-    "MJ/day/kg^0.75","dimensionless","dimensionless","dimensionless",
-    "hours/day","%",
-    "%","m3 CH₄/kg VS","fraction","fraction",
-    "kg N2O-N/kg N","kg N2O-N/kg N","kg N2O-N/kg N",
-    "fraction","fraction",
-    "%","°C"),
-  # IPCC alignment audit (2026-05) — verified against Vol.4 Ch.11 Tables 11.1
-  # and 11.3. 2026-06-16: adopted the WET-CLIMATE defaults as canonical (was
-  # aggregated) so the app's auto-fill matches exactly what the AI translator
-  # emits today for the tool's SSA / South-Asia / LatAm wet-climate user base —
-  # see translator_prompts/param_catalogue.md (values verified 2026-06-15
-  # against the 2019R source text). An arid-country inventory can edit these
-  # five bounds in the Parameters sheet. Climate splits for reference:
-  #   EF3_PRP,CPP : wet=0.006 [0.0005,0.027] (agg 0.004, dry 0.002); 2006 = 0.02
-  #   EF4         : wet=0.014 [0.011,0.017]  (agg 0.010, dry 0.005); 2006 = 0.010
-  #   EF5         : 0.011 [0.0005,0.020] (no climate split); 2006 = 0.0075
-  #   Frac_GASM_PRP : 0.21 [0.005,0.31] (2019R)
-  #   Frac_LEACH_PRP: wet=0.24 [0.01,0.73] (2019R); 2006 = 0.30; dry = 0
-  # Bo: 0.13 = 2019R Vol.4 Ch.10 Table 10.16(a) "Other regions, low productivity" cattle (2006 Africa = 0.10).
-  # Andreas review round 2 (2026-06): Africa dairy Milk and MilkFat defaults
-  # corrected to IPCC 2019R Vol.4 Ch.10 Annex Table 10A.1 — Milk 3.5 kg/d
-  # (was 4.0), MilkFat 4.3% (was 4.0).
-  ipcc_default = c(
-    NA, 275, 300, 0.0, 3.5, 4.3, 0.60, 55.0,
-    0.386, 0.17, 0.8, 0.10, 0.0, 10.0,
-    6.5, 0.13, 0.08, 0.04,
-    0.006, 0.014, 0.011,   # EF3_PRP, EF4 = wet-climate (2026-06-16, see note above); EF5 0.011
-    0.21, 0.24,
-    3.3, 20),
-  # Uncertainty % per Penman et al. (2000) / Monni et al. (2007).
-  # NA = asymmetric: use suggested_lower_bound / suggested_upper_bound instead.
-  suggested_uncertainty_pct = c(
-    10, 15, 10, 30, 20, 10, 20, 15,   # N..DE
-    30, 30, 30, 10, 20, 15,            # Cfi, Ca, C, Cp, hours, CP
-    20, 15, 25, 25,                    # Ym, Bo, ASH, UE  (Ym 8->20 2026-06-15: Penman 2000 / 2019R Tier 2 guidance — Ym is highly uncertain; aligned with translator catalogue. Bo 20->15 on 2026-09-10: 2019R Table 10.16A states "Uncertainty values are +-15 percent" — an IPCC-published figure supersedes the Penman/Monni fallback)
-    NA, NA, NA,                        # EF3_PRP, EF4, EF5 (asymmetric — use IPCC bounds)
-    NA, NA,                            # Frac_GASM_PRP, Frac_LEACH_PRP (IPCC 2019 Table 11.3 — asymmetric bounds)
-    10, 25),                           # MilkPR, Tw
-  suggested_distribution = c(
-    "normal","normal","normal","pert","normal","normal","beta","normal",
-    "pert","triangular","triangular","beta","pert","normal",
-    "pert","pert","pert","pert",
-    "pert","lognormal","lognormal",
-    "pert","pert",
-    "normal","normal"),
-  # Absolute lower/upper bounds for asymmetric parameters — sourced from IPCC 2006/2019 Refinement.
-  # These override the symmetric ±pct formula in the Excel template.
-  # IPCC alignment audit (2026-05) — corrected source attribution:
-  #   EF3_PRP    → Vol.4 Ch.11 Table 11.1 (PRP direct-N2O EFs)
-  #   EF4 / EF5  → Vol.4 Ch.11 Table 11.3 (indirect-N2O EFs; 2019 Refinement
-  #                                          values used for the central, with
-  #                                          wider Penman/Monni bounds retained)
-  #   Frac_GASM_PRP / Frac_LEACH_PRP → Vol.4 Ch.11 Table 11.3 (2019 Refinement)
-  suggested_lower_bound = c(
-    NA, NA, NA, NA, NA, NA, NA, NA,
-    NA, NA, NA, NA, NA, NA,
-    NA, NA, NA, NA,
-    0.0005, 0.011, 0.0005,  # EF3_PRP, EF4, EF5 wet-climate lower (2026-06-16)
-    0.005, 0.01,            # Frac_GASM_PRP, Frac_LEACH_PRP wet-climate lower
-    NA, NA),
-  suggested_upper_bound = c(
-    NA, NA, NA, NA, NA, NA, NA, NA,
-    NA, NA, NA, NA, NA, NA,
-    NA, NA, NA, NA,
-    0.027, 0.017, 0.020,  # EF3_PRP, EF4, EF5 wet-climate upper (2026-06-16)
-    0.31, 0.73,           # Frac_GASM_PRP, Frac_LEACH_PRP wet-climate upper
-    NA, NA),
-  # D1: IPCC convention adopted — only cattle_pop is true Activity Data;
-  # everything else is a "coefficient" (combines into the per-head emission factor)
-  param_type = c(
-    "activity_data",          # N
-    rep("coefficient", 23),   # all other production parameters + IPCC equation params
-    "coefficient"),           # Tw
-  # Andreas 2026-05 #5: renamed levels to avoid clash with IPCC "Tier" terminology.
-  # "core" = must be entered by user; "advanced" = IPCC coefficient, pre-filled with default.
-  param_tier = c(
-    "core","core","core","core","core","core","core","core",
-    "advanced","advanced","advanced","advanced","core","core",
-    "advanced","advanced","advanced","advanced",
-    "advanced","advanced","advanced",
-    "advanced","advanced",
-    "core","advanced"),
-  # TRUE = user can reduce this uncertainty by improving local data/surveys;
-  # FALSE = IPCC coefficient — requires dedicated measurement research to improve
-  user_reducible = c(
-    TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
-    FALSE, FALSE, FALSE, FALSE, TRUE, TRUE,
-    FALSE, FALSE, FALSE, FALSE,
-    FALSE, FALSE, FALSE,
-    FALSE, FALSE,
-    TRUE, TRUE),
-  # IPCC alignment audit (2026-05): corrected references —
-  #   Tw cold-climate adjustment is Vol.4 Ch.10 Eq 10.2 (confirmed in both
-  #     2006 and 2019R Vol.4 Ch.10 — it's the formal numbered equation for
-  #     Cfi(in_cold) = Cfi + 0.0048 * (20 - Tw); modifies Eq 10.3).
-  ipcc_ref = c(
-    "","Table 10A.2","Table 10A.2","Table 10A.1","","","","Eq 10.14--16",
-    "Table 10.4","Table 10.5","Eq 10.6","Table 10.7","Eq 10.11","Eq 10.32",
-    "Table 10.12","Table 10.16","Eq 10.24","Eq 10.24",
-    "Ch.11 Table 11.1","Ch.11 Table 11.3","Ch.11 Table 11.3",
-    "Ch.11 Table 11.3","Ch.11 Table 11.3",
-    "Eq 10.33","Eq 10.2"),
-  # T1.3: IPCC Inventory Software variable names (from screenshots provided by Andreas, May 2026).
-  # Surfacing these here means inventory teams can match our column to the IPCC
-  # software's terminology one-to-one when transposing data between tools.
-  # Format: "<symbol> — <full name in IPCC software>"
-  ipcc_software_name = c(
-    "N(T) — Annual Average Population (head)",
-    "BW — Body weight (kg) [also TAM = Typical Animal Mass; IPCC Eq 10.3/10.6/10.17/10.18]",
-    "(MW) — Mature body weight, used in NEg equation",
-    "WG — Daily weight gain (Average Daily Feed Intake tab)",
-    "Milk — Average daily milk production (kg/day)",
-    "Fat — Fat content of milk (% by weight)",
-    "pct_pregnant — Fraction of females pregnant in a year (Cpregnancy weight in Eq 10.13; includes pregnant heifers)",
-    "DE% — Feed digestibility (%)",
-    "Cfi — Coefficient for calculating Net Energy for Maintenance",
-    "Ca — Activity coefficient",
-    "(C) — Growth coefficient (sex-dependent: female 0.8 / castrate 1.0 / bull 1.2)",
-    "Cpregnancy — Coefficient for calculating Net Energy for Pregnancy",
-    "(hours) — Daily working hours",
-    "CP% — Percent crude protein in diet",
-    "Ym — Methane conversion factor (% of GE → CH4)",
-    "Bo — Maximum methane producing capacity",
-    "ASH — Ash content of manure (fraction of dry matter)",
-    "UE — Urinary Energy fraction of GE",
-    "EF3(PRP) — Direct N₂O EF, manure on pasture/range/paddock",
-    "EF4 — N₂O EF for atmospheric N deposition (Vol 4 Ch 11)",
-    "EF5 — N₂O EF for N leaching/runoff (Vol 4 Ch 11)",
-    "FracGASM — Fraction of N volatilised from pasture deposition (Table 11.3)",
-    "Frac_leach-(H) — Fraction of N lost through leaching from pasture deposition (Table 11.3)",
-    "Milk PR% — Milk protein content (1.9 + 0.4*Fat)",
-    "Tw — Mean winter daily temperature (°C); IPCC software Cfi adjustment input"),
-  stringsAsFactors = FALSE
-)
+# ---------------------------------------------------------------------------
+# PARAMETER CATALOGUE -- built from reference/defaults_master.csv
+#
+# The 25 rows x 13 columns that used to be literal vectors here now live in
+# the master, which is the single authority for every shipped default. The
+# object is byte-identical to what the literals produced: same columns, same
+# column order, same types, and crucially the same ROW ORDER, which is
+# load-bearing because the translator writer emits one block of rows per
+# sub-category in exactly catalogue order.
+#
+# To change a default, edit reference/defaults_master.csv. Do not reintroduce
+# literals here: the whole point is that the Excel template, the translator
+# prompts, the published guides and the audit all trace to one place.
+# Provenance (IPCC edition, table, climate basis, review round) lives next to
+# each value in the master. scripts/verify_defaults.R proves every surface
+# still agrees, and it runs in CI.
+# ---------------------------------------------------------------------------
+PARAM_CATALOGUE <- .master_wide("PARAM_CATALOGUE", "parameter")
 
 
 # ---------------------------------------------------------------------------

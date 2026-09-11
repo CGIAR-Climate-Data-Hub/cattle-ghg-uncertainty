@@ -2077,6 +2077,33 @@ section_F <- function() {
              notes = if (res_ok) "bulls.Cfi=0.370, growing_males.Cfi=0.322, bulls.Milk=0/constant, dairy.pct_preg=0.85"
                      else "resolver returned an unexpected default for a (sub_category, parameter)")
 
+  # F32 -- the defaults master is the single authority. Every IPCC default
+  # the app ships is read from reference/defaults_master.csv by
+  # R/load_defaults.R. Assert the file is present, that it still builds the
+  # objects, and that the objects have the shape the rest of the app assumes.
+  # Without this a corrupt or truncated master would surface as a hundred
+  # confusing downstream failures instead of one clear one.
+  master_ok <- tryCatch({
+    file.exists(.DEFAULTS_MASTER_PATH) &&
+      nrow(.defaults_master) > 400 &&
+      identical(names(PARAM_CATALOGUE)[1], "parameter") &&
+      nrow(PARAM_CATALOGUE) == 25L &&
+      ncol(PARAM_CATALOGUE) == 13L &&
+      is.logical(PARAM_CATALOGUE$user_reducible) &&
+      is.numeric(PARAM_CATALOGUE$ipcc_default) &&
+      identical(PARAM_CATALOGUE$parameter[1], "N") &&
+      nrow(MMS_DEFAULTS) == 12L && "ipcc_variant" %in% names(MMS_DEFAULTS) &&
+      nrow(MMS_FRAC_DEFAULTS_2019) == 12L &&
+      length(CFI_BY_SUBCAT) == 9L && is.numeric(unlist(CFI_BY_SUBCAT))
+  }, error = function(e) FALSE)
+  check_bool("F32", "F",
+             "Defaults master loads and rebuilds every constant with the expected shape",
+             master_ok,
+             notes = if (master_ok)
+               sprintf("%d master rows -> PARAM_CATALOGUE 25x13, MMS 12, frac 12, subcat lists 9",
+                       nrow(.defaults_master))
+               else "reference/defaults_master.csv missing, truncated, or rebuilt an object with the wrong shape/type")
+
   # F31 — sparse-overlay writer integration (the safety net). Writing a SPARSE
   # input (only the user's own rows + the MMS allocation) through
   # .translator_write_official_template must yield a COMPLETE template (every
