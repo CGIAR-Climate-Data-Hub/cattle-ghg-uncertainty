@@ -85,7 +85,7 @@ This is what teaches Claude how to behave as the Translator — it lays out the 
 
 Below the Instructions field there's a **Files** panel. Drag and drop these four files from the kit into it:
 
-- `param_catalogue.md` — the 27 IPCC-aligned parameters with codes, units, defaults
+- `param_catalogue.md` — the 25 IPCC-aligned parameters with codes, units, defaults
 - `template_schema.md` — the exact workbook layout and validation rules
 - `mapping_examples.md` — worked examples of "raw column → template field"
 - `questionnaire.md` — so Claude knows what the questionnaire looks like

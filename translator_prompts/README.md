@@ -7,7 +7,7 @@ The `.md` files in this folder are concatenated at runtime by `R/openai_client.R
 | File | Purpose | How produced |
 |------|---------|--------------|
 | `system_instructions.md` | Persona, workflow, and behaviour rules for the translator. | **Hand-written.** Edit to change the assistant's behaviour. |
-| `param_catalogue.md` | The 27 IPCC-aligned parameters: codes, units, defaults, distributions, aliases. | **Auto-generated** by `scripts/build_translator_kit.R`. Re-run after any change to `PARAM_CATALOGUE` or `PARAM_ALIASES` in `R/utils_template.R`. |
+| `param_catalogue.md` | The 25 IPCC-aligned parameters: codes, units, defaults, distributions, aliases. | **Auto-generated** by `scripts/build_translator_kit.R`. Re-run after any change to `PARAM_CATALOGUE` or `PARAM_ALIASES` in `R/utils_template.R`. |
 | `template_schema.md` | Exact workbook layout: sheets, columns, validation rules, MMS list, distribution-choice guide. | **Auto-generated.** Re-run after any change to template structure, MMS list, or controlled vocabularies. |
 | `mapping_examples.md` | ~10 worked examples for pattern matching (Country X, Country Y, lbs→kg, etc.). | **Hand-written.** |
 | `worked_example.md` | A complete reference template-ready JSON the model can copy the shape of. | **Hand-written.** |

@@ -14,40 +14,18 @@
 
 if (basename(getwd()) == "scripts") setwd("..")
 
-# --- SAFETY GUARD: this script is currently DESTRUCTIVE -----------------------
+# --- Regeneration is safe -----------------------------------------------------
 #
-# It regenerates translator_prompts/param_catalogue.md and template_schema.md
-# from the R constants. But both files have been HAND-EDITED since they were
-# last generated, and the generator does not reproduce those edits. Running it
-# today silently deletes, among other things:
+# This script was frozen between 2026-09-10 and 2026-09-11 because it destroyed
+# hand-added prompt content on every run. It no longer does. Every factual table
+# in the generated files is now built from the R constants, and the prose that
+# used to be hand-edited into the output lives in translator_prompts/partials/
+# and is read back in. A missing partial is a hard error rather than a silently
+# shorter prompt.
 #
-#   * the whole "Sex- and physiology-specific coefficient overrides" section of
-#     param_catalogue.md (the 9-row Cfi/Ca/C table). system_instructions.md
-#     self-check #9 names that section explicitly, so removing it also breaks
-#     the check that keeps bulls.C = 1.2 and oxen.Cfi = 0.322 out of the
-#     model's output;
-#   * the expanded Ym / Bo / EF3_PRP / pct_pregnant definitions;
-#   * the asymmetric-bounds prose;
-#   * the fixed data_source vocabulary at template_schema.md:53, which the
-#     generator replaces with "free text".
-#
-# The generator is also still wrong in ways a rebuild would re-emit: it
-# hardcodes "27 parameters" (the catalogue has 25), cites IPCC Table 10.23 for
-# leaching (correct is 10.22), emits only 2 of the 4 MCF climate zones, and
-# still lists the removed EF3_S / Frac_GASMS / Frac_LEACH_* parameters.
-#
-# The fix is the generator refactor (plan Phase 3): move the numbers into R,
-# the prose into translator_prompts/partials/, and generate everything.
-# REMOVE THIS GUARD as part of that work.
-#
-# To run anyway, knowing the above:
-#   TRANSLATOR_KIT_ALLOW_DESTRUCTIVE=1 Rscript scripts/build_translator_kit.R
-if (!nzchar(Sys.getenv("TRANSLATOR_KIT_ALLOW_DESTRUCTIVE"))) {
-  stop("build_translator_kit.R is frozen: it would delete hand-added prompt ",
-       "content that self-check #9 depends on. See the guard comment at the ",
-       "top of this file. Set TRANSLATOR_KIT_ALLOW_DESTRUCTIVE=1 to override.",
-       call. = FALSE)
-}
+# Rule for maintainers: NEVER hand-edit translator_prompts/param_catalogue.md or
+# template_schema.md. Change the R constants for numbers, or the partials for
+# prose, then re-run this script.
 # -----------------------------------------------------------------------------
 
 suppressMessages({
@@ -62,7 +40,7 @@ if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 stamp <- format(Sys.Date(), "%Y-%m-%d")
 
 # ---------------------------------------------------------------------------
-# 1. param_catalogue.md  -- the 27 IPCC-aligned parameters with everything
+# 1. param_catalogue.md  -- the IPCC-aligned parameters with everything
 # Claude needs to map a raw column to a template field.
 # ---------------------------------------------------------------------------
 fmt_num <- function(x) {
@@ -77,11 +55,50 @@ alias_to <- function(canonical) {
 }
 
 pc <- PARAM_CATALOGUE
+NPAR <- nrow(pc)
+
+# Hand-maintained prose lives in translator_prompts/partials/. Numbers never do:
+# every table in the generated files is built from the R constants above, so a
+# regeneration cannot reintroduce a stale value. A missing partial is a hard
+# error, so a deleted file fails the build instead of silently shrinking the
+# prompt the model receives.
+partial <- function(name) {
+  f <- file.path(out_dir, "partials", paste0(name, ".md"))
+  if (!file.exists(f)) stop("missing prompt partial: ", f, call. = FALSE)
+  txt <- readLines(f, warn = FALSE, encoding = "UTF-8")
+  trimws(paste(txt[!grepl("^<!--", txt) & !grepl("-->$", txt)], collapse = "
+"))
+}
+
+.read_keyed <- function(fname, required = TRUE) {
+  f <- file.path(out_dir, "partials", fname)
+  if (!file.exists(f)) {
+    if (required) stop("missing prompt partial: ", f, call. = FALSE) else return(list())
+  }
+  ln <- readLines(f, warn = FALSE, encoding = "UTF-8")
+  idx <- grep("^## ", ln); out <- list()
+  for (k in seq_along(idx)) {
+    key <- sub("^## ", "", ln[idx[k]])
+    to  <- if (k < length(idx)) idx[k + 1] - 1 else length(ln)
+    out[[key]] <- trimws(paste(ln[(idx[k] + 1):to], collapse = " "))
+  }
+  out
+}
+
+# Translator-facing definition overrides, deliberately richer than the app's.
+.defs <- .read_keyed("definition_overrides.md")
+local({
+  bad <- setdiff(names(.defs), pc$parameter)
+  if (length(bad)) stop("definition_overrides.md names unknown parameters: ",
+                        paste(bad, collapse = ", "), call. = FALSE)
+})
+def_for <- function(prm) if (!is.null(.defs[[prm]])) .defs[[prm]] else
+  pc$definition[pc$parameter == prm]
 
 lines <- c(
   "# Parameter catalogue",
   "",
-  "Single source of truth for the 27 IPCC-aligned parameters the cattle uncertainty app expects.",
+  sprintf("Single source of truth for the %d IPCC-aligned parameters the cattle uncertainty app expects.", NPAR),
   "When you (Claude) translate a user's raw column to a template field, use this table.",
   "All parameter codes are case-sensitive.",
   "",
@@ -101,7 +118,7 @@ for (i in seq_len(nrow(pc))) {
     pc$suggested_distribution[i],
     if (nzchar(pc$ipcc_ref[i])) pc$ipcc_ref[i] else "—",
     alias_to(pc$parameter[i]),
-    gsub("\\|", "\\\\|", pc$definition[i])
+    gsub("\\|", "\\\\|", def_for(pc$parameter[i]))
   ))
 }
 
@@ -111,7 +128,7 @@ if (nrow(asym) > 0) {
   lines <- c(lines, "",
     "## Asymmetric (non-symmetric) bounds",
     "",
-    "These parameters use absolute IPCC-derived lower/upper bounds rather than a symmetric ±% around the central value.",
+    partial("asymmetric_bounds_note"),
     "",
     "| code | lower | central | upper |",
     "|------|-------|---------|-------|"
@@ -125,6 +142,34 @@ if (nrow(asym) > 0) {
     ))
   }
 }
+
+# Sex- and physiology-specific coefficient overrides. The TABLE is generated
+# from CFI_BY_SUBCAT / C_GROWTH_BY_SUBCAT so it cannot drift from what
+# resolve_subcat_default() actually returns; only the prose is hand-written.
+# This section is named by system_instructions.md self-check #9, so it must not
+# disappear from a rebuild -- that was the bug that froze this script.
+.rownotes <- .read_keyed("subcat_overrides_rownotes.md", required = FALSE)
+lines <- c(lines, "",
+  "## Sex- and physiology-specific coefficient overrides",
+  "",
+  partial("subcat_overrides_intro"),
+  "",
+  "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | notes |",
+  "|---|---|---|---|")
+for (sc in ANIMAL_SUBCATEGORIES) {
+  cfi <- CFI_BY_SUBCAT[[sc]]; cg <- C_GROWTH_BY_SUBCAT[[sc]]
+  lines <- c(lines, sprintf("| `%s` | %s | %s | %s |", sc,
+    if (is.null(cfi)) "—" else fmt_num(cfi),
+    if (is.null(cg))  "—" else fmt_num(cg),
+    if (!is.null(.rownotes[[sc]])) .rownotes[[sc]] else ""))
+}
+lines <- c(lines, "",
+  "`Ca` is not per-sub-category: it depends on the feeding situation (IPCC Table 10.5).",
+  "",
+  paste0("Values: ", paste(sprintf("%s = %s", names(FEEDING_SITUATION_CA),
+         vapply(unlist(FEEDING_SITUATION_CA), fmt_num, character(1))), collapse = "; "), "."),
+  "",
+  partial("subcat_overrides_outro"))
 
 # Tier explanation
 lines <- c(lines, "",
@@ -164,7 +209,7 @@ lines <- c(
   "| `_Lists` | optional (hidden) | dropdown vocabularies — created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |",
   "| `README` | optional | human-readable quick-start — safe to omit |",
   "| `Inventory_Metadata` | **required** | country, year, IPCC version, species |",
-  "| `Parameters` | **required** | the 27 parameters per cattle sub-category |",
+  sprintf("| `Parameters` | **required** | the %d parameters per cattle sub-category |", nrow(PARAM_CATALOGUE)),
   "| `Manure_Management` | **required** | per-MMS allocation; per-group fractions must sum to 100% |",
   "| `Parameter_TimeSeries` | optional | 5+ years of annual values for auto-correlation |",
   "| `Vocab` | optional | reference catalogue — safe to omit |",
@@ -204,7 +249,7 @@ lines <- c(
   "| M | upper | no | auto-computed from H or J; safe to leave blank |",
   "| N | param_type | yes | `activity_data` (only for `N`) or `coefficient` |",
   "| O | ipcc_ref | no | citation, e.g. `Table 10.4` |",
-  "| P | data_source | no | free text: where the value came from |",
+  "| P | data_source | no | one of: `user_file`, `user_chat`, `ipcc_default`, `biological_zero` |",
   "",
   "### Sub-category codes (ANIMAL_SUBCATEGORIES)",
   ""
@@ -241,7 +286,7 @@ lines <- c(lines, "",
   "| R | lower_frac_gas | no | |",
   "| S | upper_frac_gas | no | |",
   "| T | distribution_frac_gas | no | |",
-  "| U | Frac_LeachMS_pct | no | per-MMS leaching fraction (%) — defaults from IPCC 2019 Table 10.23 |",
+  "| U | Frac_LeachMS_pct | no | per-MMS leaching fraction (%) — defaults from IPCC 2019 Table 10.22 |",
   "| V | lower_frac_leach | no | |",
   "| W | upper_frac_leach | no | |",
   "| X | distribution_frac_leach | no | |",
@@ -250,16 +295,18 @@ lines <- c(lines, "",
   ""
 )
 mms <- MMS_DEFAULTS
-lines <- c(lines, "| id | label | 2006? | 2019R? | MCF tropical | MCF temperate | EF3 |",
-  "|----|-------|-------|--------|--------------|----------------|-----|")
+lines <- c(lines, "| id | label | 2006? | 2019R? | MCF trop.moist | MCF trop.dry | MCF temperate | MCF boreal | EF3 |",
+  "|----|-------|-------|--------|----------------|--------------|---------------|------------|-----|")
 for (i in seq_len(nrow(mms))) {
   vs <- strsplit(mms$versions[i], ",")[[1]]
-  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s |",
+  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s | %s |",
     mms$id[i], mms$label[i],
     if ("2006" %in% vs) "✓" else "",
     if ("2019" %in% vs) "✓" else "",
     fmt_num(mms$mcf_tropical[i]),
+    fmt_num(mms$mcf_tropical_dry[i]),
     fmt_num(mms$mcf_temperate[i]),
+    fmt_num(mms$mcf_boreal[i]),
     fmt_num(mms$ef3[i])
   ))
 }
@@ -314,7 +361,7 @@ lines <- c(lines, "",
   "",
   "When the user gives you a value but no distribution, pick from this priority list:",
   "",
-  "1. If the parameter has an asymmetric IPCC range (EF3_PRP, EF3_S, EF4, EF5, Frac_GASMS, Frac_LEACH_*) → use **`lognormal`** or **`pert`** with the absolute bounds from the asymmetric table in param_catalogue.md.",
+  sprintf("1. If the parameter has an asymmetric IPCC range (%s) → use **`lognormal`** or **`pert`** with the absolute bounds from the asymmetric table in param_catalogue.md.", paste0("`", paste(PARAM_CATALOGUE$parameter[!is.na(PARAM_CATALOGUE$suggested_lower_bound) | !is.na(PARAM_CATALOGUE$suggested_upper_bound)], collapse = "`, `"), "`")),
   "2. If the parameter is a fraction bounded in [0, 1] (pct_pregnant, ASH, UE, manure fractions) → **`beta`** or **`tnorm_0_1`**.",
   "3. If the central value comes from a measured mean ± SD or ±CV → **`normal`**.",
   "4. If only min / mode / max are known (expert judgement) → **`pert`** (preferred) or **`triangular`**.",
@@ -335,10 +382,13 @@ if (!dir.exists(www_dir)) dir.create(www_dir, recursive = TRUE)
 # system_instructions.md is staged too — users paste it into the "Instructions"
 # field of their own Claude Project (DIY-kit flow). The other four .md files
 # are the project knowledge.
+# worked_example.md is 5th in the live system prompt (openai_client.R:32-34) but
+# was historically absent from both www/ and the kit, so DIY-kit users ran a
+# materially different translator from the in-app one. Ship it.
 user_facing <- c("system_instructions.md",
                  "questionnaire.md", "getting_started.md",
                  "param_catalogue.md", "template_schema.md",
-                 "mapping_examples.md")
+                 "mapping_examples.md", "worked_example.md")
 for (f in user_facing) {
   src <- file.path(out_dir, f)
   dst <- file.path(www_dir, f)
@@ -425,6 +475,7 @@ if (requireNamespace("rmarkdown", quietly = TRUE)) {
 # ---------------------------------------------------------------------------
 kit_files <- c("system_instructions.md", "param_catalogue.md",
                "template_schema.md", "mapping_examples.md",
+               "worked_example.md",
                "questionnaire.md", "questionnaire.docx",
                "getting_started.pdf")
 kit_files_present <- kit_files[file.exists(file.path(out_dir, kit_files))]
