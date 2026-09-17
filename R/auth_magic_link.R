@@ -197,12 +197,31 @@ auth_send_magic_link <- function(email, token,
   resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
   if (inherits(resp, "error")) {
     message("auth: SendGrid request failed: ", conditionMessage(resp))
+    .auth_log_link_fallback(email, link)
     return(FALSE)
   }
   status <- httr2::resp_status(resp)
   if (status >= 200 && status < 300) return(TRUE)
-  message(sprintf("auth: SendGrid returned HTTP %d", status))
+  # Log WHY. On 2026-09-17 the live app returned a bare "HTTP 401" and the
+  # UI told the user the service was "not yet configured"; the body said
+  # "Maximum credits exceeded": the SendGrid account was out of credits.
+  body_msg <- tryCatch({
+    b <- httr2::resp_body_json(resp)
+    paste(vapply(b$errors, function(e) e$message %||% "", character(1)), collapse = "; ")
+  }, error = function(e) "")
+  message(sprintf("auth: SendGrid returned HTTP %d%s", status,
+                  if (nzchar(body_msg)) paste0(" (", body_msg, ")") else ""))
+  .auth_log_link_fallback(email, link)
   FALSE
+}
+
+# When the email cannot go out, write the sign-in link to the server log so
+# an administrator can pass it to the user by hand (rsconnect::showLogs).
+# The link is a one-time token valid for 15 minutes and the log is visible
+# only to the account holder, which is acceptable for the pilot; remove this
+# if the log ever becomes shared.
+.auth_log_link_fallback <- function(email, link) {
+  message(sprintf("auth: EMAIL NOT SENT. Sign-in link for %s (valid 15 min): %s", email, link))
 }
 
 # Notify the admin when a non-approved user requests access. Best-effort.

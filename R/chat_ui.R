@@ -190,8 +190,9 @@ translator_chat_server <- function(input, output, session) {
         "If you don't see it, check spam.")
     } else {
       state$login_status <- paste0(
-        "We couldn't send the sign-in email (the email service is not yet ",
-        "configured on the server). Please contact the administrator.")
+        "We couldn't send the sign-in email: the email service returned an ",
+        "error, which has been logged on the server. Please contact the ",
+        "administrator, who can also send you the sign-in link directly.")
     }
   })
 
