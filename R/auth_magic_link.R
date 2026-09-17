@@ -2,8 +2,8 @@
 #
 # Flow:
 #   1. User enters email -> server generates a 32-char token, stores
-#      (token, email, expires_at) in an in-memory table, sends a link
-#      via SendGrid.
+#      (token, email, expires_at) in a file-backed table, sends a link
+#      through the first configured mail provider (Brevo / Resend / SendGrid).
 #   2. User clicks the link in their inbox -> Shiny app loads with
 #      `?token=...` in the URL -> the server validates the token,
 #      consumes it, and sets `rv$user_email`.
@@ -140,77 +140,137 @@ auth_token_consume <- function(token) {
   rec$email
 }
 
-# ----- SendGrid e-mail dispatch --------------------------------------------
-
-# Send a magic-link email. Returns TRUE on success, FALSE on any error.
-# SendGrid API: POST https://api.sendgrid.com/v3/mail/send
-# Auth: Bearer <SENDGRID_API_KEY> from env.
+# ---- Transactional email, provider-agnostic ---------------------------------
 #
-# `app_base_url` should be the public URL of the app (e.g.
-# "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/"). We read it
-# from the env var APP_BASE_URL set on shinyapps.io; sensible default is
-# left as a placeholder so a misconfiguration is loud rather than silent.
+# `app_base_url` (APP_BASE_URL) is the public URL of the app; the magic link
+# is built from it, so a missing value is logged loudly rather than silently.
+#
+# 2026-09-17. The SendGrid free trial expired on 2026-08-01 (account type
+# "free", credits 0, hard limit) and every sign-in email since has failed
+# with "Maximum credits exceeded". Rather than tie the app to one vendor's
+# pricing, the two emails the app sends (the magic link and the admin
+# access-request notice) go through one dispatcher that tries every provider
+# whose key is configured, in order:
+#
+#   MAIL_PROVIDER      optional; the provider to try first (brevo / resend /
+#                      sendgrid). Otherwise the order below.
+#   BREVO_API_KEY      Brevo (ex-Sendinblue): free tier, verifies a single
+#                      sender ADDRESS by confirmation email, so a @cgiar.org
+#                      sender works without DNS access. Recommended.
+#   RESEND_API_KEY     Resend: free tier, but a custom sender needs a
+#                      verified DOMAIN; without DNS access only the
+#                      onboarding sender to your own address works.
+#   SENDGRID_API_KEY   SendGrid: the original provider; paid plans only.
+#
+# A provider that answers non-2xx is logged with the API's own message and
+# the next one is tried. When all fail, the sign-in link is written to the
+# server log so the administrator can pass it on (see .auth_log_link_fallback).
+.MAIL_PROVIDER_ORDER <- c("brevo", "resend", "sendgrid")
+
+.auth_mail_chain <- function() {
+  keys <- c(brevo    = Sys.getenv("BREVO_API_KEY",    unset = ""),
+            resend   = Sys.getenv("RESEND_API_KEY",   unset = ""),
+            sendgrid = Sys.getenv("SENDGRID_API_KEY", unset = ""))
+  avail <- .MAIL_PROVIDER_ORDER[nzchar(keys[.MAIL_PROVIDER_ORDER])]
+  pref  <- tolower(trimws(Sys.getenv("MAIL_PROVIDER", unset = "")))
+  if (nzchar(pref) && pref %in% avail) avail <- c(pref, setdiff(avail, pref))
+  avail
+}
+
+.auth_mail_request <- function(provider, to, subject, text, html, from_email, from_name) {
+  key <- Sys.getenv(switch(provider, brevo = "BREVO_API_KEY", resend = "RESEND_API_KEY",
+                           sendgrid = "SENDGRID_API_KEY"), unset = "")
+  switch(provider,
+    brevo = httr2::request("https://api.brevo.com/v3/smtp/email") |>
+      httr2::req_headers(`api-key` = key, `Content-Type` = "application/json", Accept = "application/json") |>
+      httr2::req_body_json(list(
+        sender = list(name = from_name, email = from_email),
+        to = list(list(email = to)), subject = subject,
+        textContent = text, htmlContent = html %||% paste0("<pre>", text, "</pre>"))),
+    resend = httr2::request("https://api.resend.com/emails") |>
+      httr2::req_headers(Authorization = paste("Bearer", key), `Content-Type` = "application/json") |>
+      httr2::req_body_json(list(
+        from = sprintf("%s <%s>", from_name, from_email), to = list(to), subject = subject,
+        text = text, html = html %||% paste0("<pre>", text, "</pre>"))),
+    sendgrid = httr2::request("https://api.sendgrid.com/v3/mail/send") |>
+      httr2::req_headers(Authorization = paste("Bearer", key), `Content-Type` = "application/json") |>
+      httr2::req_body_json(list(
+        personalizations = list(list(to = list(list(email = to)), subject = subject)),
+        from = list(email = from_email, name = from_name),
+        content = c(list(list(type = "text/plain", value = text)),
+                    if (!is.null(html)) list(list(type = "text/html", value = html)) else list()))),
+    stop("unknown mail provider ", provider)) |>
+    httr2::req_timeout(20) |>
+    httr2::req_error(is_error = function(resp) FALSE)
+}
+
+# Pull the human-readable error out of each provider's error body.
+.auth_mail_error_text <- function(resp) {
+  tryCatch({
+    b <- httr2::resp_body_json(resp)
+    # [[ ]] with exact = TRUE: `b$error` partially matches `errors` and
+    # returned the whole list into the log on the first test.
+    msg <- c(b[["message", exact = TRUE]], b[["error", exact = TRUE]],
+             if (!is.null(b[["errors", exact = TRUE]]))
+               vapply(b[["errors", exact = TRUE]], function(e) e[["message", exact = TRUE]] %||% "", character(1)))
+    msg <- unlist(msg)
+    paste(msg[nzchar(msg)], collapse = "; ")
+  }, error = function(e) "")
+}
+
+# Send one email through the first provider that accepts it.
+# Returns list(ok, provider, attempts) where attempts is a character vector of
+# "<provider>: <what happened>" for the log.
+.auth_send_email <- function(to, subject, text, html = NULL,
+                             from_email = Sys.getenv("MAGIC_LINK_FROM", unset = "noreply@cattle-uncertainty.app"),
+                             from_name  = "IPCC Cattle GHG Tool") {
+  chain <- .auth_mail_chain()
+  if (length(chain) == 0)
+    return(list(ok = FALSE, provider = NA_character_,
+                attempts = "no mail provider key set (BREVO_API_KEY / RESEND_API_KEY / SENDGRID_API_KEY)"))
+  attempts <- character(0)
+  for (p in chain) {
+    resp <- tryCatch(httr2::req_perform(.auth_mail_request(p, to, subject, text, html, from_email, from_name)),
+                     error = function(e) e)
+    if (inherits(resp, "error")) {
+      attempts <- c(attempts, sprintf("%s: request failed (%s)", p, conditionMessage(resp))); next
+    }
+    st <- httr2::resp_status(resp)
+    if (st >= 200 && st < 300) return(list(ok = TRUE, provider = p, attempts = attempts))
+    em <- .auth_mail_error_text(resp)
+    attempts <- c(attempts, sprintf("%s: HTTP %d%s", p, st, if (nzchar(em)) paste0(" (", em, ")") else ""))
+  }
+  list(ok = FALSE, provider = NA_character_, attempts = attempts)
+}
+
+# Send the magic-link email. Returns TRUE on success, FALSE otherwise; every
+# failure is explained in the server log.
 auth_send_magic_link <- function(email, token,
-                                  app_base_url = Sys.getenv("APP_BASE_URL",
-                                                             unset = ""),
+                                  app_base_url = Sys.getenv("APP_BASE_URL", unset = ""),
                                   from_email = Sys.getenv("MAGIC_LINK_FROM",
                                                            unset = "noreply@cattle-uncertainty.app"),
                                   from_name  = "IPCC Cattle GHG Tool") {
-  sg_key <- Sys.getenv("SENDGRID_API_KEY", unset = "")
-  if (!nzchar(sg_key)) {
-    message("auth: SENDGRID_API_KEY not set — magic link not sent")
-    return(FALSE)
-  }
-  if (!nzchar(app_base_url)) {
+  if (!nzchar(app_base_url))
     message("auth: APP_BASE_URL not set — using a relative link (won't open in email)")
-  }
   link <- paste0(sub("/?$", "/", app_base_url), "?token=", token)
-  body <- list(
-    personalizations = list(list(
-      to      = list(list(email = email)),
-      subject = "Sign in to the IPCC Cattle GHG Uncertainty tool"
-    )),
-    from    = list(email = from_email, name = from_name),
-    content = list(
-      list(type = "text/plain",
-            value = paste0(
-              "Welcome to the AI translator for the IPCC Cattle GHG Tool.\n\n",
-              "Click the link below to sign in (the link is valid for 15 minutes):\n\n",
-              link, "\n\n",
-              "If you didn't request this, you can safely ignore this email.\n")),
-      list(type = "text/html",
-            value = paste0(
-              "<p>Welcome to the AI translator for the IPCC Cattle GHG Tool.</p>",
-              "<p><a href=\"", link, "\">Click here to sign in</a> ",
-              "(the link is valid for 15 minutes).</p>",
-              "<p>If you didn't request this, you can safely ignore this email.</p>"))
-    )
-  )
-  req <- httr2::request("https://api.sendgrid.com/v3/mail/send") |>
-    httr2::req_headers(
-      `Authorization` = paste("Bearer", sg_key),
-      `Content-Type`  = "application/json"
-    ) |>
-    httr2::req_body_json(body) |>
-    httr2::req_timeout(20) |>
-    httr2::req_error(is_error = function(resp) FALSE)
-  resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
-  if (inherits(resp, "error")) {
-    message("auth: SendGrid request failed: ", conditionMessage(resp))
-    .auth_log_link_fallback(email, link)
-    return(FALSE)
+  text <- paste0(
+    "Welcome to the AI translator for the IPCC Cattle GHG Tool.\n\n",
+    "Click the link below to sign in (the link is valid for 15 minutes):\n\n",
+    link, "\n\n",
+    "If you didn't request this, you can safely ignore this email.\n")
+  html <- paste0(
+    "<p>Welcome to the AI translator for the IPCC Cattle GHG Tool.</p>",
+    "<p><a href=\"", link, "\">Click here to sign in</a> ",
+    "(the link is valid for 15 minutes).</p>",
+    "<p>If you didn't request this, you can safely ignore this email.</p>")
+  r <- .auth_send_email(email, "Sign in to the IPCC Cattle GHG Uncertainty tool", text, html,
+                        from_email = from_email, from_name = from_name)
+  if (r$ok) {
+    if (length(r$attempts)) message("auth: sign-in email sent via ", r$provider,
+                                    " after: ", paste(r$attempts, collapse = " | "))
+    return(TRUE)
   }
-  status <- httr2::resp_status(resp)
-  if (status >= 200 && status < 300) return(TRUE)
-  # Log WHY. On 2026-09-17 the live app returned a bare "HTTP 401" and the
-  # UI told the user the service was "not yet configured"; the body said
-  # "Maximum credits exceeded": the SendGrid account was out of credits.
-  body_msg <- tryCatch({
-    b <- httr2::resp_body_json(resp)
-    paste(vapply(b$errors, function(e) e$message %||% "", character(1)), collapse = "; ")
-  }, error = function(e) "")
-  message(sprintf("auth: SendGrid returned HTTP %d%s", status,
-                  if (nzchar(body_msg)) paste0(" (", body_msg, ")") else ""))
+  message("auth: sign-in email NOT sent. ", paste(r$attempts, collapse = " | "))
   .auth_log_link_fallback(email, link)
   FALSE
 }
@@ -229,31 +289,15 @@ auth_notify_admin_of_request <- function(requesting_email,
                                           admin_email = Sys.getenv("ADMIN_EMAIL",
                                                                     unset = "")) {
   if (!nzchar(admin_email)) return(FALSE)
-  sg_key <- Sys.getenv("SENDGRID_API_KEY", unset = "")
-  if (!nzchar(sg_key)) return(FALSE)
-  body <- list(
-    personalizations = list(list(
-      to      = list(list(email = admin_email)),
-      subject = paste("Cattle GHG Tool — access request from", requesting_email)
-    )),
-    from    = list(email = Sys.getenv("MAGIC_LINK_FROM",
-                                       unset = "noreply@cattle-uncertainty.app"),
-                    name  = "IPCC Cattle GHG Tool"),
-    content = list(list(type = "text/plain",
-                         value = paste0(
-                           "A new user requested access to the in-app AI translator:\n\n",
-                           "    ", requesting_email, "\n\n",
-                           "To approve, add this email to approved_users.csv and redeploy.\n")))
-  )
-  req <- httr2::request("https://api.sendgrid.com/v3/mail/send") |>
-    httr2::req_headers(`Authorization` = paste("Bearer", sg_key),
-                        `Content-Type`  = "application/json") |>
-    httr2::req_body_json(body) |>
-    httr2::req_timeout(20) |>
-    httr2::req_error(is_error = function(resp) FALSE)
-  resp <- tryCatch(httr2::req_perform(req), error = function(e) e)
-  if (inherits(resp, "error")) return(FALSE)
-  httr2::resp_status(resp) %in% 200:299
+  r <- .auth_send_email(
+    admin_email,
+    paste("Cattle GHG Tool — access request from", requesting_email),
+    paste0("A new user requested access to the in-app AI translator:\n\n",
+           "    ", requesting_email, "\n\n",
+           "To approve, add this email to approved_users.csv and redeploy.\n"))
+  if (!r$ok) message("auth: admin notice NOT sent for ", requesting_email, ". ",
+                     paste(r$attempts, collapse = " | "))
+  r$ok
 }
 
 # ----- Long-lived session cookie -------------------------------------------
