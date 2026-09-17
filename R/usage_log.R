@@ -41,8 +41,11 @@
   "prompt_tokens", "completion_tokens", "total_tokens",
   "cached_tokens",       # cache READ hits — Anthropic: 90% off / GPT-4.1: ~50% off
   "cache_write_tokens",  # cache WRITE on first turn — Anthropic only, +25% on input
+  "cache_write_1h_tokens", # 1-hour cache writes (2x input), plan F2
   "cost_usd",
-  "latency_sec"          # wall-clock seconds for the API call (model A/B comparison)
+  "latency_sec",         # wall-clock seconds for the API call (model A/B comparison)
+  "stage",               # explore / clarify / enumerate / batch / full / retry
+  "cache_hit_ratio"      # cache_read / (cache_read + all cache writes); plan F11
 )
 
 # Create the file with a header row if it doesn't already exist.
@@ -62,10 +65,21 @@ usage_log_append <- function(user_email, model,
                               prompt_tokens, completion_tokens, cost_usd,
                               cached_tokens = 0L,
                               cache_write_tokens = 0L,
+                              cache_write_1h_tokens = 0L,
                               latency_sec = NA_real_,
+                              stage = NA_character_,
+                              # Stages that should be reading a warm cache. A
+                              # cold one here is logged as a warning so the
+                              # June pattern ($4.78 of $7.73 in cache writes)
+                              # is visible on the first run, not after a log
+                              # review (plan F11).
+                              expect_warm = FALSE,
                               ts = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ",
                                            tz = "UTC")) {
   path <- .usage_log_ensure()
+  writes <- as.integer(cache_write_tokens %||% 0L) + as.integer(cache_write_1h_tokens %||% 0L)
+  reads  <- as.integer(cached_tokens %||% 0L)
+  ratio  <- if (reads + writes > 0) reads / (reads + writes) else NA_real_
   row  <- data.frame(
     timestamp         = ts,
     user_email        = user_email %||% "unknown",
@@ -74,28 +88,43 @@ usage_log_append <- function(user_email, model,
     completion_tokens = as.integer(completion_tokens %||% 0L),
     total_tokens      = as.integer((prompt_tokens %||% 0L) +
                                     (completion_tokens %||% 0L)),
-    cached_tokens     = as.integer(cached_tokens %||% 0L),
+    cached_tokens     = reads,
     cache_write_tokens = as.integer(cache_write_tokens %||% 0L),
+    cache_write_1h_tokens = as.integer(cache_write_1h_tokens %||% 0L),
     cost_usd          = as.numeric(cost_usd %||% 0),
     latency_sec       = as.numeric(latency_sec %||% NA_real_),
+    stage             = stage %||% NA_character_,
+    cache_hit_ratio   = round(ratio, 3),
     stringsAsFactors  = FALSE
   )
-  # Append without re-writing the header.
+  # Append without re-writing the header. A log created before 2026-09-17
+  # has fewer columns; start a fresh file rather than write ragged rows.
+  hdr <- tryCatch(names(utils::read.csv(path, nrows = 1, stringsAsFactors = FALSE)),
+                  error = function(e) character(0))
+  if (!identical(hdr, .usage_log_columns) && file.exists(path)) {
+    file.rename(path, paste0(path, ".", format(Sys.time(), "%Y%m%d%H%M%S"), ".old"))
+    path <- .usage_log_ensure()
+  }
   utils::write.table(row, path, sep = ",",
                      append    = TRUE,
                      row.names = FALSE,
                      col.names = FALSE,
-                     quote     = c(2, 3))    # quote user_email + model
+                     quote     = c(2, 3, 12))    # quote user_email, model, stage
   # 2026-06-12: also log every API call's token + cost breakdown to
   # stderr so the production log captures it. The CSV on shinyapps.io
   # is ephemeral and not externally readable; the rsconnect logs API
   # is. This lets us audit "where does the $X per-run cost actually
   # go?" without bouncing through Anthropic's billing console.
   message(sprintf(
-    "translator usage: model=%s prompt=%d (cache_read=%d cache_write=%d) output=%d total=%d cost=$%.4f latency=%.1fs",
-    row$model, row$prompt_tokens, row$cached_tokens,
-    row$cache_write_tokens, row$completion_tokens,
-    row$total_tokens, row$cost_usd, row$latency_sec))
+    "translator usage: stage=%s model=%s prompt=%d (cache_read=%d cache_write_5m=%d cache_write_1h=%d hit=%s) output=%d total=%d cost=$%.4f latency=%.1fs",
+    row$stage, row$model, row$prompt_tokens, row$cached_tokens,
+    row$cache_write_tokens, row$cache_write_1h_tokens,
+    if (is.na(ratio)) "na" else sprintf("%.0f%%", 100 * ratio),
+    row$completion_tokens, row$total_tokens, row$cost_usd, row$latency_sec))
+  if (isTRUE(expect_warm) && writes > 20000L && (is.na(ratio) || ratio < 0.5))
+    message(sprintf(
+      "translator usage WARNING: stage=%s expected a warm prompt cache but wrote %d tokens (read %d). The prefix changed, or the 5-minute cache expired between calls.",
+      row$stage, writes, reads))
   invisible(row)
 }
 

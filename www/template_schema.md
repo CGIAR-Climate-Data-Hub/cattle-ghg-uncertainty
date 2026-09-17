@@ -9,7 +9,7 @@ Sheet names and column headers are **case-sensitive and must match exactly**.
 |-------|-----------|---------|
 | `_Lists` | optional (hidden) | dropdown vocabularies — created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |
 | `README` | optional | human-readable quick-start — safe to omit |
-| `Inventory_Metadata` | **required** | country, year, IPCC version, species |
+| `Inventory_Metadata` | **required** | country, region, year, IPCC version, species |
 | `Parameters` | **required** | the 25 parameters per cattle sub-category |
 | `Manure_Management` | **required** | per-MMS allocation; per-group fractions must sum to 100% |
 | `Parameter_TimeSeries` | optional | 5+ years of annual values for auto-correlation |
@@ -17,40 +17,40 @@ Sheet names and column headers are **case-sensitive and must match exactly**.
 
 ## Sheet: `Inventory_Metadata`
 
-Transposed (label/value) layout. Column A is the label, column B is the value.
+Transposed (label/value) layout, one field per row starting at row 2. Column B is the label, column C is the value, column D a hint. The parser locates the value column by its header `Value`, so a workbook built from scratch may also use label in A and value in B.
 
-| label | value | notes |
-|-------|-------|-------|
-| country | (free text) | e.g. `Zimbabwe`. Used in the report header. |
-| region | one of: africa / asia / europe / americas / oceania / global | Continental region — drives the BW deviation benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2/10A.3). Dropdown-constrained in the latest template. Legacy uploads with only a single free-text country cell are auto-mapped by the parser. |
-| inventory_year | (integer) | e.g. `2022` |
-| species | one of: cattle_dairy / cattle_non_dairy / cattle_mixed / buffalo | controlled vocabulary |
-| ipcc_version | one of: 2006 / 2019_refinement | drives MMS list filtering |
-| prepared_by | (free text) | name / institution |
-| notes | (free text) | optional |
+| label (column B) | field | value | notes |
+|-------|-------|-------|-------|
+| Country | `country` | (free text) | e.g. `Zimbabwe`. Used in the report header. |
+| Continental region | `region` | one of: africa / asia / europe / americas / oceania / global | Continental region — drives the BW plausibility benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2). Always set it from the country; never leave it to default. |
+| Inventory year | `inventory_year` | (integer) | e.g. `2022` |
+| Livestock species | `species` | one of: cattle_dairy / cattle_non_dairy / cattle_mixed / buffalo | controlled vocabulary |
+| IPCC Guidelines version | `ipcc_version` | one of: 2006 / 2019_refinement | drives MMS list filtering and the edition-specific Ym |
+| Prepared by | `prepared_by` | (free text) | name / institution |
+| Notes | `notes` | (free text) | optional; the translator appends its provenance stamp here |
 
 ## Sheet: `Parameters`
 
-Header row in row 3. Data starts at row 4. One row per (cattle_type × aggregation_level × sub_category × parameter).
+Banner in row 1, legend in row 2, header row in row 3. Data starts at row 4. One row per (cattle_type × aggregation_level × sub_category × parameter).
 
 | col | header | required? | notes |
 |-----|--------|-----------|-------|
 | A | cattle_type | yes | e.g. `dairy`, `non_dairy` |
-| B | aggregation_level | yes | free text label for the inventory grouping |
+| B | aggregation_level | yes | free text label for the inventory grouping (production system, region, AEZ) |
 | C | sub_category | yes | one of the ANIMAL_SUBCATEGORIES below (or free-text if the inventory uses custom groups) |
 | D | parameter | yes | the parameter code from param_catalogue.md |
 | E | definition | no | optional human label (mirrors param_catalogue) |
 | F | unit | no | optional unit (mirrors param_catalogue) |
 | G | value | yes | the central value — **the number the user is providing** |
-| H | uncertainty_pct | one of (H) or (I/J) | symmetric ±% half-width of 95% CI |
-| I | lower_bound | one of (H) or (I/J) | explicit lower bound (use for asymmetric params) |
-| J | upper_bound | one of (H) or (I/J) | explicit upper bound |
-| K | distribution | yes | one of the codes above |
-| L | lower | no | auto-computed from H or I; safe to leave blank |
-| M | upper | no | auto-computed from H or J; safe to leave blank |
+| H | uncertainty_pct | one of (uncertainty_pct) or (lower/upper) | symmetric ±% half-width of 95% CI |
+| I | lower_bound | no | catalogue reference bound, display only; the model writes bounds to `lower` / `upper` |
+| J | upper_bound | no | catalogue reference bound, display only |
+| K | distribution | yes | one of the distribution codes in param_catalogue.md |
+| L | lower | one of (uncertainty_pct) or (lower/upper) | explicit lower bound; this is the cell the simulator reads |
+| M | upper | one of (uncertainty_pct) or (lower/upper) | explicit upper bound; this is the cell the simulator reads |
 | N | param_type | yes | `activity_data` (only for `N`) or `coefficient` |
 | O | ipcc_ref | no | citation, e.g. `Table 10.4` |
-| P | data_source | no | one of: `user_file`, `user_chat`, `ipcc_default`, `biological_zero` |
+| P | data_source | yes | one of: `user_file`, `user_chat`, `ipcc_default`, `biological_zero`, `placeholder` |
 
 ### Sub-category codes (ANIMAL_SUBCATEGORIES)
 
@@ -66,7 +66,9 @@ Header row in row 3. Data starts at row 4. One row per (cattle_type × aggregati
 
 ## Sheet: `Manure_Management`
 
-One row per (cattle_type × aggregation_level × sub_category × mms_type). Per-group rows must sum to fraction_pct = 100.
+Banner in row 1, header row in row 2, hints in row 3. Data starts at row 4. One row per (cattle_type × aggregation_level × sub_category × mms_type). Per-group rows must sum to fraction_pct = 100.
+
+Units on this sheet: `fraction_pct`, `MCF_pct`, `Frac_GasMS_pct` and `Frac_LeachMS_pct` are PERCENTAGES (5 means 5 %). `EF3` is a FRACTION (0.01). Never write an MCF as 0.05 to mean 5 %.
 
 | col | header | required? | notes |
 |-----|--------|-----------|-------|
@@ -76,24 +78,24 @@ One row per (cattle_type × aggregation_level × sub_category × mms_type). Per-
 | D | mms_type | yes | controlled vocabulary (below) |
 | E | fraction_pct | yes | % of manure to this MMS; rows per group must sum to 100 |
 | F | lower_fraction | no | min % for fraction_pct uncertainty (optional, enables per-MMS allocation sampling) |
-| G | upper_fraction | no | max % for fraction_pct uncertainty (optional, enables per-MMS allocation sampling) |
+| G | upper_fraction | no | max % for fraction_pct uncertainty |
 | H | distribution_fraction | no | distribution code for fraction_pct (default `pert`). Rows are renormalised per iteration so the simplex (sum = 100) is preserved. |
-| I | MCF_pct | yes | methane conversion factor (%) — see climate-zone lookup |
-| J | lower_mcf | no | for asymmetric ranges |
-| K | upper_mcf | no | for asymmetric ranges |
+| I | MCF_pct | yes | methane conversion factor in PERCENT (e.g. 5 for 5 %) — see climate-zone table |
+| J | lower_mcf | no | for asymmetric ranges, percent |
+| K | upper_mcf | no | for asymmetric ranges, percent |
 | L | distribution_mcf | no | distribution code for MCF |
-| M | EF3 | yes | direct N₂O EF (kg N₂O-N/kg N) for this MMS |
-| N | lower_ef3 | no | |
-| O | upper_ef3 | no | |
-| P | distribution_ef3 | no | |
-| Q | Frac_GasMS_pct | no | per-MMS volatilisation fraction (%) — defaults from IPCC 2019 Table 10.22 |
-| R | lower_frac_gas | no | |
-| S | upper_frac_gas | no | |
-| T | distribution_frac_gas | no | |
-| U | Frac_LeachMS_pct | no | per-MMS leaching fraction (%) — defaults from IPCC 2019 Table 10.22 |
-| V | lower_frac_leach | no | |
-| W | upper_frac_leach | no | |
-| X | distribution_frac_leach | no | |
+| M | EF3 | yes | direct N₂O EF (kg N₂O-N/kg N) for this MMS, a FRACTION (e.g. 0.01) |
+| N | lower_ef3 | no |  |
+| O | upper_ef3 | no |  |
+| P | distribution_ef3 | no |  |
+| Q | Frac_GasMS_pct | yes | per-MMS volatilisation fraction in PERCENT (e.g. 45) — defaults from IPCC 2019 Table 10.22 |
+| R | lower_frac_gas | no | percent |
+| S | upper_frac_gas | no | percent |
+| T | distribution_frac_gas | no |  |
+| U | Frac_LeachMS_pct | yes | per-MMS leaching fraction in PERCENT (e.g. 2) — defaults from IPCC 2019 Table 10.22 |
+| V | lower_frac_leach | no | percent |
+| W | upper_frac_leach | no | percent |
+| X | distribution_frac_leach | no |  |
 
 ### MMS types — by IPCC version
 
@@ -114,7 +116,7 @@ One row per (cattle_type × aggregation_level × sub_category × mms_type). Per-
 
 ### Per-MMS volatilisation & leaching defaults (IPCC 2019 Refinement)
 
-Use these when filling Frac_GasMS_pct and Frac_LeachMS_pct.
+Use these when filling Frac_GasMS_pct and Frac_LeachMS_pct. The table gives FRACTIONS; multiply by 100 for the sheet.
 
 | mms_type | Frac_Gas (mean / low / high) | Frac_Leach (mean / low / high) |
 |----------|------------------------------|--------------------------------|
@@ -133,7 +135,7 @@ Use these when filling Frac_GasMS_pct and Frac_LeachMS_pct.
 
 ## Sheet: `Parameter_TimeSeries` (optional)
 
-Annual values, used to compute Spearman-rank correlations between activity-data parameters. Minimum 5 years (or 4 if first-difference detrending is used).
+Banner in row 1, header row in row 2, description in row 3, units in row 4. Data starts at row 5. Annual values, used to compute Spearman-rank correlations between activity-data parameters. Minimum 5 years (or 4 if first-difference detrending is used).
 
 | col | header | notes |
 |-----|--------|-------|
@@ -149,7 +151,7 @@ These are the checks Claude should run before declaring the workbook ready:
 
 - **bounds**: `lower ≤ value ≤ upper` for every Parameters row (exception: when `distribution = constant` and all three = 0, e.g. WG for adults, hours for non-working cattle)
 - **N ≥ 0** (cattle population can't be negative)
-- **DE ∈ [0, 100]**, **Ym > 0**, fractions (`Frac_*`, `pct_pregnant`, `ASH`, `UE`) ∈ [0, 1]
+- **DE ∈ [0, 100]**, **Ym > 0**, Parameters-sheet fractions (`pct_pregnant`, `ASH`, `UE`, `Frac_GASM_PRP`, `Frac_LEACH_PRP`) ∈ [0, 1]; Manure_Management percentages ∈ [0, 100]
 - **distribution** ∈ DISTRIBUTION_TYPES
 - **param_type** ∈ {`activity_data`, `coefficient`}
 - **Manure_Management**: per (cattle_type, aggregation_level, sub_category), `fraction_pct` central values sum to 100 ± 1 (bounds may widen; the app renormalises each Monte Carlo iteration to preserve the simplex when `lower_fraction` / `upper_fraction` are supplied)

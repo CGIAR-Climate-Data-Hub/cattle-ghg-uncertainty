@@ -28,159 +28,124 @@
 # Returns a single character string ready to be sent as the first message
 # in the conversation (role = "system"). At repo root the assembled
 # prompt is roughly 12-15K tokens.
+#
+# 2026-09-17: the three GENERATED sections (param_catalogue, template_schema,
+# worked_example) are no longer read from disk. They are built at runtime
+# from the live R objects by R/translator_prompt_build.R, so a change to the
+# defaults master or the template layout reaches the model on the next app
+# start with no rebuild step. The three hand-written files are still read
+# from disk, then passed through translator_prompt_fill_placeholders() so
+# the literal defaults they used to carry ({{default:pct_pregnant:heifers}}
+# and friends) are always current. The assembled prompt is memoised per
+# process and its hash is exposed by translator_system_prompt_hash() for the
+# conversation and workbook stamps (plan B5/B6).
+.TSP_MEMO <- new.env(parent = emptyenv())
+
 assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") {
-  files <- c("system_instructions.md", "param_catalogue.md",
-             "template_schema.md", "mapping_examples.md",
-             "worked_example.md", "questionnaire.md")
-  parts <- lapply(files, function(f) {
-    p <- file.path(asset_dir, f)
-    if (!file.exists(p)) {
-      warning(sprintf("Translator-kit asset missing: %s — skipping.", p),
-              call. = FALSE)
-      return(NULL)
+  if (!is.null(.TSP_MEMO[[asset_dir]])) return(.TSP_MEMO[[asset_dir]])
+  generated <- c(param_catalogue = "param_catalogue",
+                 template_schema = "template_schema",
+                 worked_example  = "worked_example")
+  order <- c("system_instructions", "param_catalogue", "template_schema",
+             "mapping_examples", "worked_example", "questionnaire")
+  parts <- lapply(order, function(nm) {
+    body <- if (nm %in% names(generated)) {
+      translator_generated_section(nm, partials_dir = file.path(asset_dir, "partials"))
+    } else {
+      p <- file.path(asset_dir, paste0(nm, ".md"))
+      if (!file.exists(p)) {
+        warning(sprintf("Translator-kit asset missing: %s — skipping.", p), call. = FALSE)
+        return(NULL)
+      }
+      # HTML comments are maintainer notes; the model never sees them.
+      translator_prompt_fill_placeholders(paste(
+        .tp_strip_html_comments(readLines(p, warn = FALSE, encoding = "UTF-8")),
+        collapse = "\n"))
     }
-    paste0("# ", tools::file_path_sans_ext(f), "\n\n",
-           paste(readLines(p, warn = FALSE), collapse = "\n"))
+    paste0("# ", nm, "\n\n", body)
   })
   parts <- parts[!vapply(parts, is.null, logical(1))]
   if (length(parts) == 0)
     stop("No translator-kit asset files found in ", asset_dir, call. = FALSE)
 
-  # Sentinel marker the chat UI watches for so it knows when to surface
-  # the "Download translated template" button. The system prompt tells
-  # the model to emit this marker once a complete IPCC-template-shaped
-  # JSON is in its response.
+  # The output contract for the in-app tool call. Rewritten 2026-09-17: the
+  # previous block listed BW, MW, WG, Milk, Fat, DE, CP, hours and
+  # pct_pregnant as activity_data, contradicting the catalogue (N only), and
+  # its manure example used `mcf: 0.015` (a fraction) where the sheet column
+  # is MCF_pct in percent. Every field name and unit below now matches the
+  # tool schema in R/anthropic_client.R and the template_schema section.
+  n_par <- nrow(PARAM_CATALOGUE)
   marker_instruction <- paste(
     "",
     "",
-    "## Output convention",
+    "## Output convention (in-app)",
     "",
-    "When (and only when) you have enough information to produce a",
-    "complete filled IPCC template, emit the data inside a fenced block",
-    "tagged ```template-ready ... ``` (rather than the usual ```json```).",
-    "The in-app UI watches for the `template-ready` tag, parses the JSON,",
-    "and writes it to a multi-sheet .xlsx that the user downloads via a",
-    "'Download translated template (.xlsx)' button.",
-    "",
-    "### Required JSON schema",
+    "You never write the template yourself in chat. When the user clicks",
+    "the green Produce template now button, the server calls you with a",
+    "tool named `emit_inventory_piece` and a `mode`; you answer by calling",
+    "that tool once. The shape of its input is:",
     "",
     "```",
     "{",
-    "  \"inventory_metadata\": {",
-    "    \"country\": \"Zimbabwe\",",
-    "    \"year\": 2024,",
-    "    \"species\": \"cattle_dairy\",",
-    "    \"ipcc_version\": \"2019_refinement\",",
-    "    \"prepared_by\": \"<optional>\",",
-    "    \"notes\": \"<optional>\"",
+    "  \"mode\": \"enumerate\" | \"batch\" | \"full\",",
+    "  \"inventory_metadata\": {                       (enumerate and full)",
+    "    \"country\": \"Zimbabwe\", \"region\": \"africa\", \"year\": 2024,",
+    "    \"species\": \"cattle_non_dairy\", \"ipcc_version\": \"2019_refinement\",",
+    "    \"prepared_by\": \"...\", \"notes\": \"...\"",
     "  },",
-    "  \"parameters\": [",
-    "    {",
-    "      \"cattle_type\": \"dairy\",",
-    "      \"aggregation_level\": \"all\",",
-    "      \"sub_category\": \"dairy_cows\",",
-    "      \"parameter\": \"N\",",
-    "      \"mean\": 250000,",
-    "      \"lower\": 237500,",
-    "      \"upper\": 262500,",
-    "      \"uncertainty_pct\": 5,",
-    "      \"distribution\": \"normal\",",
-    "      \"param_type\": \"activity_data\"",
-    "    }",
-    "    /* one row per (sub_category, parameter) pair */",
+    "  \"aggregation_levels\": [\"commercial_dairy\", ...],   (enumerate only)",
+    "  \"aggregation_level\": \"commercial_dairy\",           (batch only, echo the requested one)",
+    "  \"parameters\": [                                  (batch and full)",
+    "    {\"cattle_type\": \"dairy\", \"aggregation_level\": \"commercial_dairy\",",
+    "     \"sub_category\": \"dairy_cows\", \"parameter\": \"N\", \"mean\": 250000,",
+    "     \"uncertainty_pct\": 5, \"lower\": null, \"upper\": null,",
+    "     \"distribution\": \"normal\", \"param_type\": \"activity_data\",",
+    "     \"data_source\": \"user_file\"}",
     "  ],",
     "  \"manure_management\": [",
-    "    {",
-    "      \"cattle_type\": \"dairy\",",
-    "      \"aggregation_level\": \"all\",",
-    "      \"sub_category\": \"dairy_cows\",",
-    "      \"mms_type\": \"pasture\",",
-    "      \"fraction_pct\": 100,",
-    "      \"mcf\": 0.015,",
-    "      \"ef3\": 0.020",
-    "    }",
-    "    /* one row per (sub_category, MMS) combination; per-sub-category",
-    "       fraction_pct values must sum to 100 */",
+    "    {\"cattle_type\": \"dairy\", \"aggregation_level\": \"commercial_dairy\",",
+    "     \"sub_category\": \"dairy_cows\", \"mms_type\": \"solid_storage\",",
+    "     \"fraction_pct\": 60, \"MCF_pct\": 5, \"EF3\": 0.01,",
+    "     \"Frac_GasMS_pct\": 45, \"Frac_LeachMS_pct\": 2}",
     "  ],",
     "  \"parameter_timeseries\": [",
-    "    {",
-    "      \"cattle_type\": \"dairy\",",
-    "      \"aggregation_level\": \"all\",",
-    "      \"sub_category\": \"dairy_cows\",",
-    "      \"year\": 2018,",
-    "      \"N\": 240000,",
-    "      \"BW\": 432,",
-    "      \"Milk\": 9.1,",
-    "      \"DE\": 64",
-    "    }",
-    "    /* OPTIONAL — one row per (group, year). Cattle/agg/sub columns",
-    "       may be blank to apply to all groups. Only emit when the source",
-    "       file has >=5 years of activity data; otherwise omit the array",
-    "       or send []. The app uses this to compute the AD correlation",
-    "       matrix automatically. NEVER fabricate years that aren't in",
-    "       the source. */",
+    "    {\"cattle_type\": \"dairy\", \"aggregation_level\": \"commercial_dairy\",",
+    "     \"sub_category\": \"dairy_cows\", \"year\": 2018, \"N\": 240000, \"Milk\": 9.1}",
     "  ]",
     "}",
     "```",
     "",
     "Rules:",
     "",
-    "* `parameters[].parameter` MUST be one of the canonical names from the",
-    "  parameter catalogue (N, BW, MW, WG, Milk, Fat, DE, CP, Ym, Bo,",
-    "  MCF, EF3_PRP, Frac_GASM_PRP, EF4, EF5, Frac_LEACH_PRP, Cfi, Ca,",
-    "  C_growth, Cp, UE, MilkPR, pct_pregnant, hours, etc.).",
-    "* `parameters[].param_type` is either `activity_data` (N, BW, MW, WG,",
-    "  Milk, Fat, DE, CP, hours, pct_pregnant) or `coefficient` (everything",
-    "  else).",
-    "* `parameters[].distribution` is one of: normal, lognormal, pert,",
-    "  beta, uniform, constant.",
-    "* `parameters[].mean` is required; either `lower`+`upper` OR",
-    "  `uncertainty_pct` is required (not both — pick the one that matches",
-    "  how you derived the uncertainty).",
-    "* `manure_management` rows are required if N2O emission sources are",
-    "  in play; omit the array entirely if the inventory is CH4-only.",
-    "* `parameter_timeseries` is OPTIONAL. Only emit rows when the user's",
-    "  source file has multi-year activity data. Emit an empty array",
-    "  (or omit the field) for single-year inventories. Allowed numeric",
-    "  columns: N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, CP, MilkPR.",
-    "  `year` is the only required column.",
+    sprintf("* `parameters[].parameter` MUST be one of the %d canonical codes in", n_par),
+    "  param_catalogue.md. Nothing else: no `MCF`, no `C_growth` (use `C`).",
+    "* `parameters[].param_type` is `activity_data` for `N` ONLY and",
+    "  `coefficient` for every other parameter, however measurable it is.",
+    "* `parameters[].distribution` is one of the codes listed in",
+    "  param_catalogue.md.",
+    "* Every parameters row carries `mean`, `distribution`, `param_type`,",
+    "  `data_source`, and EITHER `uncertainty_pct` (symmetric, leave lower and",
+    "  upper null) OR `lower` + `upper` (asymmetric or file-supplied bounds,",
+    "  leave uncertainty_pct null). A `constant` row has lower = mean = upper.",
+    "* `data_source` is one of `user_file`, `user_chat`, `ipcc_default`,",
+    "  `biological_zero`, `placeholder`. Never omit it.",
+    "* Manure units: `fraction_pct`, `MCF_pct`, `Frac_GasMS_pct` and",
+    "  `Frac_LeachMS_pct` are PERCENTAGES (5 means 5 %); `EF3` is a fraction",
+    "  (0.01). Every manure row carries all five.",
+    "* `inventory_metadata.region` is always set from the country",
+    "  (Zimbabwe -> africa, India -> asia, Brazil -> americas). Never leave",
+    "  it for the server to guess.",
+    "* `parameter_timeseries`: one row per (group, year) ONLY when the source",
+    "  has multi-year activity data; fill only the columns that change across",
+    "  years; `[]` otherwise. NEVER fabricate years that are not in the source.",
+    "* Numbers are literals. Write 4.644, never 4.5*1.032. No placeholders",
+    "  such as \"repeat for each sub-category\": every row is listed.",
     "",
-    "### CRITICAL — JSON strictness rules",
-    "",
-    "The block must be valid RFC-8259 JSON parseable by jsonlite::fromJSON.",
-    "Common failure modes that produce an UNUSABLE template (no download",
-    "button appears for the user) — DO NOT do any of these:",
-    "",
-    "* NO comments anywhere. Not `// like this`, not `/* like this */`.",
-    "  JSON has no comments. The schema example above is the ONLY place",
-    "  any `/* */` text appears; do not copy that style into your output.",
-    "* NO expressions or formulas. Write `4.644`, NEVER `4.5*1.032`. Do",
-    "  every arithmetic step yourself and emit the resulting literal.",
-    "* NO placeholder text like `\"...\"`, `\"see above\"`, `\"repeat for",
-    "  each sub-category\"`, `\"for brevity not shown\"`. Emit every row",
-    "  in full. If the inventory has 8 sub-categories and you intend to",
-    "  fill all 25 parameters of the catalogue, the `parameters` array",
-    "  must contain 8 × 25 = 200 rows. List them all. The user gets no",
-    "  download otherwise.",
-    "* NO trailing commas after the last item of an array or object.",
-    "* NO single quotes around keys or string values — JSON requires",
-    "  double quotes only.",
-    "* NO unquoted keys.",
-    "* When in doubt about the JSON size, prefer truncating the inventory",
-    "  by HALF (e.g. only dairy sub-categories, ask user to start a new",
-    "  conversation for the beef ones) over emitting a partial / commented",
-    "  block. Both halves emitted correctly is infinitely better than one",
-    "  whole emitted as a comment-stub.",
-    "",
-    "Do NOT emit the `template-ready` block, EVER, in any chat reply.",
-    "While you are still gathering information, respond in plain text.",
-    "When you have enough information, end with one short sentence",
-    "directing the user to click the green Produce template now button",
-    "below the chat (see in-app presentation rule 9 — that's the ONLY",
-    "way emission starts; typed phrases like 'go ahead' are no longer",
-    "a trigger). Inlining JSON in chat is forbidden: multi-sub-category",
-    "templates hit the streaming token cap and the parser rejects the",
-    "truncated block, leaving the user with no download.",
+    "In chat replies you respond in plain text only. While you are still",
+    "gathering information, ask. When you have enough, end with one short",
+    "sentence directing the user to click the green Produce template now",
+    "button (in-app presentation rule 9): that is the ONLY way emission",
+    "starts; typed phrases like 'go ahead' are not a trigger.",
     sep = "\n")
 
   # 2026-06: in-app UI presentation rules. These OVERRIDE any earlier
@@ -218,9 +183,6 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "   so the important word comes first instead of bolding it. Short",
     "   bullet lists with a leading dash and a space (`- like this`) are",
     "   OK because they render visually as bullets even in plain text.",
-    "   The ONE exception: the final template-ready output uses a fenced",
-    "   code block (```template-ready ... ```) — that's required for the",
-    "   parser to find it, not visible to the user.",
     "4. **One step at a time.** Do not pre-announce 'Step 1 / Step 2 /",
     "   Step 3' — just do the most important step and wait for the user.",
     "5. **Short paragraphs.** 2-4 sentences max. The chat panel is narrow.",
@@ -317,8 +279,27 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "Stop after the questions. Wait for the user.",
     sep = "\n")
 
-  paste(c(parts, marker_instruction, ui_presentation_rules),
-        collapse = "\n\n---\n\n")
+  out <- paste(c(parts, marker_instruction, ui_presentation_rules),
+               collapse = "\n\n---\n\n")
+  .TSP_MEMO[[asset_dir]] <- out
+  out
+}
+
+# sha256 of the assembled prompt. Saved with every conversation (a resumed
+# conversation whose hash differs from the live prompt cannot produce a
+# template until the file is re-uploaded) and written into every translator
+# workbook's Notes cell, so a downloaded file can be traced to the defaults
+# it was built with.
+translator_system_prompt_hash <- function(asset_dir = "translator_prompts") {
+  key <- paste0(asset_dir, "#hash")
+  if (!is.null(.TSP_MEMO[[key]])) return(.TSP_MEMO[[key]])
+  h <- .tp_sha256(assemble_translator_system_prompt(asset_dir))
+  .TSP_MEMO[[key]] <- h
+  h
+}
+translator_system_prompt_reset <- function() {
+  rm(list = ls(.TSP_MEMO), envir = .TSP_MEMO)
+  if (exists("translator_prompt_reset")) translator_prompt_reset()
 }
 
 # Internal helper: estimate token count (approximate). OpenAI uses BPE

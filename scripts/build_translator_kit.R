@@ -45,508 +45,54 @@ suppressMessages({
 out_dir <- "translator_prompts"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-stamp <- format(Sys.Date(), "%Y-%m-%d")
-
 # ---------------------------------------------------------------------------
-# 1. param_catalogue.md  -- the IPCC-aligned parameters with everything
-# Claude needs to map a raw column to a template field.
+# 1-2. The generated knowledge files.
+#
+# 2026-09-17: the generators moved to R/translator_prompt_build.R, and the
+# app calls the SAME functions at runtime, so what the model reads in the app
+# can no longer differ from what this script writes. This script now exists
+# for the DIY kit, for review diffs of the generated files, and to write the
+# manifest that audit check F46 and scripts/deploy.R compare against the
+# defaults master. Prose still lives in translator_prompts/partials/.
 # ---------------------------------------------------------------------------
-fmt_num <- function(x) {
-  if (is.na(x)) "" else if (x == 0) "0" else format(x, scientific = FALSE,
-                                                      drop0trailing = TRUE)
-}
-
-# Build alias index: parameter -> aliases pointing to it
-alias_to <- function(canonical) {
-  hits <- names(PARAM_ALIASES)[PARAM_ALIASES == canonical]
-  if (length(hits) == 0) "(none)" else paste(hits, collapse = ", ")
-}
-
+source("R/translator_prompt_build.R", local = FALSE)
 pc <- PARAM_CATALOGUE
 NPAR <- nrow(pc)
 
-# Hand-maintained prose lives in translator_prompts/partials/. Numbers never do:
-# every table in the generated files is built from the R constants above, so a
-# regeneration cannot reintroduce a stale value. A missing partial is a hard
-# error, so a deleted file fails the build instead of silently shrinking the
-# prompt the model receives.
-# Strip HTML comments as BLOCKS. The first version of this filtered per line
-# ("starts with <!--" OR "ends with -->"), which kept every MIDDLE line of a
-# multi-line comment. Two such lines were emitted into param_catalogue.md as
-# the lead line of a section and shipped in translator_kit.zip. A 4-line
-# comment would have leaked 2. Do not simplify this back to a line filter.
-.strip_html_comments <- function(txt) {
-  keep <- rep(TRUE, length(txt)); inside <- FALSE
-  for (i in seq_along(txt)) {
-    opens  <- grepl("<!--", txt[i], fixed = TRUE)
-    closes <- grepl("-->",  txt[i], fixed = TRUE)
-    if (inside) {
-      keep[i] <- FALSE
-      if (closes) inside <- FALSE
-    } else if (opens) {
-      keep[i] <- FALSE
-      if (!closes) inside <- TRUE
-    }
-  }
-  if (inside) stop("unterminated HTML comment in a prompt partial", call. = FALSE)
-  txt[keep]
-}
-
-partial <- function(name) {
-  f <- file.path(out_dir, "partials", paste0(name, ".md"))
-  if (!file.exists(f)) stop("missing prompt partial: ", f, call. = FALSE)
-  txt <- .strip_html_comments(readLines(f, warn = FALSE, encoding = "UTF-8"))
-  trimws(paste(txt, collapse = "
-"))
-}
-
-.read_keyed <- function(fname, required = TRUE) {
-  f <- file.path(out_dir, "partials", fname)
-  if (!file.exists(f)) {
-    if (required) stop("missing prompt partial: ", f, call. = FALSE) else return(list())
-  }
-  # Comment-strip here too: a <!-- --> inside a keyed section would otherwise
-  # be emitted verbatim into a markdown table cell.
-  ln <- .strip_html_comments(readLines(f, warn = FALSE, encoding = "UTF-8"))
-  # Paragraphs are joined with a single space deliberately: every consumer of
-  # a keyed partial renders it into ONE markdown table cell, where a newline
-  # would break the table.
-  idx <- grep("^## ", ln); out <- list()
-  for (k in seq_along(idx)) {
-    key <- sub("^## ", "", ln[idx[k]])
-    to  <- if (k < length(idx)) idx[k + 1] - 1 else length(ln)
-    out[[key]] <- trimws(paste(ln[(idx[k] + 1):to], collapse = " "))
-  }
-  out
-}
-
-# Translator-facing definition overrides, deliberately richer than the app's.
-.defs <- .read_keyed("definition_overrides.md")
-local({
-  bad <- setdiff(names(.defs), pc$parameter)
-  if (length(bad)) stop("definition_overrides.md names unknown parameters: ",
-                        paste(bad, collapse = ", "), call. = FALSE)
-})
-def_for <- function(prm) if (!is.null(.defs[[prm]])) .defs[[prm]] else
-  pc$definition[pc$parameter == prm]
-
-# The declared basis goes at the TOP of the catalogue the model reads. The
-# model is asked to fill gaps with these defaults, so it has to know what
-# they assume, and it has to be able to tell the user when a choice does not
-# match their herd.
-basis_lines <- c(
-  "## What these defaults assume",
-  "",
-  "Every default in the table below is one cell of a much larger IPCC table. Reaching it means choosing a region, a productivity class, a climate and, for manure, a specific system variant. When the user's data shows that one of these choices does not describe their herd, say so in section D and use their value instead of the default.",
-  "",
-  "| choice | this tool uses | IPCC also publishes | affects | why, and what to do otherwise |",
-  "|---|---|---|---|---|")
-B_TW <- basis_tool_wide()   # tool-wide rows only; see basis_tool_wide()
-for (i in seq_len(nrow(B_TW))) {
-  lb <- DEFAULT_BASIS_LABELS[[B_TW$dimension[i]]]
-  # fixed = TRUE: a literal pipe would split the markdown table cell.
-  esc_ <- function(x) gsub("|", "\\|", x, fixed = TRUE)
-  basis_lines <- c(basis_lines, sprintf("| **%s** | %s | %s | `%s` | %s |",
-    if (is.null(lb)) B_TW$dimension[i] else lb,
-    esc_(B_TW$chosen[i]), esc_(B_TW$alternatives[i]),
-    gsub(" ", "`, `", B_TW$governs[i], fixed = TRUE),
-    esc_(B_TW$why[i])))
-}
-basis_lines <- c(basis_lines, "",
-  "### Which IPCC variant each manure system models",
-  "",
-  "Every coefficient on a manure row (MCF, EF3, and the volatilisation and leaching fractions) comes from the single variant named here, so the row describes one real system rather than a blend. If the user's file describes a different variant, flag it.",
-  "",
-  "| mms_type | IPCC variant modelled |", "|---|---|")
-for (i in seq_len(nrow(MMS_DEFAULTS)))
-  basis_lines <- c(basis_lines, sprintf("| `%s` | %s |",
-    MMS_DEFAULTS$id[i], MMS_DEFAULTS$ipcc_variant[i]))
-basis_lines <- c(basis_lines, "")
-
-lines <- c(
-  "# Parameter catalogue",
-  "",
-  basis_lines,
-  sprintf("Single source of truth for the %d IPCC-aligned parameters the cattle uncertainty app expects.", NPAR),
-  "When you (Claude) translate a user's raw column to a template field, use this table.",
-  "All parameter codes are case-sensitive.",
-  "",
-  "| code | tier | type | unit | IPCC default | suggested ±% | distribution | IPCC ref | aliases accepted | definition |",
-  "|------|------|------|------|--------------|--------------|--------------|----------|------------------|------------|"
-)
-for (i in seq_len(nrow(pc))) {
-  lines <- c(lines, sprintf(
-    "| `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s |",
-    pc$parameter[i],
-    pc$param_tier[i],
-    pc$param_type[i],
-    pc$unit[i],
-    fmt_num(pc$ipcc_default[i]),
-    if (is.na(pc$suggested_uncertainty_pct[i])) "(asymmetric — use bounds)"
-      else paste0(pc$suggested_uncertainty_pct[i], "%"),
-    pc$suggested_distribution[i],
-    if (nzchar(pc$ipcc_ref[i])) pc$ipcc_ref[i] else "—",
-    alias_to(pc$parameter[i]),
-    gsub("\\|", "\\\\|", def_for(pc$parameter[i]))
-  ))
-}
-
-# Asymmetric bounds detail
-asym <- pc[!is.na(pc$suggested_lower_bound) | !is.na(pc$suggested_upper_bound), ]
-if (nrow(asym) > 0) {
-  lines <- c(lines, "",
-    "## Asymmetric (non-symmetric) bounds",
-    "",
-    partial("asymmetric_bounds_note"),
-    "",
-    "| code | lower | central | upper |",
-    "|------|-------|---------|-------|"
-  )
-  for (i in seq_len(nrow(asym))) {
-    lines <- c(lines, sprintf("| `%s` | %s | %s | %s |",
-      asym$parameter[i],
-      fmt_num(asym$suggested_lower_bound[i]),
-      fmt_num(asym$ipcc_default[i]),
-      fmt_num(asym$suggested_upper_bound[i])
-    ))
-  }
-}
-
-# Sex- and physiology-specific coefficient overrides. The TABLE is generated
-# from CFI_BY_SUBCAT / C_GROWTH_BY_SUBCAT so it cannot drift from what
-# resolve_subcat_default() actually returns; only the prose is hand-written.
-# This section is named by system_instructions.md self-check #9, so it must not
-# disappear from a rebuild -- that was the bug that froze this script.
-.rownotes <- .read_keyed("subcat_overrides_rownotes.md", required = FALSE)
-lines <- c(lines, "",
-  "## Sex- and physiology-specific coefficient overrides",
-  "",
-  partial("subcat_overrides_intro"),
-  "",
-  "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | BW | MW | WG | DE | CP | notes |",
-  "|---|---|---|---|---|---|---|---|---|---|---|")
-for (sc in ANIMAL_SUBCATEGORIES) {
-  cfi <- CFI_BY_SUBCAT[[sc]]; cg <- C_GROWTH_BY_SUBCAT[[sc]]
-  y19 <- ym_for_subcat(sc, "2019_refinement")
-  y06 <- ym_for_subcat(sc, "2006")
-  de_ <- DE_BY_SUBCAT[[sc]]; cp_ <- CP_BY_SUBCAT[[sc]]
-  bw_ <- LW_BY_SUBCAT[[sc]]; mw_ <- MW_BY_SUBCAT[[sc]]; wg_ <- WG_BY_SUBCAT[[sc]]
-  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |", sc,
-    if (is.null(cfi)) "—" else fmt_num(cfi),
-    if (is.null(cg))  "—" else fmt_num(cg),
-    if (is.null(y19)) "—" else fmt_num(y19),
-    if (is.null(y06)) "—" else fmt_num(y06),
-    if (is.null(bw_)) "—" else fmt_num(bw_),
-    if (is.null(mw_)) "—" else fmt_num(mw_),
-    if (is.null(wg_)) "—" else fmt_num(wg_),
-    if (is.null(de_)) "—" else fmt_num(de_),
-    if (is.null(cp_)) "—" else fmt_num(cp_),
-    if (!is.null(.rownotes[[sc]])) gsub("\\|", "\\\\|", .rownotes[[sc]]) else ""))
-}
-lines <- c(lines, "",
-  "`Ca` is not per-sub-category: it depends on the feeding situation (IPCC Table 10.5).",
-  "",
-  paste0("Values: ", paste(sprintf("%s = %s", names(FEEDING_SITUATION_CA),
-         vapply(unlist(FEEDING_SITUATION_CA), fmt_num, character(1))), collapse = "; "), "."),
-  "",
-  partial("subcat_overrides_outro"))
-
-# Tier explanation
-lines <- c(lines, "",
-  "## Tier meaning",
-  "",
-  "- **core** = user must provide a value (or accept the IPCC default). These are the activity-data parameters and a handful of high-impact coefficients (DE, CP, MilkPR).",
-  "- **advanced** = IPCC equation coefficient. Pre-filled with the IPCC default from the column above; only override if the user has a country-specific measurement.",
-  "",
-  "## param_type",
-  "",
-  "- **activity_data** = `N` only (animal population). This is the one true activity-data variable.",
-  "- **coefficient** = everything else (production parameters, energy/methane/N₂O coefficients).",
-  "",
-  "## Distribution codes accepted",
-  "",
-  paste("`", paste(DISTRIBUTION_TYPES, collapse = "`, `"), "`", sep = ""),
-  "",
-  "Use `pert` or `triangular` when only a mode + bounds are known; `normal` for symmetric ±% around a measured mean; `beta` or `tnorm_0_1` for fractions that must stay in [0, 1]; `lognormal` for strictly-positive values with right skew (typical for emission factors)."
-)
-
+lines <- build_param_catalogue_md(file.path(out_dir, "partials"))
 writeLines(lines, file.path(out_dir, "param_catalogue.md"), useBytes = TRUE)
-message("✓ wrote param_catalogue.md (", nrow(pc), " parameters)")
+message("✓ wrote param_catalogue.md (", NPAR, " parameters)")
 
-# ---------------------------------------------------------------------------
-# 2. template_schema.md -- exact sheet/column layout + validation rules
-# ---------------------------------------------------------------------------
-lines <- c(
-  "# Template schema",
-  "",
-  "The app expects an `.xlsx` workbook with the sheets and columns below.",
-  "Sheet names and column headers are **case-sensitive and must match exactly**.",
-  "",
-  "## Workbook overview",
-  "",
-  "| sheet | required? | purpose |",
-  "|-------|-----------|---------|",
-  "| `_Lists` | optional (hidden) | dropdown vocabularies — created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |",
-  "| `README` | optional | human-readable quick-start — safe to omit |",
-  "| `Inventory_Metadata` | **required** | country, year, IPCC version, species |",
-  sprintf("| `Parameters` | **required** | the %d parameters per cattle sub-category |", nrow(PARAM_CATALOGUE)),
-  "| `Manure_Management` | **required** | per-MMS allocation; per-group fractions must sum to 100% |",
-  "| `Parameter_TimeSeries` | optional | 5+ years of annual values for auto-correlation |",
-  "| `Vocab` | optional | reference catalogue — safe to omit |",
-  "",
-  "## Sheet: `Inventory_Metadata`",
-  "",
-  "Transposed (label/value) layout. Column A is the label, column B is the value.",
-  "",
-  "| label | value | notes |",
-  "|-------|-------|-------|",
-  "| country | (free text) | e.g. `Zimbabwe`. Used in the report header. |",
-  "| region | one of: africa / asia / europe / americas / oceania / global | Continental region — drives the BW deviation benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2/10A.3). Dropdown-constrained in the latest template. Legacy uploads with only a single free-text country cell are auto-mapped by the parser. |",
-  "| inventory_year | (integer) | e.g. `2022` |",
-  paste0("| species | one of: ", paste(SPECIES_OPTIONS, collapse = " / "), " | controlled vocabulary |"),
-  paste0("| ipcc_version | one of: ", paste(IPCC_VERSIONS, collapse = " / "), " | drives MMS list filtering |"),
-  "| prepared_by | (free text) | name / institution |",
-  "| notes | (free text) | optional |",
-  "",
-  "## Sheet: `Parameters`",
-  "",
-  "Header row in row 3. Data starts at row 4. One row per (cattle_type × aggregation_level × sub_category × parameter).",
-  "",
-  "| col | header | required? | notes |",
-  "|-----|--------|-----------|-------|",
-  "| A | cattle_type | yes | e.g. `dairy`, `non_dairy` |",
-  "| B | aggregation_level | yes | free text label for the inventory grouping |",
-  "| C | sub_category | yes | one of the ANIMAL_SUBCATEGORIES below (or free-text if the inventory uses custom groups) |",
-  "| D | parameter | yes | the parameter code from param_catalogue.md |",
-  "| E | definition | no | optional human label (mirrors param_catalogue) |",
-  "| F | unit | no | optional unit (mirrors param_catalogue) |",
-  "| G | value | yes | the central value — **the number the user is providing** |",
-  "| H | uncertainty_pct | one of (H) or (I/J) | symmetric ±% half-width of 95% CI |",
-  "| I | lower_bound | one of (H) or (I/J) | explicit lower bound (use for asymmetric params) |",
-  "| J | upper_bound | one of (H) or (I/J) | explicit upper bound |",
-  "| K | distribution | yes | one of the codes above |",
-  "| L | lower | no | auto-computed from H or I; safe to leave blank |",
-  "| M | upper | no | auto-computed from H or J; safe to leave blank |",
-  "| N | param_type | yes | `activity_data` (only for `N`) or `coefficient` |",
-  "| O | ipcc_ref | no | citation, e.g. `Table 10.4` |",
-  "| P | data_source | no | one of: `user_file`, `user_chat`, `ipcc_default`, `biological_zero` |",
-  "",
-  "### Sub-category codes (ANIMAL_SUBCATEGORIES)",
-  ""
-)
-for (k in seq_along(ANIMAL_SUBCATEGORIES)) {
-  lines <- c(lines, sprintf("- `%s` — %s",
-    ANIMAL_SUBCATEGORIES[k], ANIMAL_SUBCATEGORY_LABELS[ANIMAL_SUBCATEGORIES[k]]))
-}
-
-lines <- c(lines, "",
-  "## Sheet: `Manure_Management`",
-  "",
-  "One row per (cattle_type × aggregation_level × sub_category × mms_type). Per-group rows must sum to fraction_pct = 100.",
-  "",
-  "| col | header | required? | notes |",
-  "|-----|--------|-----------|-------|",
-  "| A | cattle_type | yes | matches Parameters sheet |",
-  "| B | aggregation_level | yes | matches Parameters sheet |",
-  "| C | sub_category | yes | matches Parameters sheet (auto-matched on upload if a near-spelling exists in Parameters, e.g. `DINT_heif` ↔ `DINT_heifer`) |",
-  "| D | mms_type | yes | controlled vocabulary (below) |",
-  "| E | fraction_pct | yes | % of manure to this MMS; rows per group must sum to 100 |",
-  "| F | lower_fraction | no | min % for fraction_pct uncertainty (optional, enables per-MMS allocation sampling) |",
-  "| G | upper_fraction | no | max % for fraction_pct uncertainty (optional, enables per-MMS allocation sampling) |",
-  "| H | distribution_fraction | no | distribution code for fraction_pct (default `pert`). Rows are renormalised per iteration so the simplex (sum = 100) is preserved. |",
-  "| I | MCF_pct | yes | methane conversion factor (%) — see climate-zone lookup |",
-  "| J | lower_mcf | no | for asymmetric ranges |",
-  "| K | upper_mcf | no | for asymmetric ranges |",
-  "| L | distribution_mcf | no | distribution code for MCF |",
-  "| M | EF3 | yes | direct N₂O EF (kg N₂O-N/kg N) for this MMS |",
-  "| N | lower_ef3 | no | |",
-  "| O | upper_ef3 | no | |",
-  "| P | distribution_ef3 | no | |",
-  "| Q | Frac_GasMS_pct | no | per-MMS volatilisation fraction (%) — defaults from IPCC 2019 Table 10.22 |",
-  "| R | lower_frac_gas | no | |",
-  "| S | upper_frac_gas | no | |",
-  "| T | distribution_frac_gas | no | |",
-  "| U | Frac_LeachMS_pct | no | per-MMS leaching fraction (%) — defaults from IPCC 2019 Table 10.22 |",
-  "| V | lower_frac_leach | no | |",
-  "| W | upper_frac_leach | no | |",
-  "| X | distribution_frac_leach | no | |",
-  "",
-  "### MMS types — by IPCC version",
-  ""
-)
-mms <- MMS_DEFAULTS
-lines <- c(lines, "| id | label | 2006? | 2019R? | MCF trop.moist | MCF trop.dry | MCF temperate | MCF boreal | EF3 |",
-  "|----|-------|-------|--------|----------------|--------------|---------------|------------|-----|")
-for (i in seq_len(nrow(mms))) {
-  vs <- strsplit(mms$versions[i], ",")[[1]]
-  lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s | %s |",
-    mms$id[i], mms$label[i],
-    if ("2006" %in% vs) "✓" else "",
-    if ("2019" %in% vs) "✓" else "",
-    fmt_num(mms$mcf_tropical[i]),
-    fmt_num(mms$mcf_tropical_dry[i]),
-    fmt_num(mms$mcf_temperate[i]),
-    fmt_num(mms$mcf_boreal[i]),
-    fmt_num(mms$ef3[i])
-  ))
-}
-
-# Per-MMS Frac_Gas / Frac_Leach defaults (2019R)
-mfd <- MMS_FRAC_DEFAULTS_2019
-lines <- c(lines, "",
-  "### Per-MMS volatilisation & leaching defaults (IPCC 2019 Refinement)",
-  "",
-  "Use these when filling Frac_GasMS_pct and Frac_LeachMS_pct.",
-  "",
-  "| mms_type | Frac_Gas (mean / low / high) | Frac_Leach (mean / low / high) |",
-  "|----------|------------------------------|--------------------------------|"
-)
-for (i in seq_len(nrow(mfd))) {
-  lines <- c(lines, sprintf("| `%s` | %s / %s / %s | %s / %s / %s |",
-    mfd$mms_type[i],
-    fmt_num(mfd$frac_gas[i]),  fmt_num(mfd$frac_gas_low[i]),  fmt_num(mfd$frac_gas_high[i]),
-    fmt_num(mfd$frac_leach[i]),fmt_num(mfd$frac_leach_low[i]),fmt_num(mfd$frac_leach_high[i])
-  ))
-}
-
-lines <- c(lines, "",
-  "## Sheet: `Parameter_TimeSeries` (optional)",
-  "",
-  "Annual values, used to compute Spearman-rank correlations between activity-data parameters. Minimum 5 years (or 4 if first-difference detrending is used).",
-  "",
-  "| col | header | notes |",
-  "|-----|--------|-------|",
-  "| A | cattle_type | optional — blank = applies to all groups |",
-  "| B | aggregation_level | optional |",
-  "| C | sub_category | optional |",
-  "| D | year | required (integer) |",
-  "| E–N | N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, CP, MilkPR | the 10 parameters the app correlates; leave columns blank for parameters not measured |",
-  "",
-  "## Validation rules the app applies",
-  "",
-  "These are the checks Claude should run before declaring the workbook ready:",
-  "",
-  "- **bounds**: `lower ≤ value ≤ upper` for every Parameters row (exception: when `distribution = constant` and all three = 0, e.g. WG for adults, hours for non-working cattle)",
-  "- **N ≥ 0** (cattle population can't be negative)",
-  "- **DE ∈ [0, 100]**, **Ym > 0**, fractions (`Frac_*`, `pct_pregnant`, `ASH`, `UE`) ∈ [0, 1]",
-  "- **distribution** ∈ DISTRIBUTION_TYPES",
-  "- **param_type** ∈ {`activity_data`, `coefficient`}",
-  "- **Manure_Management**: per (cattle_type, aggregation_level, sub_category), `fraction_pct` central values sum to 100 ± 1 (bounds may widen; the app renormalises each Monte Carlo iteration to preserve the simplex when `lower_fraction` / `upper_fraction` are supplied)",
-  "- **Manure_Management**: `lower_fraction ≤ fraction_pct ≤ upper_fraction` for every row that supplies the uncertainty columns; blank = deterministic",
-  "- **Manure_Management**: `sub_category` should match the Parameters sheet exactly. Near-spellings (e.g. `DINT_heif` vs `DINT_heifer`) are auto-matched on upload and shown as a `warn` row in the QAQC tab; multi-candidate ambiguity blocks the run",
-  "- **Manure_Management**: mms_type must be a valid id for the selected IPCC version",
-  "- **Inventory_Metadata.species** ∈ SPECIES_OPTIONS; **ipcc_version** ∈ IPCC_VERSIONS",
-  "",
-  "## Distribution choice guide",
-  "",
-  "When the user gives you a value but no distribution, pick from this priority list:",
-  "",
-  sprintf("1. If the parameter has an asymmetric IPCC range (%s) → use **`lognormal`** or **`pert`** with the absolute bounds from the asymmetric table in param_catalogue.md.", paste0("`", paste(PARAM_CATALOGUE$parameter[!is.na(PARAM_CATALOGUE$suggested_lower_bound) | !is.na(PARAM_CATALOGUE$suggested_upper_bound)], collapse = "`, `"), "`")),
-  "2. If the parameter is a fraction bounded in [0, 1] (pct_pregnant, ASH, UE, manure fractions) → **`beta`** or **`tnorm_0_1`**.",
-  "3. If the central value comes from a measured mean ± SD or ±CV → **`normal`**.",
-  "4. If only min / mode / max are known (expert judgement) → **`pert`** (preferred) or **`triangular`**.",
-  "5. If the parameter is structurally constant (WG = 0 for adults, hours = 0 for non-working cattle) → **`constant`**, lower = value = upper.",
-  ""
-)
-
+lines <- build_template_schema_md(file.path(out_dir, "partials"))
 writeLines(lines, file.path(out_dir, "template_schema.md"), useBytes = TRUE)
-
-# ---------------------------------------------------------------------------
-# 2b. worked_example.md -- GENERATED.
-#
-# This is 5th in the assembled prompt and is the shape template the model
-# copies most literally, which is why its defects mattered: the hand-written
-# version tagged 17 of 50 rows `activity_data` against a rule the same prompt
-# states ("N only"), asserted that wrong rule outright in its closing notes,
-# and carried superseded values (EF3_PRP 0.02, solid_storage EF3 0.005,
-# Frac_GasMS 30, a lagoon MCF matching no IPCC cell, Ym +-10).
-#
-# Every coefficient now comes from resolve_subcat_default() and the MMS
-# tables, so the example cannot contradict the catalogue it sits next to.
-# Only the genuinely user-supplied values are literals, listed here.
-# ---------------------------------------------------------------------------
-.WE_SUBCATS <- c("dairy_cows", "heifers")
-.WE_USER <- list(                       # country data a user would supply
-  dairy_cows = c(N = 12000, BW = 420, MW = 450, Milk = 8.5, Fat = 4.0,
-                 DE = 62, CP = 14),
-  heifers    = c(N = 3000,  BW = 250, MW = 450, DE = 58, CP = 12))
-.WE_MMS <- list(
-  dairy_cows = c(pasture = 30, solid_storage = 50, daily_spread = 15,
-                 liquid_slurry = 5),
-  heifers    = c(pasture = 70, solid_storage = 25, daily_spread = 5))
-
-.we_num <- function(x) {
-  if (is.na(x)) return("null")
-  trimws(format(x, scientific = FALSE, trim = TRUE, drop0trailing = TRUE))
-}
-# The edition the worked example is written for. It appears in the example's
-# own inventory_metadata AND is passed to resolve_subcat_default(), so the
-# JSON and the numbers inside it can never describe different editions. Ym is
-# the first default where that distinction is load-bearing: it is 7.0 for
-# non-dairy under 2019R and 6.5 under 2006. Until Ym became edition-aware this
-# call site passed an undefined `ipcc_version` and got away with it only
-# because R evaluates arguments lazily and the callee never read it.
-.WE_IPCC_VERSION <- "2019_refinement"
-
-we <- c("# Worked example -- complete template-ready JSON for a small inventory",
-        "", partial("worked_example_intro"), "",
-        sprintf("This example has %d sub-categories, so %d x %d = %d parameter rows. An inventory with 8 sub-categories would need 8 x %d = %d.",
-                length(.WE_SUBCATS), length(.WE_SUBCATS), NPAR,
-                length(.WE_SUBCATS) * NPAR, NPAR, 8 * NPAR),
-        "", "```template-ready", "{",
-        '  "inventory_metadata": {',
-        '    "country": "Country Z", "year": 2023, "species": "cattle_dairy",',
-        sprintf('    "ipcc_version": "%s", "prepared_by": "National Inventory Team"',
-                .WE_IPCC_VERSION),
-        "  },", '  "parameters": [')
-prow <- character(0)
-for (sc in .WE_SUBCATS) {
-  usr <- .WE_USER[[sc]]
-  for (prm in pc$parameter) {
-    rs <- resolve_subcat_default(sc, prm, .WE_IPCC_VERSION)
-    is_user <- prm %in% names(usr)
-    val  <- if (is_user) usr[[prm]] else if (!is.null(rs)) rs$value else NA_real_
-    dist <- if (!is.null(rs)) rs$distribution else
-              pc$suggested_distribution[pc$parameter == prm]
-    lo <- if (!is.null(rs)) rs$lower else pc$suggested_lower_bound[pc$parameter == prm]
-    hi <- if (!is.null(rs)) rs$upper else pc$suggested_upper_bound[pc$parameter == prm]
-    unc <- if (!is.null(rs)) rs$uncertainty_pct else
-             pc$suggested_uncertainty_pct[pc$parameter == prm]
-    asym <- is.na(unc) && !is.na(lo) && !is.na(hi)
-    spread <- if (asym) sprintf('"lower": %s, "upper": %s', .we_num(lo), .we_num(hi))
-              else sprintf('"uncertainty_pct": %s', .we_num(unc))
-    prow <- c(prow, sprintf(
-      '    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "%s", "parameter": "%s", "mean": %s, %s, "distribution": "%s", "param_type": "%s"}',
-      sc, prm, .we_num(val), spread, dist,
-      pc$param_type[pc$parameter == prm]))
-  }
-}
-we <- c(we, paste0(prow, c(rep(",", length(prow) - 1), "")),
-        "  ],", '  "manure_management": [')
-mrow <- character(0)
-for (sc in .WE_SUBCATS) {
-  alloc <- .WE_MMS[[sc]]
-  for (id in names(alloc)) {
-    row <- MMS_DEFAULTS[MMS_DEFAULTS$id == id, ]
-    fr  <- mms_frac_defaults_2019(id)
-    mrow <- c(mrow, sprintf(
-      '    {"cattle_type": "dairy", "aggregation_level": "all", "sub_category": "%s", "mms_type": "%s", "fraction_pct": %s, "MCF_pct": %s, "EF3": %s, "Frac_GasMS_pct": %s, "Frac_LeachMS_pct": %s}',
-      sc, id, .we_num(unname(alloc[[id]])), .we_num(row$mcf_tropical),
-      .we_num(row$ef3), .we_num(fr$frac_gas * 100),
-      .we_num(fr$frac_leach * 100)))
-  }
-}
-we <- c(we, paste0(mrow, c(rep(",", length(mrow) - 1), "")),
-        "  ],", '  "parameter_timeseries": []', "}", "```", "",
-        partial("worked_example_outro"))
-stopifnot(!is.null(jsonlite::fromJSON(paste(
-  we[(which(we == "```template-ready") + 1):(which(we == "```") - 1)],
-  collapse = "
-"))))
-writeLines(we, file.path(out_dir, "worked_example.md"), useBytes = TRUE)
-message("✓ wrote worked_example.md (", length(.WE_SUBCATS), " sub-cats x ",
-        NPAR, " params)")
 message("✓ wrote template_schema.md")
+
+we <- build_worked_example_md(file.path(out_dir, "partials"))
+writeLines(we, file.path(out_dir, "worked_example.md"), useBytes = TRUE)
+message("✓ wrote worked_example.md (", length(.WE_SUBCATS), " sub-cats x ", NPAR, " params)")
+
+# The hand-written files carry {{placeholders}} that the app fills at
+# runtime. The DIY-kit copies must be filled here, so a kit user pastes real
+# numbers into their Claude Project. Written to www/ only; the canonical
+# translator_prompts/ copies keep their placeholders.
+fill_for_kit <- function(f) {
+  # Same treatment the app gives the file: maintainer HTML comments out,
+  # placeholders filled from the live objects.
+  txt <- paste(.tp_strip_html_comments(
+    readLines(file.path(out_dir, f), warn = FALSE, encoding = "UTF-8")), collapse = "
+")
+  translator_prompt_fill_placeholders(txt)
+}
+
+# Manifest (plan B3): hashes of the master, the template layout and each
+# generated file. F46 fails when the master or layout hash no longer matches
+# what the live objects produce, i.e. when this script needs re-running.
+manifest <- translator_prompt_manifest(out_dir)
+manifest$generated_at <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+jsonlite::write_json(manifest, file.path(out_dir, ".manifest.json"),
+                     auto_unbox = TRUE, pretty = TRUE)
+message("✓ wrote .manifest.json (master ", substr(manifest$master_sha256, 1, 8),
+        ", layout ", substr(manifest$layout_sha256, 1, 8), ")")
 
 # ---------------------------------------------------------------------------
 # 3. Stage user-facing assets into www/ so the Shiny app can serve them.
@@ -565,10 +111,14 @@ user_facing <- c("system_instructions.md",
                  "questionnaire.md", "getting_started.md",
                  "param_catalogue.md", "template_schema.md",
                  "mapping_examples.md", "worked_example.md")
+hand_written <- c("system_instructions.md", "mapping_examples.md", "questionnaire.md",
+                  "getting_started.md")
 for (f in user_facing) {
   src <- file.path(out_dir, f)
   dst <- file.path(www_dir, f)
-  if (file.exists(src)) file.copy(src, dst, overwrite = TRUE)
+  if (!file.exists(src)) next
+  if (f %in% hand_written) writeLines(fill_for_kit(f), dst, useBytes = TRUE)
+  else file.copy(src, dst, overwrite = TRUE)
 }
 message("✓ staged ", length(user_facing), " files into ", www_dir, "/")
 
@@ -707,8 +257,17 @@ if (file.exists(zip_path)) file.remove(zip_path)
 # Build the zip with paths flattened (no translator_prompts/ prefix inside
 # the archive). Switch into out_dir so the file names in the archive match the
 # short names the README references.
+# Filled copies of the hand-written files live in www/; stage them into a
+# temporary kit folder together with the generated files so the archive
+# carries no unfilled placeholder.
+kit_dir <- tempfile("translator_kit_"); dir.create(kit_dir)
+for (f in kit_files_present) {
+  from <- if (f %in% hand_written && file.exists(file.path(www_dir, f))) file.path(www_dir, f)
+          else file.path(out_dir, f)
+  file.copy(from, file.path(kit_dir, f), overwrite = TRUE)
+}
 old_wd <- getwd()
-setwd(out_dir)
+setwd(kit_dir)
 zip_ok <- tryCatch({
   if (requireNamespace("zip", quietly = TRUE)) {
     zip::zip(zipfile = zip_path, files = kit_files_present,

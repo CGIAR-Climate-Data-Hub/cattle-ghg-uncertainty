@@ -16,6 +16,42 @@
 `%||%` <- function(a, b)
   if (is.null(a) || length(a) == 0 || is.na(a[1]) || !nzchar(as.character(a[1]))) b else a
 
+# ---------------------------------------------------------------------------
+# The workbook layout, declared ONCE at top level (2026-09-17).
+#
+# generate_template_openxlsx() used to hold these vectors as locals, and the
+# AI translator's prompt (template_schema.md) described the same columns in
+# hand-typed tables that nothing checked. A column added to the template
+# therefore reached the workbook but not the model. The prompt generator in
+# R/translator_prompt_build.R now renders its column tables from these
+# objects, and generate_template_openxlsx() asserts it is using the same
+# ones, so the two cannot drift. The parser reads columns by header name, so
+# order changes here propagate everywhere at once.
+# ---------------------------------------------------------------------------
+TEMPLATE_P_COLS <- c("cattle_type","aggregation_level","sub_category",
+                     "parameter","definition","unit",
+                     "value","uncertainty_pct","lower_bound","upper_bound",
+                     "distribution","lower","upper",
+                     "param_type","ipcc_ref","data_source")
+TEMPLATE_MM_COLS <- c("cattle_type","aggregation_level","sub_category",
+                      "mms_type","fraction_pct",
+                      "lower_fraction","upper_fraction","distribution_fraction",
+                      "MCF_pct","lower_mcf","upper_mcf","distribution_mcf",
+                      "EF3","lower_ef3","upper_ef3","distribution_ef3",
+                      "Frac_GasMS_pct","lower_frac_gas","upper_frac_gas","distribution_frac_gas",
+                      "Frac_LeachMS_pct","lower_frac_leach","upper_frac_leach","distribution_frac_leach")
+TEMPLATE_TS_COLS <- c("cattle_type","aggregation_level","sub_category","year",
+                      "N","BW","MW","WG","Milk","Fat","pct_pregnant","DE","CP","MilkPR")
+# Inventory_Metadata rows, in sheet order (row 2 onwards). Column B carries the
+# label, column C the value, column D the hint. The parser reads the column
+# headed "Value", so the letter matters only to a human filling it by hand.
+TEMPLATE_META_FIELDS <- data.frame(
+  label = c("Country", "Continental region", "Inventory year",
+            "Livestock species", "IPCC Guidelines version", "Prepared by", "Notes"),
+  col   = c("country", "region", "inventory_year",
+            "species", "ipcc_version", "prepared_by", "notes"),
+  stringsAsFactors = FALSE)
+
 # R2.2: compute a correlation matrix (with nearest-PD projection) from a
 # Parameter_TimeSeries-style data frame. Used both by parse_uploaded_template()
 # (real upload path) and by .load_example() in app_server.R so that the built-in
@@ -570,6 +606,11 @@ generate_template_openxlsx <- function(filepath, include_example,
          hint="Scope, caveats, deviations from standard methodology. Note: MCF values for manure must be entered manually in Manure_Management — see Vocab sheet for IPCC Table 10.17 reference.", dropdown=NULL)
   )
 
+  # The list above is what gets written; TEMPLATE_META_FIELDS is what the
+  # translator prompt describes. Keep them identical, loudly.
+  stopifnot(identical(vapply(meta_fields, `[[`, "", "col"), TEMPLATE_META_FIELDS$col),
+            identical(vapply(meta_fields, `[[`, "", "label"), TEMPLATE_META_FIELDS$label))
+
   # Column headers
   openxlsx::writeData(wb, "Inventory_Metadata",
     data.frame(A="", B="Field", C="Value", D="Hint / valid options"),
@@ -644,11 +685,9 @@ generate_template_openxlsx <- function(filepath, include_example,
   # Q  data_quality     (dropdown, optional)
 
   # TT.2: data_quality column removed in v2.3 (was documentation-only, never used in calculations)
-  P_COLS <- c("cattle_type","aggregation_level","sub_category",
-              "parameter","definition","unit",
-              "value","uncertainty_pct","lower_bound","upper_bound",
-              "distribution","lower","upper",
-              "param_type","ipcc_ref","data_source")
+  # Declared once at the top of this file; the translator prompt renders
+  # its column table from the same vector.
+  P_COLS <- TEMPLATE_P_COLS
   P_WIDTHS <- c(14, 20, 16, 15, 46, 16, 10, 14, 12, 12, 12, 10, 10, 14, 12, 22)
   P_COL_IDX <- setNames(seq_along(P_COLS), P_COLS)
 
@@ -882,13 +921,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   # surfaces each sampled column as fraction_<mms> in the sensitivity output
   # so MMS allocation can finally show up as an influential parameter.
   # Per-iteration rows are renormalised so they sum to 1.
-  MM_COLS   <- c("cattle_type","aggregation_level","sub_category",
-                 "mms_type","fraction_pct",
-                 "lower_fraction","upper_fraction","distribution_fraction",
-                 "MCF_pct","lower_mcf","upper_mcf","distribution_mcf",
-                 "EF3","lower_ef3","upper_ef3","distribution_ef3",
-                 "Frac_GasMS_pct","lower_frac_gas","upper_frac_gas","distribution_frac_gas",
-                 "Frac_LeachMS_pct","lower_frac_leach","upper_frac_leach","distribution_frac_leach")
+  MM_COLS   <- TEMPLATE_MM_COLS
   MM_WIDTHS <- c(14, 20, 16, 18, 12, 12, 12, 18,
                  10, 10, 10, 15, 10, 10, 10, 15,
                  14, 12, 12, 18, 14, 12, 12, 18)

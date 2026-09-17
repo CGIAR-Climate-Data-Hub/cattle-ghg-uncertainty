@@ -1,0 +1,20 @@
+{
+  "master_sha256": "d14d4ee40dc793ea1b0ed9e0d23f785148447f17189438be60f31893516f3d24",
+  "layout_sha256": "46d9fbdc9d256f0494ebd9edd35e512d559b6369ff7a5d8a5da02018a926d97b",
+  "generated": [
+    {
+      "file": "param_catalogue.md",
+      "sha256": "5bf21f06a70d0004334e74bdfcf13bad9daf4096182d9e705f45e8949d33782a"
+    },
+    {
+      "file": "template_schema.md",
+      "sha256": "9f29bb07bcc2c5a527395ba2950579b19749a156c9a4954491265f919cb0ba0d"
+    },
+    {
+      "file": "worked_example.md",
+      "sha256": "47f4f34eb86762c185ad3e599d6d9aa17d42e70bc2282ec5b4dd8a9435fafa0c"
+    }
+  ],
+  "commit": "fef67c3",
+  "generated_at": "2026-09-17T13:06:56Z"
+}

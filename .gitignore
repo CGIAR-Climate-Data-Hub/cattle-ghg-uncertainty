@@ -33,7 +33,10 @@ __pycache__/
 .env
 *.env
 translator_usage_log.csv
+translator_usage_log.csv.*.old
 translator_history_*.json
+# 2026-09: on-disk memo of deterministic translator tool calls (plan F6)
+translator_memo_*.json
 auth_tokens.csv
 
 # 2026-06: repo tidy-up. Review-cycle artefacts, real-country test data,

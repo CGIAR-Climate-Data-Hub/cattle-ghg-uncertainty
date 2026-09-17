@@ -249,7 +249,7 @@ if (!is.null(m)) {
   has_corr <- rowSums(abs(off_diag)) > 0 | colSums(abs(off_diag)) > 0
   if (sum(has_corr) >= 2) m <- m[has_corr, has_corr]
   par(mar = c(5, 5, 1, 1))
-  image(seq_len(ncol(m)), seq_len(nrow(m)), t(m[nrow(m):1, ]),
+  image(seq_len(ncol(m)), seq_len(nrow(m)), base::t(m[nrow(m):1, ]),
         zlim = c(-1, 1), axes = FALSE, xlab = "", ylab = "",
         col = colorRampPalette(c("#C0392B", "white", "#2D6A4F"))(99))
   axis(1, at = seq_len(ncol(m)), labels = colnames(m), las = 2, cex.axis = 0.9)

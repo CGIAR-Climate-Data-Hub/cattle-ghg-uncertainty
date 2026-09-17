@@ -171,7 +171,9 @@ file.copy("doc/_shared.css", file.path(out_dir, "_shared.css"), overwrite = TRUE
                  "total_co2e"),
     stringsAsFactors = FALSE
   )
-  smat <- t(sapply(out$variable, function(v) summarise(inv[[v]])))
+  # base::t, not the i18n t(): this script sources all of R/, where R/i18n.R
+  # defines a translation function named t that shadows the transpose.
+  smat <- base::t(sapply(out$variable, function(v) summarise(inv[[v]])))
   out  <- cbind(out, as.data.frame(smat))
   list(summary = out, corr_matrix = unified, ad_corr_matrix = ad_mtx,
        ef_corr_matrix = ef_mtx, sub_category_names = all_names)

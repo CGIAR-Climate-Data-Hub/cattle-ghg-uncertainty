@@ -19,22 +19,36 @@
 # cache_read  = cache hits (90% discount on input price)
 # cache_write = cache creation (25% surcharge on input price)
 # Verify against https://www.anthropic.com/pricing if prices change.
+# cache_write_1h = the extended 1-hour cache write (2x input). Added
+# 2026-09-17 when the 1-hour TTL was re-enabled for long prefixes (plan F2);
+# the June objection to the 1-hour cache was only that this rate was
+# missing and the log under-reported.
 .ANTHROPIC_PRICING <- list(
   "claude-opus-4-8"   = list(input = 15.00, output = 75.00,
-                                cache_read = 1.50, cache_write = 18.75),
+                                cache_read = 1.50, cache_write = 18.75, cache_write_1h = 30.00),
   "claude-opus-4-7"   = list(input = 15.00, output = 75.00,
-                                cache_read = 1.50, cache_write = 18.75),
+                                cache_read = 1.50, cache_write = 18.75, cache_write_1h = 30.00),
   "claude-opus-4-6"   = list(input = 15.00, output = 75.00,
-                                cache_read = 1.50, cache_write = 18.75),
+                                cache_read = 1.50, cache_write = 18.75, cache_write_1h = 30.00),
   "claude-sonnet-4-6" = list(input = 3.00,  output = 15.00,
-                                cache_read = 0.30, cache_write = 3.75),
+                                cache_read = 0.30, cache_write = 3.75, cache_write_1h = 6.00),
   "claude-haiku-4-5-20251001" = list(input = 1.00, output = 5.00,
-                                         cache_read = 0.10, cache_write = 1.25),
+                                         cache_read = 0.10, cache_write = 1.25, cache_write_1h = 2.00),
   # Claude Mythos 5 (Project Glasswing). Same API surface as Fable 5;
   # $10/$50 per 1M. cache_read = 10% of input; cache_write = 5-min rate (1.25x).
   "claude-mythos-5"   = list(input = 10.00, output = 50.00,
-                                cache_read = 1.00, cache_write = 12.50)
+                                cache_read = 1.00, cache_write = 12.50, cache_write_1h = 20.00)
 )
+
+# Prefix size above which the stable prefix is cached for one hour instead
+# of five minutes (plan F2). A five-minute cache is lost whenever the user
+# takes longer than that to answer a question, or a batch streams for longer
+# than that, and the whole prefix is then re-written at 1.25x. Above this
+# size a single 2x write at the start of the run is cheaper than the second
+# 1.25x write, and every later stage reads at 10 %. Below it, a run finishes
+# inside five minutes and the 1-hour write would be pure surcharge.
+.ANTHROPIC_1H_PREFIX_TOKENS <- 40000L
+.anthropic_est_tokens <- function(x) as.integer(ceiling(nchar(x, type = "bytes") / 3.6))
 # 2026-06-11: switched from Opus 4.8 to Sonnet 4.6 after Andy's 26-sub-cat
 # Zambia file timed out at 900s on Opus and a 10-sub-cat fallback returned
 # only 2 of 10 sub-categories. Same task ran fine on claude.ai web (Sonnet).
@@ -200,7 +214,8 @@
 anthropic_cost_usd <- function(input_tokens, output_tokens,
                                 model = .ANTHROPIC_DEFAULT_MODEL,
                                 cache_read_tokens = 0L,
-                                cache_write_tokens = 0L) {
+                                cache_write_tokens = 0L,
+                                cache_write_1h_tokens = 0L) {
   p <- .ANTHROPIC_PRICING[[model]]
   if (is.null(p)) {
     warning(sprintf("Unknown Anthropic model '%s'; cost reported as NA.",
@@ -210,7 +225,8 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
   (max(input_tokens %||% 0L, 0L)        / 1e6) * p$input       +
   (max(output_tokens %||% 0L, 0L)       / 1e6) * p$output      +
   (max(cache_read_tokens %||% 0L, 0L)   / 1e6) * p$cache_read  +
-  (max(cache_write_tokens %||% 0L, 0L)  / 1e6) * p$cache_write
+  (max(cache_write_tokens %||% 0L, 0L)  / 1e6) * p$cache_write +
+  (max(cache_write_1h_tokens %||% 0L, 0L) / 1e6) * (p$cache_write_1h %||% (2 * p$input))
 }
 
 # Map a status code to a user-friendly message. Used by both the
@@ -417,16 +433,12 @@ anthropic_chat_stream <- function(messages,
                                    max_retries = 2,
                                    tools = NULL,
                                    tool_choice = NULL,
-                                   # cache_ttl = "1h" requests Anthropic's
-                                   # extended 1-hour prompt cache for the
-                                   # stable prefix (system prompt + batch-
-                                   # invariant history). Used by the batched-
-                                   # emission wrappers where batches run more
-                                   # than 5 min apart and the default cache
-                                   # would expire between them. NULL = default
-                                   # 5-minute cache (regular chat / single-shot
-                                   # calls, which never benefit from 1h).
-                                   cache_ttl = NULL) {
+                                   # cache_ttl: "auto" (default) picks the
+                                   # 1-hour cache for the stable prefix when
+                                   # the prefix exceeds .ANTHROPIC_1H_PREFIX_
+                                   # TOKENS, and the 5-minute cache otherwise
+                                   # (plan F2). "1h" / NULL force either.
+                                   cache_ttl = "auto") {
   # Provider switch (throwaway A/B test): a Mistral model id routes the whole
   # streaming path — including every forced-template call that funnels through
   # here (template_force / enumerate / batch) — to the Mistral client
@@ -446,12 +458,29 @@ anthropic_chat_stream <- function(messages,
   }
 
   split <- .anthropic_split_system(messages)
+  # Resolve "auto": measure the stable prefix (system + every message but
+  # the last) and take the 1-hour cache above the threshold. Anthropic
+  # requires 1-hour breakpoints to precede 5-minute ones; the helpers below
+  # mark the system block and message n-1 with the chosen TTL and message n
+  # with the 5-minute default, which satisfies that ordering.
+  if (identical(cache_ttl, "auto")) {
+    n_msg <- length(split$messages)
+    prefix_chars <- nchar(split$system, type = "bytes") +
+      sum(vapply(split$messages[seq_len(max(0L, n_msg - 1L))], function(m) {
+        cc <- m$content
+        if (is.character(cc)) nchar(cc, type = "bytes") else
+          sum(vapply(cc, function(b) nchar(b$text %||% "", type = "bytes"), integer(1)))
+      }, integer(1)))
+    cache_ttl <- if (ceiling(prefix_chars / 3.6) > .ANTHROPIC_1H_PREFIX_TOKENS) "1h" else NULL
+  }
   # When tools are present, this is a batched / discovery / force-template
   # call — the LAST message varies per batch (different aggregation_level
   # nudge) while the SECOND-TO-LAST message is the stable, batch-invariant
   # conversation history. Use the two-breakpoint cache helper so the long
   # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
   # cost on batches 2-5. Production cost driver per 2026-06-12 logs.
+  # Since 2026-09-17 every translator call carries the tool block (plan F1),
+  # so this is the branch chat turns take as well.
   cache_msgs <- if (is.null(tools))
     .anthropic_cache_last_message(split$messages, ttl = cache_ttl)
   else
@@ -480,13 +509,15 @@ anthropic_chat_stream <- function(messages,
   usage_in      <- 0L
   usage_out     <- 0L
   cache_read    <- 0L
-  cache_write   <- 0L
+  cache_write   <- 0L    # 5-minute cache writes
+  cache_write1h <- 0L    # 1-hour cache writes (billed at 2x input)
   sse_buffer    <- ""
 
   repeat {
     attempt <- attempt + 1
     accumulated <- ""; tool_json_acc <- ""; tool_block <- NULL
     usage_in <- 0L; usage_out <- 0L; cache_read <- 0L; cache_write <- 0L
+    cache_write1h <- 0L
     sse_buffer <- ""
 
     on_data <- function(data) {
@@ -522,7 +553,19 @@ anthropic_chat_stream <- function(messages,
           usage_in    <<- u$input_tokens               %||% usage_in
           usage_out   <<- u$output_tokens              %||% usage_out
           cache_read  <<- u$cache_read_input_tokens    %||% cache_read
-          cache_write <<- u$cache_creation_input_tokens %||% cache_write
+          # The API splits cache creation by TTL when the 1-hour cache is in
+          # play (usage.cache_creation.ephemeral_5m_input_tokens /
+          # ephemeral_1h_input_tokens). Prefer that breakdown; without it,
+          # attribute the total to whichever TTL this request asked for.
+          cc <- u$cache_creation
+          if (is.list(cc) && (!is.null(cc$ephemeral_5m_input_tokens) ||
+                              !is.null(cc$ephemeral_1h_input_tokens))) {
+            cache_write   <<- cc$ephemeral_5m_input_tokens %||% 0L
+            cache_write1h <<- cc$ephemeral_1h_input_tokens %||% 0L
+          } else {
+            tot <- u$cache_creation_input_tokens %||% 0L
+            if (identical(cache_ttl, "1h")) cache_write1h <<- tot else cache_write <<- tot
+          }
         }
         # content_block_start opens either a "text" or "tool_use" block.
         if (identical(parsed$type, "content_block_start")) {
@@ -645,198 +688,57 @@ anthropic_chat_stream <- function(messages,
                      completion_tokens  = usage_out,
                      cached_tokens      = cache_read,
                      cache_write_tokens = cache_write,
+                     cache_write_1h_tokens = cache_write1h,
                      total_tokens       = usage_in + usage_out +
-                                            cache_read + cache_write),
+                                            cache_read + cache_write + cache_write1h),
     model    = model,
+    cache_ttl = cache_ttl %||% "5m",
     cost_usd = anthropic_cost_usd(
       input_tokens       = usage_in,
       output_tokens      = usage_out,
       model              = model,
       cache_read_tokens  = cache_read,
-      cache_write_tokens = cache_write),
+      cache_write_tokens = cache_write,
+      cache_write_1h_tokens = cache_write1h),
     error    = NULL,
     latency_sec = as.numeric(difftime(Sys.time(), t0, units = "secs"))
   )
 }
 
-# --- Force-template variant (tool_use schema) -------------------------------
+# --- The translator's ONE tool ------------------------------------------------
 #
-# Same contract as openai_chat_template_force(): the model is forced to
-# emit a single tool_use call whose `input` matches the filled-template
-# schema. The streaming SSE collects the partial_json fragments and
-# returns the assembled JSON string as $reply — exactly what the
-# downstream .translator_template_is_well_formed() / write_template_xlsx
-# pipeline expects.
-anthropic_chat_template_force <- function(messages,
-                                            on_chunk = function(text) {},
-                                            model = .ANTHROPIC_DEFAULT_MODEL,
-                                            # 2026-06-10: 64K (probed up
-                                            # to 128K on Opus 4.8). 32K was
-                                            # tight for ~26-sub-cat inventories
-                                            # where parameters+manure_management
-                                            # +parameter_timeseries can hit
-                                            # ~30K tokens. 64K gives 2x
-                                            # headroom; truncation here
-                                            # produces a non-parseable JSON
-                                            # blob and the user gets no
-                                            # download with no obvious cause.
-                                            max_tokens = 64000,
-                                            # 2026-06-11: bumped 900 -> 1800
-                                            # after Lolita's full Zambia run
-                                            # (27 sub-categories x 25 params =
-                                            # 675 rows) was still streaming
-                                            # past the 900s ceiling. tool_use
-                                            # input_json_delta is empirically
-                                            # slower than text streaming
-                                            # (~8000 individual JSON fragments
-                                            # for this output). 1800s gives
-                                            # headroom up to roughly the
-                                            # shinyapps.io WebSocket-tolerance
-                                            # ceiling; beyond this, the real
-                                            # fix is server-side batch
-                                            # emission across aggregation_level.
-                                            timeout_sec = 1800) {
-  # Same schema as the OpenAI version, surfaced as an Anthropic tool with
-  # input_schema. Anthropic uses JSON Schema for tool inputs; the structure
-  # is the same as OpenAI's json_schema mode minus the strict envelope.
-  input_schema <- list(
-    type = "object",
-    properties = list(
-      inventory_metadata = list(
-        type = "object",
-        properties = list(
-          country      = list(type = "string"),
-          year         = list(type = c("integer", "string")),
-          species      = list(type = "string"),
-          ipcc_version = list(type = "string"),
-          prepared_by  = list(type = "string"),
-          notes        = list(type = "string")
-        )
-      ),
-      parameters = list(
-        type  = "array",
-        items = list(
-          type = "object",
-          properties = list(
-            cattle_type       = list(type = "string"),
-            aggregation_level = list(type = "string"),
-            sub_category      = list(type = "string"),
-            parameter         = list(type = "string"),
-            mean              = list(type = "number"),
-            uncertainty_pct   = list(type = c("number", "null")),
-            lower             = list(type = c("number", "null")),
-            upper             = list(type = c("number", "null")),
-            distribution      = list(type = "string"),
-            param_type        = list(type = "string")
-          ),
-          required = c("sub_category", "parameter", "mean",
-                        "distribution", "param_type")
-        )
-      ),
-      manure_management = list(
-        type  = "array",
-        items = list(
-          type = "object",
-          properties = list(
-            cattle_type       = list(type = "string"),
-            aggregation_level = list(type = "string"),
-            sub_category      = list(type = "string"),
-            mms_type          = list(type = "string"),
-            fraction_pct      = list(type = "number"),
-            lower_fraction    = list(type = c("number", "null")),
-            upper_fraction    = list(type = c("number", "null")),
-            distribution_fraction = list(type = c("string", "null")),
-            MCF_pct           = list(type = c("number", "null")),
-            lower_mcf         = list(type = c("number", "null")),
-            upper_mcf         = list(type = c("number", "null")),
-            distribution_mcf  = list(type = c("string", "null")),
-            EF3               = list(type = c("number", "null")),
-            lower_ef3         = list(type = c("number", "null")),
-            upper_ef3         = list(type = c("number", "null")),
-            distribution_ef3  = list(type = c("string", "null")),
-            Frac_GasMS_pct    = list(type = c("number", "null")),
-            lower_frac_gas    = list(type = c("number", "null")),
-            upper_frac_gas    = list(type = c("number", "null")),
-            distribution_frac_gas = list(type = c("string", "null")),
-            Frac_LeachMS_pct  = list(type = c("number", "null")),
-            lower_frac_leach  = list(type = c("number", "null")),
-            upper_frac_leach  = list(type = c("number", "null")),
-            distribution_frac_leach = list(type = c("string", "null"))
-          ),
-          required = c("sub_category", "mms_type", "fraction_pct",
-                        "MCF_pct", "EF3",
-                        "Frac_GasMS_pct", "Frac_LeachMS_pct")
-        )
-      ),
-      # 2026-06-10: Parameter_TimeSeries. Optional. One row per
-      # (group, year). The 10 correlated parameters from
-      # param_catalogue.md "Sex-and-physiology" section. Emit only when
-      # the user's source file has multi-year activity data (≥ 5 years
-      # ideally; the app's correlation step needs at least 4 with first-
-      # difference detrending). Leave the array empty when no multi-year
-      # data exists — emitting fabricated time series is a hallucination.
-      parameter_timeseries = list(
-        type  = "array",
-        items = list(
-          type = "object",
-          properties = list(
-            cattle_type       = list(type = c("string", "null")),
-            aggregation_level = list(type = c("string", "null")),
-            sub_category      = list(type = c("string", "null")),
-            year              = list(type = "integer"),
-            N                 = list(type = c("number", "null")),
-            BW                = list(type = c("number", "null")),
-            MW                = list(type = c("number", "null")),
-            WG                = list(type = c("number", "null")),
-            Milk              = list(type = c("number", "null")),
-            Fat               = list(type = c("number", "null")),
-            pct_pregnant      = list(type = c("number", "null")),
-            DE                = list(type = c("number", "null")),
-            CP                = list(type = c("number", "null")),
-            MilkPR            = list(type = c("number", "null"))
-          ),
-          # I() preserves the length-1 character vector as a JSON array.
-          # Without it jsonlite auto-unboxes to "required":"year" which
-          # Anthropic rejects with "JSON schema is invalid (must match
-          # JSON Schema draft 2020-12)". Same bug pattern as the top-level
-          # required = I(c("parameters")) below — applies to every `required`
-          # whose value is a length-1 character vector.
-          required = I(c("year"))
-        )
-      )
-    ),
-    # I() preserves the single-element vector as a JSON array — same
-    # reason as the OpenAI version. Anthropic also rejects scalar string
-    # for the schema-level `required`.
-    required = I(c("parameters"))
-  )
-
-  tool_def <- list(list(
-    name         = "produce_filled_inventory_template",
-    description  = "Emit the user's filled IPCC inventory template as JSON.",
-    input_schema = input_schema
-  ))
-  tool_choice <- list(type = "tool",
-                       name = "produce_filled_inventory_template")
-
-  anthropic_chat_stream(
-    messages    = messages,
-    on_chunk    = on_chunk,
-    model       = model,
-    max_tokens  = max_tokens,
-    temperature = 0,
-    timeout_sec = timeout_sec,
-    tools       = tool_def,
-    tool_choice = tool_choice
-  )
-}
-
-# --- Batch-emission helpers (Lolita's 2026-06-11 Zambia stress-test fix) ----
+# 2026-09-17 (plan F1). Until now the discovery call, the per-level batch
+# call and the monolithic call each defined a different tool. Anthropic builds
+# the prompt-cache prefix as tools -> system -> messages, so every stage
+# started a fresh cache and the same ~120K-token conversation prefix was
+# written three to seven times per run: about 60 % of a Zambia run's cost.
 #
-# Reusable item-schemas for the batch-emission tool. Same shapes as the
-# monolithic anthropic_chat_template_force() above; factored out so the
-# Stage-2 per-aggregation-level tool can reuse them verbatim without
-# diverging. Touch these in ONE place when the template schema evolves.
+# There is now a single tool, `emit_inventory_piece`, whose input carries a
+# `mode` field. The tool block is byte-identical from the first chat turn
+# onwards (chat calls carry it with tool_choice = none), so discovery and
+# every batch READ the prefix instead of writing it.
+#
+# What this trades away: the old batch schema could REQUIRE
+# parameter_timeseries, and the old monolithic schema could require
+# parameters. One schema cannot require different fields per mode without
+# JSON-Schema conditionals, which we do not send because we cannot test the
+# API's acceptance of them without a paid call. The per-mode requirements are
+# stated in each property's description and in the nudge text, and the
+# server validates presence after the call (see .translator_validate_piece
+# in chat_ui.R). If a future measured run shows the model dropping
+# parameter_timeseries again, add an allOf/if/then block here and test it.
+#
+# Schema additions in the same change: `region` on inventory_metadata (plan
+# A4; every translator workbook used to be stamped "africa") and a
+# `data_source` enum on parameter rows (plan A9; the prompt demanded it but
+# the schema let the model omit it, and the defaults-only guard depends on
+# it).
+.ANTHROPIC_TOOL_NAME <- "emit_inventory_piece"
+
+.ANTHROPIC_DATA_SOURCES <- c("user_file", "user_chat", "ipcc_default",
+                             "biological_zero", "placeholder")
+.ANTHROPIC_REGIONS <- c("africa", "asia", "europe", "americas", "oceania", "global")
+
 .ANTHROPIC_PARAMETER_ITEM_SCHEMA <- list(
   type = "object",
   properties = list(
@@ -849,10 +751,15 @@ anthropic_chat_template_force <- function(messages,
     lower             = list(type = c("number", "null")),
     upper             = list(type = c("number", "null")),
     distribution      = list(type = "string"),
-    param_type        = list(type = "string")
+    param_type        = list(type = "string", enum = I(c("activity_data", "coefficient"))),
+    data_source       = list(type = "string", enum = I(.ANTHROPIC_DATA_SOURCES),
+                             description = paste(
+                               "Where the mean came from: user_file (uploaded file),",
+                               "user_chat (typed in chat), ipcc_default (catalogue),",
+                               "biological_zero (structural zero), placeholder."))
   ),
-  required = c("sub_category", "parameter", "mean",
-                "distribution", "param_type")
+  required = I(c("sub_category", "parameter", "mean", "distribution",
+                 "param_type", "data_source"))
 )
 
 .ANTHROPIC_MANURE_ITEM_SCHEMA <- list(
@@ -862,30 +769,29 @@ anthropic_chat_template_force <- function(messages,
     aggregation_level = list(type = "string"),
     sub_category      = list(type = "string"),
     mms_type          = list(type = "string"),
-    fraction_pct      = list(type = "number"),
+    fraction_pct      = list(type = "number", description = "percent of manure to this system; per-group rows sum to 100"),
     lower_fraction    = list(type = c("number", "null")),
     upper_fraction    = list(type = c("number", "null")),
     distribution_fraction = list(type = c("string", "null")),
-    MCF_pct           = list(type = c("number", "null")),
+    MCF_pct           = list(type = c("number", "null"), description = "methane conversion factor in PERCENT (5 means 5 %)"),
     lower_mcf         = list(type = c("number", "null")),
     upper_mcf         = list(type = c("number", "null")),
     distribution_mcf  = list(type = c("string", "null")),
-    EF3               = list(type = c("number", "null")),
+    EF3               = list(type = c("number", "null"), description = "direct N2O EF as a FRACTION (0.01)"),
     lower_ef3         = list(type = c("number", "null")),
     upper_ef3         = list(type = c("number", "null")),
     distribution_ef3  = list(type = c("string", "null")),
-    Frac_GasMS_pct    = list(type = c("number", "null")),
+    Frac_GasMS_pct    = list(type = c("number", "null"), description = "volatilisation fraction in PERCENT (45 means 45 %)"),
     lower_frac_gas    = list(type = c("number", "null")),
     upper_frac_gas    = list(type = c("number", "null")),
     distribution_frac_gas = list(type = c("string", "null")),
-    Frac_LeachMS_pct  = list(type = c("number", "null")),
+    Frac_LeachMS_pct  = list(type = c("number", "null"), description = "leaching fraction in PERCENT (2 means 2 %)"),
     lower_frac_leach  = list(type = c("number", "null")),
     upper_frac_leach  = list(type = c("number", "null")),
     distribution_frac_leach = list(type = c("string", "null"))
   ),
-  required = c("sub_category", "mms_type", "fraction_pct",
-                "MCF_pct", "EF3",
-                "Frac_GasMS_pct", "Frac_LeachMS_pct")
+  required = I(c("sub_category", "mms_type", "fraction_pct",
+                 "MCF_pct", "EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct"))
 )
 
 .ANTHROPIC_TIMESERIES_ITEM_SCHEMA <- list(
@@ -906,6 +812,8 @@ anthropic_chat_template_force <- function(messages,
     CP                = list(type = c("number", "null")),
     MilkPR            = list(type = c("number", "null"))
   ),
+  # I() keeps the length-1 vector a JSON array; without it jsonlite unboxes
+  # to "required":"year" and Anthropic rejects the schema (bug 31aaec1).
   required = I(c("year"))
 )
 
@@ -913,63 +821,109 @@ anthropic_chat_template_force <- function(messages,
   type = "object",
   properties = list(
     country      = list(type = "string"),
+    region       = list(type = "string", enum = I(.ANTHROPIC_REGIONS),
+                        description = "continent of the herd, from the country: Zimbabwe -> africa, India -> asia, Brazil -> americas"),
     year         = list(type = c("integer", "string")),
     species      = list(type = "string"),
     ipcc_version = list(type = "string"),
     prepared_by  = list(type = "string"),
     notes        = list(type = "string")
-  )
+  ),
+  required = I(c("country", "region", "species", "ipcc_version"))
 )
 
-# Stage 1 of the batched emission flow.
+.ANTHROPIC_TOOL_INPUT_SCHEMA <- list(
+  type = "object",
+  properties = list(
+    mode = list(
+      type = "string", enum = I(c("enumerate", "batch", "full")),
+      description = paste(
+        "Which piece the server asked for. enumerate: aggregation_levels +",
+        "inventory_metadata only. batch: aggregation_level (echoed) +",
+        "parameters + manure_management + parameter_timeseries for that one",
+        "level. full: inventory_metadata + parameters + manure_management +",
+        "parameter_timeseries for the whole inventory.")),
+    inventory_metadata = .ANTHROPIC_METADATA_SCHEMA,
+    aggregation_levels = list(
+      type = "array", items = list(type = "string"),
+      description = paste(
+        "mode = enumerate only. The distinct production-system labels for",
+        "this inventory, snake_case, lowercase, one per system the user",
+        "confirmed.")),
+    aggregation_level = list(
+      type = "string",
+      description = paste(
+        "mode = batch only. The aggregation_level the user message asked",
+        "for, echoed back exactly; the server drops rows that do not match.")),
+    parameters = list(type = "array", items = .ANTHROPIC_PARAMETER_ITEM_SCHEMA,
+      description = "mode = batch or full. One row per (sub_category, parameter), every catalogue parameter."),
+    manure_management = list(type = "array", items = .ANTHROPIC_MANURE_ITEM_SCHEMA,
+      description = "mode = batch or full. One row per (sub_category, mms_type)."),
+    parameter_timeseries = list(type = "array", items = .ANTHROPIC_TIMESERIES_ITEM_SCHEMA,
+      description = paste(
+        "mode = batch or full. REQUIRED in those modes, [] when the file has",
+        "no multi-year activity data. One row per (sub_category, year),",
+        "filling only the columns that change across years."))
+  ),
+  required = I(c("mode"))
+)
+
+# The tool list sent on EVERY translator call, chat turns included, so the
+# cache prefix never changes shape. Chat turns pass tool_choice = none.
+anthropic_translator_tools <- function() {
+  list(list(
+    name         = .ANTHROPIC_TOOL_NAME,
+    description  = paste(
+      "Emit one piece of the user's filled IPCC cattle inventory template,",
+      "as directed by the `mode` the server's message names. Called only",
+      "when the server asks; never from a chat reply."),
+    input_schema = .ANTHROPIC_TOOL_INPUT_SCHEMA))
+}
+.ANTHROPIC_TOOL_CHOICE_FORCE <- list(type = "tool", name = .ANTHROPIC_TOOL_NAME)
+.ANTHROPIC_TOOL_CHOICE_NONE  <- list(type = "none")
+
+# --- Force-template variant (tool_use) -----------------------------------------
 #
-# Asks the model to enumerate the `aggregation_level` strings it has
-# identified in the conversation AND populate the inventory_metadata
-# object. Cheap (~200 output tokens, 5-10s). Output shape:
-#
-#   { aggregation_levels: ["commercial_dairy", ...],
-#     inventory_metadata: { country, year, species, ... } }
-#
-# The caller passes this list to anthropic_chat_batch_template_force()
-# below, once per aggregation_level. inventory_metadata is consumed
-# only once (the per-batch calls don't emit it).
+# mode = full. The model is forced to call the tool once with the whole
+# inventory. Streaming collects the partial_json fragments and returns the
+# assembled JSON string as $reply, which the downstream
+# .translator_template_is_well_formed() / write_template_xlsx pipeline expects.
+anthropic_chat_template_force <- function(messages,
+                                            on_chunk = function(text) {},
+                                            on_tick  = function() {},
+                                            model = .ANTHROPIC_DEFAULT_MODEL,
+                                            # 2026-06-10: 64K. 32K truncated
+                                            # ~26-sub-cat inventories into a
+                                            # non-parseable blob with no
+                                            # obvious cause.
+                                            max_tokens = 64000,
+                                            # 2026-06-11: 900 -> 1800 after a
+                                            # 27 x 25 = 675-row emission was
+                                            # still streaming past 900 s.
+                                            # tool_use input_json_delta is
+                                            # slower than text streaming.
+                                            timeout_sec = 1800) {
+  anthropic_chat_stream(
+    messages    = messages,
+    on_chunk    = on_chunk,
+    on_tick     = on_tick,
+    model       = model,
+    max_tokens  = max_tokens,
+    temperature = 0,
+    timeout_sec = timeout_sec,
+    tools       = anthropic_translator_tools(),
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_FORCE
+  )
+}
+
+# Stage 1 of the batched emission flow: mode = enumerate. Cheap (~200 output
+# tokens). Returns { mode, aggregation_levels: [...], inventory_metadata: {...} }.
 anthropic_chat_enumerate_aggregation_levels <- function(messages,
                                                           on_chunk = function(text) {},
                                                           on_tick  = function() {},
                                                           model = .ANTHROPIC_DEFAULT_MODEL,
                                                           max_tokens = 4000,
                                                           timeout_sec = 120) {
-  input_schema <- list(
-    type = "object",
-    properties = list(
-      aggregation_levels = list(
-        type  = "array",
-        items = list(type = "string"),
-        description = paste(
-          "The distinct production-system / aggregation_level labels you",
-          "have identified from this conversation, in the order they",
-          "appear (e.g. ['commercial_dairy', 'emergent_dairy',",
-          "'commercial_beef', 'emergent_beef', 'extensive_trad']). One",
-          "entry per production system the user wants in the final",
-          "template. Snake-case, lowercase.")
-      ),
-      inventory_metadata = .ANTHROPIC_METADATA_SCHEMA
-    ),
-    required = I(c("aggregation_levels"))
-  )
-
-  tool_def <- list(list(
-    name        = "enumerate_aggregation_levels",
-    description = paste(
-      "Emit (a) the distinct aggregation_level labels for this inventory",
-      "and (b) the inventory_metadata block (country, year, species, etc.).",
-      "Do NOT emit any parameters, manure_management, or time-series rows",
-      "here — those come in per-aggregation-level follow-up calls."),
-    input_schema = input_schema
-  ))
-  tool_choice <- list(type = "tool",
-                       name = "enumerate_aggregation_levels")
-
   anthropic_chat_stream(
     messages    = messages,
     on_chunk    = on_chunk,
@@ -978,108 +932,24 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
     max_tokens  = max_tokens,
     temperature = 0,
     timeout_sec = timeout_sec,
-    tools       = tool_def,
-    tool_choice = tool_choice
-    # cache_ttl left at the 5-minute default (see anthropic_chat_batch_template_force
-    # for the rationale: production logs show the batch chain already hits the
-    # 5-minute cache, so the extended 1h TTL only inflated the cold-write price).
+    tools       = anthropic_translator_tools(),
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_FORCE
   )
 }
 
-# Stage 2 of the batched emission flow.
+# Stage 2 of the batched emission flow: mode = batch, one call per
+# aggregation_level. The caller's nudge names the level; the model echoes it
+# in `aggregation_level` for merge-time drift detection.
 #
-# Asks the model to emit ONLY the parameters / manure_management /
-# parameter_timeseries rows for ONE aggregation_level. The caller is
-# responsible for injecting "emit ONLY <aggregation_level>" into the
-# user message (we don't do it here so the caller can attach extra
-# context like the row-count assertion). The schema requires the
-# returned `aggregation_level` field to match the request — used for
-# server-side drift detection at merge time.
-#
-# max_tokens = 24000 is enough for ~5-6 sub-categories x 25 params + ~30
-# MMS rows + ~33 time-series rows = ~6-8K output tokens, with 3x
-# headroom for verbose descriptions / data_source tags.
-#
-# timeout_sec = 300 is enough for ~5 minutes per batch. If a batch
-# legitimately takes longer than that, the inventory is too dense for
-# the batch path and the user should split the file further upstream.
+# max_tokens 48000: the 2026-06-11 extensive_trad batch (6 sub-cats x 25
+# params + 48 MMS + 33-year x 6 x ~5 TS params) truncated at 24K.
+# timeout 900 s: that batch at ~35 tok/s is ~1000 s at its cap.
 anthropic_chat_batch_template_force <- function(messages,
                                                   on_chunk = function(text) {},
                                                   on_tick  = function() {},
                                                   model = .ANTHROPIC_DEFAULT_MODEL,
-                                                  # 2026-06-11 bump: was 24000.
-                                                  # Lolita's extensive_trad batch
-                                                  # (6 sub-cats x 25 params + 48
-                                                  # MMS + 33-year x 6 sub-cat x
-                                                  # ~5 TS params = ~40K output
-                                                  # tokens) truncated at 24K and
-                                                  # produced unparseable JSON.
-                                                  # 48K covers the largest
-                                                  # realistic single-aggregation
-                                                  # level emission with 2x
-                                                  # headroom.
                                                   max_tokens = 48000,
-                                                  # 2026-06-11 bump: was 300s.
-                                                  # extensive_trad's ~40K output
-                                                  # at Sonnet's ~35 tok/sec is
-                                                  # ~1000s. 900s allowed the
-                                                  # other 4 batches to finish
-                                                  # but starved extensive_trad
-                                                  # if it got close to its cap.
                                                   timeout_sec = 900) {
-  input_schema <- list(
-    type = "object",
-    properties = list(
-      aggregation_level = list(
-        type        = "string",
-        description = paste(
-          "The aggregation_level you are emitting in this call. MUST",
-          "match the aggregation_level the user message asked you to",
-          "produce. The server validates this at merge time and drops",
-          "rows that don't match.")),
-      parameters        = list(type = "array",
-                                items = .ANTHROPIC_PARAMETER_ITEM_SCHEMA),
-      manure_management = list(type = "array",
-                                items = .ANTHROPIC_MANURE_ITEM_SCHEMA),
-      parameter_timeseries = list(type = "array",
-                                    items = .ANTHROPIC_TIMESERIES_ITEM_SCHEMA,
-                                    description = paste(
-                                      "Activity-data time series for THIS",
-                                      "aggregation_level. If the source",
-                                      "file has multi-year data (column or",
-                                      "rows spanning multiple years), emit",
-                                      "one row per (sub_category, year).",
-                                      "If the file is a single-year",
-                                      "snapshot, emit one row per",
-                                      "sub_category for the inventory",
-                                      "year. Empty array [] only when the",
-                                      "file genuinely has no activity-data",
-                                      "fields at all (extremely rare).",
-                                      "Server warns when this comes back",
-                                      "empty for an inventory the",
-                                      "discovery call flagged as",
-                                      "multi-year."))
-    ),
-    # parameter_timeseries is required (even an empty [] forces the
-    # model to make an explicit decision instead of silently dropping
-    # the field — the Zambia 2026-06-11 run produced 0 TS rows because
-    # the field was optional and Sonnet skipped it entirely).
-    required = I(c("aggregation_level", "parameters",
-                    "parameter_timeseries"))
-  )
-
-  tool_def <- list(list(
-    name        = "produce_aggregation_level_template",
-    description = paste(
-      "Emit ONLY the parameters / manure_management / parameter_timeseries",
-      "rows for the aggregation_level named in the user message. Do NOT",
-      "emit inventory_metadata (the server already has it from the",
-      "discovery call). Do NOT emit rows for any other aggregation_level."),
-    input_schema = input_schema
-  ))
-  tool_choice <- list(type = "tool",
-                       name = "produce_aggregation_level_template")
-
   anthropic_chat_stream(
     messages    = messages,
     on_chunk    = on_chunk,
@@ -1088,20 +958,8 @@ anthropic_chat_batch_template_force <- function(messages,
     max_tokens  = max_tokens,
     temperature = 0,
     timeout_sec = timeout_sec,
-    tools       = tool_def,
-    tool_choice = tool_choice
-    # cache_ttl left at the 5-minute default. We tried the extended 1-hour TTL
-    # (commit c0dac3f), but the production logs (2026-06-15 Zambia runs) showed
-    # batches 2-5 ALREADY hit the 5-minute cache: each batch streams in ~4-5 min
-    # and every cache read refreshes the TTL, so the chain stays warm. The only
-    # cold writes are discovery / enumerate / batch-1, and those are cold
-    # REGARDLESS of TTL because each stage sends a different `tools` config
-    # (Anthropic's cache key includes tools). The 1h TTL therefore saved nothing
-    # on reads but billed those unavoidable cold writes at 2x instead of 1.25x
-    # (~+$0.77/run) and made the cost log under-report (.ANTHROPIC_PRICING only
-    # carries the 1.25x rate). If 1h is ever re-enabled, add a cache_write_1h
-    # rate and branch anthropic_cost_usd first. The plumbing (cache_ttl arg,
-    # .anthropic_cache_ctl, beta header) is kept — harmless and reusable.
+    tools       = anthropic_translator_tools(),
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_FORCE
   )
 }
 

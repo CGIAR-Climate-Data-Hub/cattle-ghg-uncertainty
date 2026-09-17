@@ -35,18 +35,29 @@
 # Save the current `messages` list (the same shape used by chat_ui.R's
 # state$messages: list of list(role, content, display)) to disk. Capped
 # at the most recent 200 messages so the file stays small.
-conversation_save <- function(user_email, messages) {
+#
+# 2026-09-17: the file also carries `prompt_hash` (the sha256 of the system
+# prompt the conversation was held under; a resumed conversation whose hash
+# no longer matches the live prompt cannot produce a template until the
+# file is re-uploaded, plan B5) and `extra`, an arbitrary list the caller
+# wants to survive a reload. chat_ui.R stores the validated per-batch parts
+# there so the Stop button (a page reload) no longer discards paid work
+# (plan F5).
+conversation_save <- function(user_email, messages, prompt_hash = NULL,
+                              extra = NULL) {
   path <- .history_path(user_email)
   if (is.null(path)) return(invisible(FALSE))
   if (length(messages) > 200) messages <- tail(messages, 200)
   payload <- list(
-    user_email = tolower(trimws(user_email)),
-    saved_at   = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    messages   = messages
+    user_email  = tolower(trimws(user_email)),
+    saved_at    = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+    prompt_hash = prompt_hash,
+    messages    = messages,
+    extra       = extra
   )
   tryCatch(
     jsonlite::write_json(payload, path, auto_unbox = TRUE, pretty = FALSE,
-                          force = TRUE, null = "null"),
+                          force = TRUE, null = "null", digits = NA),
     error = function(e) {
       message("conversation_save failed: ", conditionMessage(e))
       FALSE
@@ -54,19 +65,25 @@ conversation_save <- function(user_email, messages) {
   invisible(TRUE)
 }
 
-# Load the saved conversation. Returns a list of message records, or
-# an empty list if no history exists or the file is unreadable.
-conversation_load <- function(user_email) {
+# Read the whole saved payload: list(messages, prompt_hash, extra). Empty
+# list of messages when nothing is saved or the file is unreadable.
+conversation_load_full <- function(user_email) {
+  empty <- list(messages = list(), prompt_hash = NULL, extra = NULL)
   path <- .history_path(user_email)
-  if (is.null(path) || !file.exists(path)) return(list())
+  if (is.null(path) || !file.exists(path)) return(empty)
   payload <- tryCatch(jsonlite::read_json(path, simplifyVector = FALSE),
                        error = function(e) NULL)
-  if (is.null(payload) || is.null(payload$messages)) return(list())
+  if (is.null(payload) || is.null(payload$messages)) return(empty)
   # Defensive: drop anything that doesn't have a role + content pair.
-  Filter(function(m) {
+  msgs <- Filter(function(m) {
     !is.null(m$role) && !is.null(m$content) && nzchar(m$content)
   }, payload$messages)
+  list(messages = msgs, prompt_hash = payload$prompt_hash, extra = payload$extra)
 }
+
+# Load the saved conversation. Returns a list of message records, or
+# an empty list if no history exists or the file is unreadable.
+conversation_load <- function(user_email) conversation_load_full(user_email)$messages
 
 # Delete the user's saved history (used by the "Reset conversation"
 # button).

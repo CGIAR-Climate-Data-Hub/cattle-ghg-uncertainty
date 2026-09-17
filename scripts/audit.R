@@ -2968,6 +2968,10 @@ section_F <- function() {
     "translator_prompts/system_instructions.md",
     "translator_prompts/questionnaire.md",
     "translator_prompts/getting_started.md",
+    # 2026-09-17: the inline prompt blocks in R (output convention and UI
+    # rules) are a prompt surface too; they carried a wrong activity_data
+    # rule and a fraction-unit example for months with nothing looking.
+    "R/openai_client.R",
     "doc/methodology.Rmd", "doc/user_guide.Rmd")
   ALLOW <- list(
     list(file = "translator_prompts/param_catalogue.md", key = "Milk",
@@ -3122,6 +3126,157 @@ section_F <- function() {
                sprintf("all %d sub-categories fill BW/Milk/WG/DE/CP from resolve_subcat_default (bulls, oxen, heifers, calves and feedlot each get their own weight, and the biological zeros hold); the auto-filled BW is identical across all %d regions",
                        length(ANIMAL_SUBCATEGORIES), nrow(IPCC_DEFAULTS_BY_REGION))
              else paste(utils::head(fill_fail, 4), collapse = "; "))
+
+  # F46 -- the AI translator's knowledge is in step with the defaults and
+  # the template (plan B3). The three generated prompt sections are built at
+  # runtime from the live objects, so the APP cannot go stale; this check
+  # protects the committed copies (the DIY kit and what reviewers read) and
+  # the manifest the deploy gate reads. It fails when
+  # scripts/build_translator_kit.R needs re-running, and it fails on a hand
+  # edit of a generated file, because it compares content, not timestamps.
+  f46_fail <- tryCatch({
+    f <- character(0)
+    cur <- translator_prompt_files_current("translator_prompts")
+    if (!cur$ok) f <- c(f, sprintf("generated prompt file(s) differ from the live objects: %s; run scripts/build_translator_kit.R",
+                                   paste(cur$stale, collapse = ", ")))
+    mp <- "translator_prompts/.manifest.json"
+    if (!file.exists(mp)) f <- c(f, "translator_prompts/.manifest.json is missing; run scripts/build_translator_kit.R")
+    else {
+      man <- jsonlite::read_json(mp, simplifyVector = TRUE)
+      inp <- translator_prompt_inputs_hash()
+      if (!identical(man$master_sha256, inp$master_sha256))
+        f <- c(f, "reference/defaults_master.csv changed since the translator kit was last built")
+      if (!identical(man$layout_sha256, inp$layout_sha256))
+        f <- c(f, "the template column layout changed since the translator kit was last built")
+    }
+    # The assembled prompt must carry no unfilled placeholder and no
+    # maintainer comment.
+    translator_system_prompt_reset()
+    sp <- assemble_translator_system_prompt()
+    left <- unique(regmatches(sp, gregexpr("\\{\\{[^}]*\\}\\}", sp))[[1]])
+    if (length(left)) f <- c(f, sprintf("unfilled placeholder(s) in the assembled prompt: %s", paste(left, collapse = ", ")))
+    if (grepl("<!--", sp, fixed = TRUE)) f <- c(f, "an HTML comment reached the assembled prompt")
+    # The prompt must state the activity-data rule the catalogue uses.
+    if (grepl("activity_data` \\(N, BW", sp)) f <- c(f, "the prompt still lists BW etc. as activity_data")
+    f
+  }, error = function(e) conditionMessage(e))
+  f46_ok <- length(f46_fail) == 0L
+  check_bool("F46", "F",
+             "Translator prompt: generated sections match the live objects; manifest matches master and layout; no unfilled placeholder",
+             f46_ok,
+             notes = if (f46_ok) "param_catalogue / template_schema / worked_example on disk equal the runtime build; .manifest.json hashes match; assembled prompt has no {{...}} left"
+                     else paste(utils::head(f46_fail, 4), collapse = "; "))
+
+  # F47 -- the one translator tool and the vocabularies it depends on
+  # (plan F1, A6, A9). The schema must serialise with JSON arrays wherever
+  # `required` has one element (bug 31aaec1), carry the data_source enum and
+  # the region enum, and the sub-category lists the guards use must equal
+  # ANIMAL_SUBCATEGORIES rather than a literal that can drift.
+  f47_fail <- tryCatch({
+    f <- character(0)
+    tj <- as.character(jsonlite::toJSON(anthropic_translator_tools(), auto_unbox = TRUE))
+    if (grepl('"required":"', tj, fixed = TRUE)) f <- c(f, "a `required` field serialised as a scalar string")
+    if (!grepl('"enum":["user_file"', tj, fixed = TRUE)) f <- c(f, "data_source enum missing from the parameter item schema")
+    if (!grepl('"region":{"type":"string","enum":["africa"', tj, fixed = TRUE)) f <- c(f, "region enum missing from the metadata schema")
+    if (!grepl('"mode":{"type":"string","enum":["enumerate","batch","full"]', tj, fixed = TRUE)) f <- c(f, "mode enum missing")
+    if (length(anthropic_translator_tools()) != 1L) f <- c(f, "more than one tool definition")
+    v <- .translator_subcategory_vocab()
+    if (!setequal(v, ANIMAL_SUBCATEGORIES)) f <- c(f, "coverage vocabulary != ANIMAL_SUBCATEGORIES")
+    if (!"feedlot_cattle" %in% .translator_non_dairy_subcats()) f <- c(f, "feedlot_cattle missing from the non-dairy strip list")
+    # The coverage scan must ignore server-injected text.
+    fake <- list(list(role = "user", source = "server_upload",
+                      content = "Sub-category vocabulary mapping (\"Cows\" -> `other_cows` or `dairy_cows`?)"))
+    if (length(.translator_detect_subcategories_in_history(fake)))
+      f <- c(f, "the coverage scan counts the app's own injected text as user mentions")
+    f
+  }, error = function(e) conditionMessage(e))
+  f47_ok <- length(f47_fail) == 0L
+  check_bool("F47", "F",
+             "Translator tool schema is a single tool with data_source, region and mode enums; guard vocabularies derive from ANIMAL_SUBCATEGORIES",
+             f47_ok,
+             notes = if (f47_ok) "one tool (emit_inventory_piece); arrays for every required; enums present; vocab == ANIMAL_SUBCATEGORIES; server-injected text ignored by the coverage scan"
+                     else paste(utils::head(f47_fail, 4), collapse = "; "))
+
+  # F48 -- the defects reproduced on 2026-09-17 stay fixed (plan A1 to A5).
+  # Each fixture is the exact input that showed the defect.
+  if (requireNamespace("openxlsx", quietly = TRUE) &&
+      exists(".translator_write_official_template") &&
+      exists("parse_uploaded_template")) {
+    f48_fail <- tryCatch({
+      f <- character(0)
+      # A1: first-block bounds come from the user's percentage, not the
+      # catalogue. Ym 8.0 +-20% must parse back as 6.4 .. 9.6, and EF4
+      # 0.010 +-30% as 0.007 .. 0.013, in BOTH the first and a later block.
+      pr <- data.frame(
+        cattle_type = c("dairy","dairy","dairy","non_dairy","non_dairy","non_dairy"),
+        aggregation_level = "all",
+        sub_category = c("dairy_cows","dairy_cows","dairy_cows","bulls","bulls","bulls"),
+        parameter = c("N","Ym","EF4","N","Ym","EF4"),
+        mean = c(1000, 8, 0.010, 200, 8, 0.010), uncertainty_pct = c(10, 20, 30, 10, 20, 30),
+        lower = NA_real_, upper = NA_real_,
+        distribution = c("normal","pert","lognormal","normal","pert","lognormal"),
+        param_type = c("activity_data","coefficient","coefficient","activity_data","coefficient","coefficient"),
+        data_source = "user_file", stringsAsFactors = FALSE)
+      # A5: a legacy fraction `mcf` key is scaled to percent, not copied.
+      mm <- data.frame(cattle_type = c("dairy","non_dairy"), aggregation_level = "all",
+                       sub_category = c("dairy_cows","bulls"), mms_type = "solid_storage",
+                       fraction_pct = 100, mcf = c(0.05, NA), MCF_pct = NA_real_, EF3 = NA_real_,
+                       Frac_GasMS_pct = NA_real_, Frac_LeachMS_pct = NA_real_, stringsAsFactors = FALSE)
+      # A4: no region in the metadata; the country must decide, not "africa".
+      md <- list(country = "Nepal", year = 2024, species = "cattle_mixed", ipcc_version = "2019_refinement")
+      fx <- tempfile(fileext = ".xlsx")
+      .translator_write_official_template(list(inventory_metadata = md, parameters = pr,
+        manure_management = mm, parameter_timeseries = NULL, .model = "audit"), fx)
+      pu <- suppressMessages(parse_uploaded_template(fx)); unlink(fx)
+      ps <- pu$param_specs
+      pick <- function(sc, p, col) ps[[col]][ps$sub_category == sc & ps$parameter == p][1]
+      for (sc in c("dairy_cows", "bulls")) {
+        if (!(eq(pick(sc, "Ym", "lower"), 6.4) && eq(pick(sc, "Ym", "upper"), 9.6)))
+          f <- c(f, sprintf("A1: %s Ym bounds are %s..%s, expected 6.4..9.6", sc, pick(sc,"Ym","lower"), pick(sc,"Ym","upper")))
+        if (!(eq(pick(sc, "EF4", "lower"), 0.007) && eq(pick(sc, "EF4", "upper"), 0.013)))
+          f <- c(f, sprintf("A1: %s EF4 bounds are %s..%s, expected 0.007..0.013", sc, pick(sc,"EF4","lower"), pick(sc,"EF4","upper")))
+      }
+      if (!identical(as.character(pu$metadata$region), "asia")) f <- c(f, sprintf("A4: region is '%s', expected asia", pu$metadata$region))
+      if (!grepl("translator: app", as.character(pu$metadata$notes %||% ""), fixed = TRUE)) f <- c(f, "B6: provenance stamp missing from Notes")
+      mcf_d <- pu$manure$MCF_pct[pu$manure$sub_category == "dairy_cows"][1]
+      if (!eq(mcf_d, 5)) f <- c(f, sprintf("A5: legacy mcf 0.05 written as %s, expected 5", mcf_d))
+      # A2 + A3: NA and re-spelled levels survive the merge as distinct groups.
+      p1 <- list(parameters = data.frame(cattle_type = "dairy", aggregation_level = NA_character_,
+                 sub_category = "dairy_cows", parameter = "N", mean = 111, distribution = "normal",
+                 param_type = "activity_data", stringsAsFactors = FALSE), .requested_aggregation_level = "commercial")
+      p2 <- list(parameters = data.frame(cattle_type = "dairy", aggregation_level = "Emergent_Dairy",
+                 sub_category = "dairy_cows", parameter = "N", mean = 222, distribution = "normal",
+                 param_type = "activity_data", stringsAsFactors = FALSE), .requested_aggregation_level = "emergent_dairy")
+      mg <- .translator_merge_batches(md, list(p1, p2), c("commercial", "emergent_dairy"))
+      if (!is.data.frame(mg$parameters) || nrow(mg$parameters) != 2L) f <- c(f, "A2/A3: merge did not keep both batches' rows")
+      else if (!setequal(mg$parameters$aggregation_level, c("commercial", "emergent_dairy")))
+        f <- c(f, sprintf("A2/A3: merged levels are %s", paste(mg$parameters$aggregation_level, collapse = ", ")))
+      mg$warnings <- NULL
+      fx2 <- tempfile(fileext = ".xlsx")
+      .translator_write_official_template(list(inventory_metadata = md, parameters = mg$parameters,
+        manure_management = NULL, parameter_timeseries = NULL), fx2)
+      pu2 <- suppressMessages(parse_uploaded_template(fx2)); unlink(fx2)
+      nn <- pu2$param_specs$mean[pu2$param_specs$parameter == "N"]
+      if (!setequal(nn, c(111, 222))) f <- c(f, sprintf("A2: workbook carries N = %s, expected 111 and 222", paste(nn, collapse = ", ")))
+      # A3: a batch relabelled entirely under another spelling is kept, with a warning.
+      p3 <- list(parameters = data.frame(cattle_type = "dairy", aggregation_level = "COMMERCIAL DAIRY",
+                 sub_category = "dairy_cows", parameter = "N", mean = 333, distribution = "normal",
+                 param_type = "activity_data", stringsAsFactors = FALSE), .requested_aggregation_level = "commercial_dairy")
+      m3 <- .translator_merge_batches(md, list(p3), "commercial_dairy")
+      if (is.null(m3$parameters) || nrow(m3$parameters) != 1L) f <- c(f, "A3: re-spelled batch was dropped")
+      # C4: semicolon CSV with comma decimals.
+      tf <- tempfile(fileext = ".csv"); writeLines(c("group;N;DE pct", "cows;2400000;62,0"), tf)
+      cs <- .translator_read_csv_sniffed(tf); unlink(tf)
+      if (ncol(cs) != 3L || !eq(cs[["DE pct"]][1], 62)) f <- c(f, "C4: semicolon CSV with comma decimals not read")
+      f
+    }, error = function(e) conditionMessage(e))
+    f48_ok <- length(f48_fail) == 0L
+    check_bool("F48", "F",
+               "Translator writer and merge: first-block bounds from the user's %, region from country, legacy mcf scaled, NA and re-spelled levels kept, CSV sniffed",
+               f48_ok,
+               notes = if (f48_ok) "Ym 8+-20% -> 6.4..9.6 in blocks 1 and 2; Nepal -> asia; mcf 0.05 -> 5 %; two batches with NA / re-spelled levels keep both populations; ';' CSV with ',' decimals parses"
+                       else paste(utils::head(f48_fail, 4), collapse = "; "))
+  }
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

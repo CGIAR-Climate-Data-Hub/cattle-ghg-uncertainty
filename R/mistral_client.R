@@ -75,7 +75,10 @@ mistral_chat_stream <- function(messages,
                 error = "AI translator is not configured (server is missing MISTRAL_API_KEY). Please contact the administrator."))
 
   mm <- .mistral_messages(messages)
-  force_json <- !is.null(tools)
+  # 2026-09-17: chat turns now carry the translator tool with
+  # tool_choice = none (prompt-cache prefix stability on the Claude path);
+  # only a FORCED tool call means "give me JSON" here.
+  force_json <- !is.null(tools) && !identical(tool_choice$type %||% "", "none")
   if (force_json) {
     # Nudge toward bare JSON; the "JSON" keyword is also required to enable
     # Mistral's json_object response_format.

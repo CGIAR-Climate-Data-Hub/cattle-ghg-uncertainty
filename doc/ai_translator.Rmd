@@ -29,7 +29,7 @@ The translator works in three explicit passes — Explore, Clarify, Emit — rat
 
 ### Step 1 — Explore
 
-After file upload, the AI's first response is a structured exploration report with four labelled sections:
+After the file is read, the panel lists its sheets with their size and lets the user untick reference or lookup sheets the AI does not need before sending; fewer sheets mean a faster first reply and a cheaper run. The AI's first response is then a structured exploration report with four labelled sections:
 
 - **A. File shape.** For each sheet in the upload, the AI classifies the layout pattern (column-oriented, wide-stacked, parameter-labelled, reference-table, or calc-sheet).
 - **B. Inventory of values found.** A table listing every (parameter, sub-category) pair the AI could identify in the file, with the source sheet, row, column, central value, lower and upper bounds where present, units, and any qualifier (such as "Local breed only" or "Cross breed weighted average").
@@ -100,6 +100,8 @@ The translator performs column mapping and unit conversion. It does not validate
 
 - **Spot-check the key numbers.** Compare population, body weight, and milk yield in the downloaded template against the corresponding cells in the source file. Any discrepancy indicates a translation error to be raised in the chat.
 - **Review the QA/QC tab after upload.** Any value the translator filled from an IPCC default is flagged with `data_source = "ipcc_default"` in the QA tab, allowing the user to review whether the catalogue default is appropriate for the country context. For body weight (`BW`), the QA tab also runs a continental-default deviation check (Annex Tables 10A.1 / 10A.2 / 10A.3) and warns on deviations larger than ±50%.
+- **The workbook records its provenance.** The Notes cell of `Inventory_Metadata` carries the app version, a fingerprint of the instructions the AI worked from, a fingerprint of the IPCC defaults table, the model, and the date, so a file that comes back for support can be traced to the defaults it was built with.
+- **Resumed conversations are checked against the current defaults.** If the IPCC defaults or the template changed since a saved conversation was held, the panel says so and asks for the file to be uploaded again before a template can be produced; the earlier discussion would otherwise carry the old numbers into the workbook.
 
 ## Privacy and operational cost
 
