@@ -2757,9 +2757,16 @@ translator_chat_server <- function(input, output, session) {
       "calves_female", "calves_male", "feedlot_cattle")
 }
 .translator_non_dairy_subcats <- function() setdiff(.translator_subcategory_vocab(), "dairy_cows")
+#
+# Only what the USER typed counts (2026-09-17, after the first paid smoke
+# test): the model's own clarifying question "castrated steers or intact
+# bulls?" put the word bulls into an assistant turn, the scan read it as a
+# discussed sub-category, and the retry fabricated a bulls block with a
+# placeholder population. The user's confirmations are the mapping; the
+# model's musings are not.
 .translator_detect_subcategories_in_history <- function(messages) {
   if (length(messages) == 0) return(character(0))
-  keep <- Filter(function(m) is.null(m$source), messages)
+  keep <- Filter(function(m) is.null(m$source) && identical(m$role, "user"), messages)
   text <- paste(vapply(keep, function(m) {
     paste(as.character(m$content %||% ""),
           as.character(m$display %||% ""), sep = " ")

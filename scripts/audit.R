@@ -3185,9 +3185,17 @@ section_F <- function() {
     if (!"feedlot_cattle" %in% .translator_non_dairy_subcats()) f <- c(f, "feedlot_cattle missing from the non-dairy strip list")
     # The coverage scan must ignore server-injected text.
     fake <- list(list(role = "user", source = "server_upload",
-                      content = "Sub-category vocabulary mapping (\"Cows\" -> `other_cows` or `dairy_cows`?)"))
-    if (length(.translator_detect_subcategories_in_history(fake)))
-      f <- c(f, "the coverage scan counts the app's own injected text as user mentions")
+                      content = "Sub-category vocabulary mapping (\"Cows\" -> `other_cows` or `dairy_cows`?)"),
+                 # The model's own question must not count either: on the
+                 # first paid smoke test "castrated steers or intact bulls?"
+                 # produced a fabricated bulls block.
+                 list(role = "assistant",
+                      content = "Are the growing males castrated steers or intact bulls?"),
+                 list(role = "user", content = "They are steers; map them to growing_males."))
+    got <- .translator_detect_subcategories_in_history(fake)
+    if (!identical(got, "growing_males"))
+      f <- c(f, sprintf("the coverage scan returned %s; only the user's growing_males should count",
+                        paste(got, collapse = ",")))
     f
   }, error = function(e) conditionMessage(e))
   f47_ok <- length(f47_fail) == 0L
