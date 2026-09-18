@@ -459,6 +459,14 @@ lang_state_take <- function(token) {
   ),
   btn_ai_download = list(en = "Download template (.xlsx)",
                            fr = "Télécharger le modèle (.xlsx)"),
+  # 2026-09-18: the "template ready" state hides every other control.
+  ai_ready_title = list(
+    en = "Your template is ready. Click the green button to save it, then open it and check the AI's work before uploading it on the 1. Data Input tab.",
+    fr = "Votre modèle est prêt. Cliquez sur le bouton vert pour l'enregistrer, puis ouvrez-le et vérifiez le travail de l'IA avant de le charger dans l'onglet 1. Saisie des données."),
+  btn_ai_revise = list(en = "Change something and produce again",
+                         fr = "Modifier quelque chose et produire à nouveau"),
+  btn_ai_new = list(en = "Start a new translation",
+                      fr = "Commencer une nouvelle traduction"),
   ai_spinner_default = list(
     en = "Translator is working — calling the AI, waiting for the first reply…",
     fr = "Le traducteur travaille — appel de l'IA, attente de la première réponse…"

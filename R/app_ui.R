@@ -323,28 +323,47 @@ app_ui <- function(request = NULL) {
                bubble.appendChild(s);
                var label = document.createElement('div');
                label.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+               bubble.id = 'translator_download_bubble';
                var line1 = document.createElement('div');
-               line1.innerHTML = '<strong>Building your .xlsx file</strong> — about 5 to 15 seconds. A save dialog will pop up in your browser when it is ready.';
+               line1.id = 'translator_download_line1';
+               line1.innerHTML = '<strong>Building your .xlsx file</strong>, about 5 to 15 seconds. It will save itself to your browser\\'s Downloads folder; no dialog will appear.';
                label.appendChild(line1);
                var line2 = document.createElement('div');
                line2.style.cssText = 'font-size:0.85rem; line-height:1.4;';
-               line2.innerHTML = '<strong>Important:</strong> please open the file and check the AI\\'s work before uploading it on the 1. Data Input tab. Spot-check the populations, body weights, milk yields, sub-category labels, and any unit conversions against your original data. Any IPCC default values the AI applied will be flagged amber on the 2. QA/QC tab — review those carefully too. The AI is a draft assistant, not a verified source.';
+               line2.innerHTML = '<strong>Then:</strong> open the file and check the AI\\'s work before uploading it on the 1. Data Input tab. Spot-check populations, body weights, milk yields, sub-category labels and unit conversions against your original data. IPCC default values the AI applied are flagged amber on the 2. QA/QC tab. The AI is a draft assistant, not a verified source.';
                label.appendChild(line2);
                bubble.appendChild(label);
                slot.appendChild(bubble);
                var scroller = bubble.closest('[data-translator-scroller]');
                if (scroller) scroller.scrollTop = scroller.scrollHeight;
-               // Auto-clear after 45 seconds — leaves enough time for
-               // the user to actually read the 'spot-check before
-               // uploading' guidance, but doesn't linger forever.
+               // Fallback only: the server replaces this bubble through
+               // translatorDownloadDone when the file has been written.
+               // If that never arrives, clear after two minutes.
                setTimeout(function() {
-                 if (slot.contains(bubble)) slot.removeChild(bubble);
-               }, 45000);
+                 if (slot.contains(bubble) && !bubble.dataset.done) slot.removeChild(bubble);
+               }, 120000);
                return;
              }
              t = t.parentElement;
            }
          }, false);
+         // 2026-09-18: the server has written the workbook. Turn the amber
+         // building bubble into a green confirmation that names the file
+         // and stays on screen. The browser saves the file silently to its
+         // Downloads folder, which users read as nothing having happened.
+         Shiny.addCustomMessageHandler('translatorDownloadDone', function(data) {
+           var bubble = document.getElementById('translator_download_bubble');
+           if (!bubble) return;
+           bubble.dataset.done = '1';
+           bubble.style.background = '#E8F5E9';
+           bubble.style.borderColor = '#A5D6A7';
+           bubble.style.color = '#1B4332';
+           var spin = bubble.querySelector('div');
+           if (spin) { spin.style.animation = 'none'; spin.style.border = 'none'; spin.innerHTML = '\\u2705'; spin.style.width = 'auto'; spin.style.height = 'auto'; }
+           var l1 = document.getElementById('translator_download_line1');
+           if (l1) l1.innerHTML = '<strong>Saved:</strong> ' + (data && data.file ? data.file : 'the template') +
+             ' is now in your browser\\'s Downloads folder. Open it from there.';
+         });
          // Progress tick from the server-side force-template stream.
          // Updates the inline info bubble's elapsed-label with a
          // 'chars received' counter so the user has TWO live signals:

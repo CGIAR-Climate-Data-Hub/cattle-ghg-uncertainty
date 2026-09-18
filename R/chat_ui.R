@@ -344,8 +344,24 @@ translator_chat_server <- function(input, output, session) {
   })
 
   # ---- Reset conversation: wipe history + saved file -----------------------
+  # "Change something and produce again": keep the conversation, drop the
+  # template so the chat controls come back (2026-09-18).
+  observeEvent(input$translator_revise, {
+    req(state$user_email)
+    state$last_template_json <- NULL
+    state$last_error <- NULL
+    showNotification("Type your change below, then click Produce template now again.",
+                     type = "message", duration = 5)
+  })
+  observeEvent(input$translator_reset_after, {
+    req(state$user_email)
+    .translator_do_reset(state, session)
+  })
   observeEvent(input$translator_reset, {
     req(state$user_email)
+    .translator_do_reset(state, session)
+  })
+  .translator_do_reset <- function(state, session) {
     state$messages           <- list()
     state$last_template_json <- NULL
     state$last_error         <- NULL
@@ -362,7 +378,7 @@ translator_chat_server <- function(input, output, session) {
     tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
              error = function(e) NULL)
     showNotification("Conversation reset.", type = "message", duration = 3)
-  })
+  }
 
   # ---- Produce template now: explicit emission trigger ---------------------
   # The green button is the ONLY emission trigger (typed phrases stopped
@@ -494,10 +510,12 @@ translator_chat_server <- function(input, output, session) {
   # The defensive write-raw-text branch is kept as belt-and-suspenders in
   # case the JSON somehow becomes invalid between gate and click (e.g.
   # Reset fired mid-click), but it should never fire in practice.
+  download_name <- NULL
   output$translator_download_template <- downloadHandler(
     filename = function() {
-      paste0("translated_template_",
-             format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
+      download_name <<- paste0("translated_template_",
+                               format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
+      download_name
     },
     content = function(file) {
       j <- state$last_template_json
@@ -507,6 +525,11 @@ translator_chat_server <- function(input, output, session) {
         # Should be unreachable — the button gate already validated.
         writeLines("{}", file)
       }
+      # Tell the browser the file is written, so the amber "building"
+      # bubble becomes a green "saved as <name>" that stays on screen.
+      tryCatch(session$sendCustomMessage("translatorDownloadDone",
+                                         list(file = download_name %||% "the template")),
+               error = function(e) NULL)
     },
     contentType = NULL
   )
@@ -594,6 +617,32 @@ translator_chat_server <- function(input, output, session) {
 
     tags$hr(style = "margin:14px 0;"),
 
+    # 2026-09-18: when a template is ready, every other control disappears
+    # and the download button is the only thing to click. Users could not
+    # find it among Send / Produce / Reset / Stop. Two plain links below it
+    # bring the controls back: revise (keeps the conversation, clears the
+    # template) or start over.
+    conditionalPanel(
+      condition = "output.translator_template_ready",
+      tags$div(
+        style = "padding:16px 18px; background:#E8F5E9; border:2px solid #2D6A4F;
+                 border-radius:12px; text-align:center;",
+        tags$p(style = "margin:0 0 12px 0; color:#1B4332; font-size:0.95rem;",
+               t("ai_ready_title")),
+        downloadButton("translator_download_template",
+                       t("btn_ai_download"),
+                       class = "btn-success btn-lg",
+                       icon = icon("file-arrow-down"),
+                       style = "font-size:1.05rem; padding:12px 28px;"),
+        tags$div(
+          style = "margin-top:12px; font-size:0.85rem;",
+          actionLink("translator_revise", t("btn_ai_revise"),
+                     style = "color:#2D6A4F; margin-right:18px;"),
+          actionLink("translator_reset_after", t("btn_ai_new"),
+                     style = "color:#6B7280;")))),
+
+    conditionalPanel(
+      condition = "!output.translator_template_ready",
     tags$div(
       style = "display:flex; gap:8px; align-items:flex-end;",
       div(style = "flex:1;",
@@ -638,16 +687,8 @@ translator_chat_server <- function(input, output, session) {
                           gsub("'", "\\\\'", t("ai_stop_confirm"))),
         title = t("tip_ai_stop"),
         tagList(icon("ban"), t("btn_ai_stop"))
-      ),
-      conditionalPanel(
-        condition = "output.translator_template_ready",
-        downloadButton("translator_download_template",
-                        t("btn_ai_download"),
-                        class = "btn-success",
-                        icon = icon("file-arrow-down"),
-                        style = "font-size:0.82rem;")
       )
-    ),
+    )),
 
     uiOutput("translator_last_error"))
 }
