@@ -4,6 +4,14 @@ app_server <- function(input, output, session) {
   # Reactive values
   rv <- reactiveValues(
     param_specs = NULL,
+    # QA/QC ignore + repair (2026-09-18): ids of failing rows the user waved
+    # through, the repairs applied on their behalf, whether the warning modal
+    # has been acknowledged once this session, and the id awaiting confirmation.
+    qa_ignored     = character(0),
+    qa_repairs     = NULL,
+    qa_ack         = FALSE,
+    qa_pending     = NULL,
+    qa_render_bump = 0L,
     inv_metadata = NULL,
     manure_data = NULL,
     population = NULL,
@@ -195,6 +203,14 @@ app_server <- function(input, output, session) {
       (isolate(rv$param_specs_bulk_token) %||% 0L) + 1L
   }
 
+  # A new upload starts with a clean QA slate: ignores and repairs referred
+  # to rows of the previous frame.
+  .qa_reset_caveats <- function() {
+    rv$qa_ignored <- character(0)
+    rv$qa_repairs <- NULL
+    rv$qa_pending <- NULL
+  }
+
   # 2026-06: hardcode first-difference detrending. The user-facing "Treatment
   # of trends" selectInput was retired — the alternative options ("linear",
   # "none") were rarely the right call and not a choice an Excel-fluent
@@ -213,6 +229,7 @@ app_server <- function(input, output, session) {
     if (name == "country_x") {
       rv$param_specs <- fill_bounds(generate_country_x_example())
       .bump_unc_token()
+      .qa_reset_caveats()
       # R2.2: built-in example now ships with synthetic 5-year time-series so
       # that Tab 4's "From template (auto)" correlation mode works without
       # requiring a separate Excel upload.
@@ -227,6 +244,7 @@ app_server <- function(input, output, session) {
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
       .bump_unc_token()
+      .qa_reset_caveats()
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
       rv$manure_data <- generate_country_y_manure()
@@ -267,6 +285,7 @@ app_server <- function(input, output, session) {
 
       rv$param_specs    <- parsed$param_specs
       .bump_unc_token()
+      .qa_reset_caveats()
       rv$inv_metadata   <- parsed$metadata
       rv$manure_data    <- parsed$manure
       rv$population     <- parsed$population
@@ -540,6 +559,137 @@ app_server <- function(input, output, session) {
              manure_data = rv$manure_data)
   })
 
+  # --- QA/QC ignore + repair (2026-09-18) ---
+  # A `fail` row blocks the run until fixed or explicitly ignored. Ignoring
+  # a bounds_order / dist_suitability failure applies the smallest repair
+  # (see qaqc_repair in utils_qaqc.R) because the sampler would otherwise
+  # return NaN. Everything ignored or repaired is listed on the results tab
+  # and in every export.
+  qa_open_fails <- reactive({
+    df <- qaqc_result()
+    if (nrow(df) == 0) return(df)
+    df[df$status == "fail" & !(df$id %in% rv$qa_ignored), , drop = FALSE]
+  })
+
+  qa_caveats <- reactive({
+    df  <- qaqc_result()
+    out <- list()
+    ign <- rv$qa_ignored
+    if (length(ign) && nrow(df)) {
+      rows <- df[df$id %in% ign, , drop = FALSE]
+      if (nrow(rows)) out[[length(out) + 1L]] <- data.frame(
+        action = "ignored", id = rows$id, group = rows$group, level = rows$level,
+        parameter = rows$parameter, check = rows$check, detail = rows$message,
+        stringsAsFactors = FALSE)
+    }
+    if (!is.null(rv$qa_repairs) && nrow(rv$qa_repairs))
+      out[[length(out) + 1L]] <- rv$qa_repairs
+    if (!length(out)) return(NULL)
+    do.call(rbind, out)
+  })
+
+  # Export-friendly copy (no internal id). NULL when there is nothing to say.
+  .qa_caveats_export <- function() {
+    cv <- tryCatch(isolate(qa_caveats()), error = function(e) NULL)
+    if (is.null(cv) || nrow(cv) == 0) return(NULL)
+    data.frame(Action = cv$action, Group = cv$group,
+               Level = ifelse(is.na(cv$level), "", cv$level),
+               Parameter = cv$parameter, Check = cv$check, Detail = cv$detail,
+               stringsAsFactors = FALSE)
+  }
+
+  # TRUE (and the user is told) when unignored failures remain.
+  .qa_gate_blocked <- function() {
+    open <- tryCatch(isolate(qa_open_fails()), error = function(e) NULL)
+    if (is.null(open) || nrow(open) == 0) return(FALSE)
+    msg <- sprintf(t("qa_gate_blocked"), nrow(open))
+    showNotification(msg, type = "error", duration = 12)
+    rv$sim_log <- paste0(rv$sim_log, "Run blocked: ", nrow(open),
+                         " QA/QC failure(s) neither fixed nor ignored: ",
+                         paste(utils::head(open$id, 6), collapse = "; "), "\n")
+    bslib::nav_select(id = "nav", selected = t("tab_qaqc"), session = session)
+    TRUE
+  }
+
+  .qa_apply_ignore <- function(id) {
+    df  <- tryCatch(isolate(qaqc_result()), error = function(e) NULL)
+    if (is.null(df) || !nrow(df)) return(invisible(FALSE))
+    row <- df[df$id == id, , drop = FALSE]
+    if (!nrow(row)) return(invisible(FALSE))
+    row <- row[1, , drop = FALSE]
+    if (!qaqc_ignorable(row$check)) {
+      showNotification(t("qa_not_ignorable"), type = "error", duration = 6)
+      return(invisible(FALSE))
+    }
+    if (qaqc_repairable(row$check)) {
+      fix <- qaqc_repair(isolate(rv$param_specs), row)
+      if (isTRUE(fix$changed)) {
+        rv$param_specs <- fix$param_specs
+        .bump_unc_token()
+        rec <- data.frame(action = "repaired", id = id, group = row$group,
+                          level = row$level, parameter = row$parameter,
+                          check = row$check, detail = fix$note,
+                          stringsAsFactors = FALSE)
+        rv$qa_repairs <- rbind(isolate(rv$qa_repairs), rec)
+        rv$sim_log <- paste0(rv$sim_log, "QA/QC repair (", id, "): ", fix$note, "\n")
+        showNotification(paste(t("qa_repaired_notice"), fix$note),
+                         type = "warning", duration = 8)
+        return(invisible(TRUE))
+      }
+    }
+    rv$qa_ignored <- union(isolate(rv$qa_ignored), id)
+    rv$sim_log <- paste0(rv$sim_log, "QA/QC failure ignored: ", id, "\n")
+    invisible(TRUE)
+  }
+
+  observeEvent(input$qa_ignore_toggle, {
+    ev <- input$qa_ignore_toggle
+    id <- as.character(ev$id %||% "")
+    if (!nzchar(id)) return()
+    if (!isTRUE(ev$checked)) {
+      rv$qa_ignored <- setdiff(rv$qa_ignored, id)
+      rv$sim_log <- paste0(rv$sim_log, "QA/QC ignore removed: ", id, "\n")
+      return()
+    }
+    if (isTRUE(rv$qa_ack)) { .qa_apply_ignore(id); return() }
+    rv$qa_pending <- id
+    showModal(modalDialog(
+      title = t("qa_ignore_modal_title"),
+      tags$p(t("qa_ignore_modal_body")),
+      tags$p(tags$code(id), style = "font-size:0.85rem; color:#555;"),
+      footer = tagList(
+        actionButton("qa_ignore_cancel", t("qa_ignore_cancel")),
+        actionButton("qa_ignore_confirm", t("qa_ignore_confirm"), class = "btn-danger")),
+      easyClose = FALSE))
+  })
+
+  observeEvent(input$qa_ignore_confirm, {
+    removeModal()
+    rv$qa_ack <- TRUE
+    id <- rv$qa_pending
+    rv$qa_pending <- NULL
+    if (!is.null(id)) .qa_apply_ignore(id)
+  })
+
+  observeEvent(input$qa_ignore_cancel, {
+    removeModal()
+    rv$qa_pending <- NULL
+    rv$qa_render_bump <- rv$qa_render_bump + 1L   # redraw: untick the box
+  })
+
+  # Red banner above the results while anything is ignored or repaired.
+  output$qa_caveat_banner <- renderUI({
+    cv <- qa_caveats()
+    if (is.null(cv) || nrow(cv) == 0) return(NULL)
+    div(style = "margin: 0 16px 8px 16px; padding: 10px 14px; background:#FEE2E2; border:1px solid #EF4444; border-radius:6px; color:#991B1B; font-size:0.9rem;",
+        tags$strong(sprintf(t("qa_banner"), nrow(cv))), " ", t("qa_banner_detail"),
+        tags$ul(style = "margin:6px 0 0 0;",
+                lapply(seq_len(nrow(cv)), function(i)
+                  tags$li(sprintf("%s: %s%s / %s / %s", cv$action[i], cv$group[i],
+                                  if (is.na(cv$level[i])) "" else paste0(" @", cv$level[i]),
+                                  cv$parameter[i], cv$check[i])))))
+  })
+
   # --- Auto-filled parameters card (Round 6b #4) ---
   imputed_rows <- reactive({
     ps <- rv$param_specs
@@ -695,21 +845,47 @@ app_server <- function(input, output, session) {
       names(empty) <- t("qa_col_message")
       return(DT::datatable(empty, rownames = FALSE, options = list(dom = "t")))
     }
+    rv$qa_render_bump
+    ignored  <- rv$qa_ignored
+    repaired <- if (!is.null(rv$qa_repairs)) rv$qa_repairs$id else character()
     df$status_icon <- sapply(df$status, qaqc_icon)
-    display <- df[, c("group", "parameter", "check", "status_icon", "message")]
+    df$ignore_ui <- vapply(seq_len(nrow(df)), function(i) {
+      id <- df$id[i]
+      if (id %in% repaired)
+        return(sprintf('<span style="color:#B45309;font-size:0.8rem;font-weight:600;">%s</span>',
+                       htmltools::htmlEscape(t("qa_repaired_tag"))))
+      if (df$status[i] != "fail") return("")
+      if (!qaqc_ignorable(df$check[i]))
+        return(sprintf('<span style="color:#888;font-size:0.8rem;">%s</span>',
+                       htmltools::htmlEscape(t("qa_not_ignorable"))))
+      sprintf('<label style="white-space:nowrap;cursor:pointer;margin:0;"><input type="checkbox" class="qa-ignore" data-id="%s"%s> %s</label>',
+              htmltools::htmlEscape(id, attribute = TRUE),
+              if (id %in% ignored) " checked" else "",
+              htmltools::htmlEscape(t("qa_ignore_label")))
+    }, character(1))
+    display <- df[, c("group", "parameter", "check", "status_icon", "ignore_ui", "message")]
     DT::datatable(
       display,
       escape    = FALSE,
       rownames  = FALSE,
       colnames  = c(t("qa_col_group"), t("qa_col_parameter"),
-                     t("qa_col_check"), t("qa_col_status"), t("qa_col_message")),
+                     t("qa_col_check"), t("qa_col_status"), t("qa_col_ignore"),
+                     t("qa_col_message")),
+      # Delegated change handler on the table node survives paging redraws.
+      callback  = DT::JS(
+        "$(table.table().node()).on('change', 'input.qa-ignore', function() {",
+        "  Shiny.setInputValue('qa_ignore_toggle',",
+        "    {id: $(this).attr('data-id'), checked: this.checked, nonce: Math.random()},",
+        "    {priority: 'event'});",
+        "});"),
       options   = list(
         pageLength = 50,
         dom        = "ftp",
         columnDefs = list(
           list(targets = 3, orderData = 0),  # sort by status_icon uses its text
           list(width = "90px", targets = 2),
-          list(width = "80px", targets = 3)
+          list(width = "80px", targets = 3),
+          list(width = "80px", targets = 4, orderable = FALSE)
         )
       )
     )
@@ -1279,6 +1455,9 @@ app_server <- function(input, output, session) {
         "Run blocked: corr_mode='manual' selected but no matrix uploaded.\n")
       return()
     }
+
+    # 2026-09-18: QA/QC failures block the run unless the user ticked Ignore.
+    if (.qa_gate_blocked()) return()
 
     # T1.2 / T2.2 / A1: auto-fill missing core params from IPCC defaults
     # rather than blocking the simulation.
@@ -3166,6 +3345,7 @@ app_server <- function(input, output, session) {
         rv$mc_results$inventory, rv$uncertainty,
         rv$sensitivity, rv$ipcc_table, file,
         param_specs = rv$param_specs,
+        qa_caveats  = .qa_caveats_export(),
         settings = list(
           n_iter           = as.integer(input$n_iter),
           corr_mode        = input$corr_mode,
@@ -3266,6 +3446,19 @@ app_server <- function(input, output, session) {
       }
       if (length(ct_rows) > 0) out <- rbind(out, do.call(rbind, ct_rows))
 
+      # 2026-09-18: ignored / repaired QA checks travel with the numbers.
+      cv <- .qa_caveats_export()
+      if (!is.null(cv)) {
+        cav <- out[rep(NA_integer_, nrow(cv)), , drop = FALSE]
+        cav$cattle_type       <- "QA_CAVEAT"
+        cav$emission_category <- sprintf("%s: %s%s / %s / %s. %s", cv$Action, cv$Group,
+                                         ifelse(nzchar(cv$Level), paste0(" @", cv$Level), ""),
+                                         cv$Parameter, cv$Check, cv$Detail)
+        cav$unit <- ""
+        cav$variable <- cv$Check
+        out <- rbind(out, cav)
+      }
+
       write.csv(out, file, row.names = FALSE)
     }
   )
@@ -3315,7 +3508,8 @@ app_server <- function(input, output, session) {
         decomposition         = rv$decomposition,
         comparison_uncertainty = comp_unc,
         diagnostics           = rv$diagnostics,
-        samples_for_density   = density_samples
+        samples_for_density   = density_samples,
+        qa_caveats            = .qa_caveats_export()
       )
     }
   )
@@ -3332,6 +3526,7 @@ app_server <- function(input, output, session) {
 
   observeEvent(input$run_trend, {
     req(rv$param_specs)
+    if (.qa_gate_blocked()) return()
     n_iter <- as.integer(input$n_iter %||% 10000)
     n_iter_fmt <- format(n_iter, big.mark = ",")
     # Round 9 follow-up: withProgress bar mirrors the single-year handler so

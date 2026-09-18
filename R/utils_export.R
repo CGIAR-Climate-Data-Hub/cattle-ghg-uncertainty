@@ -86,7 +86,8 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
 }
 
 export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, filepath,
-                                settings = NULL, param_specs = NULL) {
+                                settings = NULL, param_specs = NULL,
+                                qa_caveats = NULL) {
   # Andreas 2026-05 #38: previously crashed when ipcc_table was NULL (which
   # happens whenever AD/EF decomposition didn't run, e.g. for custom uploads
   # — see app_server.R line 982). Replace NULL/empty inputs with placeholder
@@ -125,7 +126,8 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     data.frame(
       Setting = c("Iterations", "AD correlations", "EF correlations",
                   "Comparison run (no corr.)", "GWP basis", "Seed",
-                  "Analysis mode", "Emission sources"),
+                  "Analysis mode", "Emission sources",
+                  "QA/QC checks ignored or repaired"),
       Value   = c(
         as.character(settings$n_iter %||% NA),
         as.character(settings$corr_mode %||% "none"),
@@ -134,7 +136,9 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
         as.character(settings$gwp_version %||% NA),
         as.character(settings$seed %||% NA),
         as.character(settings$analysis_mode %||% NA),
-        paste(settings$emission_sources %||% character(0), collapse = ", ")
+        paste(settings$emission_sources %||% character(0), collapse = ", "),
+        if (is.null(qa_caveats) || nrow(qa_caveats) == 0) "none"
+        else paste0(nrow(qa_caveats), " (see sheet QA_Caveats)")
       ),
       stringsAsFactors = FALSE
     )
@@ -151,8 +155,15 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     param_specs
   else placeholder("Input parameters unavailable. Run a Monte Carlo simulation on Tab 5 first.")
 
+  # 2026-09-18: QA/QC failures the user ignored, and repairs applied so the
+  # run could proceed. Reviewers must see these next to the numbers.
+  caveats_df <- if (!is.null(qa_caveats) && is.data.frame(qa_caveats) && nrow(qa_caveats) > 0)
+    qa_caveats
+  else placeholder("No QA/QC checks were ignored or repaired for this run.")
+
   sheets <- list(
     Run_Settings        = run_settings_df,
+    QA_Caveats          = caveats_df,
     Summary             = summary_df,
     Uncertainty_Metrics = uncertainty_df,
     Sensitivity_SRC     = src_df,

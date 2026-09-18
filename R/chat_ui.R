@@ -71,6 +71,10 @@ translator_chat_ui <- function() {
     batch_parts = list(),
     # 2026-09-17: an upload waiting for the user to pick sheets (plan F8).
     pending_upload = NULL,
+    precheck_key   = NULL,
+    precheck       = NULL,
+    template_file     = NULL,   # workbook built once at ready time
+    template_file_key = NULL,
     # 2026-09-17: TRUE when the saved conversation was held under a
     # different system prompt (the defaults or the template changed since).
     # Emission is refused until a new upload is explored under the live
@@ -485,6 +489,37 @@ translator_chat_server <- function(input, output, session) {
   })
   outputOptions(output, "translator_template_ready", suspendWhenHidden = FALSE)
 
+  # 2026-09-18: quality preview above the Download button. The produced
+  # workbook is written to a temp file, read back through the same parser
+  # the Data Input tab uses, and run through run_qaqc() plus the relational
+  # checks in translator_checks.R. The user sees what the QA/QC tab will
+  # say before downloading. Memoised on the JSON hash: the writer takes a
+  # few seconds on a 27-group inventory.
+  output$translator_predownload_qa <- renderUI({
+    js <- state$last_template_json
+    if (!.translator_template_is_well_formed(js)) return(NULL)
+    key <- tryCatch(.tp_sha256(js), error = function(e) NULL)
+    pc  <- state$precheck
+    if (is.null(key) || !identical(state$precheck_key, key) || is.null(pc)) {
+      # Not built yet (the workbook writer takes about a minute on a large
+      # inventory, too long for a render). Offer it as a click.
+      return(tags$div(
+        style = "text-align:left; margin:0 auto 14px auto; max-width:720px; padding:10px 14px; background:#fff; border:1px solid #CFD8DC; border-radius:8px; font-size:0.85rem; color:#333;",
+        tags$strong(t("ai_precheck_title")), " ",
+        actionLink("translator_precheck_run", t("ai_precheck_run"),
+                   style = "color:#2D6A4F; font-weight:600;")))
+    }
+    .translator_precheck_ui(pc)
+  })
+
+  observeEvent(input$translator_precheck_run, {
+    js <- state$last_template_json
+    if (!.translator_template_is_well_formed(js)) return()
+    withProgress(message = t("ai_precheck_building"), value = 0.3, {
+      .translator_finalise_template(state, js)
+    })
+  })
+
   # ---- Spend display REMOVED 2026-06 ---------------------------------------
   # The user-facing 'Your usage' line, the admin 'Pilot budget' line, and
   # the admin stats card have all been removed at user request — the local
@@ -519,7 +554,13 @@ translator_chat_server <- function(input, output, session) {
     },
     content = function(file) {
       j <- state$last_template_json
-      if (.translator_template_is_well_formed(j)) {
+      key <- tryCatch(.tp_sha256(j), error = function(e) NULL)
+      cached <- state$template_file
+      if (!is.null(key) && identical(state$template_file_key, key) &&
+          !is.null(cached) && file.exists(cached)) {
+        # Built at ready time by .translator_finalise_template.
+        file.copy(cached, file, overwrite = TRUE)
+      } else if (.translator_template_is_well_formed(j)) {
         .translator_write_template_xlsx(j, file)
       } else {
         # Should be unreachable — the button gate already validated.
@@ -629,6 +670,7 @@ translator_chat_server <- function(input, output, session) {
                  border-radius:12px; text-align:center;",
         tags$p(style = "margin:0 0 12px 0; color:#1B4332; font-size:0.95rem;",
                t("ai_ready_title")),
+        uiOutput("translator_predownload_qa"),
         downloadButton("translator_download_template",
                        t("btn_ai_download"),
                        class = "btn-success btn-lg",
@@ -804,6 +846,113 @@ translator_chat_server <- function(input, output, session) {
     full      = setdiff(c("parameters"), names(parsed)),
     character(0))
   if (length(miss)) sprintf("the reply omitted %s", paste(miss, collapse = ", ")) else NULL
+}
+
+# Quality preview of a produced template (2026-09-18). Writes the official
+# workbook to a temp file, parses it back and runs the app's QA/QC plus the
+# relational checks. Returns list(qa, summary, issues, n_params, n_manure,
+# error).
+.translator_precheck <- function(json_text) {
+  fail <- function(msg) list(qa = NULL, summary = NULL, issues = NULL, error = msg)
+  parsed <- tryCatch(jsonlite::fromJSON(json_text, simplifyVector = TRUE),
+                     error = function(e) NULL)
+  if (is.null(parsed)) return(fail("the template JSON did not parse"))
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+  werr <- tryCatch({ .translator_write_official_template(parsed, tmp); NULL },
+                   error = function(e) conditionMessage(e))
+  if (!is.null(werr)) return(fail(paste("the workbook could not be written:", werr)))
+  .translator_precheck_file(tmp)
+}
+
+# Same checks on a workbook that already exists (about 4 s for 800 rows).
+.translator_precheck_file <- function(path) {
+  fail <- function(msg) list(qa = NULL, summary = NULL, issues = NULL, error = msg)
+  if (is.null(path) || !file.exists(path)) return(fail("the workbook was not found"))
+  pu <- tryCatch(suppressMessages(parse_uploaded_template(path)), error = function(e) NULL)
+  if (is.null(pu) || is.null(pu$param_specs) || !nrow(pu$param_specs))
+    return(fail("the workbook could not be read back"))
+  region <- tryCatch(as.character(pu$metadata$region %||% ""), error = function(e) "")
+  if (!length(region) || is.na(region[1]) || !nzchar(region[1])) region <- "global"
+  qa <- tryCatch(run_qaqc(pu$param_specs, region = region[1], manure_data = pu$manure),
+                 error = function(e) NULL)
+  issues <- tryCatch(translator_consistency_checks(pu$param_specs, pu$manure),
+                     error = function(e) NULL)
+  list(qa = qa, summary = if (!is.null(qa)) qaqc_summary(qa) else NULL,
+       issues = issues, n_params = nrow(pu$param_specs),
+       n_manure = if (is.data.frame(pu$manure)) nrow(pu$manure) else 0L, error = NULL)
+}
+
+.translator_precheck_ui <- function(pc) {
+  box <- function(...) tags$div(
+    style = "text-align:left; margin:0 auto 14px auto; max-width:720px; padding:10px 14px; background:#fff; border:1px solid #CFD8DC; border-radius:8px; font-size:0.85rem; color:#333;",
+    ...)
+  if (!is.null(pc$error))
+    return(box(tags$strong(t("ai_precheck_title")), " ",
+               sprintf(t("ai_precheck_error"), pc$error)))
+  s <- pc$summary
+  badge <- function(n, label, bg, fg) tags$span(
+    style = sprintf("display:inline-block; padding:2px 10px; margin-right:6px; border-radius:4px; background:%s; color:%s; font-weight:600;", bg, fg),
+    paste(n, label))
+  fails <- if (!is.null(pc$qa)) pc$qa[pc$qa$status == "fail", , drop = FALSE] else NULL
+  issues <- pc$issues
+  n_issue <- if (is.null(issues)) 0L else nrow(issues)
+  n_fail  <- if (is.null(fails)) 0L else nrow(fails)
+  cap <- 15L
+  box(
+    tags$div(style = "margin-bottom:6px;", tags$strong(t("ai_precheck_title")), " ",
+             sprintf(t("ai_precheck_rows"), pc$n_params %||% 0L, pc$n_manure %||% 0L)),
+    tags$div(style = "margin-bottom:8px;",
+             badge(s$n_pass %||% 0L, t("qa_badge_pass"), "#DCFCE7", "#166534"),
+             badge(s$n_warn %||% 0L, t("qa_badge_warn"), "#FEF3C7", "#92400E"),
+             badge(n_fail, t("qa_badge_fail"), "#FEE2E2", "#991B1B"),
+             badge(n_issue, t("ai_precheck_issues_badge"), "#DBEAFE", "#1E40AF")),
+    if (n_fail == 0L && n_issue == 0L)
+      tags$div(style = "color:#166534;", t("ai_precheck_clean")),
+    if (n_fail > 0L) tagList(
+      tags$div(tags$strong(t("ai_precheck_fail_title")), " ", t("ai_precheck_fail_hint")),
+      tags$ul(style = "margin:4px 0 8px 0; padding-left:18px;",
+              lapply(seq_len(min(cap, n_fail)), function(i) tags$li(
+                sprintf("%s%s, %s: %s", fails$group[i],
+                        if (is.na(fails$level[i])) "" else paste0(" @", fails$level[i]),
+                        fails$parameter[i], fails$message[i]))),
+              if (n_fail > cap) tags$li(sprintf(t("ai_precheck_more"), n_fail - cap)))),
+    if (n_issue > 0L) tagList(
+      tags$div(tags$strong(t("ai_precheck_issues_title")), " ", t("ai_precheck_issues_hint")),
+      tags$ul(style = "margin:4px 0 0 0; padding-left:18px;",
+              lapply(seq_len(min(cap, n_issue)), function(i) tags$li(
+                tags$span(style = "color:#555;", paste0(issues$where[i], ": ")), issues$issue[i])),
+              if (n_issue > cap) tags$li(sprintf(t("ai_precheck_more"), n_issue - cap))))
+  )
+}
+
+# Build the workbook ONCE when the template becomes ready (2026-09-18).
+# The writer takes about a minute on a 27-group inventory; doing it here,
+# while the emission progress bubbles are still on screen, makes the
+# Download click instant and gives the quality preview something to read.
+# Keyed on the JSON hash so a revised template rebuilds and a repeated
+# call is free.
+.translator_finalise_template <- function(state, json, notify = function(txt) NULL) {
+  key <- tryCatch(.tp_sha256(json), error = function(e) NULL)
+  if (is.null(key)) return(invisible(NULL))
+  cached <- isolate(state$template_file)
+  if (identical(isolate(state$template_file_key), key) && !is.null(cached) &&
+      file.exists(cached) && !is.null(isolate(state$precheck)))
+    return(invisible(cached))
+  tryCatch(notify("Building the workbook and running the quality checks..."),
+           error = function(e) NULL)
+  path <- file.path(tempdir(), paste0("translated_", substr(key, 1, 12), ".xlsx"))
+  ok <- tryCatch({ .translator_write_template_xlsx(json, path); file.exists(path) },
+                 error = function(e) FALSE)
+  if (ok) {
+    state$template_file     <- path
+    state$template_file_key <- key
+  }
+  state$precheck     <- if (ok) .translator_precheck_file(path)
+                        else list(qa = NULL, summary = NULL, issues = NULL,
+                                  error = "the workbook could not be written")
+  state$precheck_key <- key
+  invisible(if (ok) path else NULL)
 }
 
 # Provenance stamp written into the workbook's Notes (plan B6).
@@ -1195,18 +1344,21 @@ translator_chat_server <- function(input, output, session) {
   # the renderUI for the message history catches up.
   session$sendCustomMessage("translatorStreamStart", "")
 
-  # The tool block rides along on every chat turn with tool_choice = none
-  # (plan F1): the prompt-cache prefix is tools -> system -> messages, so a
-  # chat turn without the tool and an emission call with it can never share
-  # a cache entry. The model cannot call the tool here; rule 9 tells it not
-  # to try.
+  # The tool block rides along on every chat turn (plan F1): the
+  # prompt-cache prefix is tools -> system -> messages, so a chat turn
+  # without the tool and an emission call with it can never share a cache
+  # entry. Since 2026-09-18 the tool_choice is `auto` here as well, the
+  # same as the emission calls, because a change of tool_choice between
+  # calls invalidates the cached message prefix. Rule 9 tells the model not
+  # to call the tool from a chat reply; if it does anyway, the block below
+  # promotes a complete piece and explains a partial one.
   resp <- anthropic_chat_stream(
     msgs,
     on_chunk = function(text) {
       session$sendCustomMessage("translatorStreamChunk", text)
     },
     tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_NONE
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO
   )
 
   if (!is.null(resp$error)) {
@@ -1234,12 +1386,36 @@ translator_chat_server <- function(input, output, session) {
   # truncated mid-stream), don't promote — but DO tell the user, otherwise
   # they see the AI's confident "template-ready" reply and no download
   # button with no explanation.
-  json_block <- .translator_extract_template_ready(resp$reply)
+  reply_text <- resp$reply
+  json_block <- NULL
+  if (isTRUE(resp$tool_used)) {
+    # Unrequested tool call from a chat turn. Only a `full` piece can stand
+    # in for the template; a batch or enumerate piece covers one production
+    # system and would download as a truncated inventory.
+    piece <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE),
+                      error = function(e) NULL)
+    mode  <- .translator_scalar(piece$mode %||% "full")
+    if (identical(mode, "full") && .translator_template_is_well_formed(resp$reply)) {
+      json_block <- resp$reply
+      reply_text <- sprintf("Template generated: %d parameter rows, %d manure rows.",
+                            if (is.data.frame(piece$parameters)) nrow(piece$parameters) else 0L,
+                            if (is.data.frame(piece$manure_management)) nrow(piece$manure_management) else 0L)
+    } else {
+      reply_text <- paste0(
+        "I started filling the template before you asked (a partial piece, mode '",
+        mode, "'). Nothing was kept. When your answers are complete, click ",
+        "'Produce template now' and the full template will be built in stages.")
+    }
+  } else {
+    json_block <- .translator_extract_template_ready(resp$reply)
+  }
   template_just_ready <- FALSE
   if (!is.null(json_block)) {
     if (.translator_template_is_well_formed(json_block)) {
       state$last_template_json <- json_block
       template_just_ready <- TRUE
+      .translator_finalise_template(state, json_block, function(txt)
+        session$sendCustomMessage("translatorAppendInfoBubble", txt))
     } else {
       state$last_error <- paste0(
         "The AI tried to emit a template but the format wasn't valid JSON ",
@@ -1260,12 +1436,14 @@ translator_chat_server <- function(input, output, session) {
   # postamble), set display to just the numbered items. The full reply
   # stays in `content` so the chat-bubble expander surfaces it on
   # demand.
-  display_text <- .translator_extract_numbered_questions(resp$reply) %||%
-                  resp$reply
+  display_text <- .translator_extract_numbered_questions(reply_text) %||%
+                  reply_text
   state$messages[[length(state$messages) + 1]] <-
-    list(role = "assistant",
-          content = resp$reply,
-          display = display_text)
+    if (isTRUE(resp$tool_used))
+      list(role = "assistant", content = reply_text, display = display_text,
+           payload = if (template_just_ready) resp$reply else NULL)
+    else
+      list(role = "assistant", content = reply_text, display = display_text)
 
   # If a valid template-ready block came through in this reply, post a
   # separate small AI message pointing the user at the green Download
@@ -1642,6 +1820,7 @@ translator_chat_server <- function(input, output, session) {
 
   state$last_template_json <- merged_json
   state$last_error <- if (length(merge_warnings)) paste(merge_warnings, collapse = " ") else NULL
+  .translator_finalise_template(state, merged_json, info)
 
   n_params <- if (is.data.frame(merged$parameters)) nrow(merged$parameters) else 0L
   n_mms <- if (is.data.frame(merged$manure_management)) nrow(merged$manure_management) else 0L
@@ -2099,6 +2278,8 @@ translator_chat_server <- function(input, output, session) {
                                    null = "null", dataframe = "rows", digits = NA)
   }
   state$last_template_json <- resp$reply
+  .translator_finalise_template(state, resp$reply, function(txt)
+    session$sendCustomMessage("translatorAppendInfoBubble", txt))
   # Two messages: a short one whose `payload` carries the raw JSON for the
   # expander (kept OUT of `content`, so it is never re-sent to the API on
   # later turns, plan C6), and a separate guidance bubble pointing at the

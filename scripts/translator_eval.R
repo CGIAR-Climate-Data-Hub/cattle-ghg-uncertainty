@@ -7,6 +7,7 @@
 #
 #   1. SCORE (offline, free):
 #        Rscript scripts/translator_eval.R score <translated.xlsx> <truth.csv> [report.md]
+#        Rscript scripts/translator_eval.R check <translated.xlsx>   (QA/QC fails + consistency notes)
 #
 #      truth.csv has one row per expected cell:
 #        aggregation_level, sub_category, parameter, mean, lower, upper, data_source
@@ -168,7 +169,33 @@ if (identical(mode, "score")) {
   sc <- translator_score(args[2], args[3])
   md <- translator_score_report(sc, if (length(args) >= 4) args[4] else NULL)
   cat(md, sep = "\n")
+  # 2026-09-18: the relational checks the app shows before download.
+  pu <- suppressMessages(parse_uploaded_template(args[2]))
+  notes <- translator_consistency_checks(pu$param_specs, pu$manure)
+  cat(sprintf("
+## Consistency notes (%d)
+", nrow(notes)))
+  for (i in seq_len(nrow(notes))) cat(sprintf("- [%s] %s
+", notes$where[i], notes$issue[i]))
 } else if (identical(mode, "replay")) {
   stopifnot(length(args) >= 4)
   translator_replay(args[2], args[3], args[4])
-} else stop("unknown mode '", mode, "'; use score or replay")
+} else if (identical(mode, "check")) {
+  # check <xlsx>: QA/QC failures + consistency notes for a produced workbook.
+  stopifnot(length(args) >= 2)
+  pu <- suppressMessages(parse_uploaded_template(args[2]))
+  region <- as.character(pu$metadata$region %||% "global"); if (!nzchar(region[1])) region <- "global"
+  qa <- run_qaqc(pu$param_specs, region = region[1], manure_data = pu$manure)
+  s <- qaqc_summary(qa)
+  cat(sprintf("QA/QC: %d pass, %d warn, %d fail
+", s$n_pass, s$n_warn, s$n_fail))
+  f <- qa[qa$status == "fail", ]
+  for (i in seq_len(nrow(f))) cat(sprintf("- FAIL %s: %s
+", f$id[i], f$message[i]))
+  notes <- translator_consistency_checks(pu$param_specs, pu$manure)
+  cat(sprintf("
+Consistency notes (%d)
+", nrow(notes)))
+  for (i in seq_len(nrow(notes))) cat(sprintf("- [%s] %s
+", notes$where[i], notes$issue[i]))
+} else stop("unknown mode '", mode, "'; use score, replay or check")

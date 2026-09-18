@@ -458,15 +458,21 @@ anthropic_chat_stream <- function(messages,
   }
 
   split <- .anthropic_split_system(messages)
-  # Resolve "auto": measure the stable prefix (system + every message but
-  # the last) and take the 1-hour cache above the threshold. Anthropic
-  # requires 1-hour breakpoints to precede 5-minute ones; the helpers below
-  # mark the system block and message n-1 with the chosen TTL and message n
-  # with the 5-minute default, which satisfies that ordering.
+  # Resolve "auto": measure the WHOLE request (system + every message, the
+  # last one included) and take the 1-hour cache above the threshold.
+  # 2026-09-18: it used to measure only the stable prefix. On the Zambia
+  # run the Explore call (prefix = system alone, below the threshold) took
+  # 5 minutes, the next call (prefix now including the upload) took 1 hour,
+  # and changing the TTL on the system block invalidated the cache: $1.04
+  # rewritten. Sizing on the full request makes the choice stable from the
+  # first call, because a request only grows. Anthropic requires 1-hour
+  # breakpoints to precede 5-minute ones; the helpers below mark the system
+  # block and message n-1 with the chosen TTL and message n with the
+  # 5-minute default, which satisfies that ordering.
   if (identical(cache_ttl, "auto")) {
     n_msg <- length(split$messages)
     prefix_chars <- nchar(split$system, type = "bytes") +
-      sum(vapply(split$messages[seq_len(max(0L, n_msg - 1L))], function(m) {
+      sum(vapply(split$messages[seq_len(n_msg)], function(m) {
         cc <- m$content
         if (is.character(cc)) nchar(cc, type = "bytes") else
           sum(vapply(cc, function(b) nchar(b$text %||% "", type = "bytes"), integer(1)))
@@ -479,8 +485,9 @@ anthropic_chat_stream <- function(messages,
   # conversation history. Use the two-breakpoint cache helper so the long
   # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
   # cost on batches 2-5. Production cost driver per 2026-06-12 logs.
-  # Since 2026-09-17 every translator call carries the tool block (plan F1),
-  # so this is the branch chat turns take as well.
+  # Since 2026-09-17 every translator call carries the tool block (plan F1)
+  # and since 2026-09-18 the same tool_choice (auto), so this is the branch
+  # chat turns take as well.
   cache_msgs <- if (is.null(tools))
     .anthropic_cache_last_message(split$messages, ttl = cache_ttl)
   else
@@ -673,9 +680,9 @@ anthropic_chat_stream <- function(messages,
   }
 
   # If a tool_use block streamed in, surface its accumulated JSON as the
-  # reply. The force-template caller hands this off to fromJSON; the
-  # regular chat path never sets tools, so this branch only fires for the
-  # "Produce template now" route.
+  # reply and flag it with tool_used. The emission callers hand it to
+  # fromJSON; a chat turn that unexpectedly produced a piece is handled in
+  # .translator_send.
   final_reply <- if (!is.null(tool_block) && nzchar(tool_json_acc)) {
     tool_json_acc
   } else {
@@ -684,6 +691,7 @@ anthropic_chat_stream <- function(messages,
 
   list(
     reply    = final_reply,
+    tool_used = !is.null(tool_block) && nzchar(tool_json_acc),
     usage    = list(prompt_tokens      = usage_in,
                      completion_tokens  = usage_out,
                      cached_tokens      = cache_read,
@@ -869,7 +877,13 @@ anthropic_chat_stream <- function(messages,
 )
 
 # The tool list sent on EVERY translator call, chat turns included, so the
-# cache prefix never changes shape. Chat turns pass tool_choice = none.
+# cache prefix never changes shape. Every call also uses the same
+# tool_choice (auto): Anthropic invalidates the cached MESSAGE prefix when
+# tool_choice changes, which on the Zambia run cost $0.85 at the switch
+# from chat (none) to enumerate (forced). The server now asks for the tool
+# in the message text and checks `tool_used` on the reply; a call that
+# should have produced a piece but came back as text is repeated once with
+# tool_choice forced (.anthropic_tool_call below).
 anthropic_translator_tools <- function() {
   list(list(
     name         = .ANTHROPIC_TOOL_NAME,
@@ -881,6 +895,43 @@ anthropic_translator_tools <- function() {
 }
 .ANTHROPIC_TOOL_CHOICE_FORCE <- list(type = "tool", name = .ANTHROPIC_TOOL_NAME)
 .ANTHROPIC_TOOL_CHOICE_NONE  <- list(type = "none")
+.ANTHROPIC_TOOL_CHOICE_AUTO  <- list(type = "auto")
+
+# Add the token counts and cost of a first attempt onto the reply of the
+# forced retry, so the usage log and the user's cost stay honest.
+.anthropic_merge_usage <- function(resp2, resp1) {
+  if (is.null(resp1) || is.null(resp1$usage)) return(resp2)
+  for (k in names(resp2$usage))
+    resp2$usage[[k]] <- (resp2$usage[[k]] %||% 0L) + (resp1$usage[[k]] %||% 0L)
+  resp2$cost_usd    <- (resp2$cost_usd %||% 0) + (resp1$cost_usd %||% 0)
+  resp2$latency_sec <- (resp2$latency_sec %||% 0) + (resp1$latency_sec %||% 0)
+  resp2$text_before_force <- resp1$reply
+  resp2
+}
+
+# One emission call: tools always attached, tool_choice auto by default,
+# one forced retry when the model answered in prose instead.
+.anthropic_tool_call <- function(messages, on_chunk, on_tick, model, max_tokens,
+                                 timeout_sec, tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+  call_once <- function(tc) anthropic_chat_stream(
+    messages    = messages,
+    on_chunk    = on_chunk,
+    on_tick     = on_tick,
+    model       = model,
+    max_tokens  = max_tokens,
+    temperature = 0,
+    timeout_sec = timeout_sec,
+    tools       = anthropic_translator_tools(),
+    tool_choice = tc)
+  resp <- call_once(tool_choice)
+  if (identical(tool_choice, .ANTHROPIC_TOOL_CHOICE_AUTO) &&
+      is.null(resp$error) && !isTRUE(resp$tool_used)) {
+    message("translator: model replied in text instead of calling ",
+            .ANTHROPIC_TOOL_NAME, "; repeating the call with tool_choice forced")
+    resp <- .anthropic_merge_usage(call_once(.ANTHROPIC_TOOL_CHOICE_FORCE), resp)
+  }
+  resp
+}
 
 # --- Force-template variant (tool_use) -----------------------------------------
 #
@@ -902,18 +953,10 @@ anthropic_chat_template_force <- function(messages,
                                             # still streaming past 900 s.
                                             # tool_use input_json_delta is
                                             # slower than text streaming.
-                                            timeout_sec = 1800) {
-  anthropic_chat_stream(
-    messages    = messages,
-    on_chunk    = on_chunk,
-    on_tick     = on_tick,
-    model       = model,
-    max_tokens  = max_tokens,
-    temperature = 0,
-    timeout_sec = timeout_sec,
-    tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_FORCE
-  )
+                                            timeout_sec = 1800,
+                                            tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+  .anthropic_tool_call(messages, on_chunk, on_tick, model, max_tokens,
+                       timeout_sec, tool_choice)
 }
 
 # Stage 1 of the batched emission flow: mode = enumerate. Cheap (~200 output
@@ -923,18 +966,10 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
                                                           on_tick  = function() {},
                                                           model = .ANTHROPIC_DEFAULT_MODEL,
                                                           max_tokens = 4000,
-                                                          timeout_sec = 120) {
-  anthropic_chat_stream(
-    messages    = messages,
-    on_chunk    = on_chunk,
-    on_tick     = on_tick,
-    model       = model,
-    max_tokens  = max_tokens,
-    temperature = 0,
-    timeout_sec = timeout_sec,
-    tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_FORCE
-  )
+                                                          timeout_sec = 120,
+                                                          tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+  .anthropic_tool_call(messages, on_chunk, on_tick, model, max_tokens,
+                       timeout_sec, tool_choice)
 }
 
 # Stage 2 of the batched emission flow: mode = batch, one call per
@@ -949,18 +984,10 @@ anthropic_chat_batch_template_force <- function(messages,
                                                   on_tick  = function() {},
                                                   model = .ANTHROPIC_DEFAULT_MODEL,
                                                   max_tokens = 48000,
-                                                  timeout_sec = 900) {
-  anthropic_chat_stream(
-    messages    = messages,
-    on_chunk    = on_chunk,
-    on_tick     = on_tick,
-    model       = model,
-    max_tokens  = max_tokens,
-    temperature = 0,
-    timeout_sec = timeout_sec,
-    tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_FORCE
-  )
+                                                  timeout_sec = 900,
+                                                  tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+  .anthropic_tool_call(messages, on_chunk, on_tick, model, max_tokens,
+                       timeout_sec, tool_choice)
 }
 
 # --- Build OpenAI-style message list (system + history + new user) ----------

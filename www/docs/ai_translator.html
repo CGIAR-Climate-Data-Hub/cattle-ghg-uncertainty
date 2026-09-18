@@ -242,8 +242,21 @@ file-derived values.</p>
 <strong>Produce template now</strong>. The AI translates section B
 (file-derived values), section C (catalogue gaps to be filled with IPCC
 defaults), and the biological zeros confirmed in section D,
-mechanically, into the JSON template. A green <strong>Download template
-(.xlsx)</strong> button appears alongside Reset conversation.</p>
+mechanically, into the JSON template. The workbook is then built once
+and a green <strong>Download template (.xlsx)</strong> button appears as
+the only control, with two small links to revise or start over.</p>
+<p>Above the button sits a <strong>quality preview</strong>: the same
+checks the QA/QC tab will run after upload (pass, warn and fail counts
+with the failing rows) plus a set of consistency notes that compare rows
+with each other. The notes name the places where a translation typically
+goes wrong: male and female calves that should carry the same numbers
+but do not, manure system shares that do not sum to 100 %, one manure
+system given different coefficients in different production systems, an
+uncertainty of 0.5 % where the same parameter runs at 50 % elsewhere,
+and a distribution that cannot represent the value it was given. Each
+note is a sentence to check against the source file. The user can ask
+the AI to revise, or download and deal with the failures on the QA/QC
+tab, where each one can be fixed or explicitly ignored.</p>
 <p>The downloaded file follows the official template format exactly.
 After download, the user should open the file and skim the
 <code>data_source</code> column of the Parameters sheet to confirm that
@@ -341,6 +354,11 @@ it cannot detect systematic errors in the source file (e.g., a
 transcription mistake in the original survey). Two checks are
 recommended after every translation:</p>
 <ul>
+<li><strong>Read the quality preview before downloading.</strong> It
+lists the checks that will fail after upload and the consistency notes
+described under Step 3. On the first real translation (a 27-group
+national inventory) every error the AI had introduced appeared in that
+list.</li>
 <li><strong>Spot-check the key numbers.</strong> Compare population,
 body weight, and milk yield in the downloaded template against the
 corresponding cells in the source file. Any discrepancy indicates a

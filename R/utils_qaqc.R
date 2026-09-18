@@ -268,15 +268,18 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
   rows <- vector("list", nrow(ps) * 6L)
   k <- 0L
 
+  has_level <- "aggregation_level" %in% names(ps)
+  lvl_i <- NA_character_
   add <- function(grp, par, chk, sta, msg) {
     k <<- k + 1L
     rows[[k]] <<- list(group = grp, parameter = par, check = chk,
-                       status = sta, message = msg)
+                       status = sta, message = msg, level = lvl_i)
   }
 
   for (i in seq_len(nrow(ps))) {
     p   <- ps$parameter[i]
     grp <- ps$group[i]
+    lvl_i <- if (has_level) as.character(ps$aggregation_level[i]) else NA_character_
     mu  <- ps$mean[i]
     lo  <- ps$lower[i]
     hi  <- ps$upper[i]
@@ -411,8 +414,12 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     if (p %in% BENCHMARK_ELIGIBLE_PARAMS &&
         !is.na(ipcc_def) && ipcc_def != 0 && !is.na(mu)) {
       pct_dev <- abs(mu - ipcc_def) / abs(ipcc_def) * 100
+      # 2026-09-18: a large deviation from the IPCC default is a reason to
+      # document the national source, not a reason to stop the run. Zambia's
+      # commercial beef calves (BW 197.5 vs an Annex 10A.2 calf weight) is a
+      # legitimate country value that used to block the simulation.
       if (pct_dev > 200) {
-        add(grp, p, "benchmark_deviation", "fail",
+        add(grp, p, "benchmark_deviation", "warn",
             qa_msg("bench_fail", mu, pct_dev, ref_str, ipcc_def))
       } else if (pct_dev > 50) {
         add(grp, p, "benchmark_deviation", "warn",
@@ -491,7 +498,8 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
   result <- if (k == 0L) {
     data.frame(group = character(), parameter = character(),
                check = character(), status = character(),
-               message = character(), stringsAsFactors = FALSE)
+               message = character(), level = character(),
+               stringsAsFactors = FALSE)
   } else {
     do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
   }
@@ -502,9 +510,13 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
   # consumes the `matched` mapping to substitute the auto-matched MM key.
   if (!is.null(manure_data)) {
     sg <- resolve_sub_category_matches(param_specs, manure_data)
-    if (nrow(sg$issues) > 0) result <- rbind(result, sg$issues)
+    if (nrow(sg$issues) > 0) {
+      sg$issues$level <- NA_character_
+      result <- rbind(result, sg$issues)
+    }
   }
 
+  result$id <- qaqc_row_id(result)
   if (nrow(result) == 0L) return(result)
   param_order <- unique(ps$parameter)
   # Sort: missing → fail → warn → info → pass, then by parameter and check name
@@ -516,6 +528,89 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
   ), ]
   rownames(result) <- NULL
   result
+}
+
+# ---------------------------------------------------------------------------
+# Ignore / repair support (2026-09-18)
+#
+# A `fail` row blocks the run until the compiler either fixes the input or
+# ticks "Ignore" next to it on the QA/QC tab. Ignoring is recorded and listed
+# in every export. Two failures would crash the sampler if left as they are,
+# so ignoring them applies the smallest repair that lets the run proceed:
+#   bounds_order      -> bounds widened so they bracket the mean
+#   dist_suitability  -> distribution switched to normal (beta needs 0<mean<1,
+#                        lognormal needs mean>0)
+# Everything else (range_check, sub_category_no_match, ...) is waved through
+# unchanged. sub_category_ambiguous cannot be ignored: the simulation would
+# not know which Manure_Management row to read.
+# ---------------------------------------------------------------------------
+QAQC_NON_IGNORABLE <- c("sub_category_ambiguous")
+QAQC_REPAIRABLE    <- c("bounds_order", "dist_suitability")
+
+qaqc_row_id <- function(df) {
+  if (is.null(df) || nrow(df) == 0L) return(character())
+  lvl <- if ("level" %in% names(df)) df$level else rep(NA_character_, nrow(df))
+  lvl <- ifelse(is.na(lvl), "", paste0("@", lvl))
+  paste0(df$group, lvl, " | ", df$parameter, " | ", df$check)
+}
+
+qaqc_ignorable <- function(check) !check %in% QAQC_NON_IGNORABLE
+qaqc_repairable <- function(check) check %in% QAQC_REPAIRABLE
+
+# Rows of `param_specs` that a QA row refers to. Matches on cattle_type /
+# sub_category (the group label), the aggregation level when the QA row
+# carries one, and the parameter.
+.qaqc_target_rows <- function(param_specs, qa_row) {
+  ps <- param_specs
+  n  <- nrow(ps)
+  if (n == 0L) return(integer())
+  sel <- ps$parameter == qa_row$parameter
+  if (all(c("cattle_type", "sub_category") %in% names(ps))) {
+    sel <- sel & paste(ps$cattle_type, ps$sub_category, sep = " / ") == qa_row$group
+  }
+  lvl <- qa_row$level
+  if (!is.null(lvl) && !is.na(lvl) && nzchar(lvl) && "aggregation_level" %in% names(ps)) {
+    sel <- sel & as.character(ps$aggregation_level) == lvl
+  }
+  which(sel & !is.na(sel))
+}
+
+# Returns list(param_specs = <repaired frame>, changed = <logical>,
+#              note = <one-line description of what was changed>)
+qaqc_repair <- function(param_specs, qa_row) {
+  out <- list(param_specs = param_specs, changed = FALSE, note = "")
+  if (is.null(qa_row) || !qaqc_repairable(qa_row$check)) return(out)
+  idx <- .qaqc_target_rows(param_specs, qa_row)
+  if (!length(idx)) return(out)
+  ps <- param_specs
+  notes <- character()
+  for (i in idx) {
+    mu <- suppressWarnings(as.numeric(ps$mean[i]))
+    lo <- suppressWarnings(as.numeric(ps$lower[i]))
+    hi <- suppressWarnings(as.numeric(ps$upper[i]))
+    if (qa_row$check == "bounds_order") {
+      if (is.na(mu) || is.na(lo) || is.na(hi)) next
+      if (lo <= mu && mu <= hi) next
+      new_lo <- lo; new_hi <- hi
+      if (lo > mu) new_lo <- if (hi > mu) mu - (hi - mu) else mu * 0.9
+      if (mu > hi) new_hi <- if (lo < mu) mu + (mu - lo) else mu * 1.1
+      if (lo > mu && mu > hi) { new_lo <- mu * 0.9; new_hi <- mu * 1.1 }
+      ps$lower[i] <- new_lo
+      ps$upper[i] <- new_hi
+      notes <- c(notes, sprintf("bounds %s to %s widened to %s to %s around mean %s",
+                                format(lo, digits = 5), format(hi, digits = 5),
+                                format(new_lo, digits = 5), format(new_hi, digits = 5),
+                                format(mu, digits = 5)))
+    } else if (qa_row$check == "dist_suitability") {
+      d <- if ("distribution" %in% names(ps)) as.character(ps$distribution[i]) else NA_character_
+      if (is.na(d) || d == "normal") next
+      ps$distribution[i] <- "normal"
+      notes <- c(notes, sprintf("distribution %s replaced by normal (mean %s)",
+                                d, format(mu, digits = 5)))
+    }
+  }
+  if (!length(notes)) return(out)
+  list(param_specs = ps, changed = TRUE, note = paste(unique(notes), collapse = "; "))
 }
 
 qaqc_summary <- function(qaqc_df) {

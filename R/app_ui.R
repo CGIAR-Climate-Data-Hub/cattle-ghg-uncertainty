@@ -1378,7 +1378,7 @@ app_ui <- function(request = NULL) {
               t("qa_pass_desc")
             )
           ),
-          t("qa_fix_fails"), tags$strong(t("qa_status_fail")), t("qa_before_sim"),
+          t("qa_fix_or_ignore_pre"), tags$strong(t("qa_status_fail")), t("qa_fix_or_ignore_post"),
           tags$strong(t("qa_status_warn")), t("qa_warnings_advisory"),
           tags$br(), tags$br(),
           tags$strong(paste0(t("qa_autofilled_label"), " ")),
@@ -1815,6 +1815,7 @@ app_ui <- function(request = NULL) {
                          class = "btn-outline-secondary",
                          icon = icon("arrow-left"))),
         h3(t("res_sim_results_h"), style = "margin: 8px 16px;"),
+        uiOutput("qa_caveat_banner"),
 
         conditionalPanel(
           condition = "input.analysis_mode != 'trend'",

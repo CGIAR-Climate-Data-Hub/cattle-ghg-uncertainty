@@ -414,14 +414,14 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
 \textbf{Status} & \textbf{Colour} & \textbf{Meaning} \\
 \midrule
 \textbf{Pass} & \textcolor{cgiargreen}{Green} & All structural checks pass; for \texttt{BW}, the mean is also within ±50\% of the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3). \\
-\textbf{Warn} & \textcolor{amber}{Amber} & For \texttt{BW}: the value deviates 50--200\% from the continental IPCC default — check and document. For any parameter: a non-fatal structural condition fired (e.g.\ implausible bounds $BW > 1500$ kg or $Y_m > 12\%$, fractional parameter with an unbounded distribution, asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match). \\
-\textbf{Fail} & \textcolor{red}{Red} & For \texttt{BW}: the value deviates more than 200\% from the continental IPCC default — likely a data-entry error. For any parameter: $DE_\% \leq 0$ or $\geq 100$; $lower > upper$; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. \\
+\textbf{Warn} & \textcolor{amber}{Amber} & For \texttt{BW}: the value deviates more than 50\% from the continental IPCC default — check and document (above 200\% the message is stronger, but it is still advisory). For any parameter: a non-fatal structural condition fired (e.g.\ implausible bounds $BW > 1500$ kg or $Y_m > 12\%$, fractional parameter with an unbounded distribution, asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match). \\
+\textbf{Fail} & \textcolor{red}{Red} & $DE_\% \leq 0$ or $\geq 100$; bounds that do not bracket the mean; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. A fail blocks the run until it is fixed or explicitly ignored (see below). \\
 \textbf{Missing} & \textit{Grey} & Parameter not found in upload; auto-filled with the IPCC default from PARAM\_CATALOGUE (Vol.4 Ch.10 / Ch.11). Applies to every parameter. \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textit{Scope of the benchmark-deviation check.} The deviation check (Pass / Warn / Fail thresholds based on ±50\% and ±200\% from the IPCC default) is applied \textbf{only to BW (body weight)} — the one parameter for which the tool keeps a defensible continental IPCC table lookup: Annex Tables 10A.1 (dairy cows), 10A.2 (non-dairy cattle), and 10A.3 (buffalo).
+\textit{Scope of the benchmark-deviation check.} The deviation check (Pass below ±50\% from the IPCC default, Warn above; a deviation above 200\% is still a warning, never a fail) is applied \textbf{only to BW (body weight)} — the one parameter for which the tool keeps a defensible continental IPCC table lookup: Annex Tables 10A.1 (dairy cows), 10A.2 (non-dairy cattle), and 10A.3 (buffalo).
 
 \textit{Cross-sheet sub-category-key check.} If a Parameters-sheet \texttt{sub\_category} (e.g.\ \texttt{DINT\_heif}) has no exact match in the Manure\_Management sheet but \textit{is} close to exactly one Manure\_Management sub-category (e.g.\ \texttt{DINT\_heifer}, edit distance $\le 2$), the tool auto-matches them and emits a \textit{Warn} row labelled \texttt{sub\_category\_auto\_match} so you can verify the substitution. If multiple candidates match, the run is blocked with a clear error.
 
@@ -429,7 +429,7 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
 
 \textbf{Pass}: No action needed. All structural checks passed; for \texttt{BW} the mean is also within ±50\% of the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3).
 
-\textbf{Warn}: Either the \texttt{BW} mean deviates 50--200\% from the continental IPCC default, or a non-fatal structural condition fired (asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match, implausible bounds, fractional parameter on an unbounded distribution). Possible actions:
+\textbf{Warn}: Either the \texttt{BW} mean deviates more than 50\% from the continental IPCC default, or a non-fatal structural condition fired (asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match, implausible bounds, fractional parameter on an unbounded distribution). Possible actions:
 \begin{itemize}
   \item Confirm the value matches your country context.
   \item If it is country-specific and well-justified, document the source in your inventory report.
@@ -437,7 +437,9 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
   \item If it is an error, correct it in your Excel file and re-upload.
 \end{itemize}
 
-\textbf{Fail}: Either the \texttt{BW} mean deviates more than 200\% from the continental IPCC default (likely a data-entry error such as a live weight of 50,000 kg), or another structural validation failed: $DE_\% \leq 0$ or $\geq 100$; $lower > upper$; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. Correct the value before proceeding.
+\textbf{Fail}: A structural validation failed: $DE_\% \leq 0$ or $\geq 100$; bounds that do not bracket the mean; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. The Run button stays blocked while any fail remains. Correct the value in your Excel file and re-upload, or, if you have checked the value and accept it, tick \textbf{Ignore} next to the row.
+
+\textit{Ignoring a failure.} Each failing row has an Ignore checkbox. The first tick opens a warning: running with ignored checks may produce unreliable results. Two failures cannot simply be waved through because the sampler would return NaN, so ignoring them applies the smallest repair instead and marks the row \textit{Repaired}: bounds that do not bracket the mean are widened around it, and a Beta or log-normal distribution on a value outside its valid range is replaced by a normal distribution. An ambiguous sub-category key cannot be ignored. Every ignored or repaired check is shown in a red banner above the results and listed in the Excel report (sheet \texttt{QA\_Caveats}), at the end of the CSV, and in section 2b of the Word summary, so a reviewer always sees them next to the numbers.
 
 \textbf{Missing}: A required parameter was not found in the upload. The tool auto-filled it with the IPCC default value from PARAM\_CATALOGUE; the value and the IPCC equation / table source are shown in the Tab 1 notification. Applies to every parameter, not just \texttt{BW}. Review whether the default is appropriate for your country context and, where possible, replace it with country-specific data.
 

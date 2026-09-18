@@ -219,7 +219,8 @@ build_run_summary_docx <- function(path,
                                    comparison_uncertainty = NULL,
                                    diagnostics            = NULL,
                                    samples_for_density    = NULL,
-                                   app_version = NULL) {
+                                   app_version = NULL,
+                                   qa_caveats  = NULL) {
 
   doc <- officer::read_docx()
 
@@ -267,6 +268,19 @@ build_run_summary_docx <- function(path,
     doc <- .add_p(doc,
       "These parameters were not in the upload and were filled with IPCC defaults so the simulation could run. Override with country-specific data when available.")
     doc <- .add_flextable_safe(doc, .styled_flextable(imputed_ft))
+  }
+
+  # ---- QA/QC checks ignored or repaired (2026-09-18) ----------------------
+  if (!is.null(qa_caveats) && is.data.frame(qa_caveats) && nrow(qa_caveats) > 0) {
+    doc <- .add_h2(doc, "2b. QA/QC checks ignored or repaired")
+    doc <- .add_p(doc, paste0(
+      "The compiler chose to run with ", nrow(qa_caveats),
+      " QA/QC failure(s) unresolved. \"ignored\" means the input was used as ",
+      "uploaded despite the failed check; \"repaired\" means the tool applied ",
+      "the smallest change that lets the sampler run (bounds widened to bracket ",
+      "the mean, or an unsuitable distribution replaced by normal). Results that ",
+      "depend on these inputs should be treated as provisional."))
+    doc <- .add_flextable_safe(doc, .styled_flextable(flextable::flextable(qa_caveats)))
   }
 
   # ---- IPCC Table 3.3 results (LANDSCAPE) --------------------------------

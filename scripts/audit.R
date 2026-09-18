@@ -3286,6 +3286,70 @@ section_F <- function() {
                        else paste(utils::head(f48_fail, 4), collapse = "; "))
   }
 
+  # F49 -- QA/QC ignore + repair and the translator's relational checks
+  # (2026-09-18). A fail row blocks the run until fixed or ignored; ignoring
+  # bounds_order / dist_suitability applies the smallest repair; benchmark
+  # deviation is advisory; sub_category_ambiguous cannot be ignored; the
+  # consistency checks catch the four error classes seen on the Zambia run.
+  {
+    f49_fail <- tryCatch({
+      f <- character()
+      spec <- data.frame(
+        cattle_type = "non_dairy", aggregation_level = c("a", "a", "a", "a"),
+        sub_category = c("calves_male", "calves_female", "other_cows", "other_cows"),
+        parameter = c("MW", "MW", "Fat", "BW"), mean = c(338, 434, 3.4, 5000),
+        uncertainty_pct = c(10, 10, 10, 10), lower = c(300, 380, 3, 4900),
+        upper = c(380, 480, 3.8, 5100),
+        distribution = c("normal", "normal", "beta", "normal"),
+        stringsAsFactors = FALSE)
+      spec$lower[1] <- 350   # lower > mean: bounds_order fail
+      q <- run_qaqc(spec, region = "africa")
+      if (!all(c("id", "level") %in% names(q))) f <- c(f, "run_qaqc lacks id/level columns")
+      if (anyDuplicated(q$id)) f <- c(f, "duplicate QA row ids")
+      if (any(q$status == "fail" & q$check == "benchmark_deviation"))
+        f <- c(f, "benchmark_deviation can still fail (should be warn at most)")
+      if (!any(q$status == "warn" & q$check == "benchmark_deviation" & q$parameter == "BW"))
+        f <- c(f, "BW 5000 kg did not raise a benchmark warning")
+      bo <- q[q$check == "bounds_order" & q$status == "fail", ][1, ]
+      if (is.na(bo$id)) f <- c(f, "bounds_order fixture did not fail") else {
+        r <- qaqc_repair(spec, bo)
+        if (!isTRUE(r$changed) || r$param_specs$lower[1] > r$param_specs$mean[1])
+          f <- c(f, "bounds_order repair did not bracket the mean")
+        if (r$param_specs$lower[2] != spec$lower[2])
+          f <- c(f, "bounds_order repair touched a row of another sub-category")
+      }
+      ds <- q[q$check == "dist_suitability" & q$status == "fail", ][1, ]
+      if (is.na(ds$id)) f <- c(f, "beta-on-3.4 fixture did not fail") else {
+        r <- qaqc_repair(spec, ds)
+        if (!isTRUE(r$changed) || r$param_specs$distribution[3] != "normal")
+          f <- c(f, "dist_suitability repair did not switch to normal")
+      }
+      if (qaqc_ignorable("sub_category_ambiguous")) f <- c(f, "sub_category_ambiguous is ignorable")
+      if (!qaqc_ignorable("range_check")) f <- c(f, "range_check is not ignorable")
+      if (qaqc_repair(spec, q[q$check == "range_check", ][1, ])$changed)
+        f <- c(f, "range_check was 'repaired'")
+      mm <- data.frame(
+        cattle_type = "non_dairy", aggregation_level = c("a", "a", "a", "b"),
+        sub_category = c("other_cows", "other_cows", "other_cows", "other_cows"),
+        mms_type = c("pasture", "solid_storage", "liquid_slurry", "pasture"),
+        fraction_pct = c(80, 20, 11.25, 100), MCF_pct = c(0.47, 4, 25, 2),
+        stringsAsFactors = FALSE)
+      notes <- translator_consistency_checks(spec, mm)
+      want <- c("calves carry different values for MW", "shares sum to 111.2",
+                "MCF_pct takes 2 different values", "beta distribution was assigned to a value of 3.4",
+                "do not bracket the mean")
+      for (w in want) if (!any(grepl(w, notes$issue, fixed = TRUE)))
+        f <- c(f, paste("consistency check missing:", w))
+      if (nrow(translator_consistency_checks(NULL, NULL)) != 0L) f <- c(f, "empty input gave notes")
+      f
+    }, error = function(e) conditionMessage(e))
+    f49_ok <- length(f49_fail) == 0L
+    check_bool("F49", "F",
+               "QA/QC ignore + repair: row ids, benchmark advisory, bounds/beta repairs, non-ignorable ambiguity; translator consistency checks catch calf split, 111 % shares, coefficient split, beta on 3.4, bounds",
+               f49_ok,
+               notes = if (f49_ok) "all fixtures behaved" else paste(utils::head(f49_fail, 4), collapse = "; "))
+  }
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without
