@@ -18,7 +18,7 @@
 #
 # Persistent storage caveat (same as usage_log.R): shinyapps.io's
 # free/starter tiers don't persist files across container restarts.
-# For tokens that's fine — they're short-lived (15 min). For the
+# For tokens that's fine — they're short-lived (MAGIC_LINK_TTL_HOURS, default 7 days). For the
 # long-lived (~100-year) "stay-logged-in" cookie, the cookie is stored
 # client-side (browser document.cookie); on the server we just validate
 # that a cookie-supplied email matches the approved list.
@@ -109,7 +109,26 @@ auth_is_approved <- function(email,
 }
 
 # Store a new token; returns the token string.
-auth_token_issue <- function(email, ttl_seconds = 15 * 60) {
+# How long a sign-in link stays valid. 2026-09-18: was a fixed 15 minutes,
+# single use. Users reading the email later, and corporate mail gateways that
+# open links before the user does, both got "invalid or has expired". The
+# link is now valid for MAGIC_LINK_TTL_HOURS (default 168 = 7 days) and may
+# be clicked more than once until it expires; the cookie set on the first
+# successful click keeps the browser signed in regardless. Data is
+# non-sensitive UNFCCC material and users are approved by name, so a
+# week-long reusable link is an acceptable trade for a working sign-in.
+.auth_link_ttl_seconds <- function() {
+  h <- suppressWarnings(as.numeric(Sys.getenv("MAGIC_LINK_TTL_HOURS", unset = "168")))
+  if (!is.finite(h) || h <= 0) h <- 168
+  h * 3600
+}
+.auth_link_validity_text <- function() {
+  h <- .auth_link_ttl_seconds() / 3600
+  if (h >= 48) sprintf("%d days", round(h / 24)) else if (h >= 2) sprintf("%d hours", round(h))
+  else sprintf("%d minutes", round(h * 60))
+}
+
+auth_token_issue <- function(email, ttl_seconds = .auth_link_ttl_seconds()) {
   tok <- .auth_token_make()
   df  <- .auth_token_read()
   df  <- rbind(df, data.frame(
@@ -122,20 +141,17 @@ auth_token_issue <- function(email, ttl_seconds = 15 * 60) {
   tok
 }
 
-# Consume a token (one-shot). Returns the email if valid, NULL otherwise.
-# Always removes the token from the store, even on failure, so a leaked
-# URL is single-use.
+# Redeem a token. Returns the email if the token exists and has not
+# expired, NULL otherwise. Since 2026-09-18 the token is NOT removed on
+# use: expired rows are pruned by .auth_token_read(), and a valid link may
+# be clicked again (a mail gateway's pre-fetch or a second click no longer
+# invalidates it).
 auth_token_consume <- function(token) {
   if (is.null(token) || !nzchar(token)) return(NULL)
   df  <- .auth_token_read()
-  hit <- df$token == token
-  rec <- if (any(hit)) df[which(hit)[1], , drop = FALSE] else NULL
-  # Always remove the matched row, even on failure
-  if (any(hit)) {
-    df <- df[!hit, , drop = FALSE]
-    .auth_token_write(df)
-  }
-  if (is.null(rec)) return(NULL)
+  hit <- which(df$token == token)
+  if (!length(hit)) return(NULL)
+  rec <- df[hit[1], , drop = FALSE]
   if (Sys.time() > rec$expires_at) return(NULL)
   rec$email
 }
@@ -255,13 +271,13 @@ auth_send_magic_link <- function(email, token,
   link <- paste0(sub("/?$", "/", app_base_url), "?token=", token)
   text <- paste0(
     "Welcome to the AI translator for the IPCC Cattle GHG Tool.\n\n",
-    "Click the link below to sign in (the link is valid for 15 minutes):\n\n",
+    "Click the link below to sign in (the link is valid for ", .auth_link_validity_text(), "):\n\n",
     link, "\n\n",
     "If you didn't request this, you can safely ignore this email.\n")
   html <- paste0(
     "<p>Welcome to the AI translator for the IPCC Cattle GHG Tool.</p>",
     "<p><a href=\"", link, "\">Click here to sign in</a> ",
-    "(the link is valid for 15 minutes).</p>",
+    "(the link is valid for ", .auth_link_validity_text(), ").</p>",
     "<p>If you didn't request this, you can safely ignore this email.</p>")
   r <- .auth_send_email(email, "Sign in to the IPCC Cattle GHG Uncertainty tool", text, html,
                         from_email = from_email, from_name = from_name)
@@ -277,11 +293,11 @@ auth_send_magic_link <- function(email, token,
 
 # When the email cannot go out, write the sign-in link to the server log so
 # an administrator can pass it to the user by hand (rsconnect::showLogs).
-# The link is a one-time token valid for 15 minutes and the log is visible
+# The link is a token valid for MAGIC_LINK_TTL_HOURS and the log is visible
 # only to the account holder, which is acceptable for the pilot; remove this
 # if the log ever becomes shared.
 .auth_log_link_fallback <- function(email, link) {
-  message(sprintf("auth: EMAIL NOT SENT. Sign-in link for %s (valid 15 min): %s", email, link))
+  message(sprintf("auth: EMAIL NOT SENT. Sign-in link for %s (valid %s): %s", email, .auth_link_validity_text(), link))
 }
 
 # Notify the admin when a non-approved user requests access. Best-effort.

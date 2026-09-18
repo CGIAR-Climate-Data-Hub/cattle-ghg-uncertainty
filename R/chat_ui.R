@@ -144,7 +144,7 @@ translator_chat_server <- function(input, output, session) {
     if (is.null(tok) || !nzchar(tok)) return()
     email <- auth_token_consume(tok)
     if (is.null(email)) {
-      state$login_status <- "Sign-in link was invalid or has expired (links are valid for 15 minutes). Please request a new one."
+      state$login_status <- sprintf("Sign-in link was invalid or has expired (links are valid for %s). Please request a new one.", .auth_link_validity_text())
     } else if (auth_is_approved(email)) {
       state$user_email <- email
       state$login_status <- NULL
@@ -186,7 +186,7 @@ translator_chat_server <- function(input, output, session) {
     ok  <- auth_send_magic_link(email, tok)
     if (ok) {
       state$login_status <- paste0(
-        "Sent! Check ", email, " for a sign-in link (valid 15 minutes). ",
+        "Sent! Check ", email, " for a sign-in link (valid ", .auth_link_validity_text(), "). ",
         "If you don't see it, check spam.")
     } else {
       state$login_status <- paste0(
