@@ -64,7 +64,7 @@ The translator is gated behind a magic-link sign-in flow. Emails ending in `@cgi
 
 1. Open the **Resources tab** of the Cattle Uncertainty App and locate the AI Translator card (the first item, identified by the green left-edge accent).
 2. Enter the email address into the sign-in field and click **Send sign-in link**.
-3. Within 1–2 minutes, an email arrives from `noreply@cattle-uncertainty.app` with subject "Sign in to the IPCC Cattle GHG Uncertainty tool". The link in it stays valid for seven days and may be clicked more than once; after the first successful click the browser stays signed in, so the link is only needed once per browser.
+3. Within 1–2 minutes, an email arrives from `noreply@cattle-uncertainty.app` with subject "Sign in to the IPCC Cattle GHG Uncertainty tool". The link in it stays valid for 30 days and may be clicked more than once; after the first successful click the browser stays signed in, so the link is only needed once per browser.
 4. Click the link. The app opens in a browser tab and recognises that the email is not on the auto-approved list. A confirmation message is displayed:
 
     > Thanks — your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.

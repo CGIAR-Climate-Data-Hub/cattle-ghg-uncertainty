@@ -18,7 +18,7 @@
 #
 # Persistent storage caveat (same as usage_log.R): shinyapps.io's
 # free/starter tiers don't persist files across container restarts.
-# For tokens that's fine — they're short-lived (MAGIC_LINK_TTL_HOURS, default 7 days). For the
+# For tokens that's fine — they're short-lived (MAGIC_LINK_TTL_HOURS, default 30 days). For the
 # long-lived (~100-year) "stay-logged-in" cookie, the cookie is stored
 # client-side (browser document.cookie); on the server we just validate
 # that a cookie-supplied email matches the approved list.
@@ -112,14 +112,14 @@ auth_is_approved <- function(email,
 # How long a sign-in link stays valid. 2026-09-18: was a fixed 15 minutes,
 # single use. Users reading the email later, and corporate mail gateways that
 # open links before the user does, both got "invalid or has expired". The
-# link is now valid for MAGIC_LINK_TTL_HOURS (default 168 = 7 days) and may
+# link is now valid for MAGIC_LINK_TTL_HOURS (default 720 = 30 days) and may
 # be clicked more than once until it expires; the cookie set on the first
 # successful click keeps the browser signed in regardless. Data is
 # non-sensitive UNFCCC material and users are approved by name, so a
-# week-long reusable link is an acceptable trade for a working sign-in.
+# month-long reusable link is an acceptable trade for a working sign-in.
 .auth_link_ttl_seconds <- function() {
-  h <- suppressWarnings(as.numeric(Sys.getenv("MAGIC_LINK_TTL_HOURS", unset = "168")))
-  if (!is.finite(h) || h <= 0) h <- 168
+  h <- suppressWarnings(as.numeric(Sys.getenv("MAGIC_LINK_TTL_HOURS", unset = "720")))
+  if (!is.finite(h) || h <= 0) h <- 720
   h * 3600
 }
 .auth_link_validity_text <- function() {
