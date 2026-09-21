@@ -673,6 +673,60 @@ basis_label <- function(parameter) {
   out
 }
 
+# Plain-language rendering of the tool-wide basis for the run reports
+# (2026-09-21). The choice, what it affects and the IPCC source come from
+# DEFAULT_BASIS; the "what to do" sentence is written for an inventory
+# compiler who has never read the guidelines. Keyed by dimension so a new
+# row in the master still renders (it falls back to the master's `why`).
+# No em dashes: these sentences go into the Word report verbatim.
+.BASIS_PLAIN_ACTION <- c(
+  geography = "The Africa rows of the IPCC tables fill any of these values your file did not give. If your country is outside Africa, enter your own values for them.",
+  productivity_class = "The default herd is the IPCC low productivity animal: small, low milk yield, grazing. If your herd is commercial or high yielding, enter your own body weight, milk yield, feed digestibility, crude protein, Ym and Bo.",
+  feeding_situation = "The activity coefficient assumes animals grazing flat pasture. Stall-fed animals need a lower value and animals grazing large areas or hilly terrain a higher one. Enter Ca yourself in those cases.",
+  animal_class_manure_N = "The nitrogen loss fractions for manure systems come from the Other Cattle column of the IPCC table, also for dairy herds. Dairy cows have their own column, and it differs for solid storage and composting. A dairy herd using those systems should enter the dairy cow fractions in the Manure_Management sheet.",
+  soils_climate = "The soil nitrogen factors assume a wet climate. In a dry climate direct and indirect nitrous oxide from pasture are about three times lower and there is no leaching. A dry climate inventory must replace EF3_PRP, EF4 and Frac_LEACH_PRP.",
+  manure_climate_zone = "Every methane conversion factor the tool filled in for you assumes a tropical climate. Values you entered yourself are used as given. A temperate or boreal inventory must replace every filled value, because tropical factors are two to five times higher.",
+  manure_system_variant = "Each row of the manure sheet describes one IPCC variant of the system, for example liquid slurry with a natural crust or composting in a static pile. If your system is a different variant, change the coefficients on that row.",
+  species = "All defaults are for cattle. Buffalo have different values and are not carried.")
+
+# One row per tool-wide assumption, for the Word report and the Excel export.
+# `param_specs` (optional) lets the table say whether THIS run leaned on the
+# assumption: a governed parameter that the tool filled from its defaults
+# (data_source ipcc_default, or the imputed flag) counts; a value from the
+# compiler's own file does not. The three manure coefficient families cannot
+# be judged from param_specs and say so.
+basis_plain_table <- function(param_specs = NULL) {
+  B <- basis_tool_wide()
+  if (!nrow(B)) return(NULL)
+  used_in_run <- function(governs) {
+    codes <- strsplit(governs, " ", fixed = TRUE)[[1]]
+    fam <- intersect(codes, c("MCF", "EF3", "FRAC"))
+    codes <- setdiff(codes, fam)
+    if (is.null(param_specs) || !is.data.frame(param_specs) || !nrow(param_specs) || !length(codes)) {
+      return(if (length(fam)) "Check the Manure_Management sheet: coefficients you left blank were filled with these defaults."
+             else "Not assessed.")
+    }
+    ps <- param_specs[param_specs$parameter %in% codes, , drop = FALSE]
+    if (!nrow(ps)) return("No: none of these parameters is in this run.")
+    src <- if ("data_source" %in% names(ps)) tolower(as.character(ps$data_source)) else rep("", nrow(ps))
+    imp <- if ("imputed" %in% names(ps)) ps$imputed %in% TRUE else rep(FALSE, nrow(ps))
+    hit <- (src %in% c("ipcc_default", "imputed", "default")) | imp
+    if (!any(hit)) return("No: every one of these parameters came from your file.")
+    by_p <- table(ps$parameter[hit])
+    sprintf("Yes: %s filled from the defaults (%d of %d rows).",
+            paste(names(by_p), collapse = ", "), sum(hit), nrow(ps))
+  }
+  data.frame(
+    Choice = basis_dimension_label(B$dimension),
+    `This tool uses` = B$chosen,
+    Affects = gsub(" ", ", ", B$governs, fixed = TRUE),
+    `Relied on in this run` = vapply(B$governs, used_in_run, character(1), USE.NAMES = FALSE),
+    `If this does not describe your herd` = unname(ifelse(B$dimension %in% names(.BASIS_PLAIN_ACTION),
+                                                          .BASIS_PLAIN_ACTION[B$dimension], B$why)),
+    `IPCC source` = B$ipcc_source,
+    check.names = FALSE, stringsAsFactors = FALSE)
+}
+
 # ==========================================================================
 # SPARSE-OVERLAY RESOLVER
 # ==========================================================================

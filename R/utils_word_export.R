@@ -145,12 +145,12 @@
 }
 
 .fmt_num <- function(x, digits = 1) {
-  if (is.null(x) || length(x) == 0 || is.na(x)) return("—")
+  if (is.null(x) || length(x) == 0 || is.na(x)) return("n/a")
   formatC(x, digits = digits, format = "f", big.mark = ",")
 }
 
 .fmt_signed <- function(x, digits = 1) {
-  if (is.null(x) || length(x) == 0 || is.na(x)) return("—")
+  if (is.null(x) || length(x) == 0 || is.na(x)) return("n/a")
   s <- formatC(x, digits = digits, format = "f")
   if (x > 0) paste0("+", s) else s
 }
@@ -225,7 +225,7 @@ build_run_summary_docx <- function(path,
   doc <- officer::read_docx()
 
   # ---- Title block --------------------------------------------------------
-  doc <- .add_h1(doc, "Cattle GHG Tier 2 Uncertainty — Single-year run")
+  doc <- .add_h1(doc, "Cattle GHG Tier 2 Uncertainty: single-year run")
   meta_line <- paste(
     sprintf("Generated %s.", format(Sys.time(), "%Y-%m-%d %H:%M %Z")),
     if (!is.null(ipcc_meta) && !is.null(ipcc_meta$ipcc_version))
@@ -283,17 +283,30 @@ build_run_summary_docx <- function(path,
     doc <- .add_flextable_safe(doc, .styled_flextable(flextable::flextable(qa_caveats)))
   }
 
+  # ---- What the default values assume (2026-09-21) ------------------------
+  basis_tbl <- tryCatch(basis_plain_table(param_specs), error = function(e) NULL)
+  if (!is.null(basis_tbl) && nrow(basis_tbl) > 0) {
+    doc <- .add_h2(doc, "2c. What the default values assume")
+    doc <- .add_p(doc, paste0(
+      "Every IPCC default in this tool is one cell of a much larger table. Reaching it means choosing a region, ",
+      "a productivity class, a climate and, for manure, one variant of each system. The choices are listed below ",
+      "in plain language. The column \"Relied on in this run\" says whether any of the affected parameters was ",
+      "filled from the defaults in this run or whether every value came from your file. Where a choice does not ",
+      "describe the herd you report, replace the parameters it affects with your own values and run again."))
+    doc <- .add_flextable_safe(doc, .styled_flextable(.basis_flextable(basis_tbl)))
+  }
+
   # ---- IPCC Table 3.3 results (LANDSCAPE) --------------------------------
   if (!is.null(ipcc_table) && is.data.frame(ipcc_table) && nrow(ipcc_table) > 0) {
-    doc <- .add_h2(doc, "3. IPCC Table 3.3 — uncertainty decomposition")
+    doc <- .add_h2(doc, "3. IPCC Table 3.3: uncertainty decomposition")
     doc <- .add_p(doc,
-      "Combined % uncertainty (95% MoE — IPCC Vol.1 Ch.3 Table 3.3 convention) per emission source decomposed into the activity-data and emission-factor contributions, formatted for Annex 7 of a national inventory submission.")
+      "Combined % uncertainty (95% MoE, IPCC Vol.1 Ch.3 Table 3.3 convention) per emission source decomposed into the activity-data and emission-factor contributions, formatted for Annex 7 of a national inventory submission.")
     doc <- .add_flextable_safe(doc, .styled_flextable(.ipcc_flextable(ipcc_table)))
     doc <- .add_landscape_break(doc)
   }
 
   # ---- Headline by-source results ----------------------------------------
-  doc <- .add_h2(doc, "4. Headline results — by source")
+  doc <- .add_h2(doc, "4. Headline results by source")
   doc <- .add_p(doc,
     "Mean total emissions per source with the 95% confidence interval and 95% margin of error (MoE %, the IPCC Vol.1 Ch.3 Table 3.3 convention) from the Monte Carlo run.")
   doc <- .add_flextable_safe(doc, .styled_flextable(.results_flextable(uncertainty)))
@@ -356,7 +369,7 @@ build_run_summary_docx <- function(path,
   # ---- Sensitivity ranking — top 10 drivers ------------------------------
   sens_ft <- .sensitivity_flextable(sensitivity, top_n = 10L)
   if (!is.null(sens_ft)) {
-    doc <- .add_h2(doc, "8. Sensitivity ranking — top 10 drivers")
+    doc <- .add_h2(doc, "8. Sensitivity ranking: top 10 drivers")
     doc <- .add_p(doc,
       "Standardised regression coefficient (SRC) and partial rank correlation (PRCC) of each input parameter against total CO2eq. Larger absolute values dominate the output uncertainty. Parameter labels include the cattle-type and sub-category they belong to when the inventory has more than one group.")
     doc <- .add_flextable_safe(doc, .styled_flextable(sens_ft))
@@ -372,7 +385,7 @@ build_run_summary_docx <- function(path,
   full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = WORD_SENS_MAX)
   if (!is.null(full_sens_ft)) {
     if (is.finite(n_sens) && n_sens > WORD_SENS_MAX) {
-      doc <- .add_h2(doc, sprintf("9. Sensitivity rankings — top %d drivers", WORD_SENS_MAX))
+      doc <- .add_h2(doc, sprintf("9. Sensitivity rankings: top %d drivers", WORD_SENS_MAX))
       doc <- .add_p(doc, sprintf(
         paste0("SRC and PRCC for the %d most influential parameters (of %d), sorted ",
                "by decreasing absolute SRC. The complete ranking for every parameter ",
@@ -392,7 +405,7 @@ build_run_summary_docx <- function(path,
 
   hist_plot <- .gg_total_co2e_hist(mc_results)
   if (!is.null(hist_plot)) {
-    doc <- .add_h3(doc, "Total CO2eq — Monte Carlo distribution")
+    doc <- .add_h3(doc, "Total CO2eq: Monte Carlo distribution")
     doc <- officer::body_add_gg(doc, value = hist_plot, width = 5.5, height = 3.0)
   }
 
@@ -414,7 +427,7 @@ build_run_summary_docx <- function(path,
   if (!is.null(density_plot)) {
     doc <- .add_h2(doc, "11. Sampled parameter distributions")
     doc <- .add_p(doc,
-      "Histograms of the actual parameter draws used in the Monte Carlo run (up to 12 parameters). Use this to confirm the distributions are shaped as you expected — particularly for any parameter with a non-normal distribution or asymmetric uncertainty bounds.")
+      "Histograms of the actual parameter draws used in the Monte Carlo run (up to 12 parameters). Use this to confirm the distributions are shaped as you expected, particularly for any parameter with a non-normal distribution or asymmetric uncertainty bounds.")
     doc <- officer::body_add_gg(doc, value = density_plot, width = 6.5, height = 4.5)
   }
 
@@ -445,7 +458,7 @@ build_run_summary_docx <- function(path,
         paste0("Showing the first %d of %s parameter rows (distribution, central ",
                "value, bounds and IPCC reference). The COMPLETE per-parameter ",
                "audit trail for every sub-category is in the 'Input_Parameters' ",
-               "sheet of the Excel download — the Word table is capped so the ",
+               "sheet of the Excel download; the Word table is capped so the ",
                "report renders quickly."),
         WORD_INPUTS_MAX, format(total_params, big.mark = ",")))
     } else {
@@ -463,7 +476,7 @@ build_run_summary_docx <- function(path,
   # against the live IPCC 2006 Vol 1 Ch 3 / Annex 7 template. Reworded to
   # describe the metric instead of pinning a column letter.
   doc <- .add_p(doc,
-    "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo) for combined uncertainty estimation. The headline 95% MoE values in section 4 are the per-source combined-uncertainty figures used to populate the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (% uncertainty column — the half-width of the 95% confidence interval / mean, per IPCC's own definition). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool — AD = animal population (N) only; coefficient (EF) = the IPCC equation parameters that combine into the per-head emission factor. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance, including the CRT category map and the three-level disaggregation scheme this tool produces.")
+    "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo) for combined uncertainty estimation. The headline 95% MoE values in section 4 are the per-source combined-uncertainty figures used to populate the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (the % uncertainty column, which is the half-width of the 95% confidence interval divided by the mean, per IPCC's own definition). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; coefficient (EF) = the IPCC equation parameters that combine into the per-head emission factor. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance, including the CRT category map and the three-level disaggregation scheme this tool produces.")
   doc <- .add_p(doc,
     "Where parameters were auto-filled (section 2), the IPCC default carries the uncertainty bounds suggested by Penman et al. (2000) and Monni et al. (2007). For parameters with country-specific values, the uncertainty bounds entered on the Uncertainty tab of the app drive the Monte Carlo distribution.")
 
@@ -474,7 +487,7 @@ build_run_summary_docx <- function(path,
     "Generated by Cattle GHG Uncertainty Calculator",
     if (!is.null(app_version)) sprintf("v%s", app_version) else NULL,
     sprintf("on %s.", format(Sys.Date(), "%Y-%m-%d")),
-    "CGIAR Alliance / Bioversity-CIAT — funded by the Global Methane Hub."
+    "CGIAR Alliance / Bioversity-CIAT, funded by the Global Methane Hub."
   )
   doc <- .add_p(doc, paste(footer_bits, collapse = " "))
 
@@ -491,7 +504,7 @@ build_run_summary_docx <- function(path,
     uncertainty[uncertainty$variable == "total_co2e", , drop = FALSE]
   else NULL
   if (is.null(total_row) || nrow(total_row) == 0) {
-    return("Total CO2eq could not be summarised — no result row found.")
+    return("Total CO2eq could not be summarised: no result row found.")
   }
   m   <- total_row$mean
   lo  <- total_row$ci_lower
@@ -545,7 +558,7 @@ build_trend_summary_docx <- function(path,
   yrs <- if (!is.null(years)) range(years) else range(trend_results$Year)
 
   # ---- Title block --------------------------------------------------------
-  doc <- .add_h1(doc, sprintf("Cattle GHG Tier 2 Uncertainty — Trend %d–%d",
+  doc <- .add_h1(doc, sprintf("Cattle GHG Tier 2 Uncertainty: trend %d to %d",
                                 yrs[1], yrs[2]))
   meta_line <- paste(
     sprintf("Generated %s.", format(Sys.time(), "%Y-%m-%d %H:%M %Z")),
@@ -610,7 +623,7 @@ build_trend_summary_docx <- function(path,
 
   py_ft <- .sensitivity_flextable(sensitivity_per_year, top_n = 10L)
   if (!is.null(py_ft)) {
-    doc <- .add_h3(doc, "Per-year (latest year) — top 10")
+    doc <- .add_h3(doc, "Per-year (latest year): top 10")
     doc <- .add_flextable_safe(doc, .styled_flextable(py_ft))
     py_plot <- .gg_tornado(sensitivity_per_year)
     if (!is.null(py_plot))
@@ -619,7 +632,7 @@ build_trend_summary_docx <- function(path,
 
   dl_ft <- .sensitivity_flextable(sensitivity_delta, top_n = 10L)
   if (!is.null(dl_ft)) {
-    doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1) — top 10")
+    doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1): top 10")
     doc <- .add_flextable_safe(doc, .styled_flextable(dl_ft))
     dl_plot <- .gg_tornado(sensitivity_delta)
     if (!is.null(dl_plot))
@@ -634,11 +647,11 @@ build_trend_summary_docx <- function(path,
     doc <- .add_p(doc,
       "Complete SRC and PRCC values for every input parameter. Per-year is the latest-year analysis; trend driver is the Δ Y_N − Y_1 analysis.")
     if (!is.null(full_py)) {
-      doc <- .add_h3(doc, "Per-year (latest year) — full ranking")
+      doc <- .add_h3(doc, "Per-year (latest year): full ranking")
       doc <- .add_flextable_safe(doc, .styled_flextable(full_py))
     }
     if (!is.null(full_dl)) {
-      doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1) — full ranking")
+      doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1): full ranking")
       doc <- .add_flextable_safe(doc, .styled_flextable(full_dl))
     }
     doc <- .add_landscape_break(doc)
@@ -659,7 +672,7 @@ build_trend_summary_docx <- function(path,
   yc_text <- switch(
     year_corr,
     full    = "Coefficient draws (the 23 IPCC equation parameters) are sampled once and reused across every year, while activity data (animal population N) is re-drawn fresh for each year. This is the IPCC 2019 Refinement Vol 1 Ch 3 §3.2.2.4 default for emission-factor uncertainty: same EF every year, AD re-estimated annually. The trend uncertainty in this configuration reflects only the AD changes between years.",
-    partial = "Coefficient draws are correlated across years with an AR(1) rank-correlation target (ρ = 0.7), reproduced through restricted-pairing reordering per IPCC Vol.1 Ch.3 §3.2.3.2. This represents partial year-to-year correlation per IPCC §3.2.2.4 — a moderate assumption for cases where coefficients drift over time but neighbouring years share most of the same observational basis.",
+    partial = "Coefficient draws are correlated across years with an AR(1) rank-correlation target (ρ = 0.7), reproduced through restricted-pairing reordering per IPCC Vol.1 Ch.3 §3.2.3.2. This represents partial year-to-year correlation per IPCC §3.2.2.4, a moderate assumption for cases where coefficients drift over time but neighbouring years share most of the same observational basis.",
     none    = "Coefficient draws and activity-data draws are both independent for each year. This is the most conservative assumption and tends to inflate trend uncertainty; per IPCC §3.2.2.4 it is appropriate only when each year's emission factors come from genuinely independent measurement campaigns."
   )
   doc <- .add_p(doc, yc_text)
@@ -671,16 +684,16 @@ build_trend_summary_docx <- function(path,
   doc <- .add_p(doc,
     "Per IPCC Vol 1 Ch 3 §3.7, trend uncertainty should be reported alongside the level of emissions in any national inventory submission that covers more than a single year. The Δ vs base year column in section 2 maps to the trend uncertainty cells of the IPCC Table 3.3 trend annex; the slope in section 4 supports the §3.7.2 'trend assessment' text typical of biennial transparency reports under the Paris Agreement Enhanced Transparency Framework. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance.")
   doc <- .add_p(doc,
-    "If the trend is reported with a year-correlation assumption other than 'fully correlated coefficients', that choice should be documented in the methods section of the national inventory report — the year-correlation setting recorded in section 1 of this document is the one to cite.")
+    "If the trend is reported with a year-correlation assumption other than 'fully correlated coefficients', that choice should be documented in the methods section of the national inventory report, the year-correlation setting recorded in section 1 of this document is the one to cite.")
 
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")
   doc <- .add_logo_footer(doc)
   footer_bits <- c(
-    "Generated by Cattle GHG Uncertainty Calculator — Trend report.",
+    "Generated by Cattle GHG Uncertainty Calculator, trend report.",
     if (!is.null(app_version)) sprintf("v%s.", app_version) else NULL,
     sprintf("Built on %s.", format(Sys.Date(), "%Y-%m-%d")),
-    "CGIAR Alliance / Bioversity-CIAT — funded by the Global Methane Hub."
+    "CGIAR Alliance / Bioversity-CIAT, funded by the Global Methane Hub."
   )
   doc <- .add_p(doc, paste(footer_bits, collapse = " "))
 
@@ -737,6 +750,19 @@ build_trend_summary_docx <- function(path,
 # Flextable builders
 # ============================================================================
 
+# Assumptions table for section 2c. The IPCC source column is dropped in
+# Word (it is in the Excel sheet) so the table fits a portrait page.
+.basis_flextable <- function(tbl) {
+  keep <- setdiff(names(tbl), "IPCC source")
+  ft <- flextable::flextable(tbl[, keep, drop = FALSE])
+  ft <- flextable::width(ft, j = 1, width = 1.0)
+  ft <- flextable::width(ft, j = 2, width = 1.1)
+  ft <- flextable::width(ft, j = 3, width = 0.8)
+  ft <- flextable::width(ft, j = 4, width = 1.2)
+  ft <- flextable::width(ft, j = 5, width = 2.2)
+  ft
+}
+
 .settings_flextable <- function(s) {
   rows <- list(
     c("Iterations",            .fmt_int(s$n_iter)),
@@ -757,7 +783,7 @@ build_trend_summary_docx <- function(path,
 .trend_settings_flextable <- function(year_corr, n_iter, yrs, ipcc_meta) {
   yc_label <- switch(
     year_corr,
-    full    = "Full (coefficients reused across years; AD redrawn) — IPCC 2019 default",
+    full    = "Full (coefficients reused across years; AD redrawn), IPCC 2019 default",
     partial = "Partial (AR(1), ρ = 0.7)",
     none    = "Independent (no year-to-year correlation)"
   )
@@ -1028,7 +1054,7 @@ build_trend_summary_docx <- function(path,
   if (length(sys_names) == 0) return(NULL)
 
   parts <- strsplit(sys_names, "\\|\\|", fixed = FALSE)
-  ct_keys <- sapply(parts, function(p) if (length(p) >= 1 && nzchar(p[1])) p[1] else "—")
+  ct_keys <- sapply(parts, function(p) if (length(p) >= 1 && nzchar(p[1])) p[1] else "n/a")
 
   # Combine per-iteration frames within each cattle_type.
   cattle_types <- unique(ct_keys)
@@ -1126,10 +1152,10 @@ WORD_SENS_MAX <- 50L
   if (is.null(diagnostics)) return(NULL)
   d <- diagnostics
   status_str <- function(val, warn, fail) {
-    if (is.null(val) || is.na(val)) return("—")
+    if (is.null(val) || is.na(val)) return("n/a")
     if (val < warn) "PASS" else if (val < fail) "WARN" else "FAIL"
   }
-  skew_label <- if (is.null(d$skew_val) || is.na(d$skew_val)) "—"
+  skew_label <- if (is.null(d$skew_val) || is.na(d$skew_val)) "n/a"
                 else if (abs(d$skew_val) < 0.5) "symmetric"
                 else if (d$skew_val > 0)         "right-skewed (expected)"
                 else                              "left-skewed"
@@ -1458,6 +1484,6 @@ WORD_SENS_MAX <- 50L
     ggplot2::geom_vline(xintercept = 0, linetype = "dotted", colour = "#555") +
     ggplot2::geom_vline(xintercept = mean(x, na.rm = TRUE), colour = "black") +
     ggplot2::labs(x = "ΔCO2eq (t) between Y_N and Y_1", y = "Frequency",
-                   title = "Distribution of ΔY_N − Y_1 — uncertainty on the trend itself") +
+                   title = "Distribution of ΔY_N − Y_1: uncertainty on the trend itself") +
     ggplot2::theme_minimal(base_size = 10)
 }
