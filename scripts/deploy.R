@@ -28,6 +28,28 @@ if (!identical(Sys.getenv("DEPLOY_SKIP_GATE", ""), "1")) {
   status <- tryCatch(system2("git", c("status", "--porcelain"), stdout = TRUE, stderr = FALSE),
                      error = function(e) character(0))
   status <- status[nzchar(trimws(status))]
+  # OneDrive re-stamps Office files with SharePoint metadata within a minute
+  # of any checkout or build (the audit above takes longer than that), which
+  # made the gate refuse three deploys on 2026-09-21 over www/user_guide.docx
+  # whose document text had not changed. A modified .docx whose
+  # word/document.xml equals the committed one is restored and not counted.
+  docx_mod <- status[grepl("^ M .*[.]docx$", status)]
+  for (line in docx_mod) {
+    path <- trimws(sub("^ M ", "", line))
+    same <- tryCatch({
+      td <- tempfile(); dir.create(td)
+      head_copy <- file.path(td, "head.docx")
+      system2("git", c("show", shQuote(paste0("HEAD:", path))), stdout = head_copy, stderr = FALSE)
+      a <- unzip(path, "word/document.xml", exdir = file.path(td, "a"))
+      b <- unzip(head_copy, "word/document.xml", exdir = file.path(td, "b"))
+      identical(readBin(a, "raw", file.size(a)), readBin(b, "raw", file.size(b)))
+    }, error = function(e) FALSE)
+    if (isTRUE(same)) {
+      system2("git", c("checkout", "--", shQuote(path)), stdout = FALSE, stderr = FALSE)
+      message("deploy gate: ", path, " differed only in OneDrive metadata; restored.")
+      status <- setdiff(status, line)
+    }
+  }
   if (length(status)) {
     cat(status, sep = "\n")
     stop("deploy gate: the working tree is not clean; commit or stash first.", call. = FALSE)
