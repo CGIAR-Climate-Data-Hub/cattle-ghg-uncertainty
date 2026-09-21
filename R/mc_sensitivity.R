@@ -147,11 +147,25 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
       trimws(parts[3L]) else sn
   }
 
+  # 2026-09-21: with several production systems the same sub-category
+  # recurs (other_cows in five beef systems on Zambia), cbind() then
+  # de-duplicated the columns to "DE (other_cows).2" and the report named a
+  # driver nobody could locate. When more than one aggregation level is
+  # present the label carries it: "DE (other_cows, emergent_beef)".
+  level_of <- function(sn) {
+    parts <- strsplit(sn, "||", fixed = TRUE)[[1]]
+    if (length(parts) >= 2 && nzchar(trimws(parts[2L]))) trimws(parts[2L]) else ""
+  }
+  levels_present <- unique(vapply(names(by_system), level_of, character(1)))
+  multi_level <- length(setdiff(levels_present, "")) > 1L
+
   label_samples <- function(sn) {
     samp <- by_system[[sn]]$samples
     if (is.null(samp) || ncol(samp) == 0) return(NULL)
     sc <- sub_category_of(sn)
-    colnames(samp) <- paste0(colnames(samp), " (", sc, ")")
+    lv <- level_of(sn)
+    tag <- if (multi_level && nzchar(lv)) paste0(sc, ", ", lv) else sc
+    colnames(samp) <- paste0(colnames(samp), " (", tag, ")")
     samp
   }
 
