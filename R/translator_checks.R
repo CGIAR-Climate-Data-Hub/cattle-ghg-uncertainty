@@ -20,7 +20,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL) {
     out[[length(out) + 1L]] <<- data.frame(where = where, issue = issue,
                                             stringsAsFactors = FALSE)
   }
-  fmt <- function(x) format(signif(x, 4), trim = TRUE)
+  fmt <- function(x) format(signif(x, 7), trim = TRUE)
 
   ps <- param_specs
   if (!is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 &&
@@ -41,7 +41,10 @@ translator_consistency_checks <- function(param_specs, manure = NULL) {
       m <- merge(data.frame(parameter = ps$parameter[a], m = mu[a], stringsAsFactors = FALSE),
                  data.frame(parameter = ps$parameter[b], f = mu[b], stringsAsFactors = FALSE),
                  by = "parameter")
-      m <- m[!is.na(m$m) & !is.na(m$f) & abs(m$m - m$f) > 1e-9 * pmax(1, abs(m$m)), , drop = FALSE]
+      # Head counts are allowed to differ by one animal: an odd pooled
+      # population splits into halves that differ by 0.5 or 1.
+      tol <- ifelse(m$parameter == "N", 1, 1e-9 * pmax(1, abs(m$m)))
+      m <- m[!is.na(m$m) & !is.na(m$f) & abs(m$m - m$f) > tol, , drop = FALSE]
       if (nrow(m)) {
         add(sprintf("%s%scalves", L, if (nzchar(L)) " / " else ""),
             sprintf(paste0("Male and female calves carry different values for %s. ",
