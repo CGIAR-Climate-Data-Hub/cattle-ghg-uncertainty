@@ -31,9 +31,9 @@ if (!nzchar(Sys.which("pdflatex")) && !nzchar(Sys.which("xelatex"))) {
 for (fmt in c("word_document", "pdf_document")) {
   ext <- if (fmt == "word_document") "docx" else "pdf"
   rmarkdown::render(
-    "doc/methodology.Rmd",
+    "documentation/source/methodology.Rmd",
     output_format = fmt,
-    output_file   = paste0("../www/methodology.", ext),
+    output_file   = paste0("../../www/methodology.", ext),
     knit_root_dir = getwd()
   )
 }

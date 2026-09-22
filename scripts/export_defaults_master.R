@@ -2,7 +2,7 @@
 # export_defaults_master.R -- one-time export of the R constants to the master
 # =============================================================================
 #
-# Run ONCE to seed reference/defaults_master.csv from the constants as they
+# Run ONCE to seed defaults/defaults_master.csv from the constants as they
 # stand today. After that the CSV is the authority and R/load_defaults.R reads
 # it; this script exists so the transition is provably lossless rather than
 # retyped, and so it can be re-run to regenerate the seed if the migration is
@@ -89,8 +89,8 @@ dir.create("reference", showWarnings = FALSE)
 # They are research results that cannot be regenerated from the constants, so
 # a re-seed must not silently discard them. scripts/annotate_ipcc_verdicts.R
 # rewrites them from its own table; this only stops a re-seed being lossy.
-if (file.exists("reference/defaults_master.csv")) {
-  old <- utils::read.csv("reference/defaults_master.csv", stringsAsFactors = FALSE,
+if (file.exists("defaults/defaults_master.csv")) {
+  old <- utils::read.csv("defaults/defaults_master.csv", stringsAsFactors = FALSE,
                          na.strings = "<NA>", colClasses = "character")
   if (all(c("ipcc_verdict", "ipcc_source") %in% names(old))) {
     k <- function(d) paste(d$object, d$key, d$field, sep = "\r")
@@ -105,7 +105,7 @@ if (file.exists("reference/defaults_master.csv")) {
 # STRING for the four parameters with no IPCC reference, while ipcc_default is
 # a true NA for N. Writing both as "" would collapse them and the round trip
 # would silently retype four cells.
-write.csv(M, "reference/defaults_master.csv", row.names = FALSE, na = "<NA>")
-cat(sprintf("wrote reference/defaults_master.csv: %d rows, %d objects\n",
+write.csv(M, "defaults/defaults_master.csv", row.names = FALSE, na = "<NA>")
+cat(sprintf("wrote defaults/defaults_master.csv: %d rows, %d objects\n",
             nrow(M), length(unique(M$object))))
 cat(sprintf("  with review provenance: %d\n", sum(nzchar(M$review_round))))

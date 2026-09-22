@@ -489,7 +489,7 @@ S[["qaqc_hints"]] <- local({
 # --- S8: published guides (.Rmd sources) ------------------------------------
 S[["doc_rmd"]] <- local({
   v <- .empty
-  for (f in c("doc/methodology.Rmd", "doc/user_guide.Rmd")) {
+  for (f in c("documentation/source/methodology.Rmd", "documentation/source/user_guide.Rmd")) {
     if (!file.exists(f)) next
     ln <- readLines(file(f, encoding = "UTF-8"), warn = FALSE)
     # A LaTeX table row writes an underscore as "\_", so "^pct_pregnant &"
@@ -958,7 +958,7 @@ for (v in names(sort(.vt, decreasing = TRUE)))
 .op <- M[M$ipcc_verdict == "DEVIATION_OPEN", ]
 if (nrow(.op)) {
   out <- c(out, "",
-    sprintf("%d cells differ from IPCC with no recorded reason. They are NOT defects of this matrix (they match across surfaces); they are open questions about the master itself, set out in `reference/provenance_register.md`.",
+    sprintf("%d cells differ from IPCC with no recorded reason. They are NOT defects of this matrix (they match across surfaces); they are open questions about the master itself, set out in `defaults/provenance_register.md`.",
             nrow(.op)),
     "", "| object | key | field | value |", "|---|---|---|---|")
   for (i in seq_len(nrow(.op)))
@@ -966,10 +966,10 @@ if (nrow(.op)) {
                           .op$field[i], .op$reference[i]))
 }
 
-writeLines(out, "DEFAULTS_MATRIX.md", useBytes = TRUE)
+writeLines(out, "reports/DEFAULTS_MATRIX.md", useBytes = TRUE)
 write.csv(M[, c("object", "key", "field", "reference_n", "ipcc_verdict",
                 "rv_round", "rv_authority", surf)],
-          "DEFAULTS_MATRIX.csv", row.names = FALSE)
+          "reports/DEFAULTS_MATRIX.csv", row.names = FALSE)
 
 cat(sprintf("\n=== DEFAULTS MATRIX ===\ncells %d | surfaces %d | rows needing attention %d\n",
             nrow(M), length(surf), nrow(bad)))
@@ -977,6 +977,6 @@ for (sn in surf)
   cat(sprintf("  %-24s MATCH %4d  DIFFERS %3d  absent %3d\n", sn,
       sum(M[[sn]] == "MATCH"), sum(M[[sn]] == "DIFFERS"),
       sum(M[[sn]] == "absent")))
-cat("Report: DEFAULTS_MATRIX.md\n")
+cat("Report: reports/DEFAULTS_MATRIX.md\n")
 
 if (nrow(bad) > 0 && !interactive()) quit(save = "no", status = 1L)

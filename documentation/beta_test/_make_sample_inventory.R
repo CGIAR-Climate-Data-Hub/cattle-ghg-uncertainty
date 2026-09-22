@@ -139,9 +139,9 @@ parsed <- list(
   parameter_timeseries = ts
 )
 
-# NOTE: run from the repo root — `Rscript feedback_workflow/_make_sample_inventory.R`
+# NOTE: run from the repo root — `Rscript documentation/beta_test/_make_sample_inventory.R`
 # (it sources R/… relative to the working dir).
-out <- "feedback_workflow/beta_sample_inventory.xlsx"
+out <- "documentation/beta_test/beta_sample_inventory.xlsx"
 .translator_write_official_template(parsed, out)
 cat("Saved:", out, "|", nrow(params), "parameter rows,", nrow(manure),
     "manure rows,", nrow(ts), "time-series rows across 4 groups\n")

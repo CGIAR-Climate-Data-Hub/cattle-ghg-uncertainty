@@ -18,10 +18,21 @@
 #     it. Acceptable for the pilot (data is non-sensitive UNFCCC
 #     reporting); not acceptable for production.
 
+# 2026-09-22: everything the app writes at runtime (conversation history,
+# response memo, usage log, sign-in tokens) goes to runtime/ under the app
+# root instead of the root itself. APP_RUNTIME_DIR overrides the location.
+# The folder is created on first use; on shinyapps.io the app root is
+# writable and ephemeral, exactly as before.
+.runtime_dir <- function() {
+  d <- Sys.getenv("APP_RUNTIME_DIR", unset = file.path(getwd(), "runtime"))
+  if (!dir.exists(d)) dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  d
+}
+
 .history_dir <- function() {
   override <- Sys.getenv("TRANSLATOR_HISTORY_DIR", unset = "")
   if (nzchar(override)) return(override)
-  getwd()
+  .runtime_dir()
 }
 
 .history_path <- function(user_email) {

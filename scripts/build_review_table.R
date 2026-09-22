@@ -8,7 +8,7 @@
 # what we still think is wrong, and the exact IPCC table behind each call.
 #
 # THE BASELINE is fbfa1bc (2026-07-10), extracted mechanically by
-# scripts/extract_baseline_defaults.R into reference/baseline_defaults.csv.
+# scripts/extract_baseline_defaults.R into defaults/baseline_defaults.csv.
 # It is the last commit before September and the last recorded deploy, so the
 # "before" column is what the live app still runs. Never hand-transcribe it.
 #
@@ -26,7 +26,7 @@
 
 if (basename(getwd()) == "scripts") setwd("..")
 
-BASE_PATH <- "reference/baseline_defaults.csv"
+BASE_PATH <- "defaults/baseline_defaults.csv"
 if (!file.exists(BASE_PATH))
   stop("run scripts/extract_baseline_defaults.R first: ", BASE_PATH,
        " is missing", call. = FALSE)
@@ -34,7 +34,7 @@ if (!file.exists(BASE_PATH))
 rd <- function(p) utils::read.csv(p, stringsAsFactors = FALSE,
                                   na.strings = "<NA>", colClasses = "character")
 B <- rd(BASE_PATH)
-M <- rd("reference/defaults_master.csv")
+M <- rd("defaults/defaults_master.csv")
 kk <- function(d) paste(d$object, d$key, d$field, sep = "\r")
 B$k <- kk(B); M$k <- kk(M)
 
@@ -279,7 +279,7 @@ out <- c(out, "",
 "",
 "## How to read the manure rows",
 "",
-"`MMS_DEFAULTS` rows are per manure management system. IPCC splits several systems into variants with different coefficients (liquid slurry with and without a crust, composting in-vessel versus static pile), and every coefficient on one of our rows must come from the variant that row declares. The `ipcc_variant` column in `reference/DEFAULTS_MASTER.md` records which one.",
+"`MMS_DEFAULTS` rows are per manure management system. IPCC splits several systems into variants with different coefficients (liquid slurry with and without a crust, composting in-vessel versus static pile), and every coefficient on one of our rows must come from the variant that row declares. The `ipcc_variant` column in `defaults/DEFAULTS_MASTER.md` records which one.",
 "",
 "`mcf_tropical_dry` mirrors `mcf_tropical` on every system: the 2019 Refinement resolves ten climate zones and the tool resolves four.",
 "",
@@ -297,14 +297,14 @@ out <- c(out, "",
 "",
 "## Where these values live",
 "",
-"`reference/defaults_master.csv` is the single authority. Every other surface (the Excel template, the AI translator prompts, the methodology and user guide, the worked examples) is generated from it, and `scripts/verify_defaults.R` checks all 14 surfaces against it on every build. A value accepted here is changed in that one file and propagates everywhere.",
+"`defaults/defaults_master.csv` is the single authority. Every other surface (the Excel template, the AI translator prompts, the methodology and user guide, the worked examples) is generated from it, and `scripts/verify_defaults.R` checks all 14 surfaces against it on every build. A value accepted here is changed in that one file and propagates everywhere.",
 "")
 
-writeLines(out, "reference/VALUE_CHANGES_FOR_REVIEW.md", useBytes = TRUE)
+writeLines(out, "reports/VALUE_CHANGES_FOR_REVIEW.md", useBytes = TRUE)
 utils::write.csv(
   R[, c("status", "object", "key", "field", "before", "now", "proposed",
         "pathway", "verdict", "round", "source", "why")],
-  "reference/VALUE_CHANGES_FOR_REVIEW.csv", row.names = FALSE)
+  "reports/VALUE_CHANGES_FOR_REVIEW.csv", row.names = FALSE)
 
-cat(sprintf("wrote reference/VALUE_CHANGES_FOR_REVIEW.md (%d rows: %d applied, %d proposed, %d open)\n",
+cat(sprintf("wrote reports/VALUE_CHANGES_FOR_REVIEW.md (%d rows: %d applied, %d proposed, %d open)\n",
             nrow(R), n_app, n_pro, n_opn))

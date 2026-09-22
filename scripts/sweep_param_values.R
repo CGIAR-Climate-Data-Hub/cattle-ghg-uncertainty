@@ -38,9 +38,9 @@ SHOW_ALL <- "--all" %in% ARGS
 
 rd <- function(p) utils::read.csv(p, stringsAsFactors = FALSE,
                                   na.strings = "<NA>", colClasses = "character")
-M <- rd("reference/defaults_master.csv")
-B <- if (file.exists("reference/baseline_defaults.csv"))
-       rd("reference/baseline_defaults.csv") else M[0, ]
+M <- rd("defaults/defaults_master.csv")
+B <- if (file.exists("defaults/baseline_defaults.csv"))
+       rd("defaults/baseline_defaults.csv") else M[0, ]
 num <- function(v) suppressWarnings(as.numeric(v))
 V <- M[!is.na(num(M$value)) & M$ipcc_verdict != "META", ]
 
@@ -133,12 +133,12 @@ FILES <- FILES[file.exists(FILES)]
 FILES <- unique(c(FILES, Sys.glob("*.csv"), Sys.glob("*.md")))
 # The master and its own generated reports are the authority, not a surface;
 # checking them against themselves proves nothing and buries the real signal.
-SELF <- c("reference/defaults_master.csv", "reference/baseline_defaults.csv",
-          "reference/ALL_VALUES.md", "reference/ALL_VALUES.csv",
-          "reference/VALUE_CHANGES_FOR_REVIEW.md",
-          "reference/VALUE_CHANGES_FOR_REVIEW.csv",
-          "reference/DEFAULTS_MASTER.md", "reference/provenance_register.md",
-          "DEFAULTS_MATRIX.csv", "DEFAULTS_MATRIX.md", "AUDIT_REPORT.md")
+SELF <- c("defaults/defaults_master.csv", "defaults/baseline_defaults.csv",
+          "reports/ALL_VALUES.md", "reports/ALL_VALUES.csv",
+          "reports/VALUE_CHANGES_FOR_REVIEW.md",
+          "reports/VALUE_CHANGES_FOR_REVIEW.csv",
+          "defaults/DEFAULTS_MASTER.md", "defaults/provenance_register.md",
+          "reports/DEFAULTS_MATRIX.csv", "reports/DEFAULTS_MATRIX.md", "reports/AUDIT_REPORT.md")
 FILES <- setdiff(FILES, SELF)
 
 NUMPAT <- "[0-9]+(?:[.][0-9]+)?"
@@ -182,7 +182,7 @@ if (!nrow(R)) { cat("no parameter mentions found -- check the file list\n"); qui
 
 ord <- c(STALE = 1, MISSING = 2, OK = 3)
 R <- R[order(ord[R$status], R$file, R$object, R$key), ]
-utils::write.csv(R, "reference/PARAM_SWEEP.csv", row.names = FALSE)
+utils::write.csv(R, "reports/PARAM_SWEEP.csv", row.names = FALSE)
 
 cat(sprintf("swept %d files against %d values\n", length(FILES), nrow(V)))
 cat(sprintf("  STALE   %4d  (line names the parameter and carries its OLD value)\n",
@@ -190,7 +190,7 @@ cat(sprintf("  STALE   %4d  (line names the parameter and carries its OLD value)
 cat(sprintf("  MISSING %4d  (line names the parameter, has numbers, none is the current value)\n",
             sum(R$status == "MISSING")))
 if (SHOW_ALL) cat(sprintf("  OK      %4d\n", sum(R$status == "OK")))
-cat("wrote reference/PARAM_SWEEP.csv\n\n")
+cat("wrote reports/PARAM_SWEEP.csv\n\n")
 
 if (any(R$status == "STALE")) {
   cat("=== STALE ===\n")

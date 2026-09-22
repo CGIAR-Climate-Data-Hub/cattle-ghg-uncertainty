@@ -5,10 +5,10 @@
 # The knowledge base is MAP/GAP: pointers and reasoning, not values, so that
 # it cannot drift. This file is the deliberate exception, and it is safe for
 # the same reason the rule exists: it is GENERATED from
-# reference/defaults_master.csv, so it cannot say anything the authority does
+# defaults/defaults_master.csv, so it cannot say anything the authority does
 # not say. Regenerate it rather than editing it.
 #
-# It answers a different question from reference/ALL_VALUES.md. That file is
+# It answers a different question from reports/ALL_VALUES.md. That file is
 # organised by tool object: "what is BW and where did it come from". This one
 # is organised by SOURCE DOCUMENT: "open Table 10A.1, which of our values are
 # supposed to be on that page". That is the direction you read in when you are
@@ -31,7 +31,7 @@ if (!dir.exists("knowledge")) {
   quit(save = "no")
 }
 
-M <- utils::read.csv("reference/defaults_master.csv", stringsAsFactors = FALSE,
+M <- utils::read.csv("defaults/defaults_master.csv", stringsAsFactors = FALSE,
                      na.strings = "<NA>", colClasses = "character")
 num <- function(v) suppressWarnings(as.numeric(v))
 V <- M[!is.na(num(M$value)) & M$ipcc_verdict != "META", ]
@@ -83,14 +83,14 @@ V$chapter <- ifelse(grepl("^(Table|Eq|Annex) ?11[.]", ifelse(is.na(V$tbl), "", V
 DOCS <- data.frame(
   edition = c("2019R", "2019R", "2006", "2006"),
   chapter = c("Ch10", "Ch11", "Ch10", "Ch11"),
-  pdf = c("reference/19R_V4_Ch10_Livestock (2).pdf",
-          "reference/19R_V4_Ch11_Soils_N2O_CO2.pdf",
-          "reference/V4_10_Ch10_Livestock.pdf",
-          "reference/V4_11_Ch11_N2O&CO2.pdf"),
-  txt = c("reference/.ipcc_text/19R_V4_Ch10_Livestock.txt",
-          "reference/.ipcc_text/19R_V4_Ch11.txt",
-          "reference/.ipcc_text/V4_10_Ch10_Livestock.txt",
-          "reference/.ipcc_text/V4_11_Ch11.txt"),
+  pdf = c("ipcc_reference/pdf/19R_V4_Ch10_Livestock (2).pdf",
+          "ipcc_reference/pdf/19R_V4_Ch11_Soils_N2O_CO2.pdf",
+          "ipcc_reference/pdf/V4_10_Ch10_Livestock.pdf",
+          "ipcc_reference/pdf/V4_11_Ch11_N2O&CO2.pdf"),
+  txt = c("ipcc_reference/text/19R_V4_Ch10_Livestock.txt",
+          "ipcc_reference/text/19R_V4_Ch11.txt",
+          "ipcc_reference/text/V4_10_Ch10_Livestock.txt",
+          "ipcc_reference/text/V4_11_Ch11.txt"),
   stringsAsFactors = FALSE)
 docfile <- function(ed, ch) {
   i <- which(DOCS$edition == ed & DOCS$chapter == ch)
@@ -102,7 +102,7 @@ o <- c(
 "# 14 - Where every value comes from",
 "",
 "**Purpose:** for each shipped value, the IPCC document, table and page it was read from, so a claim can be checked against the guidelines without going through the code.",
-sprintf("**Derived from:** `reference/defaults_master.csv`, generated %s by `scripts/build_knowledge_provenance.R`.", Sys.Date()),
+sprintf("**Derived from:** `defaults/defaults_master.csv`, generated %s by `scripts/build_knowledge_provenance.R`.", Sys.Date()),
 "**Kind:** GENERATED. Do not edit by hand; regenerate.",
 "",
 "---",
@@ -111,7 +111,7 @@ sprintf("**Derived from:** `reference/defaults_master.csv`, generated %s by `scr
 "",
 "The MAP/GAP rule says knowledge files carry pointers, not values, so they cannot drift. This file carries values and still cannot drift, because it is generated from the master. If it disagrees with the master, it is stale: rerun the script.",
 "",
-"It is organised by **source document**, which is the opposite of `reference/ALL_VALUES.md`. That file asks \"what is BW and where did it come from\". This one asks \"I have Table 10A.1 open, which of our values are supposed to be on this page\". Use this one when checking the tool against the guidelines, and that one when checking a value against the tool.",
+"It is organised by **source document**, which is the opposite of `reports/ALL_VALUES.md`. That file asks \"what is BW and where did it come from\". This one asks \"I have Table 10A.1 open, which of our values are supposed to be on this page\". Use this one when checking the tool against the guidelines, and that one when checking a value against the tool.",
 "",
 "Verbatim IPCC wording is stripped here, per the no-chapter-text rule in `README.md`. Where a footnote is quoted in full, the master has it.",
 "",
@@ -128,7 +128,7 @@ o <- c(o, "",
 "Grep the text, not the PDF. For example, to check the Africa low-productivity dairy row that supplies eight catalogue defaults at once:",
 "",
 "```bash",
-"grep -n 'Low productivity systems 270' reference/.ipcc_text/19R_V4_Ch10_Livestock.txt",
+"grep -n 'Low productivity systems 270' ipcc_reference/text/19R_V4_Ch10_Livestock.txt",
 "```",
 "",
 "That row reads `270 / 0 / Pasture-Range / 1.2 / 4.3 / 3.6 / 0 / 52 / 51 / 9.6 / 6.5`, which is BW, WG, feeding situation, Milk, Fat, MilkPR, hours, pct_pregnant, DE, CP and Ym in one line.",

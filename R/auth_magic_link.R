@@ -73,7 +73,7 @@ auth_is_approved <- function(email,
 # in simultaneously, a race could lose a write. For our scale (a few
 # users a day) the trade-off is fine.
 
-.AUTH_TOKEN_FILE <- "auth_tokens.csv"
+.auth_token_file <- function() file.path(.runtime_dir(), "auth_tokens.csv")
 
 .auth_token_make <- function() {
   paste(as.hexmode(sample.int(2^31 - 1, size = 4)), collapse = "")
@@ -86,9 +86,9 @@ auth_is_approved <- function(email,
                       email = character(),
                       expires_at = as.POSIXct(character(), tz = "UTC"),
                       stringsAsFactors = FALSE)
-  if (!file.exists(.AUTH_TOKEN_FILE)) return(empty)
+  if (!file.exists(.auth_token_file())) return(empty)
   df <- tryCatch(
-    utils::read.csv(.AUTH_TOKEN_FILE, stringsAsFactors = FALSE),
+    utils::read.csv(.auth_token_file(), stringsAsFactors = FALSE),
     error = function(e) NULL)
   if (is.null(df) || nrow(df) == 0) return(empty)
   df$expires_at <- as.POSIXct(df$expires_at, tz = "UTC",
@@ -99,12 +99,12 @@ auth_is_approved <- function(email,
 
 .auth_token_write <- function(df) {
   if (nrow(df) == 0) {
-    if (file.exists(.AUTH_TOKEN_FILE)) file.remove(.AUTH_TOKEN_FILE)
+    if (file.exists(.auth_token_file())) file.remove(.auth_token_file())
     return(invisible(NULL))
   }
   out <- df
   out$expires_at <- format(out$expires_at, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  utils::write.csv(out, .AUTH_TOKEN_FILE, row.names = FALSE)
+  utils::write.csv(out, .auth_token_file(), row.names = FALSE)
   invisible(NULL)
 }
 

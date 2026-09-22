@@ -3,7 +3,7 @@
 # pre-September baseline
 # =============================================================================
 #
-# WHY. reference/VALUE_CHANGES_FOR_REVIEW.md needs a "before" column that an
+# WHY. reports/VALUE_CHANGES_FOR_REVIEW.md needs a "before" column that an
 # external reviewer can trust. Hand-transcribing those values is exactly the
 # mechanism that produced the drift this whole audit exists to remove, so the
 # baseline is extracted mechanically from git instead.
@@ -15,7 +15,7 @@
 # value-identical and either could serve. fbfa1bc is used because it is the
 # state the reviewer last saw.
 #
-# HOW. The baseline predates reference/defaults_master.csv, so the values live
+# HOW. The baseline predates defaults/defaults_master.csv, so the values live
 # in R literals. A detached git worktree gives us that tree without disturbing
 # the working copy; a separate R process sources the two value-bearing files
 # there and prints every constant in the master's own long format.
@@ -23,14 +23,14 @@
 # Usage (from project root):
 #   Rscript scripts/extract_baseline_defaults.R
 #
-# Writes reference/baseline_defaults.csv. Re-runnable; the worktree is always
+# Writes defaults/baseline_defaults.csv. Re-runnable; the worktree is always
 # cleaned up, including after a failure.
 # =============================================================================
 
 if (basename(getwd()) == "scripts") setwd("..")
 
 BASELINE  <- "fbfa1bc"
-OUT       <- "reference/baseline_defaults.csv"
+OUT       <- "defaults/baseline_defaults.csv"
 WORKTREE  <- file.path(tempdir(), paste0("baseline-", BASELINE))
 
 git <- function(...) {

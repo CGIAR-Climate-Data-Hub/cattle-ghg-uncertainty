@@ -253,7 +253,7 @@ PARAM_ALIASES <- c(
 #                        for pre-populating the Parameters sheet)
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# PARAMETER CATALOGUE -- built from reference/defaults_master.csv
+# PARAMETER CATALOGUE -- built from defaults/defaults_master.csv
 #
 # The 25 rows x 13 columns that used to be literal vectors here now live in
 # the master, which is the single authority for every shipped default. The
@@ -262,7 +262,7 @@ PARAM_ALIASES <- c(
 # load-bearing because the translator writer emits one block of rows per
 # sub-category in exactly catalogue order.
 #
-# To change a default, edit reference/defaults_master.csv. Do not reintroduce
+# To change a default, edit defaults/defaults_master.csv. Do not reintroduce
 # literals here: the whole point is that the Excel template, the translator
 # prompts, the published guides and the audit all trace to one place.
 # Provenance (IPCC edition, table, climate basis, review round) lives next to

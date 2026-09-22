@@ -2,7 +2,7 @@
 # load_defaults.R -- build every IPCC default object from the master CSV
 # =============================================================================
 #
-# reference/defaults_master.csv is THE authority for every shipped default.
+# defaults/defaults_master.csv is THE authority for every shipped default.
 # This file turns it into the R objects the rest of the app already expects.
 #
 # WHY. The defaults used to live as literal vectors in two R files, and copies
@@ -40,7 +40,7 @@
 # changing the master and watching the object move distinguishes "reads the
 # master" from "happens to agree with it". See audit check F39.
 .DEFAULTS_MASTER_PATH <- Sys.getenv("GMH_DEFAULTS_MASTER",
-                                    "reference/defaults_master.csv")
+                                    "defaults/defaults_master.csv")
 
 .defaults_master <- local({
   p <- .DEFAULTS_MASTER_PATH

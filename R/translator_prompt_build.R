@@ -547,7 +547,7 @@ translator_prompt_reset <- function() rm(list = ls(.TP_MEMO), envir = .TP_MEMO)
 
 # What the generated prompt depends on: the master (every default) and the
 # workbook layout (every column the model is told about).
-translator_prompt_inputs_hash <- function(master_path = "reference/defaults_master.csv") {
+translator_prompt_inputs_hash <- function(master_path = "defaults/defaults_master.csv") {
   master <- if (file.exists(master_path)) readLines(master_path, warn = FALSE, encoding = "UTF-8") else ""
   list(
     master_sha256 = .tp_sha256(master),

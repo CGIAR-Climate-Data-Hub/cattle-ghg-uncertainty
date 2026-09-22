@@ -11,11 +11,11 @@ rule that matters more than any other in this repository.
 | Report a wrong number, a crash, or an IPCC non-compliance | Open a GitHub issue with the **Bug** label |
 | Suggest a feature or a usability improvement | Open a GitHub issue with the **Enhancement** label |
 | Ask how something works | Open a GitHub issue with the **Question** label, or email the address below |
-| Send structured review feedback as an inventory compiler | Use the beta-test package in `feedback_workflow/` (guide, sample inventory, feedback form) |
+| Send structured review feedback as an inventory compiler | Use the beta-test package in `documentation/beta_test/` (guide, sample inventory, feedback form) |
 | Propose a code change | Fork, branch, and open a pull request (see below) |
 
 If you are a national inventory compiler rather than a developer, the
-`feedback_workflow/` package is the best route. It is a 20-30 minute structured
+`documentation/beta_test/` package is the best route. It is a 20-30 minute structured
 walkthrough that needs no login, no R and no installation, and it produces
 feedback in a form we can act on directly.
 
@@ -53,7 +53,7 @@ without any key or account.
 **`scripts/audit.R` is the contract. Every pull request must leave it green.**
 
 ```bash
-Rscript scripts/audit.R    # writes AUDIT_REPORT.md; exits non-zero on failure
+Rscript scripts/audit.R    # writes reports/AUDIT_REPORT.md; exits non-zero on failure
 ```
 
 It builds a synthetic hand-computed "golden case" and checks every IPCC

@@ -81,90 +81,45 @@ If your raw inventory data lives in your own Excel or CSV files with column name
 
 ## Repository structure
 
+Folders the running app needs are at the top and unchanged. Everything else is grouped by the work it belongs to.
+
 ```
 cattle-ghg-uncertainty/
-├── app.R                        # Shiny entry point
-├── install.R                    # Dependency installer (Binder + shinyapps.io)
-├── runtime.txt                  # Binder R-version spec
-├── README.md
+├── app.R, install.R, runtime.txt    # Shiny entry point, dependency installer, Binder R version
+├── R/                               # All application source: UI, server, emission engine
+│                                    #   (calc_*), Monte Carlo (mc_*), utilities (utils_*),
+│                                    #   AI translator (chat_ui, anthropic_client, auth, history, usage log)
+├── www/                             # Everything the app serves: logos, CSS, built guides (PDF/DOCX),
+│                                    #   Find-out-more HTML pages, translator kit files
+├── config/                          # approved_users.csv, the translator sign-in whitelist
+├── defaults/                        # THE numbers the tool ships: defaults_master.csv (single authority),
+│                                    #   baseline_defaults.csv (July 2026 values), provenance_register.md,
+│                                    #   DEFAULTS_MASTER.md (readable rendering)
+├── translator_prompts/              # AI translator prompt sources (generated .md carry a manifest)
 │
-├── R/                           # All application source (31 files)
-│   ├── app_ui.R, app_server.R   # Shiny UI + reactive server
-│   ├── i18n.R                   # English/French string catalogue
-│   ├── trend_tab.R              # Trend tab UI helpers
-│   │
-│   │   # Emission engine — IPCC Vol.4 Ch.10/11
-│   ├── calc_energy.R            #   Net-energy chain (NEm/NEa/NEg/NEl/NEw/NEp → GE)
-│   ├── calc_enteric.R           #   Enteric fermentation CH₄
-│   ├── calc_manure_ch4.R        #   Manure management CH₄ (VS × Bo × MCF)
-│   ├── calc_manure_n2o.R        #   Direct + indirect N₂O, managed storage and PRP
-│   ├── calc_ghg_master.R        #   Scalar + vectorised orchestration (kept bit-identical)
-│   │
-│   │   # Monte Carlo
-│   ├── mc_sampling.R            #   Iman-Conover restricted pairing; AR(1) temporal correlation
-│   ├── mc_simulation.R          #   Per-system and whole-inventory simulation
-│   ├── mc_sensitivity.R         #   SRC and PRCC sensitivity ranking
-│   ├── mc_uncertainty.R         #   Legacy decomposition helpers
-│   │
-│   │   # Utilities
-│   ├── utils_ipcc_defaults.R    #   Parameter catalogue, MMS defaults, built-in examples
-│   ├── utils_distributions.R    #   Marginal samplers (normal, lognormal, beta, PERT, …)
-│   ├── utils_template.R         #   Excel template reader/writer + validation contract
-│   ├── utils_timeseries_template.R  # Time-series sheet builder
-│   ├── utils_validation.R       #   Input validators
-│   ├── utils_qaqc.R             #   Traffic-light QA/QC checks
-│   ├── utils_export.R           #   XLSX / CSV exports, IPCC Table 3.3 formatting
-│   ├── utils_word_export.R      #   Word run-summary report
-│   ├── utils_diagnostics.R      #   Runtime diagnostics
-│   ├── utils_contact.R          #   Contact / mailto helpers
-│   ├── feedback.R               #   In-app feedback button + store
-│   │
-│   │   # AI Translator
-│   ├── chat_ui.R                #   Chat panel UI + server; explore/clarify/emit flow
-│   ├── anthropic_client.R       #   Anthropic Claude client — the live provider
-│   ├── mistral_client.R         #   Mistral client (A/B, routed by model-id prefix)
-│   ├── openai_client.R          #   Legacy OpenAI client; only the system-prompt
-│   │                            #     assembler is still called
-│   ├── auth_magic_link.R        #   Magic-link email auth
-│   ├── conversation_history.R   #   Per-user persistent chat history
-│   └── usage_log.R              #   Per-call token ledger + budget gate
-│
-├── www/                         # Web assets — logos, built docs (PDF/DOCX),
-│                                #   Find-out-more topic HTML, custom CSS
-├── doc/                         # ALL R Markdown doc SOURCES (rendered into www/):
-│                                #   user_guide.Rmd, methodology.Rmd  → www/*.pdf/.docx
-│                                #   correlations.Rmd, ai_translator.Rmd (+ _shared.css) → www/docs/*.html
-│                                #   (the served, built HTML lives in www/docs/)
-├── config/                      # Runtime config (approved_users.csv whitelist)
-├── translator_prompts/          # AI Translator system-prompt knowledge files (md)
-├── scripts/                     # Build, test, deploy tooling
-│   ├── audit.R                  #   Regression test suite
-│   ├── build_methodology.R      #   Render methodology.pdf
-│   ├── build_user_guide.R       #   Render user_guide.pdf / .docx
-│   ├── build_help_docs.R        #   Render in-app Find-out-more HTML pages
-│   ├── build_translator_kit.R   #   Refresh AI Translator knowledge files + kit zip
-│   ├── deploy.R                 #   Deploy to shinyapps.io
-│   ├── example_verify.R         #   End-to-end sanity check on built-in examples
-│   ├── check_i18n.R             #   Verify every i18n key resolves in both languages
-│   ├── notify_approved.R        #   Notify newly approved translator users
-│   └── make_stress_test_data.R  #   Generate stress-test dataset for the AI Translator
-├── rsconnect/                   # shinyapps.io deploy state (auto-generated)
-│
-│   # ---- Non-app material (2026-07 reorg; none read by the running app) ----
-├── feedback_workflow/           # Beta-test package (self-contained): sample dataset,
-│                                #   feedback form(s), feedback guide (Rmd source + PDF/DOCX),
-│                                #   and generator/build scripts (_make_*.R, _build_feedback_guide.R)
-├── reference/                   # IPCC source PDFs + extracted text (audit reference)
-├── test_data/                   # Sample inventories & template variants used in testing
-├── reviews/                     # Reviewer correspondence, response drafts, notes
-└── old/                         # Archive: one-off dev scripts, backups, stale duplicates
+├── documentation/
+│   ├── source/                      # R Markdown sources of the user guide, methodology,
+│   │                                #   correlations and translator pages (built into www/)
+│   ├── team/                        # Documents written for the project team (assumptions note)
+│   └── beta_test/                   # Beta-test package: sample inventory, feedback form, guide
+├── ipcc_reference/                  # IPCC chapters we verified against (pdf/, text extracts in text/);
+│                                    #   not in git, copyrighted
+├── scripts/                         # Build, check and deploy tooling; audit.R is the test contract
+├── reports/                         # Generated by scripts: AUDIT_REPORT, DEFAULTS_MATRIX, ALL_VALUES,
+│                                    #   VALUE_CHANGES_FOR_REVIEW, PARAM_SWEEP
+├── test_data/                       # Country inventories used in testing; not in git
+├── runtime/                         # Written by the running app: conversation history, usage log,
+│                                    #   sign-in tokens; not in git
+├── project_history/                 # Reviewer rounds, received documents, 2026 archive; not in git
+├── knowledge/                       # Cold-start notes for maintainers and AI agents; not in git
+└── rsconnect/                       # shinyapps.io deploy state
 ```
 
 ---
 
 ## Testing and verification
 
-The calculation engine has a regression gate at [`scripts/audit.R`](scripts/audit.R). It builds a synthetic hand-computed "golden case" and asserts every IPCC Vol.4 Ch.10/Ch.11 equation, the Monte Carlo sampler, the validators and the exporters against it, then writes `AUDIT_REPORT.md`.
+The calculation engine has a regression gate at [`scripts/audit.R`](scripts/audit.R). It builds a synthetic hand-computed "golden case" and asserts every IPCC Vol.4 Ch.10/Ch.11 equation, the Monte Carlo sampler, the validators and the exporters against it, then writes `reports/AUDIT_REPORT.md`.
 
 ```bash
 Rscript scripts/audit.R    # exits non-zero if any check fails
@@ -176,7 +131,7 @@ It runs on every push and pull request (see the **audit** badge above). Checks t
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests go in GitHub issues. If you are a national inventory compiler rather than a developer, the structured 20-30 minute review package in `feedback_workflow/` is the most useful route, and it needs no login, no R and no installation.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests go in GitHub issues. If you are a national inventory compiler rather than a developer, the structured 20-30 minute review package in `documentation/beta_test/` is the most useful route, and it needs no login, no R and no installation.
 
 ---
 

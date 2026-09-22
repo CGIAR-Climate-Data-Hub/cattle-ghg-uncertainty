@@ -3,17 +3,17 @@
 # the input template, plus runtime config.
 
 # Topical non-app folders (2026-07 reorg) — none are read by the running app
-feedback_workflow/
-reference/
+documentation/
+ipcc_reference/
+reports/
+project_history/
+knowledge/
 test_data/
-reviews/
-old/
+runtime/
 
 # Dev / build scripts — entire folder excluded from deploy bundle
 scripts/
 
-# Source documents — only the rendered PDFs in www/ ship to the app
-doc/
 
 # Help-page cache — keep the rendered HTML in www/docs/ but skip the RDS cache
 www/docs/_cache/
@@ -39,8 +39,7 @@ www/user_guide_draft.md
 methodology.log
 
 # Beta feedback / templates not used at runtime
-beta_feedback_template.csv
-beta_feedback_template.xlsx
+documentation/beta_test/
 
 # Stale country-specific upload (raw country data file)
 22-07-2023*.xlsx
@@ -69,3 +68,5 @@ auth_tokens.csv
 # That file IS bundled into the deploy (it must be, for the deployed R
 # session to read it), but is gitignored so it never enters git history.
 # Keep .Renviron OUT of this .rscignore.
+
+# defaults/ is READ AT STARTUP (R/load_defaults.R) and must stay in the bundle.

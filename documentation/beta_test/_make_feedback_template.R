@@ -103,6 +103,6 @@ addStyle(wb, "Type_definitions", createStyle(wrapText = TRUE), rows = 1:5, cols 
 addStyle(wb, "Type_definitions", createStyle(textDecoration = "bold", fgFill = "#D8F3DC"),
          rows = 1, cols = 1:4, gridExpand = TRUE)
 
-# NOTE: run from the repo root — `Rscript feedback_workflow/_make_feedback_template.R`
-saveWorkbook(wb, "feedback_workflow/beta_feedback_template.xlsx", overwrite = TRUE)
-cat("Saved: feedback_workflow/beta_feedback_template.xlsx\n")
+# NOTE: run from the repo root — `Rscript documentation/beta_test/_make_feedback_template.R`
+saveWorkbook(wb, "documentation/beta_test/beta_feedback_template.xlsx", overwrite = TRUE)
+cat("Saved: documentation/beta_test/beta_feedback_template.xlsx\n")

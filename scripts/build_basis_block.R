@@ -71,6 +71,6 @@ lines <- c(lines,
 "",
 "% END GENERATED: default basis")
 
-writeLines(lines, "doc/_basis_block.tex", useBytes = TRUE)
-cat("wrote doc/_basis_block.tex (", length(lines), " lines,",
+writeLines(lines, "documentation/source/_basis_block.tex", useBytes = TRUE)
+cat("wrote documentation/source/_basis_block.tex (", length(lines), " lines,",
     nrow(DEFAULT_BASIS), "choices )\n")

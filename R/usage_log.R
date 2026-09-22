@@ -27,9 +27,8 @@
   # Honour an explicit override (used by tests / dev).
   override <- Sys.getenv("TRANSLATOR_LOG_DIR", unset = "")
   if (nzchar(override)) return(override)
-  # On shinyapps.io the working dir IS writable (just ephemeral).
-  # Locally we use the working dir too — keeps dev and prod identical.
-  getwd()
+  # runtime/ under the app root (see .runtime_dir in conversation_history.R).
+  .runtime_dir()
 }
 
 .usage_log_path <- function() {

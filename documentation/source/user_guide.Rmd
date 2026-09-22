@@ -21,7 +21,7 @@ header-includes:
   # knit_root_dir=getwd() is used and the .tex sees project-root paths). This
   # makes \includegraphics{www/...} resolve regardless of where the LaTeX
   # compile step happens to run.
-  - \graphicspath{{../www/}{./www/}}
+  - \graphicspath{{../../www/}{../www/}{./www/}}
   - \usepackage{amsmath}
   - \usepackage{amssymb}
   - \usepackage{hyperref}

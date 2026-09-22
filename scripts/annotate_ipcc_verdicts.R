@@ -3,7 +3,7 @@
 # master
 # =============================================================================
 #
-# Every numeric default in reference/defaults_master.csv was read back against
+# Every numeric default in defaults/defaults_master.csv was read back against
 # the IPCC source text, value by value, on 2026-09-11. This script records the
 # outcome of that reading as two columns on the master itself, so the single
 # authority also carries its own provenance and nobody has to hold a separate
@@ -32,7 +32,7 @@
 
 if (basename(getwd()) == "scripts") setwd("..")
 
-P <- "reference/defaults_master.csv"
+P <- "defaults/defaults_master.csv"
 M <- utils::read.csv(P, stringsAsFactors = FALSE, na.strings = "<NA>",
                      colClasses = "character")
 

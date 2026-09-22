@@ -62,9 +62,9 @@ docs/AW_review_response*.md
 docs/meeting_*_todo.md
 
 # Auto-regenerated outputs — no need to commit
-AUDIT_REPORT.md
-DEFAULTS_MATRIX.md
-DEFAULTS_MATRIX.csv
+reports/AUDIT_REPORT.md
+reports/DEFAULTS_MATRIX.md
+reports/DEFAULTS_MATRIX.csv
 TECHNICAL_SUMMARY.md
 docs/correlations.md
 translator_prompts/getting_started.docx
@@ -75,6 +75,8 @@ translator_prompts/README.txt
 
 # Working-copy artefacts the user no longer wants tracked
 .ipcc_text/
+ipcc_reference/text/
+ipcc_reference/pdf/
 figures/
 
 # IPCC source PDFs (copyrighted; users should fetch from ipcc-nggip.iges.or.jp)
@@ -124,7 +126,7 @@ _verify_*.R
 _make_comments_tracker.R
 _build_aw_response.py
 _build_docs.py
-_extract_ipcc.py
+ipcc_reference/extract_ipcc.py
 deploy_shinyapps.R
 R/_test_*.R
 
@@ -134,7 +136,7 @@ R/_test_*.R
 # Snapshot of the approved-users CSV from the last successful deploy.
 # Lives only on the deployer's machine; scripts/notify_approved.R uses
 # it to know which approved emails are NEW since last deploy.
-.approved_users_snapshot.csv
+runtime/
 
 # 2026-06: local dev scratch / test data — kept on the machine, never in the
 # repo (consistent with the real-country test-data and one-off-script rules
@@ -158,23 +160,27 @@ scripts/_inspect_translation.R
 # rules above, so the folder that summarises it stays local too.
 knowledge/
 CLAUDE.local.md
-doc/*.log
+documentation/source/*.log
 
 # 2026-09: scripts/sweep_param_values.R writes a 12,000-row triage list. It
 # is a working artefact for a human to read once, not a deliverable, and it
 # is noisy enough that committing it would bury the real reports. The script
 # is tracked; its output is not. The gated subset of the same check lives in
 # the audit as F44.
-reference/PARAM_SWEEP.csv
+reports/PARAM_SWEEP.csv
 
 # 2026-09: documents received from named individuals. The reviewer rules
 # above match by FILENAME, so a new file dropped in this folder under any
 # other name would not be caught and `git add -A` would publish it. Ignore
 # the directory itself, which is the only rule that does not depend on
 # whoever saves the next file choosing a matching name.
-feedback_workflow/feedback_people/
 
 # 2026-09: old/ is the pre-audit junk drawer. Everything in it predates the
 # September 2026 IPCC verification and carries superseded parameter values,
 # including a complete copy of the published translator kit. See old/README.md.
-old/
+project_history/
+
+# 2026-09-22 reorganisation. Runtime files the app writes live in runtime/;
+# generated reports in reports/ (the two review deliverables ALL_VALUES and
+# VALUE_CHANGES_FOR_REVIEW stay tracked); reviewer material, received
+# documents and the pre-audit archive in project_history/, never public.

@@ -19,7 +19,7 @@
 # pct_pregnant as 0.85/0.50). Do not restate values here.
 #
 # For what the app actually uses, and where each value comes from, read
-# reference/ALL_VALUES.md, or reference/defaults_master.csv directly.
+# reports/ALL_VALUES.md, or defaults/defaults_master.csv directly.
 #
 # The authoritative objects are PARAM_CATALOGUE (R/utils_template.R),
 # MMS_DEFAULTS, MMS_FRAC_DEFAULTS_2019, the *_BY_SUBCAT lists below, and
@@ -104,7 +104,7 @@
 ## `versions` lists which IPCC editions recognise each system.
 ## `get_mms_for_version(version)` filters MMS_DEFAULTS$id by version (used for
 ## conditional dropdowns once the user selects an IPCC guidelines version in metadata).
-# Built from reference/defaults_master.csv (see R/load_defaults.R). The
+# Built from defaults/defaults_master.csv (see R/load_defaults.R). The
 # literal table that used to sit here, including the ipcc_variant column and
 # the full MCF provenance commentary, now lives in the master alongside every
 # other default. Same columns, same order, same types.
@@ -131,7 +131,7 @@ MMS_DEFAULTS <- .master_wide("MMS_DEFAULTS", "id")
 ## system × animal sub-category). 2019R further splits each region into low-
 ## and high-productivity systems. That is a much larger data-entry job
 ## (deferred — see plan).
-# Built from reference/defaults_master.csv, like every other default.
+# Built from defaults/defaults_master.csv, like every other default.
 #
 # This object was MISSED by the master migration: the export wrote its rows
 # to the CSV and the literal stayed here, so the master's copy was
@@ -282,7 +282,7 @@ get_mms_for_version <- function(version = "2006") {
 ## and no range, +-50% remains the correct fallback under the rule.
 ## anaerobic_digester is left as-is: Table 10.22 gives "0.05 - 0.50" as a range
 ## with no central value, so the choice of central is a judgement, not a
-## transcription. Flagged in reference/provenance_register.md.
+## transcription. Flagged in defaults/provenance_register.md.
 ## Verified + corrected line-by-line on 2026-06-16 against Table 10.22:
 ##   solid_storage_covered gas 0.10->0.22, leach 0.02->0.00
 ##   dry_lot      leach 0.00->0.035 (rainfall-dependent, range 0-0.07)
@@ -309,7 +309,7 @@ mms_frac_defaults_2019 <- function(mms_type) {
   hit
 }
 
-# Built from reference/defaults_master.csv, like every other default.
+# Built from defaults/defaults_master.csv, like every other default.
 #
 # This was the second object the master migration missed, after
 # IPCC_DEFAULTS_BY_REGION: the export wrote its rows to the CSV and the
@@ -601,7 +601,7 @@ ym_for_subcat <- function(sub_category, ipcc_version = "2019_refinement") {
 #
 # DEFAULT_BASIS holds those choices once. Every surface renders from it: the
 # Definitions tab, both published guides, the Excel template, the translator
-# prompt and reference/DEFAULTS_MASTER.md.
+# prompt and defaults/DEFAULTS_MASTER.md.
 DEFAULT_BASIS <- .master_wide("DEFAULT_BASIS", "dimension")
 
 # Human-readable dimension labels. Kept next to the data rather than in the
@@ -626,7 +626,7 @@ DEFAULT_BASIS_LABELS <- c(
 # everything else 0.322 or 0.370, so the tool does not assume lactating, it
 # works it out. Presenting that as an assumption understates the tool and
 # misleads the reader, so user-facing surfaces render tool-wide rows only.
-# The full table, both scopes, stays in reference/DEFAULTS_MASTER.md.
+# The full table, both scopes, stays in defaults/DEFAULTS_MASTER.md.
 basis_tool_wide <- function()
   DEFAULT_BASIS[DEFAULT_BASIS$scope == "tool_wide", , drop = FALSE]
 

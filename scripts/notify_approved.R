@@ -3,7 +3,7 @@
 #
 # How it works:
 #   - Snapshot of the previously-approved list lives in
-#     .approved_users_snapshot.csv at the project root (gitignored).
+#     runtime/.approved_users_snapshot.csv (gitignored).
 #   - On each deploy, this script diffs the current CSV against the
 #     snapshot, finds emails added since last run, and sends each one a
 #     short welcome email via SendGrid.
@@ -73,7 +73,8 @@ if (!nzchar(Sys.getenv("SENDGRID_API_KEY", unset = ""))) {
 }
 
 current_csv  <- "config/approved_users.csv"
-snapshot_csv <- ".approved_users_snapshot.csv"
+snapshot_csv <- "runtime/.approved_users_snapshot.csv"
+if (!dir.exists("runtime")) dir.create("runtime")
 
 if (!file.exists(current_csv)) {
   message("notify_approved: ", current_csv, " not found — skipping notify pass.")

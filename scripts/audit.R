@@ -2111,7 +2111,7 @@ section_F <- function() {
                      else "resolver returned an unexpected default for a (sub_category, parameter)")
 
   # F32 -- the defaults master is the single authority. Every IPCC default
-  # the app ships is read from reference/defaults_master.csv by
+  # the app ships is read from defaults/defaults_master.csv by
   # R/load_defaults.R. Assert the file is present, that it still builds the
   # objects, and that the objects have the shape the rest of the app assumes.
   # Without this a corrupt or truncated master would surface as a hundred
@@ -2135,7 +2135,7 @@ section_F <- function() {
              notes = if (master_ok)
                sprintf("%d master rows -> PARAM_CATALOGUE 25x13, MMS 12, frac 12, subcat lists 9",
                        nrow(.defaults_master))
-               else "reference/defaults_master.csv missing, truncated, or rebuilt an object with the wrong shape/type")
+               else "defaults/defaults_master.csv missing, truncated, or rebuilt an object with the wrong shape/type")
 
   # F33 -- every shipped numeric default carries an IPCC verification verdict.
   # The whole master was read back against the IPCC source text value by value
@@ -2328,7 +2328,7 @@ section_F <- function() {
                         paste(sort(EXPECT_RESOLVED), collapse = ", "),
                         paste(got_resolved, collapse = ", ")))
     resolved <- DEFAULT_BASIS[DEFAULT_BASIS$scope != "tool_wide", , drop = FALSE]
-    for (sf in c("doc/_basis_block.tex",
+    for (sf in c("documentation/source/_basis_block.tex",
                  "translator_prompts/param_catalogue.md")) {
       if (!file.exists(sf)) next
       txt <- paste(readLines(sf, warn = FALSE, encoding = "UTF-8"), collapse = " ")
@@ -2339,9 +2339,9 @@ section_F <- function() {
     }
     # the four choices a user is most likely to be caught out by
     probes <- c("Low productivity", "Wet", "Africa")
-    surfaces <- c("doc/_basis_block.tex",
+    surfaces <- c("documentation/source/_basis_block.tex",
                   "translator_prompts/param_catalogue.md",
-                  "reference/DEFAULTS_MASTER.md")
+                  "defaults/DEFAULTS_MASTER.md")
     for (sf in surfaces) {
       if (!file.exists(sf)) { f <- c(f, paste("missing surface", sf)); next }
       txt <- paste(readLines(sf, warn = FALSE, encoding = "UTF-8"), collapse = " ")
@@ -2972,7 +2972,7 @@ section_F <- function() {
     # rules) are a prompt surface too; they carried a wrong activity_data
     # rule and a fraction-unit example for months with nothing looking.
     "R/openai_client.R",
-    "doc/methodology.Rmd", "doc/user_guide.Rmd")
+    "documentation/source/methodology.Rmd", "documentation/source/user_guide.Rmd")
   ALLOW <- list(
     list(file = "translator_prompts/param_catalogue.md", key = "Milk",
          why = "the declared-basis block names the aggregate row (Milk 3.5) as the alternative NOT chosen"),
@@ -2992,25 +2992,25 @@ section_F <- function() {
          why = "0.1 in that row is the boreal MCF column, not frac_gas"),
     list(file = "translator_prompts/getting_started.md", key = "dairy_cows",
          why = "a hypothetical user correcting a unit conversion, not a default"),
-    list(file = "doc/methodology.Rmd", key = "pasture",
+    list(file = "documentation/source/methodology.Rmd", key = "pasture",
          why = "prose mentioning pasture near an unrelated number"),
-    list(file = "doc/methodology.Rmd", key = "DE",
+    list(file = "documentation/source/methodology.Rmd", key = "DE",
          why = "IPCC's own published DE range for crop by-products, 45-55%"),
-    list(file = "doc/methodology.Rmd", key = "pct_pregnant",
+    list(file = "documentation/source/methodology.Rmd", key = "pct_pregnant",
          why = "the correlation derivation note: the 0.60 there is the old Cfi-Ca CORRELATION, and pct_pregnant is named later on the same long line"),
-    list(file = "doc/user_guide.Rmd", key = "pasture",
+    list(file = "documentation/source/user_guide.Rmd", key = "pasture",
          why = "the CRT category table, 3.D.1.c"),
-    list(file = "doc/user_guide.Rmd", key = "DE",
+    list(file = "documentation/source/user_guide.Rmd", key = "DE",
          why = "IPCC's own published DE range in the auto-fill explanation"))
 
   sweep_fail <- tryCatch({
     f <- character(0)
-    Mm <- utils::read.csv("reference/defaults_master.csv", stringsAsFactors = FALSE,
+    Mm <- utils::read.csv("defaults/defaults_master.csv", stringsAsFactors = FALSE,
                           na.strings = "<NA>", colClasses = "character")
-    if (!file.exists("reference/baseline_defaults.csv")) {
-      f <- "reference/baseline_defaults.csv is missing; the July baseline is what makes a value 'stale'"
+    if (!file.exists("defaults/baseline_defaults.csv")) {
+      f <- "defaults/baseline_defaults.csv is missing; the July baseline is what makes a value 'stale'"
     } else {
-      Bb <- utils::read.csv("reference/baseline_defaults.csv", stringsAsFactors = FALSE,
+      Bb <- utils::read.csv("defaults/baseline_defaults.csv", stringsAsFactors = FALSE,
                             na.strings = "<NA>", colClasses = "character")
       nm <- function(v) suppressWarnings(as.numeric(v))
       Vv <- Mm[!is.na(nm(Mm$value)) & Mm$ipcc_verdict != "META", ]
@@ -3145,7 +3145,7 @@ section_F <- function() {
       man <- jsonlite::read_json(mp, simplifyVector = TRUE)
       inp <- translator_prompt_inputs_hash()
       if (!identical(man$master_sha256, inp$master_sha256))
-        f <- c(f, "reference/defaults_master.csv changed since the translator kit was last built")
+        f <- c(f, "defaults/defaults_master.csv changed since the translator kit was last built")
       if (!identical(man$layout_sha256, inp$layout_sha256))
         f <- c(f, "the template column layout changed since the translator kit was last built")
     }
@@ -3534,7 +3534,7 @@ section_G <- function() {
 
   # G4 — methodology.Rmd Reporting section present (Andreas review round 2):
   # CRT category map covering 3.A, 3.B, 3.D.
-  meth_path <- if (file.exists("doc/methodology.Rmd")) "doc/methodology.Rmd"
+  meth_path <- if (file.exists("documentation/source/methodology.Rmd")) "documentation/source/methodology.Rmd"
                else if (file.exists("methodology.Rmd")) "methodology.Rmd"
                else NULL
   meth_txt <- if (!is.null(meth_path))
@@ -3688,8 +3688,8 @@ md <- c(md, "",
         "Run `Rscript scripts/audit.R` from the repo root. Output is deterministic conditional on the seeds in each test block.",
         "")
 
-writeLines(md, "AUDIT_REPORT.md", useBytes = TRUE)
-cat(sprintf("\n=== AUDIT COMPLETE ===\nTotal: %d  Pass: %d  Fail: %d  Skip: %d\nReport: AUDIT_REPORT.md\n",
+writeLines(md, "reports/AUDIT_REPORT.md", useBytes = TRUE)
+cat(sprintf("\n=== AUDIT COMPLETE ===\nTotal: %d  Pass: %d  Fail: %d  Skip: %d\nReport: reports/AUDIT_REPORT.md\n",
             total, pass, fail, skip))
 
 # Non-zero exit on failure so CI (.github/workflows/audit.yml) gates on this.

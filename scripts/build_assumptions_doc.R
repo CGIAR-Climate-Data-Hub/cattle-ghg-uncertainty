@@ -1,6 +1,6 @@
 # Build "What the tool assumes" Word document at the project root.
 suppressMessages({library(officer); library(flextable)})
-out <- "What_the_tool_assumes_and_what_it_would_take_to_offer_every_option.docx"
+out <- "documentation/team/What_the_tool_assumes_and_what_it_would_take_to_offer_every_option.docx"
 
 doc <- read_docx()
 H1 <- function(t) { doc <<- body_add_par(doc, t, style = "heading 1"); invisible() }
@@ -138,7 +138,7 @@ TB(df(Assumption = c("Region: Africa", "Productivity: low", "Feeding: flat pastu
 P("Doing everything in this table is roughly three to four weeks of development plus review. The order that gives the most value first: soil climate (half a day, large effect in dry countries), manure nitrogen column for dairy (half a day), the climate zone field for manure methane (two to three days), then region and productivity together (four days).")
 
 H1("6. Where the assumptions live")
-P("All eight declared assumptions are rows of one file, reference/defaults_master.csv, in a block called DEFAULT_BASIS. Every place that shows them (the Definitions tab of the app, the user guide, the methodology document, the Excel template, the AI translator instructions, and since 21 September 2026 the Word and Excel run reports) is generated from that file. Changing an assumption means editing that one row and rebuilding; an automatic check fails if any generated copy is out of date.")
+P("All eight declared assumptions are rows of one file, defaults/defaults_master.csv, in a block called DEFAULT_BASIS. Every place that shows them (the Definitions tab of the app, the user guide, the methodology document, the Excel template, the AI translator instructions, and since 21 September 2026 the Word and Excel run reports) is generated from that file. Changing an assumption means editing that one row and rebuilding; an automatic check fails if any generated copy is out of date.")
 
 print(doc, target = out)
 cat("written:", out, "\n")

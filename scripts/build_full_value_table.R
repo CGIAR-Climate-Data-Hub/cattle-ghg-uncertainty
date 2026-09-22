@@ -2,16 +2,16 @@
 # build_full_value_table.R -- every shipped value: July, now, source, reach
 # =============================================================================
 #
-# reference/VALUE_CHANGES_FOR_REVIEW.md lists what CHANGED. This lists
+# reports/VALUE_CHANGES_FOR_REVIEW.md lists what CHANGED. This lists
 # EVERYTHING, changed or not, because "we checked it and it did not move" is
 # also a result a reviewer needs, and because a value that was never examined
 # should be visible as such rather than absent.
 #
 # Four things per value, none of them typed by hand:
 #
-#   July        reference/baseline_defaults.csv, extracted from commit
+#   July        defaults/baseline_defaults.csv, extracted from commit
 #               fbfa1bc (2026-07-10) by scripts/extract_baseline_defaults.R.
-#   Now         reference/defaults_master.csv, the single authority.
+#   Now         defaults/defaults_master.csv, the single authority.
 #   Source      the ipcc_verdict and ipcc_source columns of the master:
 #               the exact table, page and row the value was read from, or
 #               an explicit statement that IPCC publishes nothing.
@@ -32,8 +32,8 @@ suppressMessages({
 
 rd <- function(p) utils::read.csv(p, stringsAsFactors = FALSE,
                                   na.strings = "<NA>", colClasses = "character")
-need <- c("reference/baseline_defaults.csv", "reference/defaults_master.csv",
-          "DEFAULTS_MATRIX.csv")
+need <- c("defaults/baseline_defaults.csv", "defaults/defaults_master.csv",
+          "reports/DEFAULTS_MATRIX.csv")
 for (f in need) if (!file.exists(f))
   stop("missing ", f, ". Run extract_baseline_defaults.R and verify_defaults.R first.",
        call. = FALSE)
@@ -96,7 +96,7 @@ sprintf("All %d numeric values the tool ships. Unlike `VALUE_CHANGES_FOR_REVIEW.
 "| column | what it is |",
 "|---|---|",
 "| **July** | the value at commit `fbfa1bc`, 2026-07-10, the last change before September and the last recorded deployment. Extracted from git by script, never retyped. `(new)` means the row did not exist then. |",
-"| **Now** | the value in `reference/defaults_master.csv`, the single authority every other surface is built from. |",
+"| **Now** | the value in `defaults/defaults_master.csv`, the single authority every other surface is built from. |",
 "| **Source** | the exact IPCC table, page and row the value was read from, or an explicit statement that IPCC publishes nothing for it. |",
 "| **Reach** | how many of the 15 checked surfaces carry this value and whether they agree. `master only` is normal: most values appear on only a few surfaces. |",
 "",
@@ -155,10 +155,10 @@ out <- c(out, "## Verdict glossary", "", "| verdict | meaning |", "|---|---|",
   "Two limits worth stating. The matrix proves the surfaces agree with the R constants; audit check F39 separately proves the R constants are built from the master, by perturbing it and requiring every object to move. And a value carried by no surface is not unchecked: it is verified against IPCC in the source column, it simply is not repeated anywhere else in the app.",
   "")
 
-writeLines(out, "reference/ALL_VALUES.md", useBytes = TRUE)
+writeLines(out, "reports/ALL_VALUES.md", useBytes = TRUE)
 utils::write.csv(
   R[, c("object", "key", "field", "july", "now", "moved", "ipcc_verdict",
         "ipcc_source", "reach", "review_round")],
-  "reference/ALL_VALUES.csv", row.names = FALSE)
-cat(sprintf("wrote reference/ALL_VALUES.md: %d values, %d moved, %d surface disagreements\n",
+  "reports/ALL_VALUES.csv", row.names = FALSE)
+cat(sprintf("wrote reports/ALL_VALUES.md: %d values, %d moved, %d surface disagreements\n",
             nrow(R), sum(R$moved), sum(grepl("DIFFER", R$reach))))

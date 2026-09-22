@@ -21,7 +21,7 @@ The system prompt sent to Claude on every translator call is assembled by `R/ope
 
 ## Re-build
 
-After any change to `reference/defaults_master.csv`, to the template layout vectors, or to a partial:
+After any change to `defaults/defaults_master.csv`, to the template layout vectors, or to a partial:
 
 ```bash
 Rscript scripts/build_translator_kit.R
