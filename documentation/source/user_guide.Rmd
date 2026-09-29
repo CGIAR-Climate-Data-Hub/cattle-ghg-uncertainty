@@ -306,6 +306,21 @@ Sub-categories should match your national inventory. Examples of typical sub-cat
 
 Each sub-category needs its own rows for each relevant parameter. The values of \texttt{cattle\_type}, \texttt{aggregation\_level}, and \texttt{sub\_category} together identify each group uniquely: they must be spelled consistently across all rows for the same group. (If manually entering data, consistency in spelling can be achieved by `dragging' an already-filled cell across unfilled cells, rather than retyping words.)
 
+## If you already measured feed intake
+
+Most inventories let the tool work out how much each animal eats, from body weight, growth, milk yield, pregnancy and activity. If your own data already measures intake, you can supply it instead and skip that step.
+
+Two optional rows appear for every sub-category in the Parameters sheet:
+
+- \texttt{GE}: gross energy intake, in MJ per head per day.
+- \texttt{DMI}: dry matter intake, in kg per head per day. Used only when \texttt{GE} is not given, and converted at the IPCC factor of 18.45 MJ per kg.
+
+\textbf{Leave them blank unless you have a measurement.} A blank cell means "calculate it from the animal performance data", which is the normal case and exactly what earlier versions of the tool did. Fill them in only for the sub-categories where you actually have a figure; you can mix measured and calculated groups in the same inventory. If you enter both, \texttt{GE} is used, because it carries your own measured energy density rather than the IPCC average.
+
+\textbf{You still need milk yield, weight gain and digestibility.} This surprises people, so it is worth being explicit. A measured gross energy replaces the energy calculation, not the nitrogen calculation. Nitrogen excretion works by subtracting the nitrogen retained in milk and in weight gain from the nitrogen eaten, so those inputs still drive your nitrous oxide numbers. Digestibility (\texttt{DE}) is still needed too: once you supply \texttt{GE} it no longer affects enteric methane, but it still decides how much of the feed passes through undigested and becomes manure, and therefore manure methane.
+
+\textbf{Checking which route was used.} The results table has an \textbf{Intake route} column showing, for each group, whether the figure was calculated ("Energy balance") or supplied ("Measured GE" or "Measured DMI"). The same information appears in the run settings of the Excel download and in the Word report, so anyone reviewing your inventory can see how each number was produced. If a group mixes both, it is reported as "Mixed" rather than being labelled with one method.
+
 ## Obtaining uncertainty estimates
 
 \textbf{Refer to the guidance in the IPCC Guidelines Vol.1 Ch.3. In brief:}

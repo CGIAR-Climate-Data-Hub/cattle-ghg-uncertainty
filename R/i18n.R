@@ -169,6 +169,31 @@ lang_state_take <- function(token) {
     fr = "Monte Carlo Approche 2 · Alliance CGIAR / Bioversity-CIAT · financé par le Global Methane Hub"
   ),
 
+  # ---- Measured-intake route (GE / DMI), 2026-09 -----------------------
+  # Route labels. These appear in the results table and in every export, so
+  # a reader can tell how each group reached gross energy without opening
+  # the input file.
+  route_energy_balance = list(en = "Energy balance",
+                                fr = "Bilan énergétique"),
+  route_measured_ge    = list(en = "Measured GE", fr = "EB mesurée"),
+  route_measured_dmi   = list(en = "Measured DMI", fr = "IMS mesurée"),
+  route_mixed          = list(en = "Mixed", fr = "Mixte"),
+  res_col_intake_route = list(en = "Intake route", fr = "Voie d'ingestion"),
+
+  info_measured_intake_label = list(en = "Measured feed intake (optional):",
+                                      fr = "Ingestion alimentaire mesurée (facultatif) :"),
+  info_measured_intake_body = list(
+    en = "If your dataset already measures gross energy intake, enter it as GE in MJ per head per day. If it measures dry matter intake instead, enter DMI in kg per head per day and the tool converts it at the IPCC factor of 18.45 MJ per kg. Fill these cells only for the sub-categories where you have a measurement. Any sub-category left blank is calculated from the animal performance data exactly as before, so one inventory can mix measured and modelled groups. If you enter both, GE is used, because it carries your own measured energy density.",
+    fr = "Si votre jeu de données mesure déjà l'énergie brute ingérée, saisissez-la sous GE en MJ par tête et par jour. S'il mesure plutôt l'ingestion de matière sèche, saisissez DMI en kg par tête et par jour : l'outil la convertit avec le facteur IPCC de 18,45 MJ par kg. Ne remplissez ces cellules que pour les sous-catégories où vous disposez d'une mesure. Toute sous-catégorie laissée vide est calculée à partir des données de performance animale exactement comme avant, de sorte qu'un même inventaire peut mêler groupes mesurés et modélisés. Si vous saisissez les deux, GE est retenue, car elle porte votre propre densité énergétique mesurée."
+  ),
+  info_why_perf_still_needed_label = list(
+    en = "Why milk yield and weight gain are still required:",
+    fr = "Pourquoi la production laitière et le gain de poids restent nécessaires :"),
+  info_why_perf_still_needed_body = list(
+    en = "A measured GE replaces the IPCC energy balance, which is Equations 10.3 to 10.16. It does not replace the nitrogen balance. Nitrogen excretion (Equations 10.32 and 10.33) subtracts the nitrogen retained in milk and in liveweight gain from the nitrogen eaten, so milk yield, milk protein and weight gain still set direct and indirect nitrous oxide from manure and from pasture. Digestibility DE is still required for a similar reason: with GE supplied it no longer affects enteric methane, but it still sets the indigestible share of the feed that becomes volatile solids in Equation 10.24, and therefore manure methane.",
+    fr = "Une GE mesurée remplace le bilan énergétique IPCC, c'est-à-dire les équations 10.3 à 10.16. Elle ne remplace pas le bilan azoté. L'excrétion d'azote (équations 10.32 et 10.33) soustrait l'azote retenu dans le lait et dans le gain de poids vif de l'azote ingéré : la production laitière, la protéine du lait et le gain de poids déterminent donc toujours le N₂O direct et indirect du fumier et du pâturage. La digestibilité DE reste nécessaire pour une raison analogue : avec une GE fournie, elle n'agit plus sur le méthane entérique, mais elle fixe encore la part indigestible de la ration qui devient solides volatils dans l'équation 10.24, et donc le méthane du fumier."
+  ),
+
   # ---- SEO head strings (browser tab title, meta description) ----------
   # The window title deliberately says "Cattle" (the search phrase people
   # use) while the on-page app_title keeps the formal IPCC "Livestock" name.

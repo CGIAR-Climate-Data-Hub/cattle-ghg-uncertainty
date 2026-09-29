@@ -237,6 +237,38 @@ The mean daily gross energy intake ($GE$, MJ head$^{-1}$ day$^{-1}$) is given by
 
 $$GE = \frac{(NE_m + NE_a + NE_l + NE_w + NE_p) / REM + NE_g / REG}{DE / 100}$$
 
+## Two Routes to Gross Energy: Modelled and Measured
+
+Equation 10.16 above infers intake from what the animal does. Its inputs are animal performance: body weight, growth, milk yield, pregnancy and activity. This is the route the tool takes by default, and the only route earlier versions offered.
+
+Many datasets work in the opposite direction. They measure feed intake and feed quality, and so already hold $GE$, or hold dry matter intake ($DMI$) and can convert. Such datasets frequently carry no milk yield or weight gain at all, because nothing in their method required inferring intake. Measured intake is not a lesser input than modelled intake; where it exists it is generally the stronger evidence.
+
+The tool therefore accepts $GE$ or $DMI$ as optional inputs, **per sub-category**:
+
+1. If a usable $GE$ is supplied for a sub-category, it is used directly and Equations 10.3 to 10.16 are not evaluated for that sub-category.
+2. Otherwise, if a usable $DMI$ is supplied, $GE = DMI \times 18.45$.
+3. Otherwise $GE$ is derived from Equation 10.16 exactly as above.
+
+A value is "usable" only if it is present, finite and strictly positive. Blank, missing, zero and negative all mean "not supplied", so a zero intake is never mistaken for a measurement. Because the choice is made per sub-category, one inventory may mix measured and modelled groups, and an inventory that supplies neither is numerically unchanged from earlier versions of the tool.
+
+**$GE$ takes precedence over $DMI$.** A supplied $GE$ carries the dataset's own measured dietary energy density, whereas converting $DMI$ imposes the IPCC figure of 18.45 MJ kg$^{-1}$ dry matter. Where both are given, using $GE$ preserves the user's measurement.
+
+### What a measured intake does not replace
+
+Supplying $GE$ bypasses the energy balance only. Three groups of inputs remain necessary, and this is a frequent source of confusion:
+
+- **Digestible energy $DE$** is still required. With $GE$ supplied it no longer affects enteric methane, but Equation 10.24 still uses it to set the indigestible share of the feed that becomes volatile solids, and hence manure methane.
+- **Milk yield, milk protein content and weight gain** are still required. Equations 10.32 and 10.33 obtain nitrogen excretion by subtracting the nitrogen retained in milk and in liveweight gain from the nitrogen eaten. These inputs therefore continue to determine direct and indirect N$_2$O from both managed manure and pasture.
+- **Crude protein $CP$** is still required, for the same nitrogen-intake term.
+
+### A residual the method itself carries
+
+Equations 10.24 and 10.32 divide by the IPCC constant of 18.45 MJ kg$^{-1}$ dry matter regardless of the user's own feed. A dataset whose measured energy density differs, for instance the 16.5 to 17.6 MJ kg$^{-1}$ typical of tropical forage-based systems, will therefore see that constant applied in the volatile-solids and nitrogen-intake terms even while its own $GE$ is used verbatim for enteric methane. This is a property of the IPCC equations, not a defect in the implementation, and it is documented here so it is not mistaken for one.
+
+### Reporting which route was used
+
+Every run records, for each sub-category, whether gross energy was modelled or measured. The label appears in the results table in the application, in the run-settings sheet of the Excel export, and in the Word report. Where an inventory mixes routes, the split is stated explicitly rather than a single method being implied.
+
 ## Enteric Fermentation Emission Factor
 
 The per-head per-day methane emission factor for enteric fermentation ($EF_1$, kg CH$_4$ head$^{-1}$ day$^{-1}$) is given by IPCC Eq. 10.21:

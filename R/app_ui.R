@@ -1520,7 +1520,17 @@ app_ui <- function(request = NULL) {
       div(class = "info-panel", style = "margin: 16px;",
           tags$p(
             tags$strong(paste0(t("what_to_do_label"), " ")),
-            t("info_unc_what")
+            t("info_unc_what"),
+            # Measured-intake route (2026-09). Placed here because this is the
+            # tab where a user actually sees the GE and DMI rows, and the
+            # second paragraph pre-empts the obvious question: if GE is
+            # supplied, why does the tool still want milk and weight gain?
+            tags$br(), tags$br(),
+            tags$strong(paste0(t("info_measured_intake_label"), " ")),
+            t("info_measured_intake_body"),
+            tags$br(), tags$br(),
+            tags$strong(paste0(t("info_why_perf_still_needed_label"), " ")),
+            t("info_why_perf_still_needed_body")
           ),
           tags$p(
             tags$strong(paste0(t("info_unc_triangular_label"), " ")),

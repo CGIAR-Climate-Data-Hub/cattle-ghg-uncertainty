@@ -127,6 +127,10 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
       Setting = c("Iterations", "AD correlations", "EF correlations",
                   "Comparison run (no corr.)", "GWP basis", "Seed",
                   "Analysis mode", "Emission sources",
+                  # Measured-intake route (2026-09). Says which groups used
+                  # the IPCC energy balance and which supplied a measured
+                  # intake, so the workbook is self-describing.
+                  "Intake route",
                   "QA/QC checks ignored or repaired"),
       Value   = c(
         as.character(settings$n_iter %||% NA),
@@ -137,6 +141,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
         as.character(settings$seed %||% NA),
         as.character(settings$analysis_mode %||% NA),
         paste(settings$emission_sources %||% character(0), collapse = ", "),
+        as.character(settings$intake_routes %||% "Energy balance"),
         if (is.null(qa_caveats) || nrow(qa_caveats) == 0) "none"
         else paste0(nrow(qa_caveats), " (see sheet QA_Caveats)")
       ),

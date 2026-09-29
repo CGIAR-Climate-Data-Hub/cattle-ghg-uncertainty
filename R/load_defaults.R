@@ -132,3 +132,38 @@
   d <- d[order(d$row_order), ]
   as.list(stats::setNames(.master_coerce(d$value), d$key))
 }
+
+# ---------------------------------------------------------------------------
+# Measured-intake route (2026-09)
+# ---------------------------------------------------------------------------
+
+# The catalogue parameters a user may supply INSTEAD of having the value
+# derived. Lazy (a function, not a constant) for the same reason .cat_default()
+# is: app.R sources R/ alphabetically and PARAM_CATALOGUE is built in
+# utils_template.R, which sorts after this file, so a top-level constant here
+# would be evaluated before the catalogue exists.
+measured_params <- function() {
+  PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier == "optional"]
+}
+
+# Which route a set of parameter rows takes to gross energy.
+#
+# Deterministic from the inputs alone: it depends only on whether GE or DMI
+# carries a usable value, never on the simulation. Computing it here rather
+# than tracking it through the Monte Carlo makes it impossible for the label
+# and the arithmetic to disagree, which is the failure that would matter most
+# in an inventory someone has to defend.
+#
+# Returns one of "energy_balance", "measured_ge" or "measured_dmi". The
+# usable() test matches resolve_ge() exactly: NA, non-finite and values <= 0
+# all mean "not supplied".
+intake_route <- function(param_specs) {
+  usable <- function(p) {
+    if (is.null(param_specs) || !nrow(param_specs)) return(FALSE)
+    v <- suppressWarnings(as.numeric(param_specs$mean[param_specs$parameter == p]))
+    length(v) > 0L && any(!is.na(v) & is.finite(v) & v > 0)
+  }
+  if (usable("GE"))  return("measured_ge")
+  if (usable("DMI")) return("measured_dmi")
+  "energy_balance"
+}

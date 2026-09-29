@@ -773,7 +773,11 @@ build_trend_summary_docx <- function(path,
     c("Seed",                  .as_str(s$seed,         "(random)")),
     c("Analysis mode",         .as_str(s$analysis_mode, "single-year")),
     c("Emission sources",
-      if (length(s$emission_sources)) paste(s$emission_sources, collapse = ", ") else "(none)")
+      if (length(s$emission_sources)) paste(s$emission_sources, collapse = ", ") else "(none)"),
+    # Measured-intake route (2026-09). A narrative report that does not say
+    # which groups bypassed the IPCC energy balance cannot be reproduced from
+    # its own text, so the split is stated here rather than implied.
+    c("Intake route", .as_str(s$intake_routes, "Energy balance"))
   )
   df <- do.call(rbind.data.frame, c(rows, list(stringsAsFactors = FALSE)))
   names(df) <- c("Setting", "Value")

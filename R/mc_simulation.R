@@ -256,6 +256,11 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
         nrow(sim$samples) > keep_sample_rows) {
       sim$samples <- sim$samples[seq_len(keep_sample_rows), , drop = FALSE]
     }
+    # Record HOW this system reached gross energy, so the results can say so.
+    # Derived from the inputs, not from the simulation, so the label and the
+    # arithmetic cannot disagree. Every inventory written before the
+    # measured-intake route existed reports "energy_balance" here.
+    sim$intake_route <- intake_route(sys$param_specs)
     by_system[[sys_name]] <- sim
     # Keep-alive heartbeat (no-op when progress_cb is NULL).
     if (is.function(progress_cb)) {

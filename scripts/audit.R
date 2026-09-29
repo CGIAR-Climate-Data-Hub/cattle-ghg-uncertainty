@@ -3350,6 +3350,167 @@ section_F <- function() {
                notes = if (f49_ok) "all fixtures behaved" else paste(utils::head(f49_fail, 4), collapse = "; "))
   }
 
+  # ---------------------------------------------------------------------
+  # F50-F56 -- the measured-intake route (GE / DMI), added 2026-09.
+  #
+  # A user who already measured feed intake can supply gross energy, or dry
+  # matter intake, instead of having it derived from animal performance. The
+  # switch is per sub-category: a value present is used, blank falls back to
+  # the IPCC energy balance. These checks exist because the failure modes are
+  # all silent: a zero GE would empty the inventory, a broken fallback would
+  # change every historical result, and a divergence between the two engines
+  # would only show up as a number nobody can reproduce.
+  # ---------------------------------------------------------------------
+  .mi_base <- function() {
+    fb <- default_mms_fallback()
+    list(cattle_pop = 100000, live_weight = 400, weight_gain = 0,
+         mature_weight = 500, milk_yield = 5, milk_fat = 4, pct_pregnant = 0.6,
+         hours = 0, DE = 65, Cfi = 0.386, Ca = 0.17, C_growth = 0.8, Cp = 0.1,
+         Ym = 6.5, Bo = 0.13, ASH = 0.08, UE = 0.04, CP = 15,
+         mms_fractions = fb$fractions, mcf_values = fb$mcf, ef3_values = fb$ef3,
+         EF3_PRP = 0.006, Frac_GASMS = 0.21, EF4 = 0.01, EF5 = 0.0075,
+         Frac_LEACH_H = 0.02)
+  }
+  .mi_S <- function(...) do.call(ghg_emissions,     c(.mi_base(), list(...)))
+  .mi_V <- function(...) do.call(ghg_emissions_vec, c(.mi_base(), list(...)))
+  .mi_tot <- function(r) sum(unlist(r$total_co2e))
+
+  # F50 -- THE regression guard. With no override supplied, resolve_ge() must
+  # hand back the derived value as the SAME OBJECT, so every inventory written
+  # before this feature is bit-for-bit unchanged. identical(), not all.equal():
+  # a tolerance would hide exactly the drift this is here to catch.
+  f50_ok <- tryCatch({
+    chain <- c(100, 200, 300)
+    identical(resolve_ge(chain), chain) &&
+      identical(resolve_ge(chain, NULL, NULL), chain) &&
+      identical(.mi_S(GE_measured = NA_real_, DMI_measured = NA_real_)$ge,
+                .mi_S()$ge)
+  }, error = function(e) FALSE)
+  check_bool("F50", "F",
+             "No measured intake supplied leaves the derived GE untouched (identical, not merely equal)",
+             f50_ok,
+             notes = if (f50_ok) "derived path returns the same object; all-NA override falls back exactly"
+                     else "the no-override path changed: every historical inventory would move")
+
+  # F51 -- a supplied GE really does bypass the chain, and every downstream
+  # consumer reads it. Hand-computed, so it cannot drift with the code.
+  f51_fail <- tryCatch({
+    f <- character(0)
+    d <- .mi_S(); g <- .mi_S(GE_measured = 200)
+    if (!isTRUE(all.equal(g$ge, 200)))            f <- c(f, "GE not taken verbatim")
+    if (isTRUE(all.equal(g$ge, d$ge)))            f <- c(f, "chain was not bypassed")
+    want_ent <- 200 * (6.5 / 100) * 365 / 55.65
+    if (!isTRUE(all.equal(g$enteric_ch4_head, want_ent, tolerance = TOL_REL)))
+      f <- c(f, "enteric CH4 does not follow Eq 10.21 from the supplied GE")
+    want_vs <- (200 * (1 - 65 / 100) + 0.04 * 200) * ((1 - 0.08) / 18.45)
+    if (!isTRUE(all.equal(unname(g$VS), want_vs, tolerance = TOL_REL)))
+      f <- c(f, "VS does not follow Eq 10.24 from the supplied GE")
+    f
+  }, error = function(e) conditionMessage(e))
+  f51_ok <- length(f51_fail) == 0L
+  check_bool("F51", "F",
+             "A supplied GE bypasses the energy balance and feeds enteric CH4 (Eq 10.21) and VS (Eq 10.24)",
+             f51_ok,
+             notes = if (f51_ok) "GE = 200 reproduces the hand-computed enteric and VS terms"
+                     else paste(utils::head(f51_fail, 3), collapse = "; "))
+
+  # F52/F53 -- DMI converts at the IPCC 18.45, and GE wins when both are given.
+  # GE must win because it carries the dataset's own measured energy density;
+  # converting DMI imposes 18.45 and would silently shift the answer.
+  f52_ok <- tryCatch(
+    isTRUE(all.equal(.mi_S(DMI_measured = 200 / 18.45)$ge, .mi_S(GE_measured = 200)$ge)),
+    error = function(e) FALSE)
+  check_bool("F52", "F",
+             "A supplied DMI converts to GE at the IPCC 18.45 MJ per kg dry matter",
+             f52_ok,
+             notes = if (f52_ok) "DMI = 200/18.45 reproduces GE = 200 exactly" else "conversion wrong or absent")
+
+  f53_ok <- tryCatch({
+    both <- .mi_S(GE_measured = 200, DMI_measured = 5)
+    isTRUE(all.equal(both$ge, 200)) && !isTRUE(all.equal(both$ge, 5 * 18.45))
+  }, error = function(e) FALSE)
+  check_bool("F53", "F",
+             "GE takes precedence over DMI when a sub-category supplies both",
+             f53_ok,
+             notes = if (f53_ok) "GE used, DMI ignored for the energy step" else "precedence wrong")
+
+  # F54 -- the two engines must agree under the override as well as without it.
+  # The scalar engine is the audit reference; the vectorised one is what runs.
+  f54_fail <- tryCatch({
+    f <- character(0)
+    combos <- list(list(), list(GE_measured = 200), list(DMI_measured = 200 / 18.45),
+                   list(GE_measured = 200, DMI_measured = 5))
+    labs <- c("neither", "GE only", "DMI only", "both")
+    for (k in seq_along(combos)) {
+      s <- .mi_tot(do.call(.mi_S, combos[[k]]))
+      v <- .mi_tot(do.call(.mi_V, combos[[k]]))
+      if (!isTRUE(all.equal(s, v, tolerance = 0)))
+        f <- c(f, sprintf("scalar/vec disagree (%s): %.10f vs %.10f", labs[k], s, v))
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  f54_ok <- length(f54_fail) == 0L
+  check_bool("F54", "F",
+             "Scalar and vectorised engines agree exactly under every measured-intake combination",
+             f54_ok,
+             notes = if (f54_ok) "identical totals for neither / GE / DMI / both"
+                     else paste(utils::head(f54_fail, 2), collapse = "; "))
+
+  # F55 -- zero, negative and non-finite mean "not supplied". A zero intake is
+  # never a real measurement, and honouring it would zero enteric CH4, VS and
+  # Nex at once: an empty inventory that reads like a data problem, not a bug.
+  f55_fail <- tryCatch({
+    f <- character(0); d <- .mi_S()$ge
+    for (bad in list(0, -5, NaN, Inf, NA_real_)) {
+      got <- .mi_S(GE_measured = bad)$ge
+      if (!isTRUE(all.equal(got, d)))
+        f <- c(f, paste("GE =", format(bad), "was treated as a measurement"))
+    }
+    if (!isTRUE(all.equal(.mi_S(DMI_measured = 0)$ge, d)))
+      f <- c(f, "DMI = 0 was treated as a measurement")
+    f
+  }, error = function(e) conditionMessage(e))
+  f55_ok <- length(f55_fail) == 0L
+  check_bool("F55", "F",
+             "Zero, negative and non-finite intakes count as not supplied and fall back to the energy balance",
+             f55_ok,
+             notes = if (f55_ok) "0, -5, NaN, Inf and NA all fall back"
+                     else paste(utils::head(f55_fail, 3), collapse = "; "))
+
+  # F56 -- structural. The override must be resolved identically in both
+  # engines. Comparing the source text is the only thing that keeps them from
+  # drifting the way Frac_LEACH_PRP and MilkPR once did.
+  f56_ok <- tryCatch({
+    src <- readLines("R/calc_ghg_master.R", warn = FALSE)
+    # Comments legitimately name the function (both engine signatures point
+    # the reader at it), so match the assignment itself, not the mention.
+    src <- src[!grepl("^\\s*#", src)]
+    hits <- grep("<-\\s*resolve_ge\\(", src, value = TRUE)
+    hits <- trimws(gsub("[[:space:]]+", " ", hits))
+    length(hits) == 2L && hits[1] == hits[2]
+  }, error = function(e) FALSE)
+  check_bool("F56", "F",
+             "Both engines resolve the measured intake with a textually identical expression",
+             f56_ok,
+             notes = if (f56_ok) "two call sites, same expression"
+                     else "the scalar and vectorised override expressions differ or are not both present")
+
+  # F57 -- GE and DMI must never reach .cat_default(), which returns 0 for a
+  # parameter with no published default. For N that is safe (zero head); for
+  # GE it is a silently empty inventory.
+  f57_ok <- tryCatch({
+    src <- readLines("R/mc_simulation.R", warn = FALSE)
+    src <- src[!grepl("^\\s*#", src)]
+    !any(grepl('get_param\\(\\s*"(GE|DMI)"', src)) &&
+      any(grepl('get_param_measured\\(\\s*"GE"', src)) &&
+      any(grepl('get_param_measured\\(\\s*"DMI"', src))
+  }, error = function(e) FALSE)
+  check_bool("F57", "F",
+             "Measured intake is read with the non-defaulting getter, never through get_param",
+             f57_ok,
+             notes = if (f57_ok) "GE and DMI use get_param_measured; .cat_default cannot zero them"
+                     else "GE or DMI can reach .cat_default(), which returns 0 and would empty the inventory")
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

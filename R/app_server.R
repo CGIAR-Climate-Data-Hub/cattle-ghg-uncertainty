@@ -2695,6 +2695,55 @@ app_server <- function(input, output, session) {
     out
   }
 
+  # One-line summary of the intake routes across the whole run, for the
+  # exports. Reads "Energy balance (all 9 groups)" on any inventory written
+  # before the measured-intake route existed, and names the split otherwise,
+  # e.g. "Energy balance (5 groups), measured GE (4 groups)".
+  .intake_route_summary <- function() {
+    by_sys <- rv$mc_results$by_system
+    if (is.null(by_sys) || !length(by_sys)) return(NA_character_)
+    routes <- vapply(by_sys, function(s) {
+      r <- s$intake_route
+      if (is.null(r)) "energy_balance" else r
+    }, character(1))
+    tab <- table(routes)
+    lab <- c(energy_balance = t("route_energy_balance"),
+             measured_ge    = t("route_measured_ge"),
+             measured_dmi   = t("route_measured_dmi"))
+    if (length(tab) == 1L)
+      return(sprintf("%s (all %d group(s))", lab[[names(tab)[1]]], sum(tab)))
+    paste(vapply(names(tab), function(k)
+      sprintf("%s (%d group(s))", lab[[k]], tab[[k]]), character(1)),
+      collapse = ", ")
+  }
+
+  # Which intake route the systems behind an aggregated group took. A group
+  # can span several systems, and after the 2026-09 measured-intake route
+  # those systems need not agree, so "Mixed" is a real answer and must be
+  # reported rather than papered over: a report that names a single method for
+  # a group that used two is not reproducible.
+  .route_label_for_group <- function(level, group_name) {
+    by_sys <- rv$mc_results$by_system
+    sys_names <- names(by_sys)
+    if (length(sys_names) == 0) return(NA_character_)
+    parts <- strsplit(sys_names, "\\|\\|", fixed = FALSE)
+    idx <- switch(level, "cattle_type" = 1, "aggregation_level" = 2,
+                  "sub_category" = 3, 1)
+    keys <- sapply(parts, function(p) {
+      if (length(p) >= idx && nzchar(p[idx])) p[idx] else paste(p, collapse = " / ")
+    })
+    members <- sys_names[keys == group_name]
+    routes <- unique(vapply(members, function(sn) {
+      r <- by_sys[[sn]]$intake_route
+      if (is.null(r)) "energy_balance" else r
+    }, character(1)))
+    if (length(routes) != 1L) return(t("route_mixed"))
+    switch(routes,
+           measured_ge  = t("route_measured_ge"),
+           measured_dmi = t("route_measured_dmi"),
+           t("route_energy_balance"))
+  }
+
   # Andreas 28/5/26 #7.1: tell the UI whether the inventory has more than
   # one cattle_type so the headline-split card can show/hide automatically.
   output$has_multi_cattle_type <- reactive({
@@ -2764,6 +2813,10 @@ app_server <- function(input, output, session) {
         moe  = round(((hi - lo) / 2) / m * 100, 1),
         lo   = round(lo, 2),
         hi   = round(hi, 2),
+        # How this group reached gross energy. Visible here so a reader does
+        # not have to download anything to know whether a number came from
+        # the energy balance or from a measured intake.
+        route = .route_label_for_group(level, gn),
         check.names = FALSE
       )
     })
@@ -2771,7 +2824,8 @@ app_server <- function(input, output, session) {
     names(df) <- c(t("res_col_group"), t("res_col_mean_ch4_t"),
                     t("res_col_mean_n2o_t"), t("res_col_mean_co2e_t"),
                     t("res_col_moe_pct"),
-                    t("res_col_ci_lower_t"), t("res_col_ci_upper_t"))
+                    t("res_col_ci_lower_t"), t("res_col_ci_upper_t"),
+                    t("res_col_intake_route"))
     DT::datatable(df, rownames = FALSE,
                   options = list(pageLength = 20, scrollX = TRUE))
   })
@@ -3431,7 +3485,11 @@ app_server <- function(input, output, session) {
           gwp_version      = input$gwp_version,
           seed             = input$seed,
           analysis_mode    = input$analysis_mode,
-          emission_sources = input$emission_sources
+          emission_sources = input$emission_sources,
+          # How each group reached gross energy. An inventory report that
+          # does not say which groups bypassed the energy balance is not
+          # reproducible, so this travels with every export.
+          intake_routes    = .intake_route_summary()
         )
       )
     }
