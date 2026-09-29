@@ -188,3 +188,7 @@ project_history/
 # Translator sign-in whitelist: real email addresses. Stays in the working
 # tree (the shinyapps deploy bundles working-tree files), never in git.
 config/approved_users.csv
+
+# Returned beta feedback files name their reviewer: local only, like the
+# rest of the reviewer correspondence.
+documentation/beta_test/beta_feedback_template_for_uncertainty_tool_*.xlsx
