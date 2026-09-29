@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/</loc><priority>1.0</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/ipcc-table-3-3.html</loc><priority>0.8</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/approach-1-vs-approach-2.html</loc><priority>0.8</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/enteric-fermentation-uncertainty.html</loc><priority>0.8</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/faq.html</loc><priority>0.8</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/overview.md</loc><priority>0.4</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/methodology-summary.md</loc><priority>0.4</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/faq.md</loc><priority>0.4</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/assets/methodology.pdf</loc><priority>0.5</priority></url>
+  <url><loc>https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/assets/user_guide.pdf</loc><priority>0.5</priority></url>
+</urlset>

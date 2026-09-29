@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cattle GHG Uncertainty Calculator: frequently asked questions</title>
+  <meta name="description" content="Answers on the free IPCC Approach 2 Monte Carlo tool for cattle GHG inventories: data needs, data privacy, iterations, trend analysis, species scope, reporting conventions and citation.">
+  <link rel="canonical" href="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/faq.html">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="assets/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is there a free IPCC Approach 2 Monte Carlo tool for livestock GHG inventories?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The Cattle GHG Uncertainty Calculator is a free, open-source (MIT) web tool that runs IPCC Approach 2 Monte Carlo uncertainty analysis over the full IPCC 2006 Tier 2 cattle equation chain, in the browser, with no installation or account. It was developed by the Alliance of Bioversity International and CIAT (CGIAR) with funding from the Global Methane Hub." }
+      },
+      {
+        "@type": "Question",
+        "name": "What data do I need to run it?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The herd performance data a Tier 2 inventory already uses: animal populations by category, body weights, growth rates, milk yield and fat content, diet digestibility, and manure management shares. Every IPCC coefficient is pre-filled with its default value and default uncertainty range, and anything you cannot supply is auto-filled from the IPCC catalogue and flagged. Two hypothetical example datasets let you explore the tool without any data." }
+      },
+      {
+        "@type": "Question",
+        "name": "Is my country data uploaded anywhere?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The Monte Carlo analysis runs on the app server for the duration of your session and results exist only in your browser and your downloads; the tool stores no inventory database. The optional AI data-translation assistant does send the uploaded file to a third-party AI service, so ministries with policies restricting pre-publication data sharing should fill the Excel template manually instead of using that assistant." }
+      },
+      {
+        "@type": "Question",
+        "name": "How many Monte Carlo iterations should I use?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Use 10,000 as the working minimum and 25,000 to 30,000 for final reporting. To check convergence, re-run with a different random seed: if the 95% margin of error moves by more than about 2 percentage points, increase the iteration count." }
+      },
+      {
+        "@type": "Question",
+        "name": "How is uncertainty reported?",
+        "acceptedAnswer": { "@type": "Answer", "text": "In the IPCC Table 3.3 convention: the half-width of the 95% confidence interval as a percentage of the mean (the 95% margin of error), split into activity-data, emission-factor and combined components per source category. Outputs download as Excel, CSV and a full Word report." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can it analyse trend uncertainty between years?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The trend mode runs a multi-year Monte Carlo with year-to-year correlation of emission factors per IPCC Vol. 1 Ch. 3, reporting the trend slope and the change between first and last year with their own 95% confidence intervals." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it cover species other than cattle, or Tier 1 inventories?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The current release implements the full Tier 2 chain for cattle (dairy and other cattle, with user-defined sub-categories). It does not produce Tier 1 estimates; Tier 1 uncertainty is usually tractable with Approach 1. Extension to other ruminant species is on the development agenda." }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I cite the tool?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Alliance of Bioversity International and CIAT (CGIAR) (2026). IPCC Tier 2 Livestock GHG Uncertainty Calculator (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty" }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+<main>
+<p class="crumb"><a href="./">Cattle GHG Uncertainty Calculator</a> / FAQ</p>
+<h1 style="color: var(--dgreen)">Frequently asked questions</h1>
+
+<h2>Is there a free IPCC Approach 2 Monte Carlo tool for livestock GHG inventories?</h2>
+<p>Yes. The <a href="./">Cattle GHG Uncertainty Calculator</a> is a free, open-source (MIT) web tool that runs IPCC Approach 2 Monte Carlo uncertainty analysis over the full IPCC 2006 Tier 2 cattle equation chain, in the browser, with no installation and no account. It was developed by the Alliance of Bioversity International and CIAT (CGIAR) with funding from the Global Methane Hub.</p>
+
+<h2>What data do I need to run it?</h2>
+<p>The herd performance data a Tier 2 inventory already uses: animal populations by category, body weights, growth rates, milk yield and fat content, diet digestibility (DE), and manure management system shares. Every IPCC coefficient is pre-filled with its default value and default uncertainty range, and any parameter you cannot supply is auto-filled from the IPCC catalogue and flagged as such. Two hypothetical example datasets (a dairy and a pastoral system) are built in, so you can explore everything before touching your own data.</p>
+
+<h2>Is my country data uploaded anywhere?</h2>
+<p>The simulation runs on the app server for the duration of your session; results exist only in your browser and in the files you download, and the tool keeps no inventory database. One exception to know about: the optional AI data-translation assistant sends your uploaded file to a third-party AI service to do the column mapping. Ministries with policies restricting upload of pre-publication data to external AI services should fill the Excel template manually instead of using that assistant; the rest of the tool works identically either way.</p>
+
+<h2>How many Monte Carlo iterations should I use?</h2>
+<p>Use 10,000 as the working minimum, and 25,000 to 30,000 for final reporting, especially with correlations enabled or many sub-categories. Convergence check: re-run with a different random seed; if the 95% margin of error moves by more than about 2 percentage points, increase the iterations.</p>
+
+<h2>How is uncertainty reported?</h2>
+<p>In the IPCC Table 3.3 convention: the half-width of the 95% confidence interval as a percentage of the mean (the 95% margin of error, MoE), split into activity-data, emission-factor and combined components per source category. See <a href="ipcc-table-3-3.html">IPCC Table 3.3 explained</a>.</p>
+
+<h2>Can it analyse trend uncertainty between years?</h2>
+<p>Yes. Trend mode runs a multi-year Monte Carlo with year-to-year correlation of emission factors (IPCC Vol. 1 Ch. 3), reporting the trend slope and the first-to-last-year change with their own 95% confidence intervals.</p>
+
+<h2>Does it cover other species, or Tier 1?</h2>
+<p>The current release implements the full Tier 2 chain for cattle (dairy and other cattle, with user-defined sub-categories and production systems). It does not produce Tier 1 estimates, whose uncertainty is usually tractable with Approach 1 error propagation. Extension to other ruminant species is on the development agenda.</p>
+
+<h2>How do I cite it?</h2>
+<p class="cite">Alliance of Bioversity International and CIAT (CGIAR) (2026). <em>IPCC Tier 2 Livestock GHG Uncertainty Calculator</em> (software). <a href="https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty">github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty</a></p>
+
+<p><a class="btn btn-primary" href="https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/?ref=faq">Launch the calculator</a></p>
+</main>
+<footer>Alliance of Bioversity International and CIAT (CGIAR) · CGIAR Climate Action Programme · funded by the Global Methane Hub</footer>
+</body>
+</html>

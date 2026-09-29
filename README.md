@@ -1,12 +1,15 @@
 # IPCC Tier 2 Livestock GHG Uncertainty Calculator
 
 [![Launch App](https://img.shields.io/badge/Launch%20App-shinyapps.io-2D6A4F?style=for-the-badge&logo=r)](https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/)
+[![Website](https://img.shields.io/badge/Website-cattle--ghg--uncertainty-1B4332?style=for-the-badge)](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/)
 [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/HEAD?urlpath=shiny)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![R](https://img.shields.io/badge/R-%3E%3D4.3-276DC3?logo=r)](https://www.r-project.org/)
 [![audit](https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/actions/workflows/audit.yml/badge.svg)](https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/actions/workflows/audit.yml)
 
-A web-based tool for national cattle GHG inventory teams to quantify and report uncertainty in their IPCC Tier 2 emission estimates. Upload your country data, run 10,000 Monte Carlo simulations, and download results formatted directly for IPCC Table 3.3: no coding required. An in-app **AI Translator** turns raw country data files (in any shape, any language) into the strict input template before you analyse.
+A free, web-based **cattle GHG uncertainty calculator** for national inventory teams to quantify and report uncertainty in their IPCC Tier 2 emission estimates. Upload your country data, run 10,000 Monte Carlo simulations, and download results formatted directly for IPCC Table 3.3: no coding required. An in-app **AI Translator** turns raw country data files (in any shape, any language) into the strict input template before you analyse.
+
+**Who is this for.** National GHG inventory compilers preparing Biennial Transparency Reports (BTRs), Biennial Update Reports (BURs) and National Inventory Reports (NIRs) under the UNFCCC Enhanced Transparency Framework (ETF) who need **IPCC Approach 2 (Monte Carlo) uncertainty estimates** for livestock, rather than Approach 1 error propagation. The tool implements the full IPCC 2006 Vol. 4 Ch. 10/11 Tier 2 equation chain for cattle (enteric fermentation CH₄, manure management CH₄ and N₂O, pasture deposition N₂O) and reports uncertainty in the IPCC 2006 Vol. 1 Ch. 3 Table 3.3 convention (95% margin of error as a percentage of the mean), split into activity-data, emission-factor and combined components.
 
 **Developed by** the CGIAR Alliance of Bioversity International and CIAT, under the **CGIAR Climate Action Programme**
 **Funded by** Global Methane Hub (Grant R-2026-01051)
@@ -91,7 +94,8 @@ cattle-ghg-uncertainty/
 │                                    #   AI translator (chat_ui, anthropic_client, auth, history, usage log)
 ├── www/                             # Everything the app serves: logos, CSS, built guides (PDF/DOCX),
 │                                    #   Find-out-more HTML pages, translator kit files
-├── config/                          # approved_users.csv, the translator sign-in whitelist
+├── config/                          # translator sign-in whitelist (approved_users.example.csv shows the
+│                                    #   shape; the real list is untracked and stays out of git)
 ├── defaults/                        # THE numbers the tool ships: defaults_master.csv (single authority),
 │                                    #   baseline_defaults.csv (July 2026 values), provenance_register.md,
 │                                    #   DEFAULTS_MASTER.md (readable rendering)
@@ -146,6 +150,16 @@ This tool was developed as part of project **D614: GMH Emissions Uncertainty** f
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="www/gmh_logo.png" alt="Global Methane Hub" height="80">
 </p>
+
+---
+
+## Citation
+
+If you use this tool in your inventory work or research, please cite it (see [CITATION.cff](CITATION.cff), rendered by GitHub's "Cite this repository" button):
+
+> Alliance of Bioversity International and CIAT (CGIAR) (2026). *IPCC Tier 2 Livestock GHG Uncertainty Calculator* (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
+
+A DOI badge will appear here once the first archived release is minted.
 
 ---
 

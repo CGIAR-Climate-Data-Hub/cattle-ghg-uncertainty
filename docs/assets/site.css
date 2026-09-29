@@ -1,0 +1,92 @@
+/* Website styles for the Cattle GHG Uncertainty Calculator (GitHub Pages).
+   Matches the app branding: greens on warm off-white, DM Sans. */
+:root {
+  --green: #2D6A4F;
+  --dgreen: #1B4332;
+  --lgreen: #95D5B2;
+  --bg: #F7F5F0;
+  --card: #FFFFFF;
+  --text: #1A1A1A;
+  --muted: #5f6b63;
+  --border: #e3e0d8;
+  --red: #C1121F;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141815;
+    --card: #1d231f;
+    --text: #edeae2;
+    --muted: #a8b3aa;
+    --border: #2e3630;
+    --dgreen: #95D5B2;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DM Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+.hero {
+  background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
+  color: #fff;
+  padding: 64px 24px 56px;
+  text-align: center;
+}
+.hero h1 { font-size: 2.6rem; margin: 0 0 6px; letter-spacing: 0.3px; }
+.hero .subtitle { font-size: 1.15rem; opacity: 0.92; margin: 0 auto 8px; max-width: 760px; }
+.hero .tagline { font-size: 1rem; opacity: 0.8; margin: 0 auto 28px; max-width: 680px; }
+.btn {
+  display: inline-block;
+  padding: 13px 28px;
+  margin: 6px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+.btn-primary { background: #95D5B2; color: #1B4332; }
+.btn-primary:hover { background: #b7e4c7; }
+.btn-secondary { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.45); }
+.btn-secondary:hover { background: rgba(255,255,255,0.22); }
+.hero .note { font-size: 0.88rem; opacity: 0.75; margin-top: 10px; }
+main { max-width: 900px; margin: 0 auto; padding: 24px 20px 64px; }
+h2 { color: var(--dgreen); font-size: 1.5rem; margin-top: 48px; }
+h3 { color: var(--dgreen); }
+a { color: var(--green); }
+@media (prefers-color-scheme: dark) { a { color: #95D5B2; } }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin: 16px 0;
+}
+figure { margin: 24px 0; text-align: center; }
+figure img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; }
+figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 6px; }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 0.95rem; }
+th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: rgba(45, 106, 79, 0.08); color: var(--dgreen); }
+.table-wrap { overflow-x: auto; }
+.muted { color: var(--muted); font-size: 0.9rem; }
+.logos { display: flex; gap: 32px; justify-content: center; align-items: center; flex-wrap: wrap; margin: 24px 0; }
+.logos img { max-height: 64px; width: auto; }
+footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 20px 40px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.cite {
+  background: rgba(45, 106, 79, 0.07);
+  border-left: 4px solid var(--green);
+  padding: 14px 18px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+.crumb { font-size: 0.9rem; margin: 18px 0 0; }

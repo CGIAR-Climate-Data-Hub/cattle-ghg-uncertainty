@@ -1,0 +1,38 @@
+{
+  "title": "IPCC Tier 2 Livestock GHG Uncertainty Calculator",
+  "upload_type": "software",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Alliance of Bioversity International and CIAT (CGIAR)"
+    }
+  ],
+  "description": "Free web-based cattle GHG uncertainty calculator for national greenhouse-gas inventory compilers: Monte Carlo (IPCC Approach 2) uncertainty analysis of IPCC Tier 2 cattle emission estimates (enteric fermentation CH4, manure management CH4 and N2O, pasture deposition N2O), with correlated sampling, activity-data vs emission-factor decomposition, sensitivity analysis (SRC and PRCC), trend uncertainty, and outputs formatted for IPCC 2006 Vol. 1 Ch. 3 Table 3.3 and UNFCCC Enhanced Transparency Framework reporting. Live app: https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/ . Website: https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/ . Developed by the Alliance of Bioversity International and CIAT under the CGIAR Climate Action Programme.",
+  "notes": "Funded by the Global Methane Hub, grant R-2026-01051 (project D614: GMH Emissions Uncertainty).",
+  "keywords": [
+    "GHG inventory",
+    "IPCC Tier 2",
+    "Monte Carlo",
+    "uncertainty analysis",
+    "livestock",
+    "cattle",
+    "enteric fermentation",
+    "methane",
+    "nitrous oxide",
+    "UNFCCC",
+    "Enhanced Transparency Framework",
+    "national inventory"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/",
+      "relation": "isDescribedBy",
+      "scheme": "url"
+    }
+  ]
+}

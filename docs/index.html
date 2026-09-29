@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cattle GHG Uncertainty Calculator | IPCC Tier 2 Monte Carlo (Approach 2)</title>
+  <meta name="description" content="Free web tool for national GHG inventory teams: Monte Carlo (IPCC Approach 2) uncertainty analysis for Tier 2 cattle emissions, with IPCC Table 3.3 outputs. No installation, no login.">
+  <!-- Canonical/site URL constants: when a custom domain replaces the
+       github.io URL, update the canonical, og:url and og:image below, plus
+       .SEO_SITE_URL in the app's R/app_ui.R. -->
+  <link rel="canonical" href="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <meta property="og:title" content="Cattle GHG Uncertainty Calculator | IPCC Tier 2 Monte Carlo">
+  <meta property="og:description" content="Free web tool: Monte Carlo (IPCC Approach 2) uncertainty analysis for Tier 2 cattle GHG inventories, with IPCC Table 3.3 outputs.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/">
+  <meta property="og:image" content="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/assets/og_image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cattle GHG Uncertainty Calculator | IPCC Tier 2 Monte Carlo">
+  <meta name="twitter:description" content="Free web tool: Monte Carlo (IPCC Approach 2) uncertainty analysis for Tier 2 cattle GHG inventories, with IPCC Table 3.3 outputs.">
+  <meta name="twitter:image" content="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/assets/og_image.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="assets/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Cattle GHG Uncertainty Calculator (IPCC Tier 2 Livestock GHG Uncertainty Calculator)",
+    "url": "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/",
+    "sameAs": [
+      "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty",
+      "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/"
+    ],
+    "description": "Free web tool for national GHG inventory teams: Monte Carlo (IPCC Approach 2) uncertainty analysis for Tier 2 cattle emissions, with IPCC Table 3.3 outputs.",
+    "applicationCategory": "Scientific/Engineering",
+    "operatingSystem": "Web browser",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "license": "https://opensource.org/licenses/MIT",
+    "creator": {
+      "@type": "Organization",
+      "name": "Alliance of Bioversity International and CIAT (CGIAR)",
+      "url": "https://alliancebioversityciat.org/"
+    },
+    "funder": { "@type": "Organization", "name": "Global Methane Hub" }
+  }
+  </script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Cattle GHG Uncertainty Calculator</h1>
+  <p class="subtitle">IPCC Tier 2 Livestock GHG Uncertainty Calculator: Monte Carlo (IPCC Approach 2) uncertainty analysis for national cattle greenhouse-gas inventories.</p>
+  <p class="tagline">Upload your country data, run thousands of simulations, download results formatted for IPCC Table 3.3. Free, in the browser, no installation, no login.</p>
+  <a class="btn btn-primary" href="https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/?ref=landing">Launch the calculator</a>
+  <a class="btn btn-secondary" href="https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty" rel="noopener">View on GitHub</a>
+  <p class="note">The app runs on a shared server; if it is busy, try again in a minute.</p>
+</header>
+
+<main>
+
+<h2>How do I quantify uncertainty in my national livestock GHG inventory?</h2>
+<p>When a country reports cattle greenhouse-gas emissions under the Paris Agreement, every input has uncertainty attached: animal populations, body weights, milk yields, feed digestibility, and the IPCC emission factors themselves. The IPCC 2006 Guidelines (Vol. 1, Ch. 3) ask inventory compilers to quantify how those input uncertainties combine into uncertainty on the reported total, and to report it in the Table 3.3 format.</p>
+<p>This calculator does that end to end. It propagates the uncertainty of every parameter through the full IPCC Tier 2 equation chain (IPCC 2006 Vol. 4, Ch. 10 and 11) by Monte Carlo simulation, and returns a defensible 95% confidence interval on your inventory total, a breakdown of how much uncertainty comes from activity data versus emission factors, and a ranking of which parameters would most reduce the uncertainty if you collected better data.</p>
+
+<figure>
+  <img src="assets/example_histogram.png" width="960" height="540" alt="Histogram of 10,000 Monte Carlo iterations of total CO2-equivalent emissions with dashed lines marking the 95 percent confidence interval, produced by the cattle GHG uncertainty calculator using hypothetical example data">
+  <figcaption>Example output: Monte Carlo distribution of total CO2eq with the 95% confidence interval (hypothetical Country X example data).</figcaption>
+</figure>
+
+<h2>What does the calculator cover?</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Aspect</th><th>Detail</th></tr>
+  <tr><td>Emission sources</td><td>Enteric fermentation CH<sub>4</sub>, manure management CH<sub>4</sub>, direct and indirect N<sub>2</sub>O from managed manure, direct and indirect N<sub>2</sub>O from pasture, range and paddock deposition</td></tr>
+  <tr><td>Methodology</td><td>IPCC 2006 Guidelines Vol. 4 Ch. 10 and 11 (Tier 2 energy-balance equation chain); 2019 Refinement values supported</td></tr>
+  <tr><td>Uncertainty method</td><td>IPCC Approach 2: Monte Carlo simulation (10,000+ iterations, configurable), with rank-correlation-preserving sampling of correlated parameters per IPCC Vol. 1 Ch. 3</td></tr>
+  <tr><td>Decomposition</td><td>Activity data vs emission factor vs combined uncertainty, per source, as IPCC Table 3.3 expects</td></tr>
+  <tr><td>Sensitivity analysis</td><td>Standardised regression coefficients (SRC) and partial rank correlation (PRCC) tornado charts</td></tr>
+  <tr><td>Trend uncertainty</td><td>Multi-year Monte Carlo with year-to-year correlation of emission factors</td></tr>
+  <tr><td>Outputs</td><td>IPCC Table 3.3 formatted Excel and CSV, plus a complete Word report with all charts</td></tr>
+  <tr><td>Data entry</td><td>Excel template with dropdowns and IPCC defaults, or a built-in AI assistant that converts raw country files into the template</td></tr>
+  <tr><td>Cost</td><td>Free and open source (MIT); runs in the browser with no installation or account</td></tr>
+</table>
+</div>
+
+<h2>Who is it for?</h2>
+<p>National GHG inventory compilers preparing Biennial Transparency Reports (BTRs), Biennial Update Reports (BURs) and National Inventory Reports (NIRs) under the UNFCCC Enhanced Transparency Framework, as well as researchers and MRV practitioners working on livestock emissions. If your inventory uses (or is moving to) a Tier 2 characterisation of cattle and you need Approach 2 (Monte Carlo) uncertainty estimates rather than Approach 1 error propagation, this tool was built for you. Two hypothetical example datasets (a dairy system and a pastoral system) are pre-loaded, so you can explore every feature before touching your own data.</p>
+
+<figure>
+  <img src="assets/example_tornado.png" width="960" height="540" alt="Tornado chart ranking input parameters by their contribution to total uncertainty, with green bars for parameters reducible through better local data and grey bars for fixed IPCC coefficients">
+  <figcaption>Example output: sensitivity tornado showing which parameters drive the uncertainty, and which of them better local data could narrow (hypothetical example data).</figcaption>
+</figure>
+
+<h2>Learn more</h2>
+<div class="card">
+  <ul>
+    <li><a href="ipcc-table-3-3.html">IPCC Table 3.3 explained (and how to fill it in automatically)</a></li>
+    <li><a href="approach-1-vs-approach-2.html">Approach 1 vs Approach 2 uncertainty: which does your inventory need?</a></li>
+    <li><a href="enteric-fermentation-uncertainty.html">Tier 2 enteric fermentation uncertainty: what drives it</a></li>
+    <li><a href="faq.html">Frequently asked questions</a></li>
+    <li><a href="assets/methodology.pdf">Full methodology document (PDF)</a></li>
+    <li><a href="assets/user_guide.pdf">User guide (PDF)</a></li>
+  </ul>
+</div>
+
+<h2>Citation</h2>
+<p class="cite">Alliance of Bioversity International and CIAT (CGIAR) (2026). <em>IPCC Tier 2 Livestock GHG Uncertainty Calculator</em> (software). <a href="https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty">github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty</a></p>
+
+<div class="logos">
+  <img src="assets/alliance_logo.webp" alt="Alliance of Bioversity International and CIAT">
+  <img src="assets/climate_action_logo.png" alt="CGIAR Climate Action Programme">
+  <img src="assets/gmh_logo.png" alt="Global Methane Hub">
+</div>
+
+</main>
+
+<footer>
+  Developed by the Alliance of Bioversity International and CIAT (CGIAR) under the CGIAR Climate Action Programme.<br>
+  Funded by the Global Methane Hub (grant R-2026-01051). Open source under the MIT licence.
+</footer>
+
+</body>
+</html>

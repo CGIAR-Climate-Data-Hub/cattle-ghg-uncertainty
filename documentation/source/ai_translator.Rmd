@@ -6,7 +6,9 @@ output:
     theme: null
     highlight: null
     mathjax: null
-    pandoc_args: ["--metadata=title:AI Translator, Find out more"]
+    includes:
+      in_header: _head_ai_translator.html
+    pandoc_args: ["--metadata=title:AI Translator: convert raw country livestock data into the input template | Cattle GHG Uncertainty Calculator Help"]
 ---
 
 ```{r setup, include = FALSE}

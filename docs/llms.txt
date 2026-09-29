@@ -1,0 +1,20 @@
+# Cattle GHG Uncertainty Calculator
+
+> Free, open-source (MIT) web tool for Monte Carlo (IPCC Approach 2) uncertainty analysis of IPCC Tier 2 cattle greenhouse-gas inventories: enteric fermentation CH4, manure management CH4 and N2O, pasture deposition N2O, with IPCC Table 3.3 / UNFCCC Enhanced Transparency Framework outputs. Built for national inventory compilers; no installation, no coding, no account. Developed by the Alliance of Bioversity International and CIAT (CGIAR), funded by the Global Methane Hub.
+
+Live app: https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/
+Source code: https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
+
+## Documentation
+
+- [Overview](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/overview.md): what the tool does and who it is for
+- [Methodology summary](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/methodology-summary.md): equations, distributions, correlated sampling, decomposition, sensitivity, trend
+- [FAQ](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/faq.md): data needs, privacy, iterations, reporting conventions, citation
+- [Full methodology (PDF)](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/assets/methodology.pdf): complete equation-by-equation derivation with IPCC references
+- [User guide (PDF)](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/assets/user_guide.pdf): tab-by-tab walkthrough
+
+## Topic pages
+
+- [IPCC Table 3.3 explained](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/ipcc-table-3-3.html): the uncertainty reporting format and how the tool fills it
+- [Approach 1 vs Approach 2](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/approach-1-vs-approach-2.html): when Monte Carlo is needed instead of error propagation
+- [Enteric fermentation uncertainty](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/enteric-fermentation-uncertainty.html): what drives Tier 2 CH4 uncertainty

@@ -7,9 +7,15 @@
 # below, right-side nav_item) writes the cookie + reloads the page; on
 # reload, this function runs again with the new cookie value.
 app_ui <- function(request = NULL) {
-  i18n_set_lang(i18n_lang_from_request(request))
+  lang <- i18n_lang_from_request(request)
+  i18n_set_lang(lang)
   bslib::page_navbar(
     id = "nav",
+    # SEO round 2026-09: crawlers get an exact-match <title> (they carry no
+    # app_lang cookie, so they always see the English string). `lang` fixes
+    # <html lang="fr"> for French sessions, which was always "en" before.
+    window_title = t("seo_window_title"),
+    lang = lang,
     # Round 9 follow-up: stacked header, big centered title row above the
     # tabs row. Title + subtitle live inside a flex column; CSS in
     # www/custom.css turns the navbar into vertical layout (title above
@@ -32,6 +38,61 @@ app_ui <- function(request = NULL) {
     ),
     header = tagList(
       tags$head(tags$link(rel = "stylesheet", href = "custom.css")),
+      # ---- SEO / social head block (2026-09) -------------------------------
+      # The canonical deliberately points at the org-owned website, not this
+      # personal shinyapps URL: the app page has no crawlable content of its
+      # own (JS/websocket rendered), so the cross-domain canonical consolidates
+      # any signal onto the URL the project controls. Worst case Google
+      # ignores the hint, which is neutral. The og_image lives on the website
+      # so the app, the repo social preview and the site share one file.
+      # When a custom domain replaces the github.io URL, update .SEO_SITE_URL
+      # here and the matching constants in docs/.
+      tags$head({
+        .SEO_SITE_URL <- "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/"
+        .SEO_APP_URL  <- "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/"
+        .SEO_REPO_URL <- "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty"
+        .SEO_IMG_URL  <- paste0(.SEO_SITE_URL, "assets/og_image.png")
+        tagList(
+          tags$meta(name = "description", content = t("seo_meta_description")),
+          tags$link(rel = "canonical", href = .SEO_SITE_URL),
+          tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
+          tags$meta(property = "og:title",
+                    content = t("seo_window_title")),
+          tags$meta(property = "og:description",
+                    content = t("seo_meta_description")),
+          tags$meta(property = "og:type", content = "website"),
+          tags$meta(property = "og:url", content = .SEO_APP_URL),
+          tags$meta(property = "og:image", content = .SEO_IMG_URL),
+          tags$meta(name = "twitter:card", content = "summary_large_image"),
+          tags$meta(name = "twitter:title",
+                    content = t("seo_window_title")),
+          tags$meta(name = "twitter:description",
+                    content = t("seo_meta_description")),
+          tags$meta(name = "twitter:image", content = .SEO_IMG_URL),
+          tags$script(
+            type = "application/ld+json",
+            HTML(jsonlite::toJSON(list(
+              "@context" = "https://schema.org",
+              "@type" = "SoftwareApplication",
+              name = "Cattle GHG Uncertainty Calculator (IPCC Tier 2 Livestock GHG Uncertainty Calculator)",
+              url = .SEO_APP_URL,
+              sameAs = c(.SEO_REPO_URL, .SEO_SITE_URL),
+              description = t("seo_meta_description"),
+              applicationCategory = "Scientific/Engineering",
+              operatingSystem = "Web browser",
+              isAccessibleForFree = TRUE,
+              offers = list("@type" = "Offer", price = "0",
+                            priceCurrency = "USD"),
+              license = "https://opensource.org/licenses/MIT",
+              creator = list("@type" = "Organization",
+                             name = "Alliance of Bioversity International and CIAT (CGIAR)",
+                             url = "https://alliancebioversityciat.org/"),
+              funder = list("@type" = "Organization",
+                            name = "Global Methane Hub")
+            ), auto_unbox = TRUE)))
+        )
+      }),
+      # ---- end SEO head block ---------------------------------------------
       tags$head(tags$script(HTML(
         "Shiny.addCustomMessageHandler('scrollTo', function(id) {
            // setTimeout buffer: when scrollTo follows a nav_select, the target

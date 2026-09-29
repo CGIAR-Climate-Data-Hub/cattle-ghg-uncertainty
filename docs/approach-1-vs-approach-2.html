@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approach 1 vs Approach 2 uncertainty: which does your GHG inventory need?</title>
+  <meta name="description" content="The difference between IPCC Approach 1 (error propagation) and Approach 2 (Monte Carlo) uncertainty analysis, when Approach 2 is required, and a free Monte Carlo tool for cattle inventories.">
+  <link rel="canonical" href="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/approach-1-vs-approach-2.html">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="assets/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Approach 1 vs Approach 2 uncertainty: which does your GHG inventory need?",
+    "author": { "@type": "Organization", "name": "Alliance of Bioversity International and CIAT (CGIAR)" },
+    "publisher": { "@type": "Organization", "name": "Alliance of Bioversity International and CIAT (CGIAR)" },
+    "about": "IPCC uncertainty methods for national greenhouse gas inventories"
+  }
+  </script>
+</head>
+<body>
+<main>
+<p class="crumb"><a href="./">Cattle GHG Uncertainty Calculator</a> / Approach 1 vs Approach 2</p>
+<h1 style="color: var(--dgreen)">Approach 1 vs Approach 2 uncertainty: which does your inventory need?</h1>
+
+<p>The IPCC 2006 Guidelines (Volume 1, Chapter 3) offer two ways to combine input uncertainties into inventory uncertainty. They answer the same question with very different machinery.</p>
+
+<h2>Approach 1: error propagation</h2>
+<p>Closed-form formulas combine percentage uncertainties: sums of sources combine by root-sum-of-squares weighted by magnitude, products (activity data times emission factor) combine by adding squared relative uncertainties. It needs only a spreadsheet, which is why most inventories start there. Its assumptions are strict: roughly normal distributions, uncertainties below about 30% of the mean, no correlation between inputs, and near-linear relationships.</p>
+
+<h2>Approach 2: Monte Carlo simulation</h2>
+<p>Instead of formulas, the inventory is recalculated thousands of times, each time drawing every input from its own probability distribution (normal, lognormal, beta, PERT, triangular and so on). The spread of the simulated totals gives the 95% confidence interval directly. Approach 2 handles what breaks Approach 1: large uncertainties, skewed distributions (emission factors are often lognormal), correlated parameters, and non-linear equation chains such as the IPCC Tier 2 livestock energy-balance model.</p>
+
+<h2>When is Approach 2 the right choice?</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Situation</th><th>Approach 1</th><th>Approach 2</th></tr>
+  <tr><td>Uncertainties under ~30%, roughly symmetric</td><td>adequate</td><td>works too</td></tr>
+  <tr><td>Large uncertainties (many livestock EFs are 30-100%)</td><td>biased</td><td>correct</td></tr>
+  <tr><td>Skewed or bounded distributions (lognormal EFs, fractions)</td><td>cannot represent</td><td>native</td></tr>
+  <tr><td>Correlated inputs (herd parameters, shared EF bias, trend years)</td><td>assumes independence</td><td>handled by correlated sampling</td></tr>
+  <tr><td>Non-linear model (Tier 2 energy-balance chain)</td><td>linear approximation</td><td>exact</td></tr>
+  <tr><td>Key categories (IPCC good practice)</td><td>minimum</td><td>encouraged</td></tr>
+</table>
+</div>
+<p>IPCC good practice encourages Approach 2 for key categories, and livestock is a key category in most agricultural economies. A Tier 2 cattle inventory is exactly the case Approach 2 exists for: the equation chain is non-linear, several emission factors have wide asymmetric uncertainty, and biologically related parameters co-vary.</p>
+
+<h2>Do I need to build a Monte Carlo model myself?</h2>
+<p>Not for cattle. The free <a href="./">Cattle GHG Uncertainty Calculator</a> implements IPCC Approach 2 for the full Tier 2 cattle equation chain in the browser: distributions per parameter with IPCC-based defaults, rank-correlation-preserving sampling, activity-data versus emission-factor decomposition, sensitivity ranking, trend uncertainty across years, and IPCC Table 3.3 outputs.</p>
+
+<p><a class="btn btn-primary" href="https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/?ref=a1a2">Launch the calculator</a></p>
+
+<p class="muted">References: IPCC (2006) Vol. 1 Ch. 3 sections 3.2.3.1 (Approach 1) and 3.2.3.2 (Approach 2); Penman et al. (2000), Good Practice Guidance and Uncertainty Management in National Greenhouse Gas Inventories.</p>
+</main>
+<footer>Alliance of Bioversity International and CIAT (CGIAR) · CGIAR Climate Action Programme · funded by the Global Methane Hub</footer>
+</body>
+</html>

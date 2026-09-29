@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IPCC Table 3.3 explained: uncertainty reporting for GHG inventories (with a free generator)</title>
+  <meta name="description" content="What IPCC 2006 Vol. 1 Ch. 3 Table 3.3 requires, how % uncertainty is defined, what AD, EF and combined uncertainty mean, and a free tool that fills the table automatically for cattle.">
+  <link rel="canonical" href="https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/ipcc-table-3-3.html">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="assets/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "IPCC Table 3.3 explained: uncertainty reporting for GHG inventories",
+    "author": { "@type": "Organization", "name": "Alliance of Bioversity International and CIAT (CGIAR)" },
+    "publisher": { "@type": "Organization", "name": "Alliance of Bioversity International and CIAT (CGIAR)" },
+    "about": "IPCC 2006 Guidelines Volume 1 Chapter 3 Table 3.3 uncertainty reporting"
+  }
+  </script>
+</head>
+<body>
+<main>
+<p class="crumb"><a href="./">Cattle GHG Uncertainty Calculator</a> / IPCC Table 3.3</p>
+<h1 style="color: var(--dgreen)">IPCC Table 3.3 explained (and how to fill it in automatically)</h1>
+
+<h2>What is IPCC Table 3.3?</h2>
+<p>Table 3.3 of the IPCC 2006 Guidelines (Volume 1, Chapter 3, "Uncertainties") is the standard format for reporting uncertainty in a national greenhouse-gas inventory. National inventory reports submitted under the UNFCCC, including Biennial Transparency Reports under the Enhanced Transparency Framework, present their uncertainty analysis in this shape: one row per source category, with columns for the emission estimate, the activity data uncertainty, the emission factor uncertainty, the combined uncertainty, and the contribution of each category to the uncertainty of the national total.</p>
+
+<h2>How is "% uncertainty" defined in Table 3.3?</h2>
+<p>As the half-width of the 95% confidence interval, expressed as a percentage of the mean estimate. If a category's emissions are 100 kt CO2eq and the 95% confidence interval runs from 80 to 120 kt, the uncertainty is reported as 20%. This is a margin of error, not a coefficient of variation (standard deviation over mean); the two differ, and Table 3.3 asks for the former. For asymmetric distributions the guidelines allow reporting the upper and lower half-widths separately.</p>
+
+<h2>What do the AD and EF columns mean?</h2>
+<p>The activity data (AD) column carries the uncertainty coming only from the quantity data, for livestock chiefly the animal population. The emission factor (EF) column carries the uncertainty coming only from the per-unit emission coefficients. The combined column carries both together. Under Approach 1 the combination is done with error-propagation formulas; under Approach 2 the three numbers come from three Monte Carlo runs: one with everything varying, one with emission factors held at their central values, and one with activity data held fixed.</p>
+
+<h2>How do I produce Table 3.3 for cattle without building a Monte Carlo model myself?</h2>
+<p>The free <a href="./">Cattle GHG Uncertainty Calculator</a> generates the table automatically. You load your Tier 2 cattle data (an Excel template with IPCC defaults pre-filled), run the simulation, and download Table 3.3 as Excel or CSV with the AD, EF and combined uncertainty columns already computed per source category (enteric fermentation CH4, manure management CH4 and N2O, pasture deposition N2O) in exactly the half-width-over-mean convention the guidelines require. The same values can be typed into the uncertainty worksheet of the IPCC Inventory Software.</p>
+
+<p><a class="btn btn-primary" href="https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/?ref=t33">Launch the calculator</a></p>
+
+<p class="muted">Reference: IPCC (2006), 2006 IPCC Guidelines for National Greenhouse Gas Inventories, Volume 1, Chapter 3, Table 3.3; 2019 Refinement, Volume 1, Chapter 3.</p>
+</main>
+<footer>Alliance of Bioversity International and CIAT (CGIAR) · CGIAR Climate Action Programme · funded by the Global Methane Hub</footer>
+</body>
+</html>

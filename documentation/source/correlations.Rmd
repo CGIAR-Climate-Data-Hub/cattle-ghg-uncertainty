@@ -6,7 +6,9 @@ output:
     theme: null
     highlight: null
     mathjax: null
-    pandoc_args: ["--metadata=title:Correlations, Find out more"]
+    includes:
+      in_header: _head_correlations.html
+    pandoc_args: ["--metadata=title:Parameter Correlations in Monte Carlo GHG Inventory Uncertainty Analysis | Cattle GHG Uncertainty Calculator Help"]
 params:
   cache_dir: "www/docs/_cache"
 ---

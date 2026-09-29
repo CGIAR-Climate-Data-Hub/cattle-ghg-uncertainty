@@ -169,6 +169,18 @@ lang_state_take <- function(token) {
     fr = "Monte Carlo Approche 2 · Alliance CGIAR / Bioversity-CIAT · financé par le Global Methane Hub"
   ),
 
+  # ---- SEO head strings (browser tab title, meta description) ----------
+  # The window title deliberately says "Cattle" (the search phrase people
+  # use) while the on-page app_title keeps the formal IPCC "Livestock" name.
+  seo_window_title = list(
+    en = "Cattle GHG Uncertainty Calculator | IPCC Tier 2 Monte Carlo (free web tool)",
+    fr = "Calculateur d'incertitude GES bovins | IPCC Niveau 2 Monte Carlo (outil web gratuit)"
+  ),
+  seo_meta_description = list(
+    en = "Free web tool for national GHG inventory teams: Monte Carlo (IPCC Approach 2) uncertainty analysis for Tier 2 cattle emissions, with IPCC Table 3.3 outputs.",
+    fr = "Outil web gratuit pour les équipes d'inventaire national de GES : analyse d'incertitude Monte Carlo (Approche 2 IPCC) des émissions bovines Niveau 2, sorties au format Tableau 3.3 IPCC."
+  ),
+
   # ---- Home tab: hero section -----------------------------------------
   hero_title    = list(en = "IPCC Tier 2 Livestock GHG Uncertainty Calculator",
                        fr = "Calculateur d'incertitude GES Bétail IPCC Niveau 2"),
