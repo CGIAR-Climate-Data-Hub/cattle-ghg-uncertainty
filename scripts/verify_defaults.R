@@ -663,6 +663,15 @@ S[["prompt_worked_example"]] <- local({
 # Hand-written and the largest prompt file. Self-check #9 asserts specific
 # Cfi and C values, and Step 5b asserts pct_pregnant defaults. Those are the
 # numbers that can drift from the resolver, so those are what we extract.
+#
+# 2026-09-29: the source file carries {{default:...}} placeholders rather than
+# literals (see the header of translator_prompt_fill_placeholders() for why:
+# the literals used to go stale). Extracting from the raw source therefore
+# compared placeholders, not values, and the pct_pregnant regex fell through
+# to the literal "0" that the same sentence gives for males and calves. That
+# reported 7 permanent false mismatches and failed CI on every push. Resolve
+# the placeholders first, so this surface checks the prompt the model is
+# actually sent, which is what the check is for.
 S[["prompt_system_instructions"]] <- local({
   v <- .empty
   f <- "translator_prompts/system_instructions.md"
@@ -670,6 +679,7 @@ S[["prompt_system_instructions"]] <- local({
   txt <- paste(readLines(file(f, encoding = "UTF-8"), warn = FALSE),
                collapse = "
 ")
+  txt <- translator_prompt_fill_placeholders(txt)
   grab <- function(pat) {
     m <- regmatches(txt, regexpr(pat, txt, perl = TRUE))
     if (!length(m)) return(NA_character_)
@@ -691,12 +701,23 @@ S[["prompt_system_instructions"]] <- local({
     # silently absent rather than reporting a mismatch. Same failure mode as
     # the doc_rmd extractor had.
     if (!grepl("`", ln) || !grepl("→|->", ln)) next
-    after <- sub("^.*(→|->)", "", ln)
-    m <- regmatches(after, regexpr("[0-9]*[.]?[0-9]+", after))
-    if (!length(m)) next
-    for (sc in names(PCT_PREGNANT_BY_SUBCAT))
-      if (grepl(paste0("`", sc, "`"), ln, fixed = TRUE))
-        v[paste("PCT_PREGNANT_BY_SUBCAT", sc, "value", sep = "|")] <- norm(m)
+    # One sentence carries several "`subcat` -> value" pairs separated by
+    # semicolons, and ends with "males, calves and feedlot cattle -> 0".
+    # Matching the arrow across the whole line with a greedy "^.*" landed on
+    # that LAST arrow and handed its 0 to every sub-category named earlier in
+    # the sentence, so dairy_cows/heifers/other_cows all reported 0 against a
+    # 0.52/0.5/0.54 reference. Split on ";" first, then take the number after
+    # the FIRST arrow in each segment (non-greedy), and only assign it to a
+    # sub-category whose backticked name is in that same segment.
+    for (seg in strsplit(ln, ";", fixed = TRUE)[[1]]) {
+      if (!grepl("→|->", seg)) next
+      after <- sub("^.*?(→|->)", "", seg, perl = TRUE)
+      m <- regmatches(after, regexpr("[0-9]*[.]?[0-9]+", after))
+      if (!length(m)) next
+      for (sc in names(PCT_PREGNANT_BY_SUBCAT))
+        if (grepl(paste0("`", sc, "`"), seg, fixed = TRUE))
+          v[paste("PCT_PREGNANT_BY_SUBCAT", sc, "value", sep = "|")] <- norm(m)
+    }
   }
   v
 })
