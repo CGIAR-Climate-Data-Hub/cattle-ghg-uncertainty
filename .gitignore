@@ -184,3 +184,7 @@ project_history/
 # generated reports in reports/ (the two review deliverables ALL_VALUES and
 # VALUE_CHANGES_FOR_REVIEW stay tracked); reviewer material, received
 # documents and the pre-audit archive in project_history/, never public.
+
+# Translator sign-in whitelist: real email addresses. Stays in the working
+# tree (the shinyapps deploy bundles working-tree files), never in git.
+config/approved_users.csv
