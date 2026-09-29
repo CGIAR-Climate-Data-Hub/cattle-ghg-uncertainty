@@ -331,6 +331,8 @@ lang_state_take <- function(token) {
                                 fr = "Ouvrir la méthodologie complète (PDF)"),
   btn_open_userguide = list(en = "Open user guide (PDF)",
                               fr = "Ouvrir le guide utilisateur (PDF)"),
+  btn_open_website = list(en = "Project website",
+                            fr = "Site web du projet"),
 
   card_useful_resources = list(en = "Useful resources",
                                  fr = "Ressources utiles"),

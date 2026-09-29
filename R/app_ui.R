@@ -1163,6 +1163,18 @@ app_ui <- function(request = NULL) {
                 rel = "noopener noreferrer",
                 class = "btn btn-outline-success",
                 icon("book"), " ", t("btn_open_userguide")
+              ),
+              # SEO round 2026-09: the project website is the canonical public
+              # entry point (see the canonical link in the head block). Linking
+              # it from here gives users who arrive straight at the app a route
+              # to the topic pages and the citation, and gives the site an
+              # inbound link. Keep the URL in step with .SEO_SITE_URL above.
+              tags$a(
+                href = "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/",
+                target = "_blank",
+                rel = "noopener",
+                class = "btn btn-outline-success",
+                icon("globe"), " ", t("btn_open_website")
               )
             )
           )

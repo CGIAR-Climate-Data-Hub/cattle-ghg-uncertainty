@@ -61,7 +61,7 @@ When a country reports cattle greenhouse-gas emissions under the Paris Agreement
 | Tab | Purpose |
 |---|---|
 | **Home** | Overview, quick-start guide, funding logos |
-| **Definitions** | Plain-language glossary of every IPCC parameter |
+| **Definitions** | Plain-language glossary of every IPCC parameter, plus a glossary of the statistical terms (Monte Carlo, confidence interval, margin of error, SRC/PRCC) used across the tabs |
 | **Resources** | Methodology PDF, user-guide PDF, **AI Translator chat panel**, and links to the IPCC chapters |
 | **1. Data Input** | Pick an example or upload your filled Excel template; inline editing |
 | **2. QA/QC** | Automated traffic-light checks (bounds, IPCC defaults, fractions, units) |
