@@ -1,20 +1,20 @@
 {
-  "master_sha256": "e87a27f710e5a3ecbe2a0c9f1a2d6f99e5bff13d815ec852e0f43c28f696332f",
+  "master_sha256": "f15e9f80f2c2041a579a38f2a776329562cce621f6b847d39833e3e374ca8f8a",
   "layout_sha256": "46d9fbdc9d256f0494ebd9edd35e512d559b6369ff7a5d8a5da02018a926d97b",
   "generated": [
     {
       "file": "param_catalogue.md",
-      "sha256": "7ece224bb5e04b52d7db55a8bd7cc556b6f3b88a655ca2ae77e5229eb8dab108"
+      "sha256": "20fb2269188daeb16a2ae2e9c7d08613cdf75ded60ff13b728c353182f524e3d"
     },
     {
       "file": "template_schema.md",
-      "sha256": "50601e79bea8e24515badde49affcead0e2690628217bbdaf49af4b9a53be304"
+      "sha256": "cf94e5ca913c4e9d0eba911cc79b4fd7ef064cca3e3d67649353dd4a2cb5ff8b"
     },
     {
       "file": "worked_example.md",
       "sha256": "47f4f34eb86762c185ad3e599d6d9aa17d42e70bc2282ec5b4dd8a9435fafa0c"
     }
   ],
-  "commit": "a83f8ac",
-  "generated_at": "2026-09-29T08:10:57Z"
+  "commit": "aa046af",
+  "generated_at": "2026-09-29T15:25:33Z"
 }

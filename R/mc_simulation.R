@@ -64,6 +64,17 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
     rep(if (is.null(default)) .cat_default(name) else default, n_iter)
   }
 
+  # Measured-intake getter. Deliberately has NO fallback, because the usual
+  # one is actively dangerous here: .cat_default() returns 0 for a catalogue
+  # row with no published default (load_defaults.R), and GE has none. A zero
+  # gross energy is not a missing value, it is zero enteric CH4, zero volatile
+  # solids and zero N excretion, i.e. a silently empty inventory that reads
+  # like a data problem rather than a bug. Absent must stay NULL so that
+  # resolve_ge() falls back to the energy chain.
+  get_param_measured <- function(name) {
+    if (name %in% names(samples)) samples[[name]] else NULL
+  }
+
   # MMS fallbacks from the master too. The MCF literal of 0.015 happened to
   # equal the temperate pasture value; it is now read, and the climate is
   # stated rather than implied. Tropical is the tool-wide assumption
@@ -159,7 +170,11 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
     frac_gas_samples   = frac_gas_samples,
     frac_leach_samples = frac_leach_samples,
     # Andreas 28/5/26 #4: per-iteration MMS allocation matrix.
-    mms_fraction_samples = mms_fraction_samples
+    mms_fraction_samples = mms_fraction_samples,
+    # Measured-intake override. NULL unless the user supplied a value, which
+    # is the case for every inventory written before 2026-09.
+    GE_measured  = get_param_measured("GE"),
+    DMI_measured = get_param_measured("DMI")
   )
 
   list(samples = samples, results = results)

@@ -419,7 +419,14 @@ build_template_schema_md <- function(partials_dir = .TP_PARTIALS_DIR) {
 }
 
 build_worked_example_md <- function(partials_dir = .TP_PARTIALS_DIR) {
-  pc <- PARAM_CATALOGUE; NPAR <- nrow(pc)
+  # The worked example must not demonstrate the measured-intake rows.
+  # It is the model's template for what a filled inventory looks like,
+  # so emitting GE/DMI here (necessarily with a null or invented value)
+  # would teach it to assert a measurement the user never made. Blank
+  # means "use the energy balance", and the example shows that by
+  # simply not carrying the rows.
+  pc <- PARAM_CATALOGUE[PARAM_CATALOGUE$param_tier != "optional", ]
+  NPAR <- nrow(pc)
   we <- c("# Worked example -- complete template-ready JSON for a small inventory",
           "", .tp_partial("worked_example_intro", partials_dir), "",
           sprintf("This example has %d sub-categories, so %d x %d = %d parameter rows. An inventory with 8 sub-categories would need 8 x %d = %d.",

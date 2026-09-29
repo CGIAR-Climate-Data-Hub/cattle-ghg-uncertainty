@@ -10,7 +10,7 @@ Sheet names and column headers are **case-sensitive and must match exactly**.
 | `_Lists` | optional (hidden) | dropdown vocabularies: created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |
 | `README` | optional | human-readable quick-start: safe to omit |
 | `Inventory_Metadata` | **required** | country, region, year, IPCC version, species |
-| `Parameters` | **required** | the 25 parameters per cattle sub-category |
+| `Parameters` | **required** | the 27 parameters per cattle sub-category |
 | `Manure_Management` | **required** | per-MMS allocation; per-group fractions must sum to 100% |
 | `Parameter_TimeSeries` | optional | 5+ years of annual values for auto-correlation |
 | `Vocab` | optional | reference catalogue: safe to omit |

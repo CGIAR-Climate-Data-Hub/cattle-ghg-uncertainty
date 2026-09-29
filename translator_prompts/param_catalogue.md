@@ -34,7 +34,7 @@ Every coefficient on a manure row (MCF, EF3, and the volatilisation and leaching
 | `aerobic_treatment` | Aerobic treatment, forced aeration |
 | `burned_for_fuel` | Burned for fuel |
 
-Single source of truth for the 25 IPCC-aligned parameters the cattle uncertainty app expects.
+Single source of truth for the 27 IPCC-aligned parameters the cattle uncertainty app expects.
 When you (Claude) translate a user's raw column to a template field, use this table.
 All parameter codes are case-sensitive.
 
@@ -65,6 +65,8 @@ All parameter codes are case-sensitive.
 | `Frac_LEACH_PRP` | advanced | coefficient | fraction | 0.24 | (asymmetric: use bounds) | pert | Ch.11 Table 11.3 | Frac_LeachPRP | Fraction of N leached from pasture deposition (IPCC Vol.4 Ch.11 Table 11.3, FracLEACH-(H)). The tool ships 0.24, the 2019R wet-climate value (range 0.01-0.73). Alternatives: dry climates 0; 2006 = 0.30. IPCC gives no leaching pathway at all in dry climates, so a dry-climate inventory should override it. |
 | `MilkPR` | core | coefficient | % | 3.6 | 10% | normal | Table 10A.1 | protein_milk | Protein content of milk: feeds the milk-N term in IPCC Vol.4 Ch.10 Eq 10.33 (N retention for cattle, where the 6.38 milk-protein-to-N conversion is defined) |
 | `Tw` | advanced | coefficient | °C | 20 | 25% | normal | - | (none) | Mean daily temperature in winter (°C): Cfi cold-climate adjustment per IPCC Vol.4 Ch.10 Eq 10.2 (modifies the Cfi from Eq 10.3). Leave blank or set 20 to disable adjustment |
+| `GE` | optional | coefficient | MJ/head/day |  | 15% | normal | NA | (none) | Gross energy intake, if you already know it. Leave blank to have the tool derive it from animal performance using the IPCC energy balance. Supplying it bypasses that derivation for this sub-category only. |
+| `DMI` | optional | coefficient | kg DM/head/day |  | 15% | normal | NA | (none) | Dry matter intake, if you already know it. Used only when gross energy is not supplied, and converted with the IPCC factor of 18.45 MJ per kg dry matter. Leave blank to use the energy balance. |
 
 ## Asymmetric (non-symmetric) bounds
 

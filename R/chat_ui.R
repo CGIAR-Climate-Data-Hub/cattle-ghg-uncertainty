@@ -1985,9 +1985,22 @@ translator_chat_server <- function(input, output, session) {
     "   dairy_cows) the answer is `cattle_non_dairy`. NEVER default to",
     "   `cattle_mixed` as a hedge.",
     "",
-    sprintf("4. For each sub-category, fill ALL %d parameters from the IPCC", nrow(PARAM_CATALOGUE)),
-    paste0("   catalogue (", paste(PARAM_CATALOGUE$parameter, collapse = ", "), ")"),
+    # GE and DMI are the measured-intake override and are deliberately NOT
+    # in this list. A blank value there means "derive gross energy from the
+    # energy balance", which is the right answer unless the user's own file
+    # measured intake. Asking the model to fill them would invent a
+    # measurement and silently bypass the IPCC energy chain.
+    sprintf("4. For each sub-category, fill ALL %d parameters from the IPCC",
+            sum(PARAM_CATALOGUE$param_tier != "optional")),
+    paste0("   catalogue (",
+           paste(PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier != "optional"],
+                 collapse = ", "), ")"),
     "  : but honour rule 1: user-supplied values OVERRIDE defaults.",
+    paste0("   Do NOT emit rows for ",
+           paste(PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier == "optional"],
+                 collapse = " or "),
+           " unless the user's own file gives a measured intake for that"),
+    "   sub-category. Leaving them out is correct and expected.",
     "",
     "5. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
     "   upper bounds (Lower CI / Upper CI / lower / upper / ci_lower",
@@ -2122,8 +2135,9 @@ translator_chat_server <- function(input, output, session) {
         ". You missed: ", paste(missing_subcats, collapse = ", "),
         ". Emit the COMPLETE template now with all ",
         length(history_subcats),
-        " sub-categories × 25 parameters = ",
-        25 * length(history_subcats),
+        " sub-categories x ", sum(PARAM_CATALOGUE$param_tier != "optional"),
+        " parameters = ",
+        sum(PARAM_CATALOGUE$param_tier != "optional") * length(history_subcats),
         " parameter rows, plus manure_management for ALL ",
         length(history_subcats),
         " sub-categories. Use the user's file values for parameters ",
@@ -2563,6 +2577,28 @@ translator_chat_server <- function(input, output, session) {
           else if (!is.na(num(v_mean)) && !is.na(num(v_unc))) .put_param(13, num(v_mean) * (1 + num(v_unc) / 100))
           else if (identical(tolower(as.character(v_dist)), "constant")) .put_param(13, v_mean)
           .put_param(16, ai$data_source %||% "AI translator")
+        } else if (identical(PARAM_CATALOGUE$param_tier[i], "optional")) {
+          # Measured-intake parameters (GE, DMI) are the one kind of gap that
+          # must STAY a gap. A blank cell is the signal that means "derive
+          # gross energy from the energy balance", which is the correct and
+          # overwhelmingly common answer. Backfilling them the way every other
+          # parameter is backfilled would assert a measured intake the user
+          # never made, and silently bypass the IPCC energy chain for every
+          # sub-category of every AI-produced workbook.
+          #
+          # Everything EXCEPT the value and its bounds is still written: the
+          # row stays present, self-explanatory and uniform with the other
+          # blocks (which also keeps audit F31's row-count arithmetic
+          # correct), and it carries a valid distribution so upload validation
+          # does not reject it with "Invalid distribution:". The suggested
+          # uncertainty is written too, so that a user who DOES fill the value
+          # in later already has a sensible shape around it. Only cols 7
+          # (value), 9/10 (bound overrides) and 12/13 (lower/upper) stay
+          # empty, and a blank value is precisely the "not supplied" signal.
+          .put_param(8,  PARAM_CATALOGUE$suggested_uncertainty_pct[i])
+          .put_param(11, PARAM_CATALOGUE$suggested_distribution[i])
+          .put_param(14, PARAM_CATALOGUE$param_type[i])
+          .put_param(15, PARAM_CATALOGUE$ipcc_ref[i])
         } else {
           # Gap parameter: the AI/overlay didn't supply this (parameter,
           # sub-category). Backfill the IPCC catalogue default so the row is a

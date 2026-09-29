@@ -128,9 +128,20 @@ make_block_corr <- function(param_names, rho_by_block) {
 # and pull the mean above the 97.5th percentile. Clamping DE to the documented
 # range keeps every iteration inside the equations' valid domain. Both the IPCC
 # ("DE") and legacy ("DE_pct") column spellings are covered.
+#
+# GE / DMI (measured intake, 2026-09): impossibility guards, not plausibility
+# bands. A sampled draw outside these is not a defensible cattle intake at
+# all, and letting one through would propagate a nonsense GE into enteric CH4,
+# volatile solids and N excretion at once. The band is deliberately wide so it
+# never clips a real distribution: roughly a 50 kg calf at the low end and a
+# very high-intake dairy cow at the high end. Absent columns are untouched,
+# and the is.finite mask leaves NA alone, so a blank (not supplied) intake
+# keeps its NA and still falls back to the energy chain.
 .PHYSICAL_BOUNDS <- list(
   DE     = c(45, 85),
-  DE_pct = c(45, 85)
+  DE_pct = c(45, 85),
+  GE     = c(5, 600),
+  DMI    = c(0.2, 40)
 )
 
 # Clamp any sampled column that has a registered physical domain into that

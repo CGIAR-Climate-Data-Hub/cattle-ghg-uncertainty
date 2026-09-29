@@ -90,3 +90,63 @@ calc_ge <- function(nem, nea, nel, nep, new_energy, neg, rem, reg, DE) {
   GE_num <- (nem + nea + nel + new_energy + nep) / rem + neg / reg
   GE_num / (DE / 100)
 }
+
+# IPCC dietary energy density, MJ per kg of feed dry matter. IPCC treats this
+# as near-constant across forage and grain diets and hard-codes it inside
+# Eq 10.24 (volatile solids) and Eq 10.32 (N intake), which is why those two
+# equations keep using it even when a user supplies a measured intake whose
+# own implied density differs. See the "measured intake" section of the
+# methodology: that residual is the IPCC method, not a defect here.
+GE_MJ_PER_KG_DM <- 18.45
+
+# Measured-intake override (2026-09).
+#
+# The Tier 2 chain above infers gross energy from what the animal DOES:
+# maintenance, activity, growth, lactation, work and pregnancy. Datasets that
+# measured feed intake instead already know GE, or know dry-matter intake and
+# can convert. They typically have no milk yield or weight gain at all,
+# because they never needed to infer anything.
+#
+# Semantics, applied ELEMENT BY ELEMENT so one inventory can mix measured and
+# modelled sub-categories:
+#   supplied GE  -> use it
+#   else supplied DMI -> DMI * 18.45
+#   else         -> the value the energy chain just computed
+# A value that is NA, non-finite or <= 0 counts as "not supplied". Zero is
+# treated as absent deliberately: a zero intake is never a real measurement,
+# and reading it as one would silently zero every emission for that group.
+#
+# GE beats DMI because a supplied GE carries the dataset's own measured feed
+# energy density, whereas converting DMI imposes the IPCC 18.45.
+#
+# Both arguments NULL is the universal case for existing inventories, and it
+# returns `ge_chain` itself, untouched, with no arithmetic performed. That is
+# what makes the no-override path bit-for-bit identical rather than merely
+# numerically close. Audit F50 asserts it with identical().
+resolve_ge <- function(ge_chain, GE_measured = NULL, DMI_measured = NULL) {
+  if (is.null(GE_measured) && is.null(DMI_measured)) return(ge_chain)
+
+  usable <- function(x) !is.na(x) & is.finite(x) & x > 0
+  n <- max(length(ge_chain),
+           if (is.null(GE_measured)) 0L else length(GE_measured),
+           if (is.null(DMI_measured)) 0L else length(DMI_measured))
+
+  override <- rep(NA_real_, n)
+  if (!is.null(DMI_measured)) {
+    d <- rep_len(as.numeric(DMI_measured), n)
+    ok <- usable(d)
+    override[ok] <- d[ok] * GE_MJ_PER_KG_DM
+  }
+  if (!is.null(GE_measured)) {
+    g <- rep_len(as.numeric(GE_measured), n)
+    ok <- usable(g)
+    override[ok] <- g[ok]          # applied second, so GE wins over DMI
+  }
+
+  # rep_len + logical index rather than ifelse(): ifelse is length-fragile
+  # when one side is scalar and the other length n, and it drops attributes.
+  out <- rep_len(ge_chain, n)
+  hit <- !is.na(override)
+  out[hit] <- override[hit]
+  out
+}

@@ -2120,7 +2120,7 @@ section_F <- function() {
     file.exists(.DEFAULTS_MASTER_PATH) &&
       nrow(.defaults_master) > 400 &&
       identical(names(PARAM_CATALOGUE)[1], "parameter") &&
-      nrow(PARAM_CATALOGUE) == 25L &&
+      nrow(PARAM_CATALOGUE) == 27L &&
       ncol(PARAM_CATALOGUE) == 14L &&   # gained ipcc_equation
       is.logical(PARAM_CATALOGUE$user_reducible) &&
       is.numeric(PARAM_CATALOGUE$ipcc_default) &&
@@ -2133,7 +2133,7 @@ section_F <- function() {
              "Defaults master loads and rebuilds every constant with the expected shape",
              master_ok,
              notes = if (master_ok)
-               sprintf("%d master rows -> PARAM_CATALOGUE 25x13, MMS 12, frac 12, subcat lists 9",
+               sprintf("%d master rows -> PARAM_CATALOGUE 27x13, MMS 12, frac 12, subcat lists 9",
                        nrow(.defaults_master))
                else "defaults/defaults_master.csv missing, truncated, or rebuilt an object with the wrong shape/type")
 
@@ -3379,7 +3379,7 @@ section_F <- function() {
     on.exit(unlink(probe), add = TRUE)
     writeLines(c(
       sprintf('source("%s")', files),
-      'stopifnot(is.data.frame(PARAM_CATALOGUE), nrow(PARAM_CATALOGUE) == 25L)',
+      'stopifnot(is.data.frame(PARAM_CATALOGUE), nrow(PARAM_CATALOGUE) == 27L)',
       'cat("KIT_SOURCE_ORDER_OK\\n")'), probe)
     res <- suppressWarnings(system2(
       file.path(R.home("bin"), "Rscript"), c("--vanilla", shQuote(probe)),

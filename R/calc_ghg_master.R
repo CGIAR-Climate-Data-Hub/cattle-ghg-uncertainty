@@ -32,7 +32,14 @@ ghg_emissions <- function(
   # calc_n_excretion. The default reads the catalogue so it cannot drift
   # from it; it was 3.3, cited to Table 10.11, which is the Tier 1 enteric
   # emission factor table and has no milk protein column.
-  MilkPR = .cat_default("MilkPR")
+  MilkPR = .cat_default("MilkPR"),
+  # Measured-intake override (2026-09). NULL on both means "derive GE from
+  # the energy chain", which is every existing caller, and resolve_ge()
+  # returns the derived value untouched in that case. Named *_measured, not
+  # GE/DMI, because ghg_emissions_vec() carries a local Eq 10.32 dry-matter
+  # term that an argument called DMI would shadow. See resolve_ge().
+  GE_measured  = NULL,
+  DMI_measured = NULL
 ) {
   # E1: cold-climate Cfi adjustment via Tw
   # (the 20 inside calc_nem is Eq 10.2's own threshold, not a default)
@@ -45,7 +52,8 @@ ghg_emissions <- function(
   nep <- calc_nep(nem, Cp, pct_pregnant = pct_pregnant)
   rem <- calc_rem(DE)
   reg <- calc_reg(DE)
-  ge <- calc_ge(nem, nea, nel, nep, new_energy, neg, rem, reg, DE)
+  ge <- resolve_ge(calc_ge(nem, nea, nel, nep, new_energy, neg, rem, reg, DE),
+                   GE_measured, DMI_measured)
 
   # Enteric CH4
   enteric_ch4_head <- calc_enteric_ch4(ge, Ym)
@@ -149,7 +157,10 @@ ghg_emissions_vec <- function(
   # Andreas 28/5/26 #4: per-iteration MMS allocation matrix (n_iter × n_MMS,
   # rows pre-renormalised to sum to 1). NULL = treat mms_fractions as a
   # deterministic vector across iterations (pre-fix behaviour).
-  mms_fraction_samples = NULL
+  mms_fraction_samples = NULL,
+  # Measured-intake override. Mirrors ghg_emissions() exactly; see resolve_ge().
+  GE_measured  = NULL,
+  DMI_measured = NULL
 ) {
   # Round 11 (2026-06): fully vectorised over all n iterations. Previously this
   # looped i = 1..n calling the scalar ghg_emissions() once per iteration, which
@@ -177,6 +188,15 @@ ghg_emissions_vec <- function(
 
   .bcast <- function(x, default) {
     if (is.null(x)) rep(default, n)
+    else if (length(x) == 1L) rep(x, n)
+    else x
+  }
+  # Measured-intake broadcaster. Deliberately NOT .bcast: that turns NULL into
+  # a vector of a default, which would destroy the "not supplied" signal the
+  # override depends on. Here NULL must stay NULL so resolve_ge() short-circuits
+  # and the derived path stays bit-for-bit identical.
+  .bcast_opt <- function(x) {
+    if (is.null(x)) NULL
     else if (length(x) == 1L) rep(x, n)
     else x
   }
@@ -250,7 +270,8 @@ ghg_emissions_vec <- function(
   nep <- calc_nep(nem, Cp, pct_pregnant = pct_pregnant)
   rem <- calc_rem(DE)
   reg <- calc_reg(DE)
-  ge  <- calc_ge(nem, nea, nel, nep, new_energy, neg, rem, reg, DE)
+  ge <- resolve_ge(calc_ge(nem, nea, nel, nep, new_energy, neg, rem, reg, DE),
+                   GE_measured, DMI_measured)
 
   # ---- Enteric CH4 (Eq 10.21) ----
   enteric_ch4_head  <- calc_enteric_ch4(ge, Ym)
