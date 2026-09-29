@@ -68,14 +68,39 @@
   and ranks the parameters where better data would most improve your inventory.
 </p>
 
-<h2>How do I quantify uncertainty in my national livestock GHG inventory?</h2>
-<p>When a country reports cattle greenhouse-gas emissions under the Paris Agreement, every input has uncertainty attached: animal populations, body weights, milk yields, feed digestibility, and the IPCC emission factors themselves. The IPCC 2006 Guidelines (Vol. 1, Ch. 3) ask inventory compilers to quantify how those input uncertainties combine into uncertainty on the reported total, and to report it in the Table 3.3 format.</p>
-<p>This calculator does that end to end. It propagates the uncertainty of every parameter through the full IPCC Tier 2 equation chain (IPCC 2006 Vol. 4, Ch. 10 and 11) by Monte Carlo simulation, and returns a defensible 95% confidence interval on your inventory total, a breakdown of how much uncertainty comes from activity data versus emission factors, and a ranking of which parameters would most reduce the uncertainty if you collected better data.</p>
+<h2>What the calculator gives you</h2>
+<p>Three results, each answering a question a national inventory report has to address.</p>
+
+<h3>1. A confidence interval on your reported total</h3>
+<p>The calculator propagates the uncertainty of every input through the full IPCC Tier 2 equation chain (2006 Guidelines, Vol. 4, Ch. 10 and 11) by Monte Carlo simulation. It then reports the 95% confidence interval on your inventory total, together with the margin of error as a percentage of the mean, which is the form IPCC Table 3.3 asks for.</p>
 
 <figure>
   <img src="assets/example_histogram.png" width="960" height="540" alt="Histogram of 10,000 Monte Carlo iterations of total CO2-equivalent emissions with dashed lines marking the 95 percent confidence interval, produced by the cattle GHG uncertainty calculator using hypothetical example data">
-  <figcaption>Example output: Monte Carlo distribution of total CO2eq with the 95% confidence interval (hypothetical Country X example data).</figcaption>
+  <figcaption>Example output: the distribution of total CO2eq across 10,000 iterations, with the 95% confidence interval marked (hypothetical Country X data).</figcaption>
 </figure>
+
+<h3>2. The split between activity data and emission factors</h3>
+<p>Table 3.3 asks for activity-data uncertainty and emission-factor uncertainty separately, as well as combined. The calculator produces all three for each emission source by repeating the simulation with one group of inputs held at its central values. These per-category figures can be entered directly into the uncertainty worksheet of the IPCC Inventory Software.</p>
+
+<h3>3. A ranking of what drives the uncertainty</h3>
+<p>A sensitivity analysis ranks every input by how much it contributes to the spread in the result, and distinguishes the parameters you could improve with better national data from the IPCC default coefficients you cannot. This is what turns an uncertainty estimate into a plan, because it shows where further data collection would narrow the interval most.</p>
+
+<figure>
+  <img src="assets/example_tornado.png" width="960" height="540" alt="Tornado chart ranking input parameters by their contribution to total uncertainty, with green bars for parameters reducible through better local data and grey bars for fixed IPCC coefficients">
+  <figcaption>Example output: the same inventory ranked by influence. Green bars are parameters better national data could narrow; grey bars are fixed IPCC coefficients (hypothetical Country X data).</figcaption>
+</figure>
+
+<h2>Who is it for?</h2>
+<p>National inventory compilers preparing Biennial Transparency Reports, Biennial Update Reports and National Inventory Reports under the UNFCCC Enhanced Transparency Framework, and the researchers, consultants and MRV practitioners who support them. If your cattle inventory uses Tier 2, or is moving to it, and you need Approach 2 (Monte Carlo) uncertainty rather than Approach 1 error propagation, it was built for your case.</p>
+<p>The results also serve a wider purpose. Knowing which parameters dominate the uncertainty shows governments and development partners where data collection and mitigation investment will have most effect, and better-quantified inventories support more credible tracking of progress under Nationally Determined Contributions.</p>
+
+<h2>How do I quantify uncertainty in my national livestock GHG inventory?</h2>
+<p>In three steps, with no coding and no statistical software.</p>
+<ol>
+  <li><strong>Prepare your data.</strong> Download the Excel template, which carries dropdowns and IPCC default values, and enter your animal sub-categories, populations, body weights, feed quality and manure-management shares. If your national data is held in a different shape, a built-in assistant will map it into the template for you.</li>
+  <li><strong>Review the uncertainty ranges.</strong> Every parameter arrives with a default range and distribution drawn from the IPCC guidance, which you adjust to reflect your own data and its sources. That judgement stays with you: the calculator propagates the uncertainty you give it rather than estimating it.</li>
+  <li><strong>Run and export.</strong> Choose the number of iterations and the GWP set, run the simulation, then download the results as Excel, CSV or a formatted Word report. Two example inventories, one dairy and one pastoral, are pre-loaded, so you can work through the whole sequence before using your own data.</li>
+</ol>
 
 <h2>What does the calculator cover?</h2>
 <div class="table-wrap">

@@ -3155,13 +3155,19 @@ app_server <- function(input, output, session) {
         c(t("basis_col_dimension"), t("basis_col_chosen"),
           t("basis_col_alternatives"), t("basis_col_governs"),
           t("basis_col_source"), t("basis_col_why"))),
-      # FixedHeader (beta feedback 2026-09): these tables show every row at
-      # once (pageLength = -1), so the column headers scroll out of view long
-      # before the rows do. The extension re-pins them to the top of the
-      # viewport while the table body is on screen.
-      extensions = "FixedHeader",
+      # Sticky column names (beta feedback 2026-09). These tables show every
+      # row at once (pageLength = -1), so the column names scrolled out of
+      # view long before the rows did.
+      #
+      # The FixedHeader extension is the obvious tool and does NOT work here:
+      # it is incompatible with scrollX, which these wide tables need, because
+      # scrollX already moves the header into its own container. The visible
+      # symptom was the card title appearing to stick instead of the column
+      # names. scrollY is the supported route: the table gets its own scroll
+      # area with the header row pinned above it, and scrollCollapse stops a
+      # short table reserving the full height.
       options = list(pageLength = -1, dom = "t", scrollX = TRUE,
-                     fixedHeader = TRUE,
+                     scrollY = "60vh", scrollCollapse = TRUE,
                      columnDefs = list(list(width = "22%", targets = 5))),
       class = "compact stripe")
   })
@@ -3203,11 +3209,10 @@ app_server <- function(input, output, session) {
           t("def_col_ipcc_default"), t("def_col_basis"), t("def_col_dist"),
           t("def_col_level"),
           t("def_col_ipcc_framing"), t("def_col_ipcc_ref"))),
-      # See the FixedHeader note on basis_table: 25 rows shown at once, so the
-      # header has to follow the reader down the page.
-      extensions = "FixedHeader",
+      # Sticky column names: see the note on basis_table. scrollY gives the
+      # table its own scroll area with the header row pinned above it.
       options = list(pageLength = -1, dom = "t", scrollX = TRUE,
-                     fixedHeader = TRUE),
+                     scrollY = "65vh", scrollCollapse = TRUE),
       class = "compact stripe"
     )
   })
@@ -3233,9 +3238,8 @@ app_server <- function(input, output, session) {
       rownames = FALSE,
       colnames = setNames(c("term", "definition"),
                           c(t("stat_col_term"), t("stat_col_def"))),
-      extensions = "FixedHeader",
       options = list(pageLength = -1, dom = "t", scrollX = TRUE,
-                     fixedHeader = TRUE),
+                     scrollY = "60vh", scrollCollapse = TRUE),
       class = "compact stripe"
     )
   })

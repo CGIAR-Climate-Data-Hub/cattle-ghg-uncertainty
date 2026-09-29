@@ -106,20 +106,6 @@ app_ui <- function(request = NULL) {
          // Beta feedback 2026-09 (APickering #3): the navbar is sticky
          // (www/custom.css) so the step tabs stay reachable; past 60px of
          // scroll, compact the title banner so the bar stays slim.
-         // Keep DataTables' FixedHeader pinned BELOW the sticky navbar
-         // instead of underneath it. The navbar height is not a constant: it
-         // compacts past 60px of scroll, and its tab row wraps to a second
-         // line on narrow windows, so measure it rather than hard-coding.
-         function _syncTableHeaderOffset() {
-           var nb = document.querySelector('.navbar');
-           if (!nb || !window.jQuery || !jQuery.fn.dataTable) return;
-           var h = nb.offsetHeight;
-           try {
-             jQuery.fn.dataTable.tables({ api: true }).every(function () {
-               if (this.fixedHeader) this.fixedHeader.headerOffset(h);
-             });
-           } catch (e) { /* no FixedHeader tables on this tab */ }
-         }
          // Hysteresis, not a single threshold. The navbar is `position:
          // sticky`, so it still occupies space in the flow: compacting it
          // makes it shorter, the page content shifts up, scrollY drops back
@@ -139,14 +125,7 @@ app_ui <- function(request = NULL) {
            } else if (_navCompact && y < 40) {
              _navCompact = false; nb.classList.remove('navbar-compact');
            }
-           _syncTableHeaderOffset();
          }, { passive: true });
-         window.addEventListener('resize', _syncTableHeaderOffset);
-         // Tables render after the tab does, so re-sync once things settle.
-         window.addEventListener('load', function () {
-           setTimeout(_syncTableHeaderOffset, 400);
-           setTimeout(_syncTableHeaderOffset, 1500);
-         });
          // 2026-06: after the magic-link auth flow consumes a ?token=...
          // query parameter, server sends this to clean it out of the
          // browser URL so the token doesn't sit in browser history.
