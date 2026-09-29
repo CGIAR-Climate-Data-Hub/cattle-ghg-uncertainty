@@ -6,7 +6,7 @@ output:
     theme: null
     highlight: null
     mathjax: null
-    pandoc_args: ["--metadata=title:AI Translator — Find out more"]
+    pandoc_args: ["--metadata=title:AI Translator, Find out more"]
 ---
 
 ```{r setup, include = FALSE}
@@ -17,7 +17,7 @@ This page describes what the in-app AI translator does, how to use it for a sing
 
 ## What the AI translator is for
 
-The Cattle Uncertainty App expects its data in a specific Excel template — three sheets (Inventory_Metadata, Parameters, Manure_Management), with controlled vocabularies for sub-categories and manure-management systems, and a fixed column order. Real national inventory data rarely arrives in that shape: column names differ, units may be in litres instead of kilograms, sub-category labels reflect local practice ("Local breed adult cows", "draught oxen"), and uncertainty bounds are sometimes reported as a mean ± standard deviation rather than as an explicit 95% confidence interval.
+The Cattle Uncertainty App expects its data in a specific Excel template: three sheets (Inventory_Metadata, Parameters, Manure_Management), with controlled vocabularies for sub-categories and manure-management systems, and a fixed column order. Real national inventory data rarely arrives in that shape: column names differ, units may be in litres instead of kilograms, sub-category labels reflect local practice ("Local breed adult cows", "draught oxen"), and uncertainty bounds are sometimes reported as a mean ± standard deviation rather than as an explicit 95% confidence interval.
 
 The AI translator converts raw inventory data, in whatever shape it arrives, into the exact template the tool needs. The user uploads an Excel or CSV file (multi-sheet is supported), answers a small number of clarification questions in natural language, and downloads a filled template ready to upload to the Data Input tab.
 
@@ -25,9 +25,9 @@ The translator does column mapping and unit conversion. It does not do the emiss
 
 ## The three-step workflow
 
-The translator works in three explicit passes — Explore, Clarify, Emit — rather than attempting all three at once. This separation prevents the AI from silently dropping rows or substituting catalogue defaults for values the user supplied.
+The translator works in three explicit passes: Explore, Clarify, Emit, rather than attempting all three at once. This separation prevents the AI from silently dropping rows or substituting catalogue defaults for values the user supplied.
 
-### Step 1 — Explore
+### Step 1: Explore
 
 After the file is read, the panel lists its sheets with their size and lets the user untick reference or lookup sheets the AI does not need before sending; fewer sheets mean a faster first reply and a cheaper run. The AI's first response is then a structured exploration report with four labelled sections:
 
@@ -36,9 +36,9 @@ After the file is read, the panel lists its sheets with their size and lets the 
 - **C. Inventory of gaps.** IPCC catalogue parameters that the file does not provide. These will need to be filled with IPCC defaults at emission time.
 - **D. Ambiguities to resolve.** Questions the user must answer before the template can be produced: sub-category vocabulary mapping, unit conversions, biological zeros, manure-management code interpretation, breed disaggregation, and similar.
 
-The exploration report is the persistent ground-truth artefact that drives the rest of the workflow. The user is expected to read it carefully — section B in particular should list every parameter present in the source file. A parameter missing from section B should be raised in the chat before proceeding.
+The exploration report is the persistent ground-truth artefact that drives the rest of the workflow. The user is expected to read it carefully: section B in particular should list every parameter present in the source file. A parameter missing from section B should be raised in the chat before proceeding.
 
-### Step 2 — Clarify
+### Step 2: Clarify
 
 The user answers the questions in section D in plain natural-language chat messages. There is no required template for the answers; the AI parses them and updates its internal mapping. Typical clarifications include:
 
@@ -50,7 +50,7 @@ The user answers the questions in section D in plain natural-language chat messa
 
 If the user wants to add data that is not in the file (typically national population numbers), the values can be typed directly into the chat. They will be incorporated into the final template alongside the file-derived values.
 
-### Step 3 — Emit
+### Step 3: Emit
 
 When the section D questions are answered, the user clicks **Produce template now**. The AI translates section B (file-derived values), section C (catalogue gaps to be filled with IPCC defaults), and the biological zeros confirmed in section D, mechanically, into the JSON template. The workbook is then built once and a green **Download template (.xlsx)** button appears as the only control, with two small links to revise or start over.
 
@@ -69,7 +69,7 @@ The translator is gated behind a magic-link sign-in flow. Emails ending in `@cgi
 3. Within 1–2 minutes, an email arrives from `noreply@cattle-uncertainty.app` with subject "Sign in to the IPCC Cattle GHG Uncertainty tool". The link in it stays valid for 30 days and may be clicked more than once; after the first successful click the browser stays signed in, so the link is only needed once per browser.
 4. Click the link. The app opens in a browser tab and recognises that the email is not on the auto-approved list. A confirmation message is displayed:
 
-    > Thanks — your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.
+    > Thanks: your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.
 
    At the same moment, the administrator receives a notification email summarising the request (email address, timestamp).
 
@@ -94,7 +94,7 @@ The AI translator is intended for the common case in which raw inventory data do
 - Units are inconsistent (mix of kg and lb, fractions and percentages, litres and kilograms of milk).
 - IPCC defaults are needed for parameters the user does not measure.
 
-The translator is not required when the user already has a filled template — in that case, upload directly via the Data Input tab. The translator is also not the appropriate tool for converting an emissions-calculation result; it works on input parameters only.
+The translator is not required when the user already has a filled template: in that case, upload directly via the Data Input tab. The translator is also not the appropriate tool for converting an emissions-calculation result; it works on input parameters only.
 
 ## Quality control and limitations
 
@@ -115,9 +115,9 @@ The IPCC inventory data the translator handles is generally non-sensitive (it is
 <div class="related">
 ### Related material
 
-- [User Guide](../user_guide.pdf), §"AI-assisted data preparation" — the same workflow described in the printable user guide, including the non-CGIAR step-by-step.
-- [Methodology document](../methodology.pdf) — full equations, parameter definitions, and references for everything the translator outputs.
-- [Find out more — Correlations](correlations.html) — the companion topic page covering the correlation modes on the Simulate tab.
+- [User Guide](../user_guide.pdf), §"AI-assisted data preparation": the same workflow described in the printable user guide, including the non-CGIAR step-by-step.
+- [Methodology document](../methodology.pdf): full equations, parameter definitions, and references for everything the translator outputs.
+- [Find out more: Correlations](correlations.html), the companion topic page covering the correlation modes on the Simulate tab.
 
 </div>
 

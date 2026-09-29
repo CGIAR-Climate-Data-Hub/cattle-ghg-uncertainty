@@ -1,15 +1,15 @@
 # =============================================================================
-# Excel Input Template — openxlsx version with dropdown menus
+# Excel Input Template: openxlsx version with dropdown menus
 # =============================================================================
 # Sheets produced:
-#   _Lists            (hidden)  — raw lists that power dropdown validation
-#   README                      — colour legend + quick-start
-#   Inventory_Metadata          — dropdowns for species/climate/GWP/version
-#   Parameters                  — pre-populated 22-row block per sub-category,
+#   _Lists            (hidden) : raw lists that power dropdown validation
+#   README                     : colour legend + quick-start
+#   Inventory_Metadata         : dropdowns for species/climate/GWP/version
+#   Parameters                 : pre-populated 22-row block per sub-category,
 #                                  dropdowns, auto-fill formulas for lower/upper
-#   Manure_Management           — dropdown for mms_type
-#   Parameter_TimeSeries        — year-by-parameter grid for correlation estimation
-#   Vocab                       — parameter catalogue + all controlled terms
+#   Manure_Management          : dropdown for mms_type
+#   Parameter_TimeSeries       : year-by-parameter grid for correlation estimation
+#   Vocab                      : parameter catalogue + all controlled terms
 # =============================================================================
 
 # Safe-default operator (used in parse_uploaded_template)
@@ -112,7 +112,7 @@ compute_corr_from_population <- function(population,
 # Andreas 28/5/26 follow-up: country-name → continental region lookup.
 # Used by normalise_metadata_region() to rescue legacy uploads that only
 # have a free-text "Country / region" cell (without the new Continental
-# region dropdown). The list is illustrative — it covers the cases
+# region dropdown). The list is illustrative: it covers the cases
 # inventory teams in our partner network are likely to type. Country
 # names are matched case-insensitively after stripping whitespace.
 # Anything not in this list falls through to "global", which preserves
@@ -160,7 +160,7 @@ COUNTRY_TO_REGION <- c(
 # Resolve the metadata `region` field from either:
 #   (a) the new "Continental region" cell (case-insensitive match to
 #       africa / asia / europe / americas / oceania / global), OR
-#   (b) the legacy single "Country / region" cell — by looking up the
+#   (b) the legacy single "Country / region" cell: by looking up the
 #       country in COUNTRY_TO_REGION.
 # Anything unresolved falls through to "global" (the existing default).
 normalise_metadata_region <- function(metadata) {
@@ -202,7 +202,7 @@ normalise_metadata_region <- function(metadata) {
 # parse_uploaded_template applies these so existing user templates keep working.
 # New canonical names match the IPCC Inventory Software v2.95 symbols.
 PARAM_ALIASES <- c(
-  # Phase 2 — first batch
+  # Phase 2: first batch
   "ash"          = "ASH",
   "DE_pct"       = "DE",
   "CP_pct"       = "CP",
@@ -215,13 +215,13 @@ PARAM_ALIASES <- c(
   # names "Frac_GASMS" and "Frac_LEACH_H" are the MS-side parameters;
   # "Frac_GASM_PRP" / "Frac_LEACH_PRP" are the PRP-side parameters. The new
   # canonical names exposed in the methodology and user guide are
-  # "Frac_LeachMS" / "Frac_GasMS" / "Frac_LeachPRP" / "Frac_GasPRP" — accept
+  # "Frac_LeachMS" / "Frac_GasMS" / "Frac_LeachPRP" / "Frac_GasPRP": accept
   # them as aliases here so docs and templates stay in sync.
   "Frac_LeachMS"  = "Frac_LEACH_H",
   "Frac_GasMS"    = "Frac_GASMS",
   "Frac_LeachPRP" = "Frac_LEACH_PRP",
   "Frac_GasPRP"   = "Frac_GASM_PRP",
-  # R1.6 — full IPCC alignment per IPCC Inventory Software v2.95
+  # R1.6: full IPCC alignment per IPCC Inventory Software v2.95
   "cattle_pop"   = "N",
   "mature_weight"= "MW",
   "weight_gain"  = "WG",
@@ -230,7 +230,7 @@ PARAM_ALIASES <- c(
   "protein_milk" = "MilkPR",
   "C_growth"     = "C",
   # Andreas 2026-05 #6 (final rename 2026-05-19): canonical name is now
-  # "BW" (matches IPCC Eq 10.6 / 10.17 / 10.18 — see Vol 4 Ch 10 p.17).
+  # "BW" (matches IPCC Eq 10.6 / 10.17 / 10.18: see Vol 4 Ch 10 p.17).
   # Legacy "W" and "live_weight" still accepted on upload.
   "W"            = "BW",
   "live_weight"  = "BW",
@@ -274,18 +274,18 @@ PARAM_CATALOGUE <- .master_wide("PARAM_CATALOGUE", "parameter")
 
 # ---------------------------------------------------------------------------
 # Correlation matrix template (Lolita 2026-06-02 review).
-# Produces a square CSV the user can drop into the "Advanced — manual entry"
+# Produces a square CSV the user can drop into the "Advanced: manual entry"
 # correlation-mode upload. The row and column names are the canonical
 # PARAM_CATALOGUE$parameter values so the upload parser + expand_corr_matrix()
 # in the simulation observer can pick up every pair correctly. Without this
 # template, users hand-writing a matrix risk typos in headers that get
-# silently dropped (expand_corr_matrix uses intersect() — names that don't
+# silently dropped (expand_corr_matrix uses intersect(): names that don't
 # match the simulation's parameter list contribute no correlation).
 #
 # include_example = TRUE pre-fills the seven structural-defaults pairs
 # (BW <-> MW, BW <-> WG, Milk <-> Fat, Milk <-> BW, Milk <-> DE, DE <-> CP,
 # DE <-> Ym) via build_ipcc_preset_corr() so the example matrix is IDENTICAL
-# to what the in-app "Structural defaults" preset applies — single source of
+# to what the in-app "Structural defaults" preset applies: single source of
 # truth in PRESET_PAIRS (R/mc_sampling.R).
 generate_corr_matrix_template <- function(filepath, include_example = FALSE) {
   params <- PARAM_CATALOGUE$parameter
@@ -297,7 +297,7 @@ generate_corr_matrix_template <- function(filepath, include_example = FALSE) {
     out
   }
   # write.csv with row.names = TRUE so the first column carries the parameter
-  # names — exactly the shape read.csv(..., row.names = 1, check.names = FALSE)
+  # names: exactly the shape read.csv(..., row.names = 1, check.names = FALSE)
   # expects in the upload parser (R/app_server.R observeEvent(corr_matrix_upload)).
   utils::write.csv(m, file = filepath, row.names = TRUE)
   invisible(filepath)
@@ -311,7 +311,7 @@ generate_template <- function(filepath, include_example = FALSE,
   if (requireNamespace("openxlsx", quietly = TRUE)) {
     generate_template_openxlsx(filepath, include_example, ipcc_version = ipcc_version)
   } else {
-    message("Package 'openxlsx' not found — install it for dropdown menus:\n",
+    message("Package 'openxlsx' not found: install it for dropdown menus:\n",
             "  install.packages('openxlsx')\n",
             "Falling back to basic template (no dropdowns).")
     generate_template_basic(filepath, include_example)
@@ -321,16 +321,16 @@ generate_template <- function(filepath, include_example = FALSE,
 
 
 # ===========================================================================
-# OPENXLSX VERSION — full dropdowns, formulas, colour-coding
+# OPENXLSX VERSION: full dropdowns, formulas, colour-coding
 # ===========================================================================
 generate_template_openxlsx <- function(filepath, include_example,
                                          ipcc_version = "2006") {
 
-  # Helper — turn a character vector into a 1-row data.frame for
+  # Helper: turn a character vector into a 1-row data.frame for
   # writeData. Previously we used as.data.frame(t(vec)). Production
   # logs (2026-06-12 traceback inside .translator_write_official_template
   # → generate_template_openxlsx) showed t(legend_labels) throwing
-  # "no such index at level 1" intermittently — most likely from
+  # "no such index at level 1" intermittently: most likely from
   # Matrix's S4 t() generic interfering with base's t.default on
   # plain character vectors when the deploy stack loads Matrix,
   # plotly, mc2d, officer, flextable, etc. in that order. The
@@ -344,14 +344,14 @@ generate_template_openxlsx <- function(filepath, include_example,
   openxlsx::modifyBaseFont(wb, fontName = "Calibri", fontSize = 10)
 
   # ── colour palette ─────────────────────────────────────────────────────────
-  C_HEADER     <- "#1B4332"   # dark green  — column headers
-  C_SECTION    <- "#2D6A4F"   # mid green   — section labels
-  C_REQUIRED   <- "#FFF9C4"   # pale yellow — cells user MUST fill (core activity data)
-  C_TECHNICAL  <- "#FFF3E0"   # pale orange — IPCC coefficient pre-filled, editable
-  C_DROPDOWN   <- "#E8F5E9"   # pale green  — controlled-vocab dropdowns
-  C_PREFILL    <- "#E3F2FD"   # pale blue   — pre-filled info (read only)
-  C_AUTO       <- "#F5F5F5"   # light grey  — auto-computed formulas
-  C_OPTIONAL   <- "#FFFFFF"   # white       — optional free-text
+  C_HEADER     <- "#1B4332"   # dark green : column headers
+  C_SECTION    <- "#2D6A4F"   # mid green  : section labels
+  C_REQUIRED   <- "#FFF9C4"   # pale yellow: cells user MUST fill (core activity data)
+  C_TECHNICAL  <- "#FFF3E0"   # pale orange: IPCC coefficient pre-filled, editable
+  C_DROPDOWN   <- "#E8F5E9"   # pale green : controlled-vocab dropdowns
+  C_PREFILL    <- "#E3F2FD"   # pale blue  : pre-filled info (read only)
+  C_AUTO       <- "#F5F5F5"   # light grey : auto-computed formulas
+  C_OPTIONAL   <- "#FFFFFF"   # white      : optional free-text
   C_GREY_TXT   <- "#6B6B6B"
   C_RED        <- "#C62828"   # for required labels
 
@@ -395,7 +395,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
   # helper ─────────────────────────────────────────────────────────────────
   add_validation <- function(sheet, col, rows, list_key) {
-    # Use cell-range reference — produces standard <dataValidation> with visible arrows
+    # Use cell-range reference: produces standard <dataValidation> with visible arrows
     ref <- list_ref(list_key)
     openxlsx::dataValidation(wb, sheet, col = col, rows = rows,
                              type = "list", operator = "equal", value = ref,
@@ -428,7 +428,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   # the systems valid for the chosen IPCC version, instead of always showing
   # all 12 entries. Two separate template downloads (2006 / 2019) are exposed
   # on Tab 1; each generates its own filtered dropdown list. The previous
-  # behaviour deferred the version mismatch to upload-time validation only —
+  # behaviour deferred the version mismatch to upload-time validation only -
   # this change matches the dropdown to the user's selected version up-front.
   V_MMS       <- if (exists("get_mms_for_version"))
                    get_mms_for_version(ipcc_version)$id
@@ -463,7 +463,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   }
 
   # =========================================================================
-  # SHEET: _Lists (hidden — vocabulary columns for Excel dropdown validation)
+  # SHEET: _Lists (hidden, vocabulary columns for Excel dropdown validation)
   # =========================================================================
   openxlsx::addWorksheet(wb, "_Lists", visible = FALSE)
 
@@ -476,7 +476,7 @@ generate_template_openxlsx <- function(filepath, include_example,
                         startRow = 1, startCol = i, colNames = FALSE)
   }
 
-  # Sub-category property lookup (used by Vocab) — placed after vocabulary cols
+  # Sub-category property lookup (used by Vocab): placed after vocabulary cols
   lut_start_col <- length(V_LISTS) + 2   # leave a gap
   subcat_lut <- data.frame(
     subsystem  = V_SUBSYS,
@@ -502,7 +502,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   openxlsx::setColWidths(wb, "README", cols = 1:3, widths = c(6, 28, 70))
 
   readme_title <- data.frame(
-    x = "Cattle GHG Uncertainty Calculator — Input Template",
+    x = "Cattle GHG Uncertainty Calculator: Input Template",
     stringsAsFactors = FALSE)
   openxlsx::writeData(wb, "README", readme_title, startRow = 1, startCol = 1,
                       colNames = FALSE)
@@ -515,11 +515,11 @@ generate_template_openxlsx <- function(filepath, include_example,
   legend <- data.frame(
     Colour = c("Pale yellow","Pale green","Pale blue","Light grey","White"),
     Meaning = c(
-      "REQUIRED — you must fill this in",
-      "CONTROLLED — choose from the dropdown list",
-      "PRE-FILLED — read the value, keep or override (emission factors pre-filled with IPCC defaults)",
-      "AUTO-COMPUTED — calculated from your inputs, do not edit",
-      "OPTIONAL — free text or leave blank (white lower_bound/upper_bound columns override the symmetric auto-computed bounds for asymmetric distributions)"),
+      "REQUIRED: you must fill this in",
+      "CONTROLLED: choose from the dropdown list",
+      "PRE-FILLED: read the value, keep or override (emission factors pre-filled with IPCC defaults)",
+      "AUTO-COMPUTED: calculated from your inputs, do not edit",
+      "OPTIONAL: free text or leave blank (white lower_bound/upper_bound columns override the symmetric auto-computed bounds for asymmetric distributions)"),
     stringsAsFactors = FALSE)
   openxlsx::writeData(wb, "README", legend, startRow = 3, startCol = 1,
                       colNames = TRUE)
@@ -533,10 +533,10 @@ generate_template_openxlsx <- function(filepath, include_example,
   steps <- data.frame(
     Step = paste0("Step ", 1:7),
     Action = c(
-      "Fill in the Inventory_Metadata sheet (country, species, inventory year). Note: MCF values for manure must be entered manually in Manure_Management — see Vocab sheet for IPCC Table 10.17 reference values by climate zone.",
+      "Fill in the Inventory_Metadata sheet (country, species, inventory year). Note: MCF values for manure must be entered manually in Manure_Management, see Vocab sheet for IPCC Table 10.17 reference values by climate zone.",
       "In the Parameters sheet, fill in cattle_type (col A: 'dairy' or 'other'), aggregation_level (col B: your region/AEZ/system name), and optionally sub_category (col C: cows/heifers/calves/etc.).",
-      "Fill in the VALUE (col G) for each parameter. Emission factor parameters (Cfi, Ym, Bo, etc.) are pre-filled with IPCC defaults — update with your own values if available.",
-      "Fill in UNCERTAINTY_PCT (col H) for symmetric distributions — LOWER and UPPER bounds auto-compute. For asymmetric distributions (triangular/PERT): also fill LOWER_BOUND (col I) and UPPER_BOUND (col J) with the min/max values.",
+      "Fill in the VALUE (col G) for each parameter. Emission factor parameters (Cfi, Ym, Bo, etc.) are pre-filled with IPCC defaults: update with your own values if available.",
+      "Fill in UNCERTAINTY_PCT (col H) for symmetric distributions: LOWER and UPPER bounds auto-compute. For asymmetric distributions (triangular/PERT): also fill LOWER_BOUND (col I) and UPPER_BOUND (col J) with the min/max values.",
       "To add a second sub-category: copy the parameter rows, paste below, change cattle_type/aggregation_level/sub_category.",
       "Fill in the Manure_Management sheet: one row per MMS type per sub-category. Enter MCF and EF3 values (look up IPCC Table 10.17 and 10.21 in the Vocab sheet). Fractions must sum to 100% per sub-category.",
       "Optionally fill in the Parameter_TimeSeries sheet with historical annual values (one row per year, one column per parameter) to enable automatic activity data correlation analysis."),
@@ -556,7 +556,7 @@ generate_template_openxlsx <- function(filepath, include_example,
       "Country, reporting year, species, IPCC guidelines version.",
       "All parameters for each animal sub-category. 3 user-defined naming columns (cattle_type, aggregation_level, sub_category). Emission factors pre-filled with IPCC defaults. Supports symmetric (uncertainty_pct) and asymmetric (lower_bound, upper_bound) distributions.",
       "Manure management system allocation. Enter MCF and EF3 values manually (see Vocab for IPCC reference tables). Fractions must sum to 100 per sub-category. Full distribution support for MCF and EF3.",
-      "CORRELATIONS — one row per year, one column per activity data parameter. Fill in historical values; the app computes a Pearson correlation matrix automatically on upload (Tab 4). You only need columns you have data for.",
+      "CORRELATIONS: one row per year, one column per activity data parameter. Fill in historical values; the app computes a Pearson correlation matrix automatically on upload (Tab 4). You only need columns you have data for.",
       "Parameter catalogue + IPCC MCF reference table (Table 10.17) + controlled vocabulary terms and definitions."),
     stringsAsFactors = FALSE)
   openxlsx::writeData(wb, "README", sheets_desc, startRow = 20, startCol = 1,
@@ -574,7 +574,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   openxlsx::setRowHeights(wb, "Inventory_Metadata",
                           rows = 1:8, heights = 24)
 
-  # Write as label-value pairs (transposed layout — more readable)
+  # Write as label-value pairs (transposed layout: more readable)
   meta_fields <- list(
     list(label="Country",                  col="country",       req=TRUE,
          hint="Free text, e.g. Zimbabwe. Used in the report header.",
@@ -587,13 +587,13 @@ generate_template_openxlsx <- function(filepath, include_example,
     # falling back to the global default; the dropdown makes that
     # impossible.
     list(label="Continental region",       col="region",        req=TRUE,
-         hint="Select your continent — drives the IPCC continental BW benchmark (Annex 10A.1/10A.2/10A.3).",
+         hint="Select your continent: drives the IPCC continental BW benchmark (Annex 10A.1/10A.2/10A.3).",
          dropdown="region"),
     list(label="Inventory year",           col="inventory_year",req=TRUE,
          hint="Integer year, e.g. 2021",                          dropdown=NULL),
     list(label="Livestock species",        col="species",       req=TRUE,
          hint="Select from dropdown",                             dropdown="species"),
-    # Round 7.2: ipcc_version is no longer a dropdown — the user picks the
+    # Round 7.2: ipcc_version is no longer a dropdown, the user picks the
     # version at download time on Tab 1, and this cell is pre-set to match.
     # Hint reminds them not to change it without downloading the matching
     # template (otherwise the MMS dropdown won't line up).
@@ -603,7 +603,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     list(label="Prepared by",             col="prepared_by",   req=FALSE,
          hint="Agency / author name",                             dropdown=NULL),
     list(label="Notes",                   col="notes",         req=FALSE,
-         hint="Scope, caveats, deviations from standard methodology. Note: MCF values for manure must be entered manually in Manure_Management — see Vocab sheet for IPCC Table 10.17 reference.", dropdown=NULL)
+         hint="Scope, caveats, deviations from standard methodology. Note: MCF values for manure must be entered manually in Manure_Management, see Vocab sheet for IPCC Table 10.17 reference.", dropdown=NULL)
   )
 
   # The list above is what gets written; TEMPLATE_META_FIELDS is what the
@@ -622,7 +622,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     inventory_year=2021, species="cattle_non_dairy",
     ipcc_version=ipcc_version,
     prepared_by="National GHG Inventory Team",
-    notes="Hypothetical example inventory — replace with your country's data.")
+    notes="Hypothetical example inventory: replace with your country's data.")
 
   for (i in seq_along(meta_fields)) {
     f <- meta_fields[[i]]
@@ -673,9 +673,9 @@ generate_template_openxlsx <- function(filepath, include_example,
   # E  definition       (pre-filled, info)
   # F  unit             (pre-filled, info)
   # G  value            *** REQUIRED USER INPUT ***
-  # H  uncertainty_pct  (yellow — fill for symmetric distributions)
-  # I  lower_bound      (optional override — min value for asymmetric distributions)
-  # J  upper_bound      (optional override — max value for asymmetric distributions)
+  # H  uncertainty_pct  (yellow: fill for symmetric distributions)
+  # I  lower_bound      (optional override: min value for asymmetric distributions)
+  # J  upper_bound      (optional override: max value for asymmetric distributions)
   # K  distribution     (dropdown)
   # L  lower            (auto-formula: uses lower_bound if filled, else value*(1-pct/100))
   # M  upper            (auto-formula: uses upper_bound if filled, else value*(1+pct/100))
@@ -695,7 +695,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
   # Row 1: instruction banner
   openxlsx::writeData(wb, "Parameters",
-    "HOW TO USE: YELLOW = core activity data — enter your own values. ORANGE = technical IPCC coefficient — pre-filled with defaults from Penman et al. (2000); uncertainty ranges from Penman (2000) / Monni et al. (2007); edit if you have country-specific values. GREEN = dropdown. BLUE = pre-filled info. GREY = auto-computed. PERCENTAGE FIELDS (DE_pct, milk_fat, CP_pct, Ym_pct, uncertainty_pct, etc.): enter the bare number, e.g. '45' for 45% — do NOT include the '%' symbol. uncertainty_pct is the ±% half-width of the 95% CI. For symmetric distributions: fill value (G) + uncertainty_pct (H). For asymmetric distributions (PERT/lognormal): fill lower_bound (I) and upper_bound (J) instead — these override the pct formula. Copy rows 4 onwards to add more sub-categories.",
+    "HOW TO USE: YELLOW = core activity data, enter your own values. ORANGE = technical IPCC coefficient, pre-filled with defaults from Penman et al. (2000); uncertainty ranges from Penman (2000) / Monni et al. (2007); edit if you have country-specific values. GREEN = dropdown. BLUE = pre-filled info. GREY = auto-computed. PERCENTAGE FIELDS (DE_pct, milk_fat, CP_pct, Ym_pct, uncertainty_pct, etc.): enter the bare number, e.g. '45' for 45%, do NOT include the '%' symbol. uncertainty_pct is the ±% half-width of the 95% CI. For symmetric distributions: fill value (G) + uncertainty_pct (H). For asymmetric distributions (PERT/lognormal): fill lower_bound (I) and upper_bound (J) instead, these override the pct formula. Copy rows 4 onwards to add more sub-categories.",
     startRow=1, startCol=1, colNames=FALSE)
   openxlsx::mergeCells(wb, "Parameters", cols=1:16, rows=1)
   apply_style("Parameters",
@@ -910,7 +910,7 @@ generate_template_openxlsx <- function(filepath, include_example,
                          gridLines = TRUE)
 
   # Round 7 R1.12: per-MMS Frac_GasMS / Frac_LeachMS columns.
-  # Andreas 2026-05 #22b: Bo removed from Manure_Management — it is animal-
+  # Andreas 2026-05 #22b: Bo removed from Manure_Management, it is animal-
   # sub-category-specific (varies by dairy vs non-dairy, not by MMS) and the
   # app reads it from the Parameters sheet only. The earlier MM column was
   # never consumed and lacked uncertainty inputs (#22d), so it created
@@ -932,7 +932,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
   # Instruction banner
   openxlsx::writeData(wb, "Manure_Management",
-    "Enter one row per manure management system (MMS) per sub-category. fraction_pct values for the same cattle_type+aggregation_level+sub_category MUST sum to 100. SUB-CATEGORY HANDLING: if all sub-categories of the same cattle_type+aggregation_level use the same MMS allocation, you may leave sub_category blank — the values will apply to every sub-category in that group. If sub-categories differ (e.g. cows vs calves), provide a separate set of rows per sub-category. Enter MCF values from IPCC Table 10.17 for your climate zone (see Vocab sheet). EF3 from IPCC Table 10.21. For asymmetric distributions, fill lower_mcf/upper_mcf or lower_ef3/upper_ef3 with min/max values.",
+    "Enter one row per manure management system (MMS) per sub-category. fraction_pct values for the same cattle_type+aggregation_level+sub_category MUST sum to 100. SUB-CATEGORY HANDLING: if all sub-categories of the same cattle_type+aggregation_level use the same MMS allocation, you may leave sub_category blank, the values will apply to every sub-category in that group. If sub-categories differ (e.g. cows vs calves), provide a separate set of rows per sub-category. Enter MCF values from IPCC Table 10.17 for your climate zone (see Vocab sheet). EF3 from IPCC Table 10.21. For asymmetric distributions, fill lower_mcf/upper_mcf or lower_ef3/upper_ef3 with min/max values.",
     startRow=1, startCol=1, colNames=FALSE)
   openxlsx::mergeCells(wb, "Manure_Management", cols=1:MM_NCOL, rows=1)
   apply_style("Manure_Management",
@@ -953,23 +953,23 @@ generate_template_openxlsx <- function(filepath, include_example,
     fraction_pct="% of manure to this MMS (all rows per sub-cat must sum to 100)",
     lower_fraction="Optional: min % for the fraction_pct uncertainty range (leave blank if known exactly)",
     upper_fraction="Optional: max % for the fraction_pct uncertainty range (leave blank if known exactly)",
-    distribution_fraction="Distribution for fraction_pct uncertainty — select from dropdown (default pert). Per-iteration rows are renormalised to sum to 100%.",
-    MCF_pct="Methane conv. factor % — look up IPCC Table 10.17 in Vocab sheet",
+    distribution_fraction="Distribution for fraction_pct uncertainty: select from dropdown (default pert). Per-iteration rows are renormalised to sum to 100%.",
+    MCF_pct="Methane conv. factor %: look up IPCC Table 10.17 in Vocab sheet",
     lower_mcf="Optional: min value for asymmetric MCF distribution",
     upper_mcf="Optional: max value for asymmetric MCF distribution",
-    distribution_mcf="Distribution for MCF uncertainty — select from dropdown",
-    EF3="Direct N2O EF — look up IPCC Table 10.21 in Vocab sheet",
+    distribution_mcf="Distribution for MCF uncertainty: select from dropdown",
+    EF3="Direct N2O EF: look up IPCC Table 10.21 in Vocab sheet",
     lower_ef3="Optional: min value for asymmetric EF3 distribution",
     upper_ef3="Optional: max value for asymmetric EF3 distribution",
-    distribution_ef3="Distribution for EF3 uncertainty — select from dropdown",
-    Frac_GasMS_pct="Volatilisation fraction % per MMS — IPCC 2019 Table 10.22",
+    distribution_ef3="Distribution for EF3 uncertainty: select from dropdown",
+    Frac_GasMS_pct="Volatilisation fraction % per MMS: IPCC 2019 Table 10.22",
     lower_frac_gas="Optional: min for asymmetric Frac_GasMS distribution",
     upper_frac_gas="Optional: max for asymmetric Frac_GasMS distribution",
-    distribution_frac_gas="Distribution for Frac_GasMS — select from dropdown",
-    Frac_LeachMS_pct="Leaching fraction % per MMS — IPCC 2019 Table 10.23",
+    distribution_frac_gas="Distribution for Frac_GasMS: select from dropdown",
+    Frac_LeachMS_pct="Leaching fraction % per MMS: IPCC 2019 Table 10.23",
     lower_frac_leach="Optional: min for asymmetric Frac_LeachMS distribution",
     upper_frac_leach="Optional: max for asymmetric Frac_LeachMS distribution",
-    distribution_frac_leach="Distribution for Frac_LeachMS — select from dropdown",
+    distribution_frac_leach="Distribution for Frac_LeachMS: select from dropdown",
     stringsAsFactors=FALSE)
   openxlsx::writeData(wb, "Manure_Management", hints_mm, startRow=3, startCol=1,
                       colNames=FALSE)
@@ -1210,7 +1210,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   openxlsx::setColWidths(wb, "Parameter_TimeSeries", cols=5:ts_n_cols, widths=14)
   openxlsx::freezePane(wb, "Parameter_TimeSeries", firstActiveRow=TS_DATA_START)
 
-  if (FALSE) { # dead block — kept only so unicode – below doesn't break parse
+  if (FALSE) { # dead block: kept only so unicode – below doesn't break parse
     pop_example_dead <- data.frame(
       cattle_type="dairy",
       aggregation_level="Country X \u2013 smallholder dairy",
@@ -1230,7 +1230,7 @@ generate_template_openxlsx <- function(filepath, include_example,
                          cols=1:8, widths=c(18,48,18,12,14,12,16,50))
 
   # ── Section A: Parameter catalogue ──────────────────────────────────────
-  openxlsx::writeData(wb, "Vocab", "SECTION A — Parameter Catalogue",
+  openxlsx::writeData(wb, "Vocab", "SECTION A: Parameter Catalogue",
                       startRow=1, startCol=1, colNames=FALSE)
   openxlsx::mergeCells(wb, "Vocab", cols=1:8, rows=1)
   apply_style("Vocab",
@@ -1274,7 +1274,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   spacer_row <- max(cat_data_rows) + 2
 
   # ── Section B: Controlled vocabulary tables ───────────────────────────────
-  openxlsx::writeData(wb, "Vocab", "SECTION B — Controlled Vocabulary",
+  openxlsx::writeData(wb, "Vocab", "SECTION B: Controlled Vocabulary",
                       startRow=spacer_row, startCol=1, colNames=FALSE)
   openxlsx::mergeCells(wb, "Vocab", cols=1:8, rows=spacer_row)
   apply_style("Vocab",
@@ -1301,7 +1301,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     # it is one cell of a much larger IPCC table, and a user who cannot see
     # which region, productivity class and climate were chosen cannot judge
     # whether a default applies to their herd or know what to override.
-    list(title="WHAT THE DEFAULTS ASSUME — read this before accepting any pre-filled value",
+    list(title="WHAT THE DEFAULTS ASSUME: read this before accepting any pre-filled value",
          cols=c("choice","this tool uses","IPCC also publishes","affects",
                 "IPCC source","why, and what to do otherwise"),
          # Tool-wide rows only: basis_tool_wide(). Lactation state and the
@@ -1323,7 +1323,7 @@ generate_template_openxlsx <- function(filepath, include_example,
            variant=MMS_DEFAULTS$ipcc_variant,
            stringsAsFactors=FALSE)),
 
-    list(title="IPCC Table 10.17 — MCF (%) by climate zone  [enter values into Manure_Management sheet]",
+    list(title="IPCC Table 10.17: MCF (%) by climate zone  [enter values into Manure_Management sheet]",
          cols=c("mms_type","tropical_moist_%","tropical_dry_%","temperate_%","boreal_%"),
          data=data.frame(
            mms_type=MMS_DEFAULTS$id,
@@ -1349,13 +1349,13 @@ generate_template_openxlsx <- function(filepath, include_example,
            term=V_DIST,
            shape=c("Symmetric bell","Symmetric, truncated at 0","Right-skewed, always positive",
                    "Flexible, bounded [lower,upper]","Linear triangle","Smooth peak at mode",
-                   "Flat — all values equally likely","No variation","Normal clamped to [0,1]"),
+                   "Flat: all values equally likely","No variation","Normal clamped to [0,1]"),
            use=c("Large populations, body weights, symmetric uncertainty",
                  "Non-negative parameters with near-symmetric uncertainty",
-                 "Emission factors, ratios — strictly positive, possible right tail",
+                 "Emission factors, ratios: strictly positive, possible right tail",
                  "Fractions 0-1: pct_pregnant, Cp",
                  "Expert-elicited min/mode/max: Ca, C_growth, DE_pct",
-                 "IPCC coefficients: Cfi, Ym, Bo, EF3_PRP — recommended for most EFs",
+                 "IPCC coefficients: Cfi, Ym, Bo, EF3_PRP, recommended for most EFs",
                  "Only bounds known, no preferred value",
                  "Zero uncertainty, e.g. WG=0 for non-growing adults",
                  "Fractions that must stay in [0,1]"),
@@ -1367,7 +1367,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
     # data_quality vocab section removed in v2.3 (TT.2 - column was unused)
 
-    list(title="animal sub-category reference — IPCC defaults (for reference only; sub_category is free text in the template)",
+    list(title="animal sub-category reference: IPCC defaults (for reference only; sub_category is free text in the template)",
          cols=c("ipcc_term","label","sex","age_class","default_Cfi",
                 "default_LW_kg","default_WG_kg_day"),
          data=data.frame(
@@ -1380,7 +1380,7 @@ generate_template_openxlsx <- function(filepath, include_example,
            WG=unlist(WG_BY_SUBCAT[V_SUBSYS]),
            stringsAsFactors=FALSE)),
 
-    list(title="feeding_situation reference — Ca values (for reference only; feeding situation is captured in sub_category free text)",
+    list(title="feeding_situation reference: Ca values (for reference only; feeding situation is captured in sub_category free text)",
          cols=c("term","description","Ca value (IPCC Table 10.5)"),
          data=data.frame(
            term=V_FEED,
@@ -1449,7 +1449,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     rule = sprintf('AND(G%1$d="",A%1$d<>"")', qc_data_rows[1]),
     style = red_fill, type = "expression")
 
-  # Rule 2: uncertainty_pct (col H) > 100 — likely entered "45%" instead of 45
+  # Rule 2: uncertainty_pct (col H) > 100, likely entered "45%" instead of 45
   openxlsx::conditionalFormatting(wb, "Parameters",
     cols = P_COL_IDX["uncertainty_pct"], rows = qc_data_rows,
     rule = ">100", style = orange_fill, type = "expression")
@@ -1473,7 +1473,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
 
 # ===========================================================================
-# FALLBACK — basic writexl version (no dropdowns)
+# FALLBACK: basic writexl version (no dropdowns)
 # ===========================================================================
 generate_template_basic <- function(filepath, include_example) {
   # Derived from the catalogue, as in generate_template_openxlsx. The previous
@@ -1529,7 +1529,7 @@ generate_template_basic <- function(filepath, include_example) {
 
 
 # ===========================================================================
-# PARSER — read back an uploaded template (openxlsx or writexl output)
+# PARSER: read back an uploaded template (openxlsx or writexl output)
 # ===========================================================================
 parse_uploaded_template <- function(path) {
   warnings_list <- character()
@@ -1537,7 +1537,7 @@ parse_uploaded_template <- function(path) {
   sheet_names <- tryCatch(readxl::excel_sheets(path),
                           error = function(e) character())
 
-  # T1.1 (followup): The generated template has multi-row headers — Parameters
+  # T1.1 (followup): The generated template has multi-row headers, Parameters
   # has banner+legend+header (skip=2), Manure_Management has banner+header
   # (skip=1), Inventory_Metadata starts with headers (skip=0). Try several
   # skip values and pick the one where expected columns appear.
@@ -1694,7 +1694,7 @@ parse_uploaded_template <- function(path) {
   # catalogue filter, otherwise rows whose parameter still uses the pre-rename
   # spelling (cattle_pop, live_weight, milk_yield, DE_pct, ...) get dropped
   # silently. Then ensure_completeness() reports the renamed parameter as
-  # missing — and N has no IPCC default, so the run fails with a confusing
+  # missing: and N has no IPCC default, so the run fails with a confusing
   # "missing N" error instead of the legacy template just working.
   if ("parameter" %in% names(params) && exists("PARAM_ALIASES")) {
     aliased <- params$parameter %in% names(PARAM_ALIASES)
@@ -1722,7 +1722,7 @@ parse_uploaded_template <- function(path) {
   if ("value" %in% names(params) && !"mean" %in% names(params))
     names(params)[names(params) == "value"] <- "mean"
 
-  # D1: backwards-compat alias — coerce legacy "emission_factor" param_type to "coefficient"
+  # D1: backwards-compat alias, coerce legacy "emission_factor" param_type to "coefficient"
   if ("param_type" %in% names(params))
     params$param_type[params$param_type == "emission_factor"] <- "coefficient"
 
@@ -1744,7 +1744,7 @@ parse_uploaded_template <- function(path) {
     .bo <- .cat_default("Bo")
     if (!"Bo" %in% names(manure)) manure$Bo <- .bo
     manure$Bo[is.na(manure$Bo)] <- .bo
-    # Ensure numeric — fraction_pct was missing from this list which caused
+    # Ensure numeric: fraction_pct was missing from this list which caused
     # "non-numeric argument to binary operator" when systems_data tried to do
     # `mms_rows$fraction_pct / 100` after upload.
     for (nm in c("fraction_pct","MCF_pct","EF3","Bo",
@@ -1766,7 +1766,7 @@ parse_uploaded_template <- function(path) {
 
 
 # ===========================================================================
-# IPCC REFERENCE SHEET  (kept for backwards compatibility — used by the
+# IPCC REFERENCE SHEET  (kept for backwards compatibility: used by the
 # old writexl path and accessible from build_ipcc_reference_sheet())
 # ===========================================================================
 build_ipcc_reference_sheet <- function() {

@@ -1,4 +1,4 @@
-# Trend Tab — multi-year inventory uncertainty (F / T4.22 / TT.6)
+# Trend Tab: multi-year inventory uncertainty (F / T4.22 / TT.6)
 #
 # Reads a long-format CSV (year, parameter, mean, uncertainty_pct), runs a
 # separate Monte Carlo simulation per year using the year-specific values, and
@@ -36,7 +36,7 @@
 trend_df_from_population <- function(population, base_specs,
                                       default_uncertainty_pct = 15) {
   if (is.null(population) || ncol(population) < 2)
-    stop("No time-series data available — load a template with a Parameter_TimeSeries sheet, or use the CSV upload override below.")
+    stop("No time-series data available: load a template with a Parameter_TimeSeries sheet, or use the CSV upload override below.")
   if (!"year" %in% names(population))
     stop("Time-series must have a 'year' column.")
   param_cols <- setdiff(names(population), "year")
@@ -87,7 +87,7 @@ trend_df_from_population <- function(population, base_specs,
 # Procedure (per IPCC Vol.1 Ch.3 §3.2.3.2): draw n_iter independent samples
 # from the coefficient's marginal for each year, then reorder columns so the
 # resulting Spearman rank correlation across years matches the AR(1) target
-# matrix rho^|i-j|. Distribution-free — the coefficient's PERT/lognormal/beta
+# matrix rho^|i-j|. Distribution-free: the coefficient's PERT/lognormal/beta
 # shape is preserved exactly.
 .ar1_samples_one_coef <- function(spec, n_iter, n_years, rho = 0.7) {
   # Independent draws per year from the coefficient's marginal
@@ -177,7 +177,7 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
   samples_by_year <- list()
   co2e_by_year    <- list()
 
-  # Round 9: emission-source filter — applied per year to recompute total_co2e
+  # Round 9: emission-source filter, applied per year to recompute total_co2e
   # from the per-source columns of sim$inventory. Mirrors the single-year
   # post-filter at app_server.R ~line 927. NULL or all 5 keys = include all.
   # Andreas 2026-05 #27: pasture direct & indirect split. Legacy "pasture_n2o"
@@ -273,7 +273,7 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
                                     out$Mean_t_CO2eq[-nrow(out)] * 100, 1))
   attr(out, "year_corr") <- year_corr
 
-  # Round 8: per-iteration trend metrics — slope (kt CO2eq/yr) via lm() per
+  # Round 8: per-iteration trend metrics, slope (kt CO2eq/yr) via lm() per
   # iteration, and Delta total (Y_N - Y_1) per iteration. Both are returned
   # with their own MC distribution + 95% CI per IPCC Vol 1 Ch 3 §3.7.
   yr_vec <- as.numeric(years)

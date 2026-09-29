@@ -1,4 +1,4 @@
-# Build beta_sample_inventory.xlsx — a short, anonymized practice dataset for
+# Build beta_sample_inventory.xlsx: a short, anonymized practice dataset for
 # beta testers. Structurally like the ZIM/Zambia files (multiple production
 # systems x sub-categories) but tiny, so a reviewer can grasp it in minutes.
 #
@@ -27,7 +27,7 @@ source("R/chat_ui.R")
 # are entered as constant so they are not auto-filled with a nonzero default.
 mk_params <- function(ct, agg, sub, rows) {
   # Provide explicit lower/upper (value ± uncertainty%) so they overwrite the
-  # blank template's pre-filled CATALOGUE bounds — otherwise an overridden
+  # blank template's pre-filled CATALOGUE bounds: otherwise an overridden
   # value (e.g. Bo 0.13->0.24) would keep catalogue bounds that no longer
   # bracket it, and the run-time bounds check would block. u=0 -> lower=upper=mean.
   lower <- rows$m * (1 - rows$u / 100)
@@ -133,13 +133,13 @@ parsed <- list(
     country = "Country", region = "africa", inventory_year = 2022,
     species = "cattle_non_dairy", ipcc_version = "2019_refinement",
     prepared_by = "GMH beta-test sample",
-    notes = "Anonymized practice dataset for beta testers — not real inventory data."),
+    notes = "Anonymized practice dataset for beta testers: not real inventory data."),
   parameters = params,
   manure_management = manure,
   parameter_timeseries = ts
 )
 
-# NOTE: run from the repo root — `Rscript documentation/beta_test/_make_sample_inventory.R`
+# NOTE: run from the repo root, `Rscript documentation/beta_test/_make_sample_inventory.R`
 # (it sources R/… relative to the working dir).
 out <- "documentation/beta_test/beta_sample_inventory.xlsx"
 .translator_write_official_template(parsed, out)

@@ -162,7 +162,7 @@ This row of the register is **not yet complete**: deep bedding, liquid slurry, c
 
 **Composting.** EF3 takes the *In-Vessel* value (0.006) while the volatilisation and leaching fractions take the *Static Pile* values (0.65, 0.06). Table 10.21 and Table 10.22 both disaggregate composting into four variants, and the tool's single `composting` row mixes two of them. In-Vessel would be 0.60 gas and 0 leach; Static Pile would be 0.010 EF3. Pick one variant, or split the row.
 
-**Pasture EF3 — this one is deliberate, and is NOT a defect.** `MMS_DEFAULTS$ef3` carries 0.02 for `pasture`. The inline comment at `R/utils_ipcc_defaults.R:134` states it explicitly: *"pasture 0.02 is the PRP/Ch.11 pathway value (not a Table 10.21 MS), left as-is."* Table 10.21 does direct PRP to Chapter 11, so declining to put a managed-storage EF3 there is correct.
+**Pasture EF3: this one is deliberate, and is NOT a defect.** `MMS_DEFAULTS$ef3` carries 0.02 for `pasture`. The inline comment at `R/utils_ipcc_defaults.R:134` states it explicitly: *"pasture 0.02 is the PRP/Ch.11 pathway value (not a Table 10.21 MS), left as-is."* Table 10.21 does direct PRP to Chapter 11, so declining to put a managed-storage EF3 there is correct.
 
 The residual question, which is a question and not an error: 0.02 is the **2006** EF3_PRP value, while the catalogue's `EF3_PRP` moved to the 2019R wet-climate 0.006 on 2026-06-16. The two PRP numbers in the codebase are now from different editions. Worth confirming that the manure-sheet fallback was intended to stay on 2006 when the catalogue moved.
 
@@ -321,11 +321,11 @@ Regenerates automatically, no edit needed: the template's `Manure_Management` ex
 
 Follows automatically: every blank template's `Parameters` sheet, which writes `suggested_uncertainty_pct` per row. Not affected: `doc/methodology.Rmd`, whose parameter table has no uncertainty column; the Definitions tab, same reason.
 
-**Change C. ASH citation — WITHDRAWN, no defect**
+**Change C. ASH citation: WITHDRAWN, no defect**
 
 `PARAM_CATALOGUE$ipcc_ref` for ASH is `"Eq 10.24"`, which is edition-neutral and correct in both editions. And `doc/methodology.Rmd:144` already states it precisely: *"0.08 (cattle; IPCC example 0.06 is pig-specific)"*. Nothing to fix. My earlier finding overstated this.
 
-**Change D. MCF cells** (`dry_lot` tropical + tropical_dry, `solid_storage` boreal, `pasture` row) — **blocked pending reviewer confirmation**
+**Change D. MCF cells** (`dry_lot` tropical + tropical_dry, `solid_storage` boreal, `pasture` row): **blocked pending reviewer confirmation**
 
 | Would have to change | Why |
 |---|---|
@@ -336,7 +336,7 @@ Regenerates automatically: the `Vocab` sheet MCF table, the `Vocab` mms_type tab
 
 **This is the highest-exposure error in the register.** The wrong `dry_lot` 5.0 is presented to every user in the template's `Vocab` sheet under the caption "IPCC Table 10.17 - MCF (%) by climate zone", and the sheet banner at `utils_template.R:662` instructs them to copy values from it. It is therefore not only used as an internal default; it is published to users as an IPCC reference value.
 
-**Change E. Composting variant** (EF3 In-Vessel 0.006 vs Frac Static Pile 0.65/0.06) — **blocked pending a decision**. Changing EF3 would move an emission mean and would break audit F29, which pins `composting` leach 0.06.
+**Change E. Composting variant** (EF3 In-Vessel 0.006 vs Frac Static Pile 0.65/0.06): **blocked pending a decision**. Changing EF3 would move an emission mean and would break audit F29, which pins `composting` leach 0.06.
 
 **Change F. Two stale statements in the technical guide, found while building this map**
 

@@ -18,7 +18,7 @@
 #
 # Persistent storage caveat (same as usage_log.R): shinyapps.io's
 # free/starter tiers don't persist files across container restarts.
-# For tokens that's fine — they're short-lived (MAGIC_LINK_TTL_HOURS, default 30 days). For the
+# For tokens that's fine: they're short-lived (MAGIC_LINK_TTL_HOURS, default 30 days). For the
 # long-lived (~100-year) "stay-logged-in" cookie, the cookie is stored
 # client-side (browser document.cookie); on the server we just validate
 # that a cookie-supplied email matches the approved list.
@@ -26,10 +26,10 @@
 # ----- Approved-users whitelist --------------------------------------------
 
 # Read the whitelist CSV (single column: email). Returns character(0)
-# if the file is missing — fail-closed (no one gets in).
+# if the file is missing: fail-closed (no one gets in).
 auth_read_approved_users <- function(path = "config/approved_users.csv") {
   if (!file.exists(path)) {
-    warning("config/approved_users.csv not found — no users will be approved.",
+    warning("config/approved_users.csv not found: no users will be approved.",
             call. = FALSE)
     return(character(0))
   }
@@ -80,7 +80,7 @@ auth_is_approved <- function(email,
 }
 
 # Read the current CSV. Returns a data.frame with columns
-# (token, email, expires_at) — drops expired rows on the way out.
+# (token, email, expires_at): drops expired rows on the way out.
 .auth_token_read <- function() {
   empty <- data.frame(token = character(),
                       email = character(),
@@ -267,7 +267,7 @@ auth_send_magic_link <- function(email, token,
                                                            unset = "noreply@cattle-uncertainty.app"),
                                   from_name  = "IPCC Cattle GHG Tool") {
   if (!nzchar(app_base_url))
-    message("auth: APP_BASE_URL not set — using a relative link (won't open in email)")
+    message("auth: APP_BASE_URL not set, using a relative link (won't open in email)")
   link <- paste0(sub("/?$", "/", app_base_url), "?token=", token)
   text <- paste0(
     "Welcome to the AI translator for the IPCC Cattle GHG Tool.\n\n",
@@ -307,7 +307,7 @@ auth_notify_admin_of_request <- function(requesting_email,
   if (!nzchar(admin_email)) return(FALSE)
   r <- .auth_send_email(
     admin_email,
-    paste("Cattle GHG Tool — access request from", requesting_email),
+    paste("Cattle GHG Tool: access request from", requesting_email),
     paste0("A new user requested access to the in-app AI translator:\n\n",
            "    ", requesting_email, "\n\n",
            "To approve, add this email to approved_users.csv and redeploy.\n"))
@@ -320,7 +320,7 @@ auth_notify_admin_of_request <- function(requesting_email,
 #
 # After a successful magic-link consume we drop a long-lived (~100-year)
 # cookie in the browser so the user doesn't have to re-verify on every
-# reload. Functionally permanent — the cookie outlives the browser
+# reload. Functionally permanent: the cookie outlives the browser
 # install. Users can still sign out by clearing site data. The cookie
 # is a signed token:
 #
@@ -328,19 +328,19 @@ auth_notify_admin_of_request <- function(requesting_email,
 #
 # - email + expires_at_epoch are in the clear (they're shown to the
 #   user themselves anyway, no secret).
-# - hmac = HMAC-SHA256(email|expires_at, SESSION_SIGNING_KEY) — the
+# - hmac = HMAC-SHA256(email|expires_at, SESSION_SIGNING_KEY): the
 #   server verifies this on every page load. If the attacker doesn't
 #   have SESSION_SIGNING_KEY they can't forge a valid token.
 #
 # The cookie is set via JS (document.cookie) so it can't be HttpOnly,
-# but the value is also not a usable secret on its own — it identifies
+# but the value is also not a usable secret on its own: it identifies
 # the user but doesn't authorise any privileged action beyond the
 # translator chat. For the pilot this trade-off is acceptable.
 
 .auth_hmac <- function(message) {
   key <- Sys.getenv("SESSION_SIGNING_KEY", unset = "")
   if (!nzchar(key))
-    stop("SESSION_SIGNING_KEY is not set — refusing to issue session tokens.",
+    stop("SESSION_SIGNING_KEY is not set: refusing to issue session tokens.",
          call. = FALSE)
   # Use openssl::sha256 with HMAC-SHA256. openssl is a transitive
   # dependency of httr2 so already loaded.

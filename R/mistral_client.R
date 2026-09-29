@@ -1,4 +1,4 @@
-# Mistral AI client — throwaway A/B test of the AI translator on Mistral.
+# Mistral AI client: throwaway A/B test of the AI translator on Mistral.
 #
 # This is a MINIMAL, REVERSIBLE provider switch. The translator (R/chat_ui.R)
 # only ever calls the anthropic_chat* family, and every forced-template path
@@ -26,7 +26,7 @@
 
 .MISTRAL_ENDPOINT <- "https://api.mistral.ai/v1/chat/completions"
 
-# Per-MTok USD. Approximate — verify against https://mistral.ai/pricing before
+# Per-MTok USD. Approximate: verify against https://mistral.ai/pricing before
 # trusting the cost column. mistral-large-latest as of 2026: ~$2 in / $6 out.
 .MISTRAL_PRICING <- list(
   "mistral-large-latest"  = list(input = 2.00, output = 6.00),
@@ -50,12 +50,12 @@ mistral_cost_usd <- function(input_tokens, output_tokens, model) {
 .mistral_api_key <- function() Sys.getenv("MISTRAL_API_KEY", unset = "")
 
 # Convert the translator's messages (list(role, content) strings, incl. a
-# leading "system" entry) straight through — Mistral accepts the same shape.
+# leading "system" entry) straight through: Mistral accepts the same shape.
 .mistral_messages <- function(messages) {
   lapply(messages, function(m) list(role = m$role, content = m$content))
 }
 
-# Streaming chat — the workhorse. tools!=NULL signals a forced-template call,
+# Streaming chat: the workhorse. tools!=NULL signals a forced-template call,
 # which we serve via JSON mode + content streaming (see file header).
 mistral_chat_stream <- function(messages,
                                 on_chunk = function(text) {},
@@ -85,7 +85,7 @@ mistral_chat_stream <- function(messages,
     mm[[length(mm) + 1]] <- list(
       role = "system",
       content = paste("Respond with ONLY a single valid JSON object that fills the",
-                      "template described above. No markdown fences, no prose — JSON only."))
+                      "template described above. No markdown fences, no prose: JSON only."))
   }
 
   body <- list(model = model, messages = mm, max_tokens = max_tokens,
@@ -149,7 +149,7 @@ mistral_chat_stream <- function(messages,
     emsg <- tryCatch(jsonlite::fromJSON(buf)$message, error = function(e) NULL)
     return(list(reply = if (nzchar(accumulated)) accumulated else NULL,
                 error = sprintf("Mistral API error (HTTP %d)%s.", status,
-                                if (!is.null(emsg)) paste0(" — ", emsg) else "")))
+                                if (!is.null(emsg)) paste0(": ", emsg) else "")))
   }
 
   list(
@@ -166,7 +166,7 @@ mistral_chat_stream <- function(messages,
   )
 }
 
-# Non-streaming chat — for the anthropic_chat() entry point (used by any
+# Non-streaming chat: for the anthropic_chat() entry point (used by any
 # direct, short, non-streamed call). Same return contract.
 mistral_chat <- function(messages,
                          model = "mistral-large-latest",
@@ -193,7 +193,7 @@ mistral_chat <- function(messages,
   status <- httr2::resp_status(resp)
   if (!(status %in% 200:299)) {
     emsg <- tryCatch(httr2::resp_body_json(resp)$message, error = function(e) "")
-    return(list(reply = NULL, error = sprintf("Mistral API error (HTTP %d) — %s", status, emsg %||% "")))
+    return(list(reply = NULL, error = sprintf("Mistral API error (HTTP %d): %s", status, emsg %||% "")))
   }
   b <- httr2::resp_body_json(resp)
   reply    <- b$choices[[1]]$message$content %||% ""

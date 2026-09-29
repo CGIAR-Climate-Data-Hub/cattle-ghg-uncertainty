@@ -2,7 +2,7 @@
 # The app itself only needs R/, www/, app.R, methodology.pdf, user_guide.pdf,
 # the input template, plus runtime config.
 
-# Topical non-app folders (2026-07 reorg) — none are read by the running app
+# Topical non-app folders (2026-07 reorg) - none are read by the running app
 documentation/
 ipcc_reference/
 reports/
@@ -11,11 +11,11 @@ knowledge/
 test_data/
 runtime/
 
-# Dev / build scripts — entire folder excluded from deploy bundle
+# Dev / build scripts - entire folder excluded from deploy bundle
 scripts/
 
 
-# Help-page cache — keep the rendered HTML in www/docs/ but skip the RDS cache
+# Help-page cache - keep the rendered HTML in www/docs/ but skip the RDS cache
 www/docs/_cache/
 install.R
 

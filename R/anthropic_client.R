@@ -2,7 +2,7 @@
 # Thin httr2 wrapper around https://api.anthropic.com/v1/messages.
 #
 # 2026-06 vendor swap: GPT-4.1 quality on real African inventory uploads
-# was not good enough — Lolita's review found the model hallucinated
+# was not good enough: Lolita's review found the model hallucinated
 # parameter mappings on multi-sheet templates. Switched to Claude Opus 4.8
 # (the current latest Opus per Anthropic's 2026 pricing page).
 #
@@ -58,7 +58,7 @@
 # Opus 4.8 if real-world quality drops noticeably.
 # Default model is overridable via the TRANSLATOR_MODEL env var (.Renviron) so an
 # A/B run can flip the whole translator to e.g. claude-mythos-5 without code edits
-# — every anthropic_chat* call site uses this default (none passes model=).
+#: every anthropic_chat* call site uses this default (none passes model=).
 .ANTHROPIC_DEFAULT_MODEL <- Sys.getenv("TRANSLATOR_MODEL", unset = "claude-sonnet-4-6")
 .ANTHROPIC_ENDPOINT      <- "https://api.anthropic.com/v1/messages"
 .ANTHROPIC_VERSION       <- "2023-06-01"
@@ -67,9 +67,9 @@
 #
 # chat_ui.R + openai_build_messages prepend a {role:"system", content:...}
 # message to the conversation. Anthropic's API takes the system prompt as
-# a separate top-level `system` field — it is NOT a member of `messages`.
+# a separate top-level `system` field: it is NOT a member of `messages`.
 # This helper splits an OpenAI-shaped message list into:
-#   $system   character — the system prompt content (or "")
+#   $system   character: the system prompt content (or "")
 #   $messages list of {role, content} with only user/assistant turns
 .anthropic_split_system <- function(messages) {
   if (length(messages) == 0) return(list(system = "", messages = list()))
@@ -96,7 +96,7 @@
 # Why the 1-hour option exists: in the batched-emission flow a single batch can
 # take 5-17 min to stream, so the 5-minute cache expires BETWEEN batches and
 # each batch re-pays the full cache-WRITE surcharge on the ~170K conversation
-# prefix — the dominant cost per the 2026-06-12 Zambia logs ($4.78 of $7.73).
+# prefix: the dominant cost per the 2026-06-12 Zambia logs ($4.78 of $7.73).
 # A 1-hour TTL writes that prefix once (at 2x input price instead of 1.25x) and
 # re-reads it at 10% for every later batch in the run, roughly halving per-run
 # cost with NO change to the output.
@@ -106,7 +106,7 @@
 }
 
 # Build the `system` payload for Anthropic. When the system prompt is
-# non-trivial (>= 1024 chars — Anthropic's cache eligibility threshold),
+# non-trivial (>= 1024 chars: Anthropic's cache eligibility threshold),
 # wrap it in a content block with cache_control: ephemeral so the long
 # translator prompt gets cached and re-billed at 10% on subsequent calls.
 .anthropic_system_payload <- function(system_text, ttl = NULL) {
@@ -125,21 +125,21 @@
 # so the conversation prefix is cached too. Without this, each new turn
 # re-pays the full input cost for every prior user + assistant message
 # (15 USD/M for Opus 4.8). With this, every subsequent turn within 5
-# minutes reads the prior history at 10% of input price — typical 90%
+# minutes reads the prior history at 10% of input price: typical 90%
 # saving on multi-turn conversations.
 #
 # Anthropic accepts up to 4 cache breakpoints per request. We're using
-# one on the system prompt and one here on the last message — leaves
+# one on the system prompt and one here on the last message: leaves
 # two spare for future use.
 #
 # IMPORTANT: the cache_control marker MUST be present on every request
 # that wants to read the cache. Anthropic only consults the cache at a
 # block flagged with cache_control. The 1024-token minimum applies to
 # the CUMULATIVE prefix (system + messages up to the marked block), NOT
-# to the marked block alone — so we mark the last message regardless of
+# to the marked block alone: so we mark the last message regardless of
 # its size. Short final messages (a one-word reply like "go") still let
 # the cache for all prior turns hit. Skipping the marker on short
-# messages was the bug in the first attempt — turn 2 missed the cache
+# messages was the bug in the first attempt: turn 2 missed the cache
 # entirely.
 #
 # The content of the marked message must be a content-block array
@@ -167,16 +167,16 @@
 #      identical across a batched-emission loop)
 #
 # Why: in the batched-emission flow, the per-batch user message
-# (batch_nudge) differs on every batch — so a cache_control marker
+# (batch_nudge) differs on every batch: so a cache_control marker
 # placed only on the last message creates a fresh cache key each
 # batch and re-writes the entire ~170K conversation history every
 # time. Production logs from the 2026-06-12 Zambia run showed all
 # 5 batches paying $1.0-1.2 each, with $4.78 of the $7.73 total
 # being cache-write surcharges (171K × $3.75/M × 5 batches).
 #
-# By ALSO marking the second-to-last message — which IS identical
+# By ALSO marking the second-to-last message: which IS identical
 # across all batches (it's the last item of state$messages, the
-# user's prior confirmation) — the prefix UP TO that point gets
+# user's prior confirmation): the prefix UP TO that point gets
 # cached once on batch 1 and re-read at 10% cost on batches 2-5.
 # Anthropic supports up to 4 cache breakpoints per request; we use
 # 3 (system prompt + 2 here), leaving 1 spare.
@@ -187,7 +187,7 @@
   n <- length(messages)
   if (n < 2L) return(.anthropic_cache_last_message(messages, ttl = ttl))
   # Mark message n-1 first (the stable, batch-invariant prefix). This is the
-  # block that should carry the 1-hour TTL in the batch flow — it is identical
+  # block that should carry the 1-hour TTL in the batch flow: it is identical
   # across all batches, so it's written once and re-read on every later batch.
   prev <- messages[[n - 1L]]
   prev_content <- prev$content %||% ""
@@ -200,17 +200,17 @@
   }
   # Then mark message n (the batch-specific nudge). It changes every batch and
   # is never re-read, so it keeps the cheap default 5-minute ephemeral write
-  # regardless of `ttl` — paying the 2x 1-hour write surcharge on a throwaway
+  # regardless of `ttl`: paying the 2x 1-hour write surcharge on a throwaway
   # block would be pure waste.
   .anthropic_cache_last_message(messages)
 }
 
 # Cost in USD for a usage tuple, taking Anthropic's prompt-cache discount
 # into account. Usage shape (from the API response):
-#   $input_tokens                 — non-cached input
-#   $cache_creation_input_tokens  — tokens written to cache this turn
-#   $cache_read_input_tokens      — tokens read from cache this turn
-#   $output_tokens                — generated output
+#   $input_tokens                : non-cached input
+#   $cache_creation_input_tokens : tokens written to cache this turn
+#   $cache_read_input_tokens     : tokens read from cache this turn
+#   $output_tokens               : generated output
 anthropic_cost_usd <- function(input_tokens, output_tokens,
                                 model = .ANTHROPIC_DEFAULT_MODEL,
                                 cache_read_tokens = 0L,
@@ -239,7 +239,7 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
   # "Out of credits" detection. Anthropic returns either 400 or 402 with
   # body wording like "Your credit balance is too low" / "billing" /
   # "credits exhausted". Show a friendly user-facing message that does
-  # NOT reveal the dollar amount or that there's a per-app cap — the
+  # NOT reveal the dollar amount or that there's a per-app cap: the
   # user just needs to know the AI service is temporarily unavailable
   # and the admin will deal with it.
   is_billing <- !is.null(error_body_msg) && nzchar(error_body_msg) &&
@@ -248,7 +248,7 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
   if (is_billing) {
     return(paste0(
       "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly — ",
+      "We've been notified and will restore service shortly: ",
       "please try again in a few hours, or contact the administrator ",
       "if it persists."))
   }
@@ -258,7 +258,7 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
               paste0("AI translator request was rejected by Anthropic: ",
                       error_body_msg, ". Please contact the administrator.")
             else "AI translator request was rejected by Anthropic. Please try again or contact the administrator.",
-    "401" = "AI translator authentication failed. The server's ANTHROPIC_API_KEY is missing or invalid — please contact the administrator.",
+    "401" = "AI translator authentication failed. The server's ANTHROPIC_API_KEY is missing or invalid: please contact the administrator.",
     "402" = "The AI translator is temporarily unavailable. We've been notified and will restore service shortly.",
     "403" = "AI translator is blocked by Anthropic. The administrator may need to add billing or remove a usage cap.",
     "404" = "AI translator endpoint or model is unavailable. Please contact the administrator.",
@@ -410,7 +410,7 @@ anthropic_chat_stream <- function(messages,
                                    # tool_use stream. Text streams call
                                    # on_chunk for every token (which is
                                    # already a heartbeat). Tool_use streams
-                                   # accumulate JSON silently — without
+                                   # accumulate JSON silently: without
                                    # on_tick the user sees a frozen UI for
                                    # the entire 5-15 min force-template
                                    # emission. Default: no-op.
@@ -426,7 +426,7 @@ anthropic_chat_stream <- function(messages,
                                    # x 7 sub-categories x 15 parameters =
                                    # ~600 rows in section B alone). The
                                    # low_speed_time=45 stall detector below
-                                   # is still the safety net — wall-clock
+                                   # is still the safety net: wall-clock
                                    # only kills calls that are genuinely
                                    # making progress for over 15 minutes.
                                    timeout_sec = 900,
@@ -440,8 +440,8 @@ anthropic_chat_stream <- function(messages,
                                    # (plan F2). "1h" / NULL force either.
                                    cache_ttl = "auto") {
   # Provider switch (throwaway A/B test): a Mistral model id routes the whole
-  # streaming path — including every forced-template call that funnels through
-  # here (template_force / enumerate / batch) — to the Mistral client
+  # streaming path: including every forced-template call that funnels through
+  # here (template_force / enumerate / batch): to the Mistral client
   # (R/mistral_client.R). Claude path untouched otherwise.
   if (.is_mistral_model(model))
     return(mistral_chat_stream(messages = messages, on_chunk = on_chunk,
@@ -480,7 +480,7 @@ anthropic_chat_stream <- function(messages,
     cache_ttl <- if (ceiling(prefix_chars / 3.6) > .ANTHROPIC_1H_PREFIX_TOKENS) "1h" else NULL
   }
   # When tools are present, this is a batched / discovery / force-template
-  # call — the LAST message varies per batch (different aggregation_level
+  # call: the LAST message varies per batch (different aggregation_level
   # nudge) while the SECOND-TO-LAST message is the stable, batch-invariant
   # conversation history. Use the two-breakpoint cache helper so the long
   # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
@@ -623,7 +623,7 @@ anthropic_chat_stream <- function(messages,
       ) |>
       httr2::req_body_json(body) |>
       httr2::req_timeout(timeout_sec) |>
-      # Stall detector — same rationale as the OpenAI client.
+      # Stall detector: same rationale as the OpenAI client.
       httr2::req_options(low_speed_time = 45L, low_speed_limit = 1L) |>
       httr2::req_error(is_error = function(resp) FALSE)
     # Extended (1-hour) prompt cache requires this beta header. Only sent when
@@ -650,7 +650,7 @@ anthropic_chat_stream <- function(messages,
     network_error    <- inherits(resp, "error")
 
     if (success_status) { final_resp <- resp; break }
-    # Don't retry mid-stream — user already saw some text.
+    # Don't retry mid-stream: user already saw some text.
     if (nzchar(accumulated) || nzchar(tool_json_acc)) {
       final_resp <- resp; break
     }

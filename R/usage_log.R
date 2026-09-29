@@ -5,16 +5,16 @@
 # exceeded, the caller refuses the request and surfaces a "monthly cap
 # reached" message to the user.
 #
-# IMPORTANT — shinyapps.io ephemerality:
+# IMPORTANT: shinyapps.io ephemerality:
 #
 # The shinyapps.io free/starter tiers do not have persistent storage.
 # The container is recycled on idle and the local CSV resets to empty.
-# This means the in-app cap is BEST-EFFORT only — a container restart
+# This means the in-app cap is BEST-EFFORT only: a container restart
 # resets the month-to-date counter.
 #
 # The REAL hard ceiling is set on OpenAI's side, by the account holder
 # (Lolita), at <https://platform.openai.com/account/limits>. The plan
-# recommends $20/month — a 2× buffer above this app's $10/month soft cap.
+# recommends $20/month: a 2× buffer above this app's $10/month soft cap.
 # OpenAI itself stops billing the account at the hard limit regardless
 # of what the in-app log reports.
 #
@@ -38,8 +38,8 @@
 .usage_log_columns <- c(
   "timestamp", "user_email", "model",
   "prompt_tokens", "completion_tokens", "total_tokens",
-  "cached_tokens",       # cache READ hits — Anthropic: 90% off / GPT-4.1: ~50% off
-  "cache_write_tokens",  # cache WRITE on first turn — Anthropic only, +25% on input
+  "cached_tokens",       # cache READ hits: Anthropic: 90% off / GPT-4.1: ~50% off
+  "cache_write_tokens",  # cache WRITE on first turn: Anthropic only, +25% on input
   "cache_write_1h_tokens", # 1-hour cache writes (2x input), plan F2
   "cost_usd",
   "latency_sec",         # wall-clock seconds for the API call (model A/B comparison)
@@ -159,7 +159,7 @@ month_to_date_spend <- function() {
 # Sentinels for "no cap" (added 2026-06-10 after Andy hit the $30 cap
 # mid-conversation and we decided to let the Anthropic billing console be
 # the only ceiling): if the env var is unset, empty, "0", "none", "off",
-# or "unlimited", the in-app cap is treated as infinite — every call goes
+# or "unlimited", the in-app cap is treated as infinite: every call goes
 # through and the only "out of credits" surface is Anthropic's own 400
 # (handled in .anthropic_status_msg).
 monthly_budget_cap_usd <- function() {
@@ -191,23 +191,23 @@ budget_would_exceed <- function(estimated_next_cost = NULL) {
 
 # Human-friendly status string for display under the chat panel
 # ("Pilot budget: $1.42 / $10.00 used this month"). This is the GLOBAL
-# spend across all users — shown to the admin only.
+# spend across all users: shown to the admin only.
 budget_status_line <- function() {
   cap <- monthly_budget_cap_usd()
   if (!is.finite(cap))
-    sprintf("Pilot spend (all users): $%.2f this month — no in-app cap (Anthropic billing console controls the ceiling)",
+    sprintf("Pilot spend (all users): $%.2f this month, no in-app cap (Anthropic billing console controls the ceiling)",
             month_to_date_spend())
   else
     sprintf("Pilot budget (all users): $%.2f / $%.2f used this month",
             month_to_date_spend(), cap)
 }
 
-# Per-user spend — month-to-date and lifetime. Case-insensitive email
+# Per-user spend: month-to-date and lifetime. Case-insensitive email
 # match. Returns 0 if log is empty / unreadable / email NULL.
 #
 # IMPORTANT: shinyapps.io recycles the container on idle, which resets
 # the local CSV. So "lifetime" really means "since this container last
-# booted." The container has been up for `<unknown>` time — the user
+# booted." The container has been up for `<unknown>` time: the user
 # should treat these numbers as best-effort. The authoritative number
 # lives in OpenAI's billing dashboard.
 .user_spend_filter <- function(df, email) {
@@ -234,10 +234,10 @@ user_spend_lifetime <- function(email) {
   sum(as.numeric(df$cost_usd), na.rm = TRUE)
 }
 
-# "Your usage — $0.34 this month / $1.78 lifetime"
+# "Your usage: $0.34 this month / $1.78 lifetime"
 # Returns "" when email is missing (e.g. user not signed in yet).
 user_spend_status_line <- function(email) {
   if (is.null(email) || !nzchar(email)) return("")
-  sprintf("Your usage — $%.2f this month / $%.2f lifetime",
+  sprintf("Your usage: $%.2f this month / $%.2f lifetime",
           user_spend_month(email), user_spend_lifetime(email))
 }

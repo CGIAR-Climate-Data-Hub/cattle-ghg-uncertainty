@@ -10,7 +10,7 @@ app_ui <- function(request = NULL) {
   i18n_set_lang(i18n_lang_from_request(request))
   bslib::page_navbar(
     id = "nav",
-    # Round 9 follow-up: stacked header — big centered title row above the
+    # Round 9 follow-up: stacked header, big centered title row above the
     # tabs row. Title + subtitle live inside a flex column; CSS in
     # www/custom.css turns the navbar into vertical layout (title above
     # tabs) and centers both rows. The bg=transparent on .app-title keeps
@@ -42,6 +42,13 @@ app_ui <- function(request = NULL) {
              if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
            }, 150);
          });
+         // Beta feedback 2026-09 (APickering #3): the navbar is sticky
+         // (www/custom.css) so the step tabs stay reachable; past 60px of
+         // scroll, compact the title banner so the bar stays slim.
+         window.addEventListener('scroll', function() {
+           var nb = document.querySelector('.navbar');
+           if (nb) nb.classList.toggle('navbar-compact', window.scrollY > 60);
+         }, { passive: true });
          // 2026-06: after the magic-link auth flow consumes a ?token=...
          // query parameter, server sends this to clean it out of the
          // browser URL so the token doesn't sit in browser history.
@@ -51,7 +58,7 @@ app_ui <- function(request = NULL) {
                                    window.location.pathname);
            }
          });
-         // 2026-06: in-app AI translator — Server-Sent-Events streaming.
+         // 2026-06: in-app AI translator, Server-Sent-Events streaming.
          // server -> client message protocol:
          //   translatorStreamStart : create a fresh assistant bubble,
          //                            remember it as the active target.
@@ -119,7 +126,7 @@ app_ui <- function(request = NULL) {
            // If the user is on the force-template path, there's no
            // _translatorActiveBubble yet (text chunks never arrive).
            // The dots ARE in the upstream typing-bubble in
-           // #translator_stream_target — those animate on their own,
+           // #translator_stream_target: those animate on their own,
            // so we just rearm the watchdog so the bubble stays alive.
            _translatorArmWatchdog();
          });
@@ -137,7 +144,7 @@ app_ui <- function(request = NULL) {
            _translatorActiveBubble = null;
          });
          Shiny.addCustomMessageHandler('translatorStreamChunk', function(text) {
-           // First real token arrived — hide the pre-stream spinner now
+           // First real token arrived: hide the pre-stream spinner now
            // (cheap no-op if it was already hidden).
            if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
            // Lazy bubble creation on first chunk: wipes the typing-dots
@@ -191,13 +198,13 @@ app_ui <- function(request = NULL) {
              container.innerHTML = '';
            }
            _translatorActiveBubble = null;
-           // Also hide the pre-stream spinner — covers the non-streaming
+           // Also hide the pre-stream spinner: covers the non-streaming
            // force-template path where StreamStart never fires.
            if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
          });
          // 2026-06: persistent sign-in. After magic-link consume, server
          // sends a signed cookie value here; we drop it into document.cookie
-         // with a 100-year max-age — functionally permanent, so once an
+         // with a 100-year max-age: functionally permanent, so once an
          // email is approved the user stays signed in indefinitely on
          // this browser. On the next refresh the server reads the Cookie:
          // header (session$request$HTTP_COOKIE), HMAC-verifies it, and
@@ -212,7 +219,7 @@ app_ui <- function(request = NULL) {
          // 2026-06: visible loading spinner with a context-aware label.
          // Without this the user clicks Send / uploads a file and sees
          // nothing for 1-5 seconds.
-         var _translatorSpinnerDefault = 'Translator is working — calling the AI, waiting for the first reply…';
+         var _translatorSpinnerDefault = 'Translator is working: calling the AI, waiting for the first reply…';
          function _translatorShowSpinner(label) {
            var el = document.getElementById('translator_spinner');
            if (!el) return;
@@ -293,7 +300,7 @@ app_ui <- function(request = NULL) {
            var scroller = bubble.closest('[data-translator-scroller]');
            if (scroller) scroller.scrollTop = scroller.scrollHeight;
          });
-         // Download click feedback — when the user clicks the green
+         // Download click feedback: when the user clicks the green
          // Download button, the server takes 5-15 seconds to build the
          // multi-sheet .xlsx (style overlay + many cell writes). Without
          // feedback the user sees a frozen-looking app. Paint an inline
@@ -381,7 +388,7 @@ app_ui <- function(request = NULL) {
              }
            });
          });
-         // Inline info bubble inside the conversation — used during the
+         // Inline info bubble inside the conversation: used during the
          // force-template path (non-streaming, can take 60-120s). The
          // bubble lives in translator_stream_target so it's visible
          // alongside the conversation regardless of page scroll, and
@@ -391,7 +398,7 @@ app_ui <- function(request = NULL) {
            var slot = document.getElementById('translator_stream_target');
            if (!slot) return;
            slot.innerHTML = '';
-           // Outer bubble — column flex so we can stack text + progress bar.
+           // Outer bubble: column flex so we can stack text + progress bar.
            var bubble = document.createElement('div');
            bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
              'padding:12px 16px; border-radius:12px; white-space:pre-wrap;' +
@@ -412,7 +419,7 @@ app_ui <- function(request = NULL) {
            txt.textContent = text || 'Translator is working…';
            topRow.appendChild(txt);
            bubble.appendChild(topRow);
-           // Progress bar — fake-determinate, animates 0 -> 90% over 60s.
+           // Progress bar: fake-determinate, animates 0 -> 90% over 60s.
            // Gives a tangible 'something is happening' feel during the
            // long non-streaming force-template call. Stays at 90% until
            // the work actually completes (translatorStreamEnd clears
@@ -440,7 +447,7 @@ app_ui <- function(request = NULL) {
              var pct = Math.min(90, (sec / targetSec) * 90);
              barFill.style.width = pct + '%';
              elapsedLabel.textContent = sec + 's elapsed' +
-               (sec >= targetSec ? ' — still working, large inventories take longer' : '');
+               (sec >= targetSec ? ': still working, large inventories take longer' : '');
            }, 500);
            bubble._translatorProgressInterval = iv;
            var scroller = bubble.closest('[data-translator-scroller]');
@@ -465,7 +472,7 @@ app_ui <- function(request = NULL) {
              e.stopPropagation();
              // Just trigger the Send button. The click handler (below)
              // reads the textarea value, pushes it to Shiny, paints the
-             // optimistic bubble, clears the DOM, and shows the spinner —
+             // optimistic bubble, clears the DOM, and shows the spinner -
              // all in one pass. Don't pre-clear here or the click handler
              // would re-read an empty value and clobber the typed text.
              var btn = document.getElementById('translator_send');
@@ -492,7 +499,7 @@ app_ui <- function(request = NULL) {
                                       {priority: 'event'});
                }
                // Optimistic UI: paint the user's bubble in the conversation
-               // BEFORE clearing the textarea — instant feedback that the
+               // BEFORE clearing the textarea: instant feedback that the
                // message was accepted. Server-side renderUI will replace
                // it with the canonical version when state$messages updates.
                // The 'AI is typing…' indicator is now painted inline by
@@ -563,7 +570,7 @@ app_ui <- function(request = NULL) {
          }
          // 2026-06: native downloads give no 'finished' signal, so the banner
          // used to linger until its 180s timeout. Fetch the file via JS instead
-         // — the promise resolves exactly when the build + transfer completes —
+         //: the promise resolves exactly when the build + transfer completes -
          // then save it as a blob, hide the banner and show a 'saved' toast. If
          // anything fails we fall back to the native navigation so the download
          // still happens.
@@ -646,7 +653,7 @@ app_ui <- function(request = NULL) {
          }
          // Read the currently-active navbar tab so we can restore it after
          // reload. We use the INDEX position (0..N-1) rather than the tab
-         // title — titles are language-dependent, so a stored title from
+         // title: titles are language-dependent, so a stored title from
          // one language won't match the tab name after switching language.
          // Indexing is stable because nav_panels are declared in the same
          // order regardless of language.
@@ -738,7 +745,7 @@ app_ui <- function(request = NULL) {
            document.cookie = 'app_lang=' + lang +
              '; max-age=' + maxAge +
              '; path=/; SameSite=Lax';
-           // Persist the active tab INDEX (0..N-1) — language-independent.
+           // Persist the active tab INDEX (0..N-1): language-independent.
            var idx = _activeTabIndex();
            var hash = (idx !== null && idx !== undefined)
              ? '#tabidx=' + idx : '';
@@ -845,7 +852,7 @@ app_ui <- function(request = NULL) {
            }
          });"
       ))),
-      # Floating "Feedback" button — fixed bottom-right, visible on every tab
+      # Floating "Feedback" button: fixed bottom-right, visible on every tab
       # AND on the pre-login screen (it lives in the navbar header, outside
       # every nav_panel). Opens the feedback modal (see R/app_server.R).
       actionButton(
@@ -1038,6 +1045,17 @@ app_ui <- function(request = NULL) {
       bslib::card(
         bslib::card_header(t("card_param_definitions")),
         bslib::card_body(DT::DTOutput("definitions_table"))
+      ),
+      # Beta feedback 2026-09 (APickering): the app leans on statistical
+      # vocabulary the target user (an Excel-fluent inventory compiler, not
+      # a statistician) may not have. Plain-language glossary of every
+      # statistical term used across the tabs, below the parameter glossary.
+      bslib::card(
+        bslib::card_header(t("card_stat_glossary")),
+        bslib::card_body(
+          tags$p(t("info_stat_glossary")),
+          DT::DTOutput("stat_glossary_table")
+        )
       )
     ),
 
@@ -1056,7 +1074,7 @@ app_ui <- function(request = NULL) {
               tags$strong(" Note : "),
               t("resources_fr_only_note"))
         else NULL,
-        # Tool-specific resources — methodology + user guide. Kept first so it
+        # Tool-specific resources: methodology + user guide. Kept first so it
         # is the first thing users see in the Resources tab.
         # The id is the scroll target for the Home tab "Methodology, user
         # guide & downloads" button (see goto_resources in app_server.R).
@@ -1088,7 +1106,7 @@ app_ui <- function(request = NULL) {
             )
           )
         ),
-        # AI Translator kit — free, self-serve helper to turn the user's own
+        # AI Translator kit: free, self-serve helper to turn the user's own
         # 2026-06: in-app AI translator. Backed by Lolita's OpenAI account
         # with a $10/month spending cap and gated by a magic-link login.
         # Replaces the earlier "Download translator kit, set up on
@@ -1244,7 +1262,7 @@ app_ui <- function(request = NULL) {
           ),
           # Andreas 2026-05 follow-up: the IPCC version picker, template
           # downloads and upload section only apply to the Custom Upload
-          # path — hide them entirely for the built-in example datasets so
+          # path: hide them entirely for the built-in example datasets so
           # the sidebar isn't cluttered.
           conditionalPanel(
             condition = "input.country == 'custom'",
@@ -1260,7 +1278,7 @@ app_ui <- function(request = NULL) {
             div(style = "font-size:0.78rem; color:#666; margin-top:-6px; margin-bottom:8px;",
                 tags$em(t("ipcc_version_note"))),
             h5(t("data_h_download_template")),
-            # Active controls — visible only when an IPCC version is picked.
+            # Active controls: visible only when an IPCC version is picked.
             conditionalPanel(
               condition = "input.template_version === '2006' || input.template_version === '2019_refinement'",
               downloadButton("download_template", "Download Blank Template",
@@ -1268,7 +1286,7 @@ app_ui <- function(request = NULL) {
               downloadButton("download_template_example", "Download Template with Example",
                              class = "btn-outline-primary btn-sm mt-2")
             ),
-            # Greyed-out placeholder shown when no version is picked yet —
+            # Greyed-out placeholder shown when no version is picked yet -
             # explains the gating instead of just hiding the buttons.
             conditionalPanel(
               condition = "input.template_version !== '2006' && input.template_version !== '2019_refinement'",
@@ -1311,7 +1329,7 @@ app_ui <- function(request = NULL) {
               t("ai_inline_promo_body_post")),
             hr(),
             h5(t("data_h_upload")),
-            # Active upload — only after an IPCC version is picked.
+            # Active upload: only after an IPCC version is picked.
             conditionalPanel(
               condition = "input.template_version === '2006' || input.template_version === '2019_refinement'",
               fileInput("data_upload", "Upload Excel Template (.xlsx)",
@@ -1515,7 +1533,7 @@ app_ui <- function(request = NULL) {
               # default ("first differences") is the right call almost every
               # time, and the choice is not something an Excel-fluent inventory
               # compiler should be asked to make. First differences is now
-              # hardcoded in .compute_corr_now() — see R/app_server.R.
+              # hardcoded in .compute_corr_now(): see R/app_server.R.
               uiOutput("corr_ts_status")
             ),
             conditionalPanel(
@@ -1573,10 +1591,10 @@ app_ui <- function(request = NULL) {
                 style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
                 tags$ul(style = "padding-left:18px; margin:0;",
                   tags$li(tags$strong("No EF correlations (default)"),
-                          " — emission factors are treated as independent. Standard IPCC Approach 2 assumption; ",
+                          ": emission factors are treated as independent. Standard IPCC Approach 2 assumption; ",
                           "appropriate when each EF comes from its own study."),
                   tags$li(tags$strong("Block-structured EF correlation"),
-                          " — pick this when coefficients within the same measurement literature share bias ",
+                          ": pick this when coefficients within the same measurement literature share bias ",
                           "(e.g. all rumen-fermentation coefficients from one regional database) but the three literatures ",
                           "are independent of one another.")
                 )),
@@ -1588,11 +1606,11 @@ app_ui <- function(request = NULL) {
               # (driven by output$ef_rho_*_interp in app_server.R).
               sliderInput("ef_rho_energy",
                           label = tagList(
-                            "Within-block ρ — Energy-equation coefficients (Cfi, Ca, C, Cp, Ym) ",
+                            "Within-block ρ: Energy-equation coefficients (Cfi, Ca, C, Cp, Ym) ",
                             bslib::tooltip(
                               span(icon("circle-question"),
                                    style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                              "Move the slider toward 0.5 if you believe your energy-equation coefficients (Cfi, Ca, Ym, …) share a common bias — e.g. all derived from the same regional rumen-fermentation database. Move toward 0 if you treat them as independent. ρ = 0.3 means: if Ym is sampled at its 80th percentile in one iteration, the others are nudged up to about their 60th percentile on average.",
+                              "Move the slider toward 0.5 if you believe your energy-equation coefficients (Cfi, Ca, Ym, …) share a common bias: e.g. all derived from the same regional rumen-fermentation database. Move toward 0 if you treat them as independent. ρ = 0.3 means: if Ym is sampled at its 80th percentile in one iteration, the others are nudged up to about their 60th percentile on average.",
                               placement = "right"
                             )
                           ),
@@ -1602,11 +1620,11 @@ app_ui <- function(request = NULL) {
 
               sliderInput("ef_rho_manureCH",
                           label = tagList(
-                            "Within-block ρ — Manure-CH₄ coefficients (Bo, MCF, ASH) ",
+                            "Within-block ρ: Manure-CH₄ coefficients (Bo, MCF, ASH) ",
                             bslib::tooltip(
                               span(icon("circle-question"),
                                    style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                              "Move toward 0.5 if Bo, MCF, ASH likely share systematic bias — e.g. all from one country's BMP / lagoon-temperature database. Move toward 0 if independent. ρ = 0.3 means: a high Bo iteration tends to come with a slightly high MCF.",
+                              "Move toward 0.5 if Bo, MCF, ASH likely share systematic bias: e.g. all from one country's BMP / lagoon-temperature database. Move toward 0 if independent. ρ = 0.3 means: a high Bo iteration tends to come with a slightly high MCF.",
                               placement = "right"
                             )
                           ),
@@ -1616,7 +1634,7 @@ app_ui <- function(request = NULL) {
 
               sliderInput("ef_rho_manureN",
                           label = tagList(
-                            "Within-block ρ — Manure-N coefficients (EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, UE) ",
+                            "Within-block ρ: Manure-N coefficients (EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, UE) ",
                             bslib::tooltip(
                               span(icon("circle-question"),
                                    style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
@@ -1630,9 +1648,9 @@ app_ui <- function(request = NULL) {
 
               div(style = "font-size:0.82rem; color:#555; margin-top:4px;",
                   "These sliders only matter when you want to capture systematic measurement bias ",
-                  tags$em("within"), " one literature. Cross-block correlation is always zero — ",
+                  tags$em("within"), " one literature. Cross-block correlation is always zero: ",
                   "the three coefficient groups come from independent measurement programmes."),
-              # 2026-06: warn when all three sliders are at 0 — selecting
+              # 2026-06: warn when all three sliders are at 0, selecting
               # block-structured then leaving the sliders at zero is a silent
               # no-op exactly like the AD-side empty-TS issue.
               uiOutput("ef_rho_all_zero_warning")
@@ -1657,8 +1675,11 @@ app_ui <- function(request = NULL) {
           t("info_simulate_back_body"),
           tags$br(), tags$br(),
           tags$strong(paste0(t("info_simulate_n_label"), " ")),
-          t("info_simulate_n_body")),
-      # R1.5: view toggle — output.sim_view is "settings" or "results"
+          t("info_simulate_n_body"),
+          tags$br(), tags$br(),
+          tags$strong(paste0(t("info_simulate_repro_label"), " ")),
+          t("info_simulate_repro_body")),
+      # R1.5: view toggle, output.sim_view is "settings" or "results"
       conditionalPanel(
         condition = "output.sim_view != 'results'",
         bslib::layout_columns(
@@ -1713,7 +1734,7 @@ app_ui <- function(request = NULL) {
                 t("sim_must_tick_body")),
             hr(),
             # Round 9: single-year-only options (decomposition + comparison).
-            # Trend mode doesn't use these — the trend's IPCC-§3.7 framework
+            # Trend mode doesn't use these: the trend's IPCC-§3.7 framework
             # already separates AD vs coefficient via the year_corr radio.
             conditionalPanel(
               condition = "input.analysis_mode != 'trend'",
@@ -1734,7 +1755,7 @@ app_ui <- function(request = NULL) {
             # Round 9: trend-only settings (year-correlation mode).
             # Visible only when 'trend' is picked on Home.
             # 2026-05 UX overhaul: the "optional separate CSV override" section
-            # was removed — the Parameter_TimeSeries sheet in the main upload is
+            # was removed: the Parameter_TimeSeries sheet in the main upload is
             # now the single source of trend data. Each radio choice carries
             # its own tooltip with concrete "when to pick this" guidance.
             conditionalPanel(
@@ -1759,23 +1780,23 @@ app_ui <- function(request = NULL) {
                   style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
                   tags$ul(style = "padding-left:18px; margin:0;",
                     tags$li(tags$strong("Fully correlated coefficients (IPCC 2019 default)"),
-                            " — same coefficient draw is reused for every year within one Monte Carlo iteration. ",
+                            ": same coefficient draw is reused for every year within one Monte Carlo iteration. ",
                             "Trend uncertainty then reflects only the year-to-year changes in your activity data ",
                             "(N, BW, Milk, …); coefficient uncertainty cancels because Ym is the same in 2010 and 2022. ",
                             tags$em("Pick this if your emission factors are IPCC defaults or come from a single estimation programme reused across the whole inventory series.")),
                     tags$li(tags$strong("Partial (AR(1), ρ=0.7)"),
-                            " — coefficient draws drift slowly between years (last year's value gets 70% weight, a fresh draw 30%). ",
+                            ": coefficient draws drift slowly between years (last year's value gets 70% weight, a fresh draw 30%). ",
                             tags$em("Pick this if your emission factors are re-estimated periodically but neighbouring years share most of the same observational basis "),
-                            "— e.g. your country reviewed Ym every 5 years and the value drifted slightly each time."),
+                            "- e.g. your country reviewed Ym every 5 years and the value drifted slightly each time."),
                     tags$li(tags$strong("Independent (no year-to-year correlation)"),
-                            " — coefficient draws are sampled fresh each year. Maximises the EF contribution to trend uncertainty. ",
+                            ": coefficient draws are sampled fresh each year. Maximises the EF contribution to trend uncertainty. ",
                             tags$em("Pick this only if you genuinely re-measured every emission factor every year with fully new field data "),
-                            "— rarely realistic for a national inventory.")
+                            "- rarely realistic for a national inventory.")
                   )),
               div(style = "font-size:0.78rem; color:#92400E; background:#FEF3C7; padding:6px 10px; border-radius:4px; margin-bottom:8px;",
                   icon("info-circle"),
                   tags$em(" Trend mode runs n_iter simulations ", tags$strong("per year"),
-                          " — total compute = n_iter × number of years."))
+                          ": total compute = n_iter × number of years."))
             ),
             hr(),
             # Round 9: route the Run button by mode. Single-year shows the
@@ -1916,7 +1937,7 @@ app_ui <- function(request = NULL) {
                     tags$br(),
                     tags$em(style = "color:#555; font-size:0.85rem;",
                             icon("circle-info", style = "font-size:0.8rem;"),
-                            " Note: this tool uses ", tags$strong("independent Monte Carlo"), " — not MCMC. ",
+                            " Note: this tool uses ", tags$strong("independent Monte Carlo"), ", not MCMC. ",
                             "Each iteration is drawn independently, so there are no chains, no warmup, and no burn-in. ",
                             "The diagnostics above replace the multi-chain Gelman-Rubin checks used in Bayesian MCMC.")),
                 div(style = "margin-top:14px;",
@@ -1970,7 +1991,7 @@ app_ui <- function(request = NULL) {
           uiOutput("comparison_card")
         ),
 
-        # Round 9 follow-up: trend results layout — mirrors single-year's
+        # Round 9 follow-up: trend results layout, mirrors single-year's
         # value-boxes-then-charts pattern but with trend-specific metrics.
         conditionalPanel(
           condition = "input.analysis_mode == 'trend'",
@@ -2024,7 +2045,7 @@ app_ui <- function(request = NULL) {
               tags$em(t("res_trend_footer_note")))
         )
       ),
-      # R1.5: placeholder removed — settings panel itself shows when sim_view is settings
+      # R1.5: placeholder removed, settings panel itself shows when sim_view is settings
     ),
 
     # ==================== TAB 6: SENSITIVITY ====================
@@ -2173,14 +2194,20 @@ app_ui <- function(request = NULL) {
             tags$strong(t("col_combined_uncert")),
             if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
                                 ifnotfound = "en"), "fr"))
-              " — toutes exprimées en " else " — all expressed as ",
+              ", toutes exprimées en " else ", all expressed as ",
             tags$strong(t("info_ipcc_pct_label")),
             t("info_ipcc_pct_body"),
             " ", t("info_ipcc_click_label"),
             tags$strong(t("info_ipcc_xlsx_label")),
             t("info_ipcc_xlsx_body"),
             tags$strong(t("info_ipcc_csv_label")),
-            t("info_ipcc_csv_body")),
+            t("info_ipcc_csv_body"),
+            " ", t("info_ipcc_click_label"),
+            tags$strong(t("info_ipcc_word_label")),
+            t("info_ipcc_word_body"),
+            tags$br(), tags$br(),
+            tags$strong(paste0(t("info_ipcc_software_label"), " ")),
+            t("info_ipcc_software_body")),
         div(style = "margin: 0 16px 12px; font-size:0.82rem; color:#1B4332; background:#D8F3DC; border-left:3px solid #2D6A4F; padding:10px 12px; border-radius:4px;",
             tags$strong(paste0(t("ad_ef_convention_label"), " ")),
             t("ad_ef_convention_body")),
@@ -2301,7 +2328,7 @@ app_ui <- function(request = NULL) {
     # ==================== TAB 9: CONTACT / FEEDBACK ====================
     # Round 8: client-side Web3Forms submission. The form HTML below posts
     # directly from the visitor's browser to https://api.web3forms.com/submit
-    # — Web3Forms restrict server-side POST on the free tier, so we use their
+    #: Web3Forms restrict server-side POST on the free tier, so we use their
     # recommended client-side fetch() pattern. The Shiny server is bypassed
     # for the actual relay; the access key (which is public-facing by design,
     # see R/utils_contact.R) is embedded in the form.

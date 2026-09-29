@@ -2,7 +2,7 @@
 #
 # Stores the chat transcript on disk so the user can close the tab,
 # reload the page (we have a persistent sign-in cookie now), and resume
-# where they left off — instead of starting from a blank chat.
+# where they left off: instead of starting from a blank chat.
 #
 # Caveats:
 #
@@ -14,7 +14,7 @@
 #   * Storage is one JSON file per user, named with a SHA-256 of the
 #     email so listing the directory doesn't reveal user identities.
 #     The file content does carry the email (and the chat content) in
-#     the clear — anyone with shell access to the container could read
+#     the clear: anyone with shell access to the container could read
 #     it. Acceptable for the pilot (data is non-sensitive UNFCCC
 #     reporting); not acceptable for production.
 

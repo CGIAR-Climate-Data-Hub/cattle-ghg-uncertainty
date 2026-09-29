@@ -19,7 +19,7 @@ sample_distribution <- function(n, type, mean_val, lower, upper) {
   # Constant distribution short-circuit: only `mean_val` matters, lower/upper
   # are irrelevant. Without this special case, the NA-bounds guard below
   # would poison every biological-zero row (Milk=0 for males, hours=0 for
-  # non-oxen, N placeholders) with NA samples — these typically have NA
+  # non-oxen, N placeholders) with NA samples: these typically have NA
   # bounds because there's no uncertainty to express. The downstream
   # emission calc would then propagate NaN into total_co2e and crash the
   # quantile() convergence check at the end of the simulation.
@@ -29,7 +29,7 @@ sample_distribution <- function(n, type, mean_val, lower, upper) {
   }
 
   # Andreas 2026-05-26 follow-up: short-circuit when any of mean/lower/upper
-  # is NA — this happens when a user uploads a template with a blank yellow
+  # is NA: this happens when a user uploads a template with a blank yellow
   # cell. Passing NA to mc2d::rpert / mc2d::rtriang / rnorm trips
   # "missing value where TRUE/FALSE needed" deep inside an `if (any(check))`
   # in mc2d that doesn't understand NA inputs. Returning NA samples here

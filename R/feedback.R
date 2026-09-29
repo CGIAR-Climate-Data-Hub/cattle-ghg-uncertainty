@@ -1,7 +1,7 @@
 # In-app feedback → GitHub issue + admin email
 #
 # The floating "Feedback" button (see R/app_ui.R + R/app_server.R) opens a
-# modal where any user — signed-in or not — can describe a bug/idea/question
+# modal where any user: signed-in or not, can describe a bug/idea/question
 # and optionally attach a screenshot. On submit, feedback_submit():
 #   1. uploads any attachment to a dedicated `feedback-assets` branch of the
 #      repo via the GitHub Contents API (so it can be embedded in the issue),
@@ -11,7 +11,7 @@
 # Everything degrades gracefully: if GitHub is unreachable/misconfigured the
 # admin still gets the full feedback by email, so nothing is ever lost.
 #
-# Config (gitignored .Renviron, bundled into the deploy — same handling as
+# Config (gitignored .Renviron, bundled into the deploy: same handling as
 # SENDGRID_API_KEY / ANTHROPIC_API_KEY, never committed, never sent to the
 # browser):
 #   GITHUB_FEEDBACK_REPO   = "owner/repo"   (e.g. CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty)
@@ -20,7 +20,7 @@
 #
 # All HTTP reuses httr2 (already loaded by app.R) and the same perform/parse
 # pattern as R/anthropic_client.R and R/auth_magic_link.R. base64 via
-# jsonlite::base64_enc (already loaded) — no new package dependencies.
+# jsonlite::base64_enc (already loaded), no new package dependencies.
 
 # ----- GitHub helpers -------------------------------------------------------
 
@@ -72,7 +72,7 @@ github_create_issue <- function(title, body, labels = NULL) {
   }
   msg <- tryCatch(httr2::resp_body_json(resp)$message, error = function(e) "")
   list(url = NULL, number = NULL,
-       error = sprintf("GitHub issue create failed: HTTP %d — %s", st, msg %||% ""))
+       error = sprintf("GitHub issue create failed: HTTP %d, %s", st, msg %||% ""))
 }
 
 # Make sure the asset branch exists; create it from the default branch's HEAD
@@ -131,7 +131,7 @@ github_upload_asset <- function(local_path, dest_path, branch = "feedback-assets
   if (is.na(sz) || sz <= 0) return(list(download_url = NULL, error = "empty or missing file"))
 
   raw <- readBin(local_path, "raw", n = sz)
-  b64 <- jsonlite::base64_enc(raw)          # newline-free base64 — Contents API wants exactly this
+  b64 <- jsonlite::base64_enc(raw)          # newline-free base64, Contents API wants exactly this
   rm(raw); gc(FALSE)
 
   url <- sprintf("https://api.github.com/repos/%s/%s/contents/%s",
@@ -151,7 +151,7 @@ github_upload_asset <- function(local_path, dest_path, branch = "feedback-assets
   if (!(st %in% 200:299)) {
     msg <- tryCatch(httr2::resp_body_json(resp)$message, error = function(e) "")
     return(list(download_url = NULL,
-                error = sprintf("asset upload HTTP %d — %s", st, msg %||% "")))
+                error = sprintf("asset upload HTTP %d: %s", st, msg %||% "")))
   }
   body <- httr2::resp_body_json(resp)
   list(download_url = body$content$download_url, error = NULL)
@@ -308,7 +308,7 @@ feedback_submit <- function(text, category = "Question", reporter_email = "",
       else if (isTRUE(mailed))
         "Thanks! We couldn't file it automatically, but the team has been emailed your feedback."
       else
-        sprintf("Sorry — we couldn't send your feedback right now. Please email %s directly.",
+        sprintf("Sorry: we couldn't send your feedback right now. Please email %s directly.",
                 Sys.getenv("ADMIN_EMAIL", unset = "the administrator"))
 
     list(ok = ok, issue_url = iss$url, issue_error = iss$error, mailed = mailed,
@@ -323,8 +323,8 @@ feedback_submit <- function(text, category = "Question", reporter_email = "",
     list(ok = FALSE, issue_url = NULL, issue_error = conditionMessage(e),
          mailed = mailed, notes = "exception",
          user_message = if (isTRUE(mailed))
-           "Thanks — we hit a hiccup filing it, but the team has been emailed your feedback."
+           "Thanks: we hit a hiccup filing it, but the team has been emailed your feedback."
          else
-           "Sorry — we couldn't send your feedback right now. Please email the administrator directly.")
+           "Sorry: we couldn't send your feedback right now. Please email the administrator directly.")
   })
 }

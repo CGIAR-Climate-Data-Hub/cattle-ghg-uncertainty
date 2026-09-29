@@ -12,7 +12,7 @@
 
 
 
-<title>AI Translator — Find out more</title>
+<title>AI Translator, Find out more</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -146,7 +146,7 @@ color: var(--grey-soft);
 
 
 
-<h1 class="title toc-ignore">AI Translator — Find out more</h1>
+<h1 class="title toc-ignore">AI Translator, Find out more</h1>
 
 
 
@@ -157,7 +157,7 @@ with a step-by-step walk-through of the translator workflow.</p>
 <div id="what-the-ai-translator-is-for" class="section level2">
 <h2>What the AI translator is for</h2>
 <p>The Cattle Uncertainty App expects its data in a specific Excel
-template — three sheets (Inventory_Metadata, Parameters,
+template: three sheets (Inventory_Metadata, Parameters,
 Manure_Management), with controlled vocabularies for sub-categories and
 manure-management systems, and a fixed column order. Real national
 inventory data rarely arrives in that shape: column names differ, units
@@ -176,12 +176,12 @@ template is uploaded.</p>
 </div>
 <div id="the-three-step-workflow" class="section level2">
 <h2>The three-step workflow</h2>
-<p>The translator works in three explicit passes — Explore, Clarify,
-Emit — rather than attempting all three at once. This separation
-prevents the AI from silently dropping rows or substituting catalogue
-defaults for values the user supplied.</p>
+<p>The translator works in three explicit passes: Explore, Clarify,
+Emit, rather than attempting all three at once. This separation prevents
+the AI from silently dropping rows or substituting catalogue defaults
+for values the user supplied.</p>
 <div id="step-1-explore" class="section level3">
-<h3>Step 1 — Explore</h3>
+<h3>Step 1: Explore</h3>
 <p>After the file is read, the panel lists its sheets with their size
 and lets the user untick reference or lookup sheets the AI does not need
 before sending; fewer sheets mean a faster first reply and a cheaper
@@ -206,12 +206,12 @@ interpretation, breed disaggregation, and similar.</li>
 </ul>
 <p>The exploration report is the persistent ground-truth artefact that
 drives the rest of the workflow. The user is expected to read it
-carefully — section B in particular should list every parameter present
+carefully: section B in particular should list every parameter present
 in the source file. A parameter missing from section B should be raised
 in the chat before proceeding.</p>
 </div>
 <div id="step-2-clarify" class="section level3">
-<h3>Step 2 — Clarify</h3>
+<h3>Step 2: Clarify</h3>
 <p>The user answers the questions in section D in plain natural-language
 chat messages. There is no required template for the answers; the AI
 parses them and updates its internal mapping. Typical clarifications
@@ -237,7 +237,7 @@ chat. They will be incorporated into the final template alongside the
 file-derived values.</p>
 </div>
 <div id="step-3-emit" class="section level3">
-<h3>Step 3 — Emit</h3>
+<h3>Step 3: Emit</h3>
 <p>When the section D questions are answered, the user clicks
 <strong>Produce template now</strong>. The AI translates section B
 (file-derived values), section C (catalogue gaps to be filled with IPCC
@@ -291,7 +291,7 @@ browser.</p></li>
 that the email is not on the auto-approved list. A confirmation message
 is displayed:</p>
 <blockquote>
-<p>Thanks — your request to access the AI translator (<a href="mailto:your.email@example.org" class="email">your.email@example.org</a>) has been forwarded to the
+<p>Thanks: your request to access the AI translator (<a href="mailto:your.email@example.org" class="email">your.email@example.org</a>) has been forwarded to the
 administrator for approval. You’ll receive an email once approved.</p>
 </blockquote>
 <p>At the same moment, the administrator receives a notification email
@@ -342,7 +342,7 @@ litres and kilograms of milk).</li>
 measure.</li>
 </ul>
 <p>The translator is not required when the user already has a filled
-template — in that case, upload directly via the Data Input tab. The
+template: in that case, upload directly via the Data Input tab. The
 translator is also not the appropriate tool for converting an
 emissions-calculation result; it works on input parameters only.</p>
 </div>
@@ -402,19 +402,19 @@ manually using the IPCC defaults provided in the user guide.</p>
 <h3>Related material</h3>
 <ul>
 <li><a href="../user_guide.pdf">User Guide</a>, §“AI-assisted data
-preparation” — the same workflow described in the printable user guide,
+preparation”: the same workflow described in the printable user guide,
 including the non-CGIAR step-by-step.</li>
-<li><a href="../methodology.pdf">Methodology document</a> — full
+<li><a href="../methodology.pdf">Methodology document</a>: full
 equations, parameter definitions, and references for everything the
 translator outputs.</li>
-<li><a href="correlations.html">Find out more — Correlations</a> — the
+<li><a href="correlations.html">Find out more: Correlations</a>, the
 companion topic page covering the correlation modes on the Simulate
 tab.</li>
 </ul>
 </div>
 <footer>
 Generated by <code>scripts/build_help_docs.R</code> from
-<code>doc/ai_translator.Rmd</code>.
+<code>documentation/source/ai_translator.Rmd</code>.
 </footer>
 </div>
 

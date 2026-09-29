@@ -17,7 +17,7 @@ if (!requireNamespace("rmarkdown", quietly = TRUE)) install.packages("rmarkdown"
 # LaTeX engine: prefer whatever is already installed (MiKTeX / TeX Live / TinyTeX).
 # R's child-process PATH often omits MiKTeX even when the shell has it, so add the
 # usual Windows install dir before probing (same approach as build_translator_kit.R).
-# Only fall back to installing TinyTeX if NO engine is found at all — otherwise
+# Only fall back to installing TinyTeX if NO engine is found at all: otherwise
 # tinytex::install_tinytex() errors out when a system LaTeX like MiKTeX exists.
 tb <- file.path(Sys.getenv("LOCALAPPDATA"), "Programs/MiKTeX/miktex/bin/x64")
 if (dir.exists(tb)) Sys.setenv(PATH = paste(tb, Sys.getenv("PATH"), sep = .Platform$path.sep))
@@ -37,5 +37,5 @@ for (fmt in c("word_document", "pdf_document")) {
     knit_root_dir = getwd(),
     quiet         = TRUE
   )
-  cat("Done — www/user_guide.", ext, " created.\n", sep = "")
+  cat("Done: www/user_guide.", ext, " created.\n", sep = "")
 }

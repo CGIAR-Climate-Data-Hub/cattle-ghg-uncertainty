@@ -20,9 +20,9 @@ calc_uncertainty_metrics <- function(x) {
     cv_pct  = cv_pct,
     ci_lower = q025,
     ci_upper = q975,
-    # T6.1 / T8.1: IPCC 95% margin of error — half-width of the 95% CI as a
+    # T6.1 / T8.1: IPCC 95% margin of error, half-width of the 95% CI as a
     # percent of the mean. Quantile-based so it handles asymmetric distributions.
-    # (Previous formula was 1.96*sd/sqrt(n)/mean — that is the standard error
+    # (Previous formula was 1.96*sd/sqrt(n)/mean: that is the standard error
     # of the *estimator*, not the uncertainty of the emission value.)
     moe_pct = moe_pct,
     upper_pct = upper_pct,
@@ -41,9 +41,9 @@ calc_all_uncertainty <- function(results_df) {
 }
 
 # Uncertainty decomposition: AD-only, EF-only, Combined.
-# Andreas 2026-05 #29: defensive coercion of param_type — custom uploads can
+# Andreas 2026-05 #29: defensive coercion of param_type, custom uploads can
 # arrive with NA in param_type when the user didn't fill that column. Treat
-# missing as "coefficient" (the IPCC convention adopted in this tool — only
+# missing as "coefficient" (the IPCC convention adopted in this tool: only
 # N is activity data). NA in a logical subset triggers "NAs not allowed in
 # subscripted assignments", which manifested as the silent decomposition
 # failure on custom data Andreas reported.
@@ -54,7 +54,7 @@ calc_all_uncertainty <- function(results_df) {
 # (a) supports multi-group inventories and (b) correctly passes per-MMS
 # uncertainty matrices (mcf_samples, ef3_samples, frac_gas_samples,
 # frac_leach_samples). This function is retained for direct/test use but will
-# not reflect per-MMS sampling — call the app_server.R path instead for
+# not reflect per-MMS sampling: call the app_server.R path instead for
 # production results.
 decompose_uncertainty <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
                                    mms_fractions = NULL, mcf_values = NULL, ef3_values = NULL,

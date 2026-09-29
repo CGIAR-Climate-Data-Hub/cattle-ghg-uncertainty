@@ -87,7 +87,7 @@ file.copy("documentation/source/_shared.css", file.path(out_dir, "_shared.css"),
 
 # -----------------------------------------------------------------------------
 # Run one (country, corr_mode) combination, return a compact summary frame.
-# Optional ef_rho_energy / ef_rho_manureCH / ef_rho_manureN — when any is
+# Optional ef_rho_energy / ef_rho_manureCH / ef_rho_manureN: when any is
 # non-zero, a block-structured EF correlation matrix is built (via
 # make_block_corr() from R/mc_sampling.R) and merged into the unified matrix
 # alongside the AD-side correlations. Used by the help-doc figure that shows
@@ -139,7 +139,7 @@ file.copy("documentation/source/_shared.css", file.path(out_dir, "_shared.css"),
   # so the two matrices overlap only on the identity diagonal.
   unified <- NULL
   if (!is.null(ad_unified) && !is.null(ef_unified)) {
-    # Both present — overlay the EF block onto the AD-extended identity matrix
+    # Both present: overlay the EF block onto the AD-extended identity matrix
     unified <- ad_unified
     ef_idx <- which(rownames(unified) %in% rownames(ef_unified))
     if (length(ef_idx) >= 2) {

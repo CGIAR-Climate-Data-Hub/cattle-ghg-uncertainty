@@ -26,7 +26,7 @@ __pycache__/
 *.pyc
 
 # 2026-06: in-app AI translator runtime artefacts
-# Never commit secrets or per-call usage logs — secrets only live in the
+# Never commit secrets or per-call usage logs - secrets only live in the
 # shinyapps.io env-var dashboard; the usage log lives ephemerally in the
 # container's working dir.
 .Renviron
@@ -45,7 +45,7 @@ auth_tokens.csv
 # repo. The canonical built docs live in www/ and are tracked there.
 
 # Reviewer cycle (Andreas, etc.). NOTE: gitignore patterns do NOT use
-# shell-style quotes — spaces in filenames are matched directly, quotes
+# shell-style quotes - spaces in filenames are matched directly, quotes
 # would become literal characters and never match anything.
 AW_review_response*
 AW_final_comments_tracker.docx
@@ -61,7 +61,7 @@ email_to_andreas.md
 docs/AW_review_response*.md
 docs/meeting_*_todo.md
 
-# Auto-regenerated outputs — no need to commit
+# Auto-regenerated outputs - no need to commit
 reports/AUDIT_REPORT.md
 reports/DEFAULTS_MATRIX.md
 reports/DEFAULTS_MATRIX.csv
@@ -83,14 +83,14 @@ figures/
 19R_V*.pdf
 V[14]_*.pdf
 
-# Real-country test data — sensitive, not for a public repo
+# Real-country test data - sensitive, not for a public repo
 22-07-2023 Zimbabwe*.xlsx
 uncertainty_template_ipcc2019_v2.xlsx
 uncertainty_template_ipcc2019 ZIM*.xlsx
 uncertainty_template_ipcc2019_ZIM*.xlsx
 *.pre_audit_*_bak
 
-# Review-round screenshots dropped in repo root (1.png … 8.png) —
+# Review-round screenshots dropped in repo root (1.png … 8.png) -
 # pinning the exact set; legitimate www/ images keep their own filenames.
 /1.png
 /2.png
@@ -101,7 +101,7 @@ uncertainty_template_ipcc2019_ZIM*.xlsx
 /7.png
 /8.png
 
-# Build outputs at the repo root — the deployed copies live in www/
+# Build outputs at the repo root - the deployed copies live in www/
 /methodology.docx
 /methodology.pdf
 /methodology.log
@@ -138,7 +138,7 @@ R/_test_*.R
 # it to know which approved emails are NEW since last deploy.
 runtime/
 
-# 2026-06: local dev scratch / test data — kept on the machine, never in the
+# 2026-06: local dev scratch / test data - kept on the machine, never in the
 # repo (consistent with the real-country test-data and one-off-script rules
 # above). claude_old/ is an old docs backup; ZAM/ is the Zambia test inventory;
 # AI_model_prices/ is a pricing side-analysis; the loose analyze_/inspect_/
@@ -152,7 +152,7 @@ count_prompt.R
 inspect_zambia_tmp.R
 scripts/_inspect_translation.R
 
-# 2026-08: knowledge/ — a local-only project knowledge base written for AI
+# 2026-08: knowledge/ - a local-only project knowledge base written for AI
 # agent context (cold-start onboarding for future Claude Code sessions). It
 # indexes the codebase and records the decision/review history, so it names
 # the reviewers, quotes their comments, and describes the real-country test

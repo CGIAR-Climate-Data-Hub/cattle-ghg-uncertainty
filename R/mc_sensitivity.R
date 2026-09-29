@@ -34,7 +34,7 @@ calc_src <- function(inputs, output) {
 }
 
 calc_prcc <- function(inputs, output) {
-  # Andreas 28/5/26 #10: preserve original column names — `as.data.frame()`
+  # Andreas 28/5/26 #10: preserve original column names, `as.data.frame()`
   # default `check.names = TRUE` mangles "Ym (DINT_cow)" into "Ym..DINT_cow.".
   orig_names <- colnames(inputs)
   ranked_list <- lapply(inputs, rank)
@@ -70,7 +70,7 @@ sensitivity_analysis <- function(inputs, output, method = c("src", "prcc", "both
 
   # Output-variance guard: SRC/PRCC on a constant (or near-constant) output
   # returns spurious ranks. This happens when the selected output column is
-  # structurally zero — e.g. PRP direct N2O for an intensive-dairy run where
+  # structurally zero: e.g. PRP direct N2O for an intensive-dairy run where
   # pct_pasture = 0 across all iterations. Return an empty list with a
   # `message` attribute so renderers can surface why the chart is empty.
   out_sd <- stats::sd(output, na.rm = TRUE)
@@ -108,7 +108,7 @@ sensitivity_analysis <- function(inputs, output, method = c("src", "prcc", "both
     prcc_note <- paste0(
       "PRCC was skipped: the combined parameter matrix has ",
       ncol(inputs_var), " columns (limit: ", max_prcc_cols, "). ",
-      "SRC is shown instead — it requires only one regression fit regardless ",
+      "SRC is shown instead: it requires only one regression fit regardless ",
       "of the number of parameters. To see PRCC, select a single emission ",
       "source from the 'Output' dropdown above."
     )
@@ -126,7 +126,7 @@ sensitivity_analysis <- function(inputs, output, method = c("src", "prcc", "both
 # parentheses (e.g. "Ym" -> "Ym (DINT_cow)") so the tornado chart and rank-
 # correlation table identify which animal sub-category each influential
 # parameter belongs to (Andreas 28/5/26 #8). The labelled frames are
-# column-bound and regressed against the supplied `output` vector — which
+# column-bound and regressed against the supplied `output` vector: which
 # should be the per-iteration sum of the chosen metric across systems
 # (typically `inventory$total_co2e` or `rowSums(by_system[[*]]$results[[src]])`
 # for a per-source view).
@@ -177,17 +177,17 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   # inventory the combined design matrix is ~n_iter x (15 x n_systems) columns;
   # the SRC lm() on a full 10,000-row x ~685-column matrix peaks several hundred
   # MB and runs twice (main + no-correlation comparison) on top of the 3x
-  # decomposition — enough to exhaust a small instance and force a reload during
+  # decomposition: enough to exhaust a small instance and force a reload during
   # the sensitivity step (the "server needed to reload" failure on the heaviest
   # all-sources + correlations + decomposition run). SRC/PRCC *rankings* are
   # stable far below the iteration count the headline percentiles need, so we
   # rank on a capped subsample. Each Monte Carlo row is an independent draw, so
   # the first `max_rows` rows are a valid random subsample. The headline 95% MoE
-  # is unaffected — it is computed elsewhere from the full iteration set.
+  # is unaffected: it is computed elsewhere from the full iteration set.
   # Reconcile the design matrix and the output vector to a common row count
   # before regressing. Two reasons:
   #   1. the subsample cap (rankings are stable far below the iteration count
-  #      the headline percentiles need — see the note above), and
+  #      the headline percentiles need: see the note above), and
   #   2. `combined` may now be SHORTER than `output`: the Shiny app thins the
   #      retained per-system `samples` to ~4000 rows for memory, while the
   #      per-source `output` (e.g. rowSums of the full-n_iter `results`) is
@@ -214,7 +214,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
 }
 
 # Parse a sensitivity parameter name produced by aggregate_sensitivity() and
-# return its sub_category (the contents of the trailing parentheses) — or
+# return its sub_category (the contents of the trailing parentheses): or
 # "(ungrouped)" when the column name was emitted without a parenthesised
 # suffix (single-system inputs to sensitivity_analysis directly).
 sens_group_of <- function(var_name) {

@@ -27,7 +27,7 @@ calc_neg <- function(live_weight, weight_gain, C, mature_weight) {
   # Andreas 2026-05-26 follow-up: `isTRUE(x <= 0)` instead of bare `x <= 0`
   # so NAs in weight_gain or mature_weight (e.g. a blank yellow cell) don't
   # trip `if(NA)` with "missing value where TRUE/FALSE needed". When either
-  # is NA we fall through to the equation, which will produce NA — that NA
+  # is NA we fall through to the equation, which will produce NA: that NA
   # propagates downstream and the pre-run NA-mean check in the simulation
   # observer is what blocks the run with a helpful message.
   if (isTRUE(weight_gain <= 0) || isTRUE(mature_weight <= 0)) return(0)

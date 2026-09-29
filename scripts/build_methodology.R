@@ -37,4 +37,4 @@ for (fmt in c("word_document", "pdf_document")) {
     knit_root_dir = getwd()
   )
 }
-cat("Done — www/methodology.pdf created.\n")
+cat("Done: www/methodology.pdf created.\n")

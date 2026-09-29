@@ -2,7 +2,7 @@
 # the in-app AI translator. The file mimics the kind of file a real
 # inventory compiler might send: multiple sheets, French/English mix,
 # typos in category names, wide-format years, unit-suffix-in-cell,
-# decimal-comma vs decimal-point, missing values as "n/a" and "—",
+# decimal-comma vs decimal-point, missing values as "n/a" and "-",
 # total rows mixed in with category rows, and a footnote inline.
 #
 # A good translator should be able to map this into the strict template
@@ -18,7 +18,7 @@ if (basename(getwd()) == "scripts") setwd("..")
 suppressMessages(library(writexl))
 
 # Each value is a CHARACTER string so we can mix units, footnote markers,
-# decimal commas, percentage suffixes, etc. — i.e. simulate the kind of
+# decimal commas, percentage suffixes, etc.: i.e. simulate the kind of
 # raw data the translator actually receives.
 
 cover <- data.frame(
@@ -69,8 +69,8 @@ cattle_counts <- data.frame(
 # Weights + growth rates. UNITS ARE MIXED ON PURPOSE:
 #  - BW for the dairy cows is in kg
 #  - BW for the bulls is in lbs (translation challenge!)
-#  - WG is in "kg/an" (kg per year) NOT kg/day — a common confusion
-#  - MW has some entries as "—" and some as "n/a"
+#  - WG is in "kg/an" (kg per year) NOT kg/day: a common confusion
+#  - MW has some entries as "-" and some as "n/a"
 
 weights <- data.frame(
   subcat   = c("Vaches laitières",
@@ -85,7 +85,7 @@ weights <- data.frame(
   `BW (kg)` = c("385", "350", "295", "260", "770 lbs",   # lbs!!
                 "510", "240", "95", "92"),
   MW        = c("440", "440", "440", "440", "550",
-                "550", "—", "n/a", "n/a"),
+                "550", "-", "n/a", "n/a"),
   `WG (kg/an)` = c("12",   "0",    "65",   "75",   "0",
                    "0",    "180",  "55",   "50"),
   Notes = c("perte de poids saison sèche -10%", "", "", "", "",
@@ -95,12 +95,12 @@ weights <- data.frame(
 )
 
 # Milk and feed. UNIT TRAPS:
-#  - Milk is "L/jour" (litres per day), not kg/day — needs conversion
+#  - Milk is "L/jour" (litres per day), not kg/day: needs conversion
 #    via density (~1.03)
 #  - DE pct column uses decimal-COMMA ("60,5") instead of decimal-point
 #  - Crude protein has a unit suffix in the cell ("12 %")
 #  - Methane factor (Ym) is in absolute % ("6,5") for some, fraction
-#    ("0.065") for others — inconsistent!
+#    ("0.065") for others: inconsistent!
 
 milk_feed <- data.frame(
   Cat = c("Vaches laitières",
@@ -112,7 +112,7 @@ milk_feed <- data.frame(
           "Bouvillons en croissance",
           "Veaux"),
   `Lait l/jour` = c("4,5", "0", "0", "0", "0", "0", "0", "0"),
-  `Fat %`       = c("4,2", "—", "—", "—", "—", "—", "—", "—"),
+  `Fat %`       = c("4,2", "-", "-", "-", "-", "-", "-", "-"),
   `DE pct`      = c("62,0", "55,0", "58,0", "57,5", "54,0", "55,0", "60,5", "63,5"),
   `Crude protein` = c("13 %", "9 %", "11 %", "10 %", "8 %", "9 %", "11 %", "14 %"),
   `Méthane factor` = c("6,5", "7,0", "6,8", "6,8", "7,2", "7,1", "0.065", "0.065"),  # inconsistent units
@@ -144,7 +144,7 @@ manure <- data.frame(
   check.names = FALSE
 )
 
-# Some completely unrelated noise sheet — the kind that ends up in real
+# Some completely unrelated noise sheet: the kind that ends up in real
 # files. Should be IGNORED by the translator.
 
 extras <- data.frame(

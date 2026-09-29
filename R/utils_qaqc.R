@@ -22,7 +22,7 @@ FRACTION_PARAMS   <- c("pct_pregnant", "ASH", "UE",
 ## key off the continental Annex Tables 10A.1 (dairy cows) / 10A.2 (other
 ## cattle) / 10A.3 (buffalo). Milk / DE / Ym / Bo / MW previously fired
 ## warnings citing values that came from heuristic mid-points, not the
-## published IPCC tables — see the block comment over IPCC_DEFAULTS_BY_REGION
+## published IPCC tables: see the block comment over IPCC_DEFAULTS_BY_REGION
 ## in utils_ipcc_defaults.R.
 BENCHMARK_ELIGIBLE_PARAMS <- c("BW")
 
@@ -287,11 +287,11 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     ipcc_def <- ps$ipcc_default[i]
 
     # ------------------------------------------------------------------
-    # Check 1: bounds order — lower < mean < upper
+    # Check 1: bounds order, lower < mean < upper
     # ------------------------------------------------------------------
     is_constant <- !is.na(d) && d %in% c("constant", "const")
     # Zero-mean parameters (hours=0 when no work, weight_gain=0 for adults, etc.)
-    # are degenerate constants — pass silently rather than flagging as failure.
+    # are degenerate constants: pass silently rather than flagging as failure.
     is_zero_mean <- !is.na(mu) && mu == 0 && !is.na(lo) && lo == 0 &&
                     !is.na(hi) && hi == 0
     if (!is_constant && !is_zero_mean && !is.na(lo) && !is.na(hi) && !is.na(mu)) {
@@ -391,7 +391,7 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     # BW uses continental IPCC Annex Tables 10A.1 (dairy cows) / 10A.2
     # (other cattle) / 10A.3 (buffalo). Milk / DE / Ym / Bo / MW no longer
     # produce benchmark warnings because the previous heuristic mid-points
-    # were not citable to a published IPCC table — Andreas's reviewer
+    # were not citable to a published IPCC table: Andreas's reviewer
     # finding was that the QA tab claimed "IPCC default" values he could
     # not locate in the guidelines. The catalogue's `ipcc_default` values
     # are still used for template auto-fill, just not for deviation
@@ -442,7 +442,7 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     }
 
     # ------------------------------------------------------------------
-    # Check 4b (R1.3 / Round 6b): missing parameter — auto-filled from IPCC default
+    # Check 4b (R1.3 / Round 6b): missing parameter, auto-filled from IPCC default
     # Reported as a dedicated "missing" severity so reviewers see exactly which
     # parameters were not supplied and what default value+reference was used.
     # ------------------------------------------------------------------
@@ -506,7 +506,7 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
 
   # Cross-sheet sub-category-key reconciliation rows (see
   # resolve_sub_category_matches above). Surfaces silent fallback / auto-match
-  # / ambiguity as visible QAQC entries — the simulation observer separately
+  # / ambiguity as visible QAQC entries: the simulation observer separately
   # consumes the `matched` mapping to substitute the auto-matched MM key.
   if (!is.null(manure_data)) {
     sg <- resolve_sub_category_matches(param_specs, manure_data)

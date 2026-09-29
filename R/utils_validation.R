@@ -183,11 +183,11 @@ normalise_param_names <- function(param_specs) {
   param_specs
 }
 
-# T1.2 / T2.2 + A1: completeness check — instead of blocking the Run button when
+# T1.2 / T2.2 + A1: completeness check, instead of blocking the Run button when
 # core parameters are missing, auto-fill them from PARAM_CATALOGUE$ipcc_default.
 # Returns a list with $param_specs (possibly augmented), $auto_filled (data frame
 # of what was added), $message, and $valid (only FALSE if a core param has no
-# default available — genuine error).
+# default available: genuine error).
 ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
                                  region = NULL) {
   if (is.null(param_specs) || nrow(param_specs) == 0)
@@ -228,7 +228,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
                           names(param_specs))
   if (length(group_cols) == 0) {
     return(list(valid = TRUE, param_specs = param_specs, auto_filled = NULL,
-                message = "Single-group input — no per-group completeness check."))
+                message = "Single-group input: no per-group completeness check."))
   }
 
   groups <- unique(param_specs[, group_cols, drop = FALSE])
@@ -265,7 +265,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
       rs  <- subcat_default(p)
       def <- if (!is.null(rs)) rs$value else defaults_lut[[p]]
       if (is.null(def) || is.na(def)) {
-        # No default — record as unfillable
+        # No default: record as unfillable
         unfillable[[length(unfillable) + 1]] <- list(
           group = paste(unlist(g), collapse = " / "),
           parameter = p
@@ -324,7 +324,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
     msg_parts <- c(msg_parts, base_msg)
   }
   if (length(unfillable) > 0) {
-    uf <- vapply(unfillable, function(x) sprintf("%s — %s", x$group, x$parameter),
+    uf <- vapply(unfillable, function(x) sprintf("%s: %s", x$group, x$parameter),
                  character(1))
     msg_parts <- c(msg_parts,
       sprintf("Cannot run: %d core parameter(s) have no IPCC default and are missing: %s.",
@@ -340,7 +340,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   )
 }
 
-# Backwards-compat shim — old callers may still use validate_completeness()
+# Backwards-compat shim: old callers may still use validate_completeness()
 validate_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE) {
   res <- ensure_completeness(param_specs, catalogue)
   list(valid = res$valid, missing = NULL, message = res$message)

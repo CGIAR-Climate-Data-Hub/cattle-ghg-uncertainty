@@ -1,8 +1,8 @@
-# Round 8 — Contact / Feedback form via Web3Forms (client-side AJAX).
+# Round 8: Contact / Feedback form via Web3Forms (client-side AJAX).
 #
 # Web3Forms is a free HTTP form-relay service that forwards POSTed form
 # payloads to a verified email address. Their access keys are public-facing
-# by design — abuse protection is captcha + rate limits, not key secrecy.
+# by design: abuse protection is captcha + rate limits, not key secrecy.
 #
 # Round 8 design note: the free tier of Web3Forms blocks server-side POSTs
 # (responding with "use our API in client side or contact support"). So the
@@ -11,7 +11,7 @@
 #
 # Round 9 follow-up bug fix: the original implementation returned the form
 # AND the <script> tag inside a single HTML() call. Browsers do NOT execute
-# <script> tags inserted via innerHTML — so the submit handler was never
+# <script> tags inserted via innerHTML: so the submit handler was never
 # defined, the onsubmit fired the form's default action (full POST + page
 # nav), and nothing reached the visitor's inbox. Fix: split into form HTML
 # + a tags$script() block so Shiny / htmltools render the script properly
@@ -195,7 +195,7 @@ async function submitContactFormW3(e) {
    t("btn_cf_send"))
 
   # Return as a tagList: HTML form, <style>, then a separate script tag.
-  # Splitting the script out is the bug fix — htmltools renders tags$script
+  # Splitting the script out is the bug fix: htmltools renders tags$script
   # as a real DOM element so the browser actually executes it, unlike script
   # tags smuggled inside an HTML() call (innerHTML doesn't run scripts).
   htmltools::tagList(

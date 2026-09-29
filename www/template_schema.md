@@ -7,13 +7,13 @@ Sheet names and column headers are **case-sensitive and must match exactly**.
 
 | sheet | required? | purpose |
 |-------|-----------|---------|
-| `_Lists` | optional (hidden) | dropdown vocabularies — created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |
-| `README` | optional | human-readable quick-start — safe to omit |
+| `_Lists` | optional (hidden) | dropdown vocabularies: created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |
+| `README` | optional | human-readable quick-start: safe to omit |
 | `Inventory_Metadata` | **required** | country, region, year, IPCC version, species |
 | `Parameters` | **required** | the 25 parameters per cattle sub-category |
 | `Manure_Management` | **required** | per-MMS allocation; per-group fractions must sum to 100% |
 | `Parameter_TimeSeries` | optional | 5+ years of annual values for auto-correlation |
-| `Vocab` | optional | reference catalogue — safe to omit |
+| `Vocab` | optional | reference catalogue: safe to omit |
 
 ## Sheet: `Inventory_Metadata`
 
@@ -22,7 +22,7 @@ Transposed (label/value) layout, one field per row starting at row 2. Column B i
 | label (column B) | field | value | notes |
 |-------|-------|-------|-------|
 | Country | `country` | (free text) | e.g. `Zimbabwe`. Used in the report header. |
-| Continental region | `region` | one of: africa / asia / europe / americas / oceania / global | Continental region — drives the BW plausibility benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2). Always set it from the country; never leave it to default. |
+| Continental region | `region` | one of: africa / asia / europe / americas / oceania / global | Continental region: drives the BW plausibility benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2). Always set it from the country; never leave it to default. |
 | Inventory year | `inventory_year` | (integer) | e.g. `2022` |
 | Livestock species | `species` | one of: cattle_dairy / cattle_non_dairy / cattle_mixed / buffalo | controlled vocabulary |
 | IPCC Guidelines version | `ipcc_version` | one of: 2006 / 2019_refinement | drives MMS list filtering and the edition-specific Ym |
@@ -41,7 +41,7 @@ Banner in row 1, legend in row 2, header row in row 3. Data starts at row 4. One
 | D | parameter | yes | the parameter code from param_catalogue.md |
 | E | definition | no | optional human label (mirrors param_catalogue) |
 | F | unit | no | optional unit (mirrors param_catalogue) |
-| G | value | yes | the central value — **the number the user is providing** |
+| G | value | yes | the central value: **the number the user is providing** |
 | H | uncertainty_pct | one of (uncertainty_pct) or (lower/upper) | symmetric ±% half-width of 95% CI |
 | I | lower_bound | no | catalogue reference bound, display only; the model writes bounds to `lower` / `upper` |
 | J | upper_bound | no | catalogue reference bound, display only |
@@ -54,15 +54,15 @@ Banner in row 1, legend in row 2, header row in row 3. Data starts at row 4. One
 
 ### Sub-category codes (ANIMAL_SUBCATEGORIES)
 
-- `dairy_cows` — Dairy Cows (mature lactating females)
-- `other_cows` — Other Cows (mature non-dairy females, inc. dry)
-- `bulls` — Bulls (mature intact males, breeding)
-- `oxen` — Oxen (mature castrated males)
-- `heifers` — Heifers (young females 1-3yr, not yet calved)
-- `growing_males` — Growing Males (young males 1-3yr, steers/bulls)
-- `calves_female` — Calves - Female (<1yr)
-- `calves_male` — Calves - Male (<1yr)
-- `feedlot_cattle` — Feedlot Cattle (concentrated feeding)
+- `dairy_cows`: Dairy Cows (mature lactating females)
+- `other_cows`: Other Cows (mature non-dairy females, inc. dry)
+- `bulls`: Bulls (mature intact males, breeding)
+- `oxen`: Oxen (mature castrated males)
+- `heifers`: Heifers (young females 1-3yr, not yet calved)
+- `growing_males`: Growing Males (young males 1-3yr, steers/bulls)
+- `calves_female`: Calves - Female (<1yr)
+- `calves_male`: Calves - Male (<1yr)
+- `feedlot_cattle`: Feedlot Cattle (concentrated feeding)
 
 ## Sheet: `Manure_Management`
 
@@ -80,7 +80,7 @@ Units on this sheet: `fraction_pct`, `MCF_pct`, `Frac_GasMS_pct` and `Frac_Leach
 | F | lower_fraction | no | min % for fraction_pct uncertainty (optional, enables per-MMS allocation sampling) |
 | G | upper_fraction | no | max % for fraction_pct uncertainty |
 | H | distribution_fraction | no | distribution code for fraction_pct (default `pert`). Rows are renormalised per iteration so the simplex (sum = 100) is preserved. |
-| I | MCF_pct | yes | methane conversion factor in PERCENT (e.g. 5 for 5 %) — see climate-zone table |
+| I | MCF_pct | yes | methane conversion factor in PERCENT (e.g. 5 for 5 %): see climate-zone table |
 | J | lower_mcf | no | for asymmetric ranges, percent |
 | K | upper_mcf | no | for asymmetric ranges, percent |
 | L | distribution_mcf | no | distribution code for MCF |
@@ -88,16 +88,16 @@ Units on this sheet: `fraction_pct`, `MCF_pct`, `Frac_GasMS_pct` and `Frac_Leach
 | N | lower_ef3 | no |  |
 | O | upper_ef3 | no |  |
 | P | distribution_ef3 | no |  |
-| Q | Frac_GasMS_pct | yes | per-MMS volatilisation fraction in PERCENT (e.g. 45) — defaults from IPCC 2019 Table 10.22 |
+| Q | Frac_GasMS_pct | yes | per-MMS volatilisation fraction in PERCENT (e.g. 45): defaults from IPCC 2019 Table 10.22 |
 | R | lower_frac_gas | no | percent |
 | S | upper_frac_gas | no | percent |
 | T | distribution_frac_gas | no |  |
-| U | Frac_LeachMS_pct | yes | per-MMS leaching fraction in PERCENT (e.g. 2) — defaults from IPCC 2019 Table 10.22 |
+| U | Frac_LeachMS_pct | yes | per-MMS leaching fraction in PERCENT (e.g. 2): defaults from IPCC 2019 Table 10.22 |
 | V | lower_frac_leach | no | percent |
 | W | upper_frac_leach | no | percent |
 | X | distribution_frac_leach | no |  |
 
-### MMS types — by IPCC version
+### MMS types: by IPCC version
 
 | id | label | 2006? | 2019R? | MCF trop.moist | MCF trop.dry | MCF temperate | MCF boreal | EF3 |
 |----|-------|-------|--------|----------------|--------------|---------------|------------|-----|
@@ -139,7 +139,7 @@ Banner in row 1, header row in row 2, description in row 3, units in row 4. Data
 
 | col | header | notes |
 |-----|--------|-------|
-| A | cattle_type | optional — blank = applies to all groups |
+| A | cattle_type | optional: blank = applies to all groups |
 | B | aggregation_level | optional |
 | C | sub_category | optional |
 | D | year | required (integer) |

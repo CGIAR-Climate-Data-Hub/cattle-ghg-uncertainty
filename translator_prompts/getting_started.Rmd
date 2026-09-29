@@ -1,7 +1,7 @@
 ---
 title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
 subtitle: "Getting Started with the AI-Assisted Data Translator"
-author: "CIAT / CGIAR Alliance — ClimateActionNetZero"
+author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
   pdf_document:
     toc: false
@@ -26,7 +26,7 @@ header-includes:
   - \pagestyle{fancy}
   - \fancyhf{}
   - \fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Livestock GHG Uncertainty Calculator}}
-  - \fancyhead[R]{\textcolor{darkgrey}{\small Getting Started — AI Translator}}
+  - \fancyhead[R]{\textcolor{darkgrey}{\small Getting Started, AI Translator}}
   - \fancyfoot[C]{\textcolor{darkgrey}{\small \thepage}}
   - \renewcommand{\headrulewidth}{0.4pt}
   - \renewcommand{\footrulewidth}{0pt}
@@ -44,7 +44,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 # A free AI assistant for translating your data into the app template
 
-Filling the app's input template by hand can take several hours when your raw data isn't already in the right shape. The **GMH Uncertainty Translator** is a free, AI-powered helper — built on top of Claude.ai — that turns your own Excel or CSV files into a ready-to-upload template in roughly **10 minutes**. No installation, no payment, and you keep full control of your own data inside your own Claude account.
+Filling the app's input template by hand can take several hours when your raw data isn't already in the right shape. The **GMH Uncertainty Translator** is a free, AI-powered helper: built on top of Claude.ai, that turns your own Excel or CSV files into a ready-to-upload template in roughly **10 minutes**. No installation, no payment, and you keep full control of your own data inside your own Claude account.
 
 This guide shows you how to set up your personal copy of the Translator. The whole process takes about 2 minutes the first time; after that, every new inventory is a fresh chat in the same Project you've already built.
 
@@ -52,11 +52,11 @@ This guide shows you how to set up your personal copy of the Translator. The who
 
 You will need:
 
-1. The **Translator kit (`translator_kit.zip`)** downloaded from the Cattle Uncertainty App's Resources tab. Unzip it anywhere — you'll see a `README.txt`, a `system_instructions.md` file, four knowledge files (`param_catalogue.md`, `template_schema.md`, `mapping_examples.md`, `questionnaire.md`), the **questionnaire** as a fillable Word document (`questionnaire.docx`), and a copy of this Getting Started guide.
-2. Your raw inventory data file(s) — Excel, CSV, or even a PDF / screenshot of a table.
+1. The **Translator kit (`translator_kit.zip`)** downloaded from the Cattle Uncertainty App's Resources tab. Unzip it anywhere: you'll see a `README.txt`, a `system_instructions.md` file, four knowledge files (`param_catalogue.md`, `template_schema.md`, `mapping_examples.md`, `questionnaire.md`), the **questionnaire** as a fillable Word document (`questionnaire.docx`), and a copy of this Getting Started guide.
+2. Your raw inventory data file(s): Excel, CSV, or even a PDF / screenshot of a table.
 3. About 10 minutes (counting the 2 minutes of one-time setup).
 
-## What the questionnaire is — and what your data file is
+## What the questionnaire is: and what your data file is
 
 The Translator chat has **two distinct inputs** that you must not confuse:
 
@@ -69,7 +69,7 @@ In short: questionnaire = text you paste, data = file you attach.
 
 ### 1. Sign up for a free Claude.ai account
 
-Go to **[claude.ai](https://claude.ai)** and click *Sign up*. The free tier is enough for this task. You can sign in with Google, email, or Apple — no payment details required.
+Go to **[claude.ai](https://claude.ai)** and click *Sign up*. The free tier is enough for this task. You can sign in with Google, email, or Apple, no payment details required.
 
 ### 2. Create a new Project
 
@@ -79,16 +79,16 @@ In the left sidebar of claude.ai, click **Projects** and then **Create project**
 
 Open `system_instructions.md` from the kit in any text editor (Notepad, TextEdit, Word, ...). Select everything (Ctrl+A), copy (Ctrl+C). In your new Project page, find the **Instructions** field (top right) and click *Edit*. Paste (Ctrl+V) the contents into the field. Save.
 
-This is what teaches Claude how to behave as the Translator — it lays out the workflow, the IPCC rules, and the output format.
+This is what teaches Claude how to behave as the Translator: it lays out the workflow, the IPCC rules, and the output format.
 
 ### 4. Upload the four knowledge files
 
 Below the Instructions field there's a **Files** panel. Drag and drop these four files from the kit into it:
 
-- `param_catalogue.md` — the 25 IPCC-aligned parameters with codes, units, defaults
-- `template_schema.md` — the exact workbook layout and validation rules
-- `mapping_examples.md` — worked examples of "raw column → template field"
-- `questionnaire.md` — so Claude knows what the questionnaire looks like
+- `param_catalogue.md`: the 25 IPCC-aligned parameters with codes, units, defaults
+- `template_schema.md`: the exact workbook layout and validation rules
+- `mapping_examples.md`: worked examples of "raw column → template field"
+- `questionnaire.md`: so Claude knows what the questionnaire looks like
 
 These are the reference materials Claude consults every time you chat with the Translator.
 
@@ -114,14 +114,14 @@ Claude reads the whole questionnaire, briefly summarises back what it understood
 
 ### 4. Upload your raw data file(s)
 
-**This is a file upload**, not text. Click the **paperclip icon** in the chat input box, select your file(s) — `.xlsx`, `.csv`, `.pdf`, or images of tables all work — and send. Claude will inspect the file, propose a column mapping, and ask you to confirm anything ambiguous.
+**This is a file upload**, not text. Click the **paperclip icon** in the chat input box, select your file(s): `.xlsx`, `.csv`, `.pdf`, or images of tables all work, and send. Claude will inspect the file, propose a column mapping, and ask you to confirm anything ambiguous.
 
 ### 5. Answer Claude's clarification questions
 
 You'll typically see 2–5 short questions, e.g.:
 
-- *"Your column `weight` — is this body weight (current) or mature weight (adult target)?"*
-- *"Your milk yield column is in litres — should I convert to kg using ×1.03, or treat 1 L = 1 kg?"*
+- *"Your column `weight`: is this body weight (current) or mature weight (adult target)?"*
+- *"Your milk yield column is in litres: should I convert to kg using ×1.03, or treat 1 L = 1 kg?"*
 
 Answer in plain language. Claude will adjust and re-confirm.
 
@@ -136,15 +136,15 @@ In the app's **Data Input** tab:
 1. Click *Upload your filled template (.xlsx)*.
 2. Select `filled_template_for_app.xlsx`.
 
-The app will validate the file and load it. Any issues appear in the **QA/QC** tab — green = OK, amber = review, red = fix.
+The app will validate the file and load it. Any issues appear in the **QA/QC** tab: green = OK, amber = review, red = fix.
 
 You are now ready to run the uncertainty simulation.
 
 ## Tips for a smooth session
 
 - **Be specific.** "Population in column B is total dairy cattle in 2022" beats "B is animals".
-- **Tell Claude when something is wrong.** If a unit conversion looks off, just say *"wait — that should be 275 kg, not 599 kg"* and Claude will fix it.
-- **Ask Claude to explain.** *"Why did you set Ym = 6.5?"* is a fine question — it will cite the IPCC table.
+- **Tell Claude when something is wrong.** If a unit conversion looks off, just say *"wait: that should be 275 kg, not 599 kg"* and Claude will fix it.
+- **Ask Claude to explain.** *"Why did you set Ym = 6.5?"* is a fine question: it will cite the IPCC table.
 - **Don't worry about advanced parameters.** The 16 IPCC coefficients (`Cfi`, `Ca`, `Ym`, `EF3`, ...) ship with sensible defaults. You only need to provide them if you have country-specific measurements.
 - **Keep the same Project for every inventory.** You only set it up once. New chats reuse the same knowledge files and instructions automatically.
 
@@ -153,13 +153,13 @@ You are now ready to run the uncertainty simulation.
 The Translator is a helper, not an oracle. Always:
 
 - **Spot-check** the key numbers (population, body weight, milk yield) by comparing with your original file.
-- **Watch the QA/QC tab** for amber and red flags after upload — those highlight values outside IPCC ranges.
+- **Watch the QA/QC tab** for amber and red flags after upload: those highlight values outside IPCC ranges.
 - **Tell us** when something is off. Use the in-app Feedback tab to report mistranslations so we can improve the kit.
 
 ## Updates to the kit
 
-If we update the parameter catalogue, schema, or mapping examples (e.g. after an IPCC alignment audit), download the new `translator_kit.zip` from the app's Resources tab and replace the corresponding files in your Project's **Files** panel — drag the new versions in and remove the old ones. The Instructions field rarely changes; if it does, the new version will be in the updated `system_instructions.md`.
+If we update the parameter catalogue, schema, or mapping examples (e.g. after an IPCC alignment audit), download the new `translator_kit.zip` from the app's Resources tab and replace the corresponding files in your Project's **Files** panel: drag the new versions in and remove the old ones. The Instructions field rarely changes; if it does, the new version will be in the updated `system_instructions.md`.
 
 ---
 
-*Produced by the CGIAR Alliance, Climate Action–Net Zero Initiative, Project D614 — GMH Emissions Uncertainty.*
+*Produced by the CGIAR Alliance, Climate Action–Net Zero Initiative, Project D614: GMH Emissions Uncertainty.*

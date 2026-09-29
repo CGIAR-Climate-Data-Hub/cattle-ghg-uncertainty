@@ -69,7 +69,7 @@ generate_timeseries_template <- function(filepath) {
   }
 
   openxlsx::setRowHeights(wb, "README", rows = 1, heights = 30)
-  wr(1, 2, "Activity Data Time Series Template — README", s_title)
+  wr(1, 2, "Activity Data Time Series Template: README", s_title)
 
   openxlsx::setRowHeights(wb, "README", rows = 3, heights = 20)
   wr(3, 2, "PURPOSE", s_h2)
@@ -79,7 +79,7 @@ generate_timeseries_template <- function(filepath) {
            "When you upload this file in Tab 4 (Correlations > Activity Data > Upload time series),",
            "the tool computes a Spearman rank correlation matrix from your data and",
            "preserves it through Monte Carlo sampling per IPCC Vol.1 Ch.3 §3.2.3.2.",
-           "You do NOT need to fill in every column — include only the parameters you have",
+           "You do NOT need to fill in every column: include only the parameters you have",
            "historical data for. The tool will treat unspecified parameters as uncorrelated",
            "with everything else (correlation = 0)."))
 
@@ -94,7 +94,7 @@ generate_timeseries_template <- function(filepath) {
     "At least 5 rows of data (years/periods). More years = more reliable correlations.",
     "Column names must exactly match the parameter names shown in row 2 of the TimeSeries sheet.",
     "Do not include a 'year' column with letters (e.g. '2015' as text). Use numbers or leave year out.",
-    "Missing values are allowed — the tool uses pairwise complete observations (use = 'complete.obs')."
+    "Missing values are allowed: the tool uses pairwise complete observations (use = 'complete.obs')."
   )
   for (i in seq_along(rows_req)) {
     r <- 9 + i
@@ -117,22 +117,22 @@ generate_timeseries_template <- function(filepath) {
              "%", "%", "%",
              "MJ/day/kg^0.75", "dimensionless", "dimensionless", "dimensionless", "hours/day"),
     Source = c(
-      "Year label — not used in correlation",
+      "Year label: not used in correlation",
       "National livestock census / survey",
       "Livestock survey / liveweight monitoring",
       "Livestock survey / breed records",
-      "Growth trials / expert estimate — often constant",
+      "Growth trials / expert estimate: often constant",
       "Dairy records / milk production surveys",
       "Dairy records / laboratory analysis",
       "Dairy records / reproduction surveys",
-      "Feed quality studies / IPCC default table — often constant",
-      "Feed quality studies — often constant",
+      "Feed quality studies / IPCC default table: often constant",
+      "Feed quality studies: often constant",
       "Dairy records / laboratory analysis",
-      "IPCC Table 10.4 — typically constant, rarely measured annually",
-      "IPCC Table 10.5 — typically constant (depends on feeding system)",
-      "IPCC Eq 10.6 — typically constant (depends on sex)",
-      "IPCC Table 10.7 — typically constant (0 or 0.10)",
-      "Work hours records — typically constant or zero"
+      "IPCC Table 10.4: typically constant, rarely measured annually",
+      "IPCC Table 10.5: typically constant (depends on feeding system)",
+      "IPCC Eq 10.6: typically constant (depends on sex)",
+      "IPCC Table 10.7: typically constant (0 or 0.10)",
+      "Work hours records: typically constant or zero"
     ),
     stringsAsFactors = FALSE
   )
@@ -144,7 +144,7 @@ generate_timeseries_template <- function(filepath) {
   wr(35, 2, "WHICH COLUMNS TO INCLUDE", s_h2)
   wr(35, 3,
      paste("Most users will only have reliable time series for cattle_pop and possibly",
-           "BW or milk_yield. That is perfectly fine — include those columns only.",
+           "BW or milk_yield. That is perfectly fine: include those columns only.",
            "The tool will set the correlation to 0 for all other pairs.",
            "\n\nIf your param_specs has Cfi, Ca, C_growth, or Cp as activity_data parameters",
            "and you suspect these vary correlated with your population data",
@@ -154,8 +154,8 @@ generate_timeseries_template <- function(filepath) {
   openxlsx::setRowHeights(wb, "README", rows = 42, heights = 20)
   wr(42, 2, "IMPORTANT", s_h2)
   msgs <- c(
-    "Do not change column header names — they must match the parameter names exactly.",
-    "Column order does not matter — the tool matches by name.",
+    "Do not change column header names: they must match the parameter names exactly.",
+    "Column order does not matter: the tool matches by name.",
     "You can delete columns you have no data for.",
     "You can add more rows (years) beyond the 20 provided.",
     "Save the file as .xlsx before uploading."
@@ -168,7 +168,7 @@ generate_timeseries_template <- function(filepath) {
   }
   openxlsx::setRowHeights(wb, "README", rows = 49, heights = 32)
   openxlsx::writeData(wb, "README",
-    "Note: The tool uses Pearson correlation on the raw time series. If your data has strong trends, consider detrending before using this template (e.g., use percentage changes year-on-year rather than absolute values) — correlations in trending data reflect the shared trend, not the true year-to-year co-movement.",
+    "Note: The tool uses Pearson correlation on the raw time series. If your data has strong trends, consider detrending before using this template (e.g., use percentage changes year-on-year rather than absolute values), correlations in trending data reflect the shared trend, not the true year-to-year co-movement.",
     startRow = 49, startCol = 3)
   apply_style("README", s_warn, rows = 49, cols = 3)
 

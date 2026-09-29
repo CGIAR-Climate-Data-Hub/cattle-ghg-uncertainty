@@ -96,12 +96,12 @@ message("✓ wrote .manifest.json (master ", substr(manifest$master_sha256, 1, 8
 
 # ---------------------------------------------------------------------------
 # 3. Stage user-facing assets into www/ so the Shiny app can serve them.
-# Only the files end-users need to download go to www/ — system_instructions.md
+# Only the files end-users need to download go to www/: system_instructions.md
 # and the README stay in translator_prompts/ for the maintainer.
 # ---------------------------------------------------------------------------
 www_dir <- "www"
 if (!dir.exists(www_dir)) dir.create(www_dir, recursive = TRUE)
-# system_instructions.md is staged too — users paste it into the "Instructions"
+# system_instructions.md is staged too: users paste it into the "Instructions"
 # field of their own Claude Project (DIY-kit flow). The other four .md files
 # are the project knowledge.
 # worked_example.md is 5th in the live system prompt (openai_client.R:32-34) but
@@ -178,26 +178,26 @@ if (requireNamespace("rmarkdown", quietly = TRUE)) {
     }
   }
 } else {
-  message("(rmarkdown package not installed — ",
+  message("(rmarkdown package not installed: ",
           "install.packages('rmarkdown') to enable styled PDF/DOCX.)")
 }
 
 # ---------------------------------------------------------------------------
-# 3c. Build translator_kit.zip — the bundle users download to set up their
+# 3c. Build translator_kit.zip: the bundle users download to set up their
 # OWN Claude Project (DIY-kit flow). Public sharing of Claude Projects is
 # limited on personal accounts, so instead of pointing users at a shared
 # project URL we ship them everything they need to recreate it on their
 # own claude.ai account in ~2 minutes.
 #
 # Zip contents:
-#   README.txt              — one-page quick-start (created here, inline)
-#   getting_started.pdf     — the polished step-by-step with screenshots
-#   system_instructions.md  — paste into the Project's "Instructions" field
+#   README.txt             : one-page quick-start (created here, inline)
+#   getting_started.pdf    : the polished step-by-step with screenshots
+#   system_instructions.md : paste into the Project's "Instructions" field
 #   param_catalogue.md      ┐
 #   template_schema.md      │ upload as Project "Files" (knowledge base)
 #   mapping_examples.md     │
 #   questionnaire.md        ┘
-#   questionnaire.docx      — the fillable form the user pastes per chat
+#   questionnaire.docx     : the fillable form the user pastes per chat
 # ---------------------------------------------------------------------------
 kit_files <- c("system_instructions.md", "param_catalogue.md",
                "template_schema.md", "mapping_examples.md",
@@ -206,9 +206,9 @@ kit_files <- c("system_instructions.md", "param_catalogue.md",
                "getting_started.pdf")
 kit_files_present <- kit_files[file.exists(file.path(out_dir, kit_files))]
 
-# Inline README.txt — gives the user the 5-step recipe at a glance.
+# Inline README.txt: gives the user the 5-step recipe at a glance.
 readme_lines <- c(
-  "GMH UNCERTAINTY TRANSLATOR — DIY KIT",
+  "GMH UNCERTAINTY TRANSLATOR: DIY KIT",
   "=====================================",
   "",
   "WHAT THIS IS",
@@ -216,7 +216,7 @@ readme_lines <- c(
   "A free AI helper that turns your raw cattle inventory data (Excel/CSV)",
   "into the input template expected by the Cattle Uncertainty App. The",
   "kit lets you set up your OWN Translator on claude.ai in about 2",
-  "minutes — no payment, no installation.",
+  "minutes: no payment, no installation.",
   "",
   "QUICK-START (5 STEPS)",
   "---------------------",
@@ -237,7 +237,7 @@ readme_lines <- c(
   "      - questionnaire.md",
   "",
   "5. Open `questionnaire.docx`, fill it in (country, year, sub-categories,",
-  "   manure systems, etc. — about 2 minutes). Then start a new chat in",
+  "   manure systems, etc.: about 2 minutes). Then start a new chat in",
   "   your Project, paste the filled questionnaire as the first message,",
   "   and follow the conversation. Claude will ask you to upload your",
   "   data file(s) next.",
@@ -289,7 +289,7 @@ if (zip_ok) {
           file.info(zip_path)$size, " bytes, ",
           length(kit_files_present), " files)")
 } else {
-  message("✗ translator_kit.zip — neither zip::zip nor utils::zip worked. ",
+  message("✗ translator_kit.zip: neither zip::zip nor utils::zip worked. ",
           "install.packages('zip') and try again.")
 }
 

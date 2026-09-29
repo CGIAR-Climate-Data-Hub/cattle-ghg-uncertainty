@@ -54,7 +54,7 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     } else {
       p <- file.path(asset_dir, paste0(nm, ".md"))
       if (!file.exists(p)) {
-        warning(sprintf("Translator-kit asset missing: %s — skipping.", p), call. = FALSE)
+        warning(sprintf("Translator-kit asset missing: %s, skipping.", p), call. = FALSE)
         return(NULL)
       }
       # HTML comments are maintainer notes; the model never sees them.
@@ -158,7 +158,7 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
   ui_presentation_rules <- paste(
     "",
     "",
-    "## In-app UI presentation rules (HIGHEST PRIORITY — override earlier rules)",
+    "## In-app UI presentation rules (HIGHEST PRIORITY: override earlier rules)",
     "",
     "You are now deployed inside a small chat panel embedded in a Shiny",
     "web app, not in the claude.ai workspace. The UI is narrow and users",
@@ -174,8 +174,8 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "3. NO markdown formatting at all in chat replies. The chat panel",
     "   renders text as-is, so asterisks show up as literal asterisks,",
     "   which looks broken. Specifically:",
-    "     - No **bold** or __bold__ markers — they appear as asterisks.",
-    "     - No *italic* or _italic_ markers — same problem.",
+    "     - No **bold** or __bold__ markers: they appear as asterisks.",
+    "     - No *italic* or _italic_ markers: same problem.",
     "     - No `inline code` backticks.",
     "     - No # or ## or ### headings.",
     "     - No markdown tables (| col | col |).",
@@ -184,9 +184,9 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "   bullet lists with a leading dash and a space (`- like this`) are",
     "   OK because they render visually as bullets even in plain text.",
     "4. **One step at a time.** Do not pre-announce 'Step 1 / Step 2 /",
-    "   Step 3' — just do the most important step and wait for the user.",
+    "   Step 3': just do the most important step and wait for the user.",
     "5. **Short paragraphs.** 2-4 sentences max. The chat panel is narrow.",
-    "6. **Confirmations are terse.** 'OK — Cows in milk maps to dairy_cows'",
+    "6. **Confirmations are terse.** 'OK: Cows in milk maps to dairy_cows'",
     "   is better than restating the reasoning.",
     "7. **No 'Next steps' / 'Summary' / 'Please answer above' meta-text.**",
     "   The user will reply when they're ready; trust them to drive the",
@@ -211,23 +211,23 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "   meant to be a deferral substitute. Treat them as a request to",
     "   confirm readiness, not a request to start emission. The correct",
     "   reply to any such phrase is one short sentence directing the",
-    "   user to the button, e.g.: 'Great — everything's confirmed. To",
+    "   user to the button, e.g.: 'Great, everything's confirmed. To",
     "   start emission, click the green Produce template now button",
     "   below the chat. The server runs ~5 minutes of batched calls",
     "   and shows the Download button when done.'",
     "",
     "   When you finish a clarification round and have enough",
     "   information, ALWAYS end the reply with this same one-line",
-    "   instruction — never inline JSON, never start emission yourself,",
+    "   instruction: never inline JSON, never start emission yourself,",
     "   never promise to 'generate the template now'. The ONE exception",
     "   has been removed: even for tiny single-sub-category inventories,",
     "   the user clicks the button.",
     "",
-    "10. **Explore reply must be SHORT — Section D only, with a 3-5",
+    "10. **Explore reply must be SHORT: Section D only, with a 3-5",
     "    line orientation, and NO Section A / B / C table dumps.**",
     "    (Added 2026-06-12 after Lolita's $7.73 Zambia run logged",
     "    16,000 output tokens of repeated structured tables on the",
-    "    Explore reply alone — the user uploaded the file, they know",
+    "    Explore reply alone: the user uploaded the file, they know",
     "    what's in it, they don't need it recited back.)",
     "",
     "    For the FIRST reply after a file upload (the EXPLORE step in",
@@ -241,19 +241,19 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "      - the one-line direction to the button if you have everything",
     "        already; otherwise end after the questions and wait.",
     "",
-    "    DO NOT emit Section A (file shape) — the orientation line",
+    "    DO NOT emit Section A (file shape): the orientation line",
     "    covers it. DO NOT emit Section B (the per-row inventory of",
-    "    values) — you have it internally for emission via the batched",
+    "    values): you have it internally for emission via the batched",
     "    tool_use path; the user does not need it printed in chat. DO",
     "    NOT emit Section C (gaps detail) beyond the one-line summary.",
     "",
     "    If the user explicitly asks 'show me what you found' or 'list",
     "    the BWs you have', then and only then emit the relevant slice",
-    "    of B — but as a 5-15-row excerpt, not the full dump.",
+    "    of B: but as a 5-15-row excerpt, not the full dump.",
     "",
     "Concrete first-response templates, for reference:",
     "",
-    "  SHORT EXPLORE REPLY (preferred — typical):",
+    "  SHORT EXPLORE REPLY (preferred: typical):",
     "    I read your file: 6 sheets, 5 production systems, 26",
     "    sub-categories, parameters found: N, BW, MW, WG, pct_pregnant,",
     "    hours, Milk, Fat, DE, CP, Cfi, Ca, C, Ym, Bo, EF3_PRP, EF4,",
@@ -265,13 +265,13 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
     "    Before I can produce the template, please answer:",
     "",
     "    1. Year: confirm 2022 as the point-estimate year?",
-    "    2. Calves are pooled in the file — split 50/50 to calves_male",
+    "    2. Calves are pooled in the file: split 50/50 to calves_male",
     "       and calves_female with identical parameters?",
-    "    3. MoE column (e.g. 0.35) — read as a fraction (=±35%)?",
+    "    3. MoE column (e.g. 0.35): read as a fraction (=±35%)?",
     "    4. Milk units: kg/head/day (the MoE header 'kg/head/year' is",
     "       a typo)?",
     "    5. Emergent beef DE: mean 55.5987 falls below the MoE lower",
-    "       bound 56 — widen the bound to 55 to encompass the mean?",
+    "       bound 56: widen the bound to 55 to encompass the mean?",
     "",
     "  CLARIFICATION REPLY (after user answers some of the questions):",
     "    Confirmed. One more: <next ambiguity>?",
@@ -340,10 +340,10 @@ openai_cost_usd <- function(prompt_tokens, completion_tokens,
 # The function adds the OpenAI auth header from the env var, posts the
 # request, and returns a list with three named slots:
 #
-#   $reply              character — the assistant's reply text
-#   $usage              list      — prompt_tokens, completion_tokens, total_tokens
-#   $model              character — the model name OpenAI confirmed
-#   $cost_usd           numeric   — estimated USD cost of this call
+#   $reply              character: the assistant's reply text
+#   $usage              list     : prompt_tokens, completion_tokens, total_tokens
+#   $model              character: the model name OpenAI confirmed
+#   $cost_usd           numeric  : estimated USD cost of this call
 #
 # On any non-2xx response, returns a list with $error set to a
 # user-friendly message and $reply = NULL. The caller (the Shiny chat
@@ -415,7 +415,7 @@ openai_chat <- function(messages,
   } else {
     # Map common error statuses to user-friendly messages.
     user_msg <- switch(as.character(status),
-      "401" = "AI translator authentication failed. The server's OPENAI_API_KEY is missing or invalid — please contact the administrator.",
+      "401" = "AI translator authentication failed. The server's OPENAI_API_KEY is missing or invalid: please contact the administrator.",
       "403" = "AI translator is blocked by OpenAI. The administrator may need to add billing or remove a usage cap.",
       "429" = "OpenAI is rate-limiting requests. Try again in a minute.",
       "500" = "OpenAI is having trouble. Try again later.",
@@ -424,7 +424,7 @@ openai_chat <- function(messages,
       "504" = "OpenAI is having trouble. Try again later.",
       sprintf("OpenAI returned an unexpected error (HTTP %d). Try again later.", status)
     )
-    # Try to surface the API's own error_message for diagnostics — but
+    # Try to surface the API's own error_message for diagnostics: but
     # don't show it to the user (could leak request internals); log via
     # message() so it lands in the Shiny server log.
     tryCatch({
@@ -440,7 +440,7 @@ openai_chat <- function(messages,
 #
 # Uses OpenAI's `stream: true` mode (Server-Sent Events) so the response
 # tokens arrive incrementally as the model generates them. The supplied
-# `on_chunk(text)` callback is fired once per token delta — typically
+# `on_chunk(text)` callback is fired once per token delta: typically
 # the Shiny chat UI uses this to push the new text to the browser via
 # `session$sendCustomMessage()` so the bubble appears to type out live.
 #
@@ -472,14 +472,14 @@ openai_chat_stream <- function(messages,
     stream_options = list(include_usage = TRUE)
   )
   # Optional response_format (e.g. json_schema strict mode). Streaming
-  # supports it — chunks arrive with delta.content fragments of the
+  # supports it: chunks arrive with delta.content fragments of the
   # JSON, accumulated they form the complete validated payload. Lets
   # the force-template path share this streaming machinery and avoid
   # the 180s timeout that hit the old non-streaming call.
   if (!is.null(response_format)) body$response_format <- response_format
 
   # Retry loop. Only retries while NO chunks have been emitted to the
-  # browser yet — once the user has seen partial output we can't safely
+  # browser yet: once the user has seen partial output we can't safely
   # restart without duplicating tokens.
   attempt   <- 0
   last_err  <- NULL
@@ -535,7 +535,7 @@ openai_chat_stream <- function(messages,
       httr2::req_timeout(timeout_sec) |>
       # Stall detector: if the stream sends < 1 byte/sec for 45 seconds,
       # treat the call as dead and abort. This is the right knob for a
-      # streaming API — wall-clock timeouts kill calls that are still
+      # streaming API: wall-clock timeouts kill calls that are still
       # legitimately progressing (e.g. a 6MB response that legitimately
       # takes 4 minutes to fully stream). curl options are exposed via
       # req_options() and map directly to CURLOPT_LOW_SPEED_*.
@@ -563,7 +563,7 @@ openai_chat_stream <- function(messages,
       break
     }
 
-    # Don't retry if user already saw some text — would duplicate output.
+    # Don't retry if user already saw some text: would duplicate output.
     if (nzchar(accumulated)) {
       final_resp <- resp
       break
@@ -630,7 +630,7 @@ openai_chat_stream <- function(messages,
 
 # Non-streaming variant that uses OpenAI's `response_format: json_schema`
 # strict mode to force a guaranteed-valid filled-template JSON. Called
-# only by the "Produce template now" button — the regular chat path
+# only by the "Produce template now" button: the regular chat path
 # stays text/streaming.
 #
 # The strict-mode schema mirrors `.translator_write_template_xlsx()`'s
@@ -640,11 +640,11 @@ openai_chat_template_force <- function(messages,
                                         on_chunk = function(text) {},
                                         model = .OPENAI_DEFAULT_MODEL,
                                         max_tokens = 32000,  # GPT-4.1 max output is 32768
-                                        timeout_sec = 600) {  # 10-min wall-clock — actual progress check is the stall detector in openai_chat_stream
+                                        timeout_sec = 600) {  # 10-min wall-clock: actual progress check is the stall detector in openai_chat_stream
   # Build the json_schema response_format, then delegate to
   # openai_chat_stream so we get streaming (no 180s timeout) + the
   # built-in retry logic for free. The on_chunk callback lets the
-  # caller observe progress as JSON streams in — useful for updating
+  # caller observe progress as JSON streams in: useful for updating
   # the progress bubble on the client.
   schema_body <- list(
       type = "json_schema",
@@ -702,7 +702,7 @@ openai_chat_template_force <- function(messages,
                   upper_fraction    = list(type = c("number", "null")),
                   distribution_fraction = list(type = c("string", "null")),
                   MCF_pct           = list(type = c("number", "null")),
-                  # Optional bounds on the IPCC coefficients — populate
+                  # Optional bounds on the IPCC coefficients: populate
                   # from user-supplied data when available, otherwise
                   # leave null and the catalogue defaults are used.
                   lower_mcf         = list(type = c("number", "null")),
@@ -731,7 +731,7 @@ openai_chat_template_force <- function(messages,
         )  # closes schema
       )    # closes json_schema
     )      # closes schema_body
-  # (one trailing close bracket removed — was a leftover from the old non-streaming wrapper)
+  # (one trailing close bracket removed: was a leftover from the old non-streaming wrapper)
 
   openai_chat_stream(
     messages        = messages,

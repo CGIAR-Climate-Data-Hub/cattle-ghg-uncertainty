@@ -15,7 +15,7 @@ Fraction of females in this sub-category that are pregnant during the year, betw
 
 ## Ym
 
-Methane conversion factor: % of gross energy in feed converted to methane (IPCC Vol.4 Ch.10 Table 10.12). Default uncertainty 20% per Penman et al. (2000) and IPCC 2019R Vol.1 Ch.3 Tier 2 guidance — Ym is one of the most uncertain parameters in cattle CH₄ inventories and a tight ±% misstates that. Sub-category values the tool ships (2019 Refinement): lactating dairy cows 6.5%, all other grazing classes 7.0%, feedlot 4.0%. Under the 2006 Guidelines the tool uses 6.5% for every class except feedlot, which is 3.0%. Calves here are the forage-fed class, Ym 7.0 in Annex 10A.2. Milk-fed pre-weaning calves are a different animal: Annex 10A.2 gives them Ym 0.0 and a zero enteric emission factor, and the tool has no sub-category for them, so a herd with a large milk-fed calf population must enter Ym explicitly or it will be overstated.
+Methane conversion factor: % of gross energy in feed converted to methane (IPCC Vol.4 Ch.10 Table 10.12). Default uncertainty 20% per Penman et al. (2000) and IPCC 2019R Vol.1 Ch.3 Tier 2 guidance, Ym is one of the most uncertain parameters in cattle CH₄ inventories and a tight ±% misstates that. Sub-category values the tool ships (2019 Refinement): lactating dairy cows 6.5%, all other grazing classes 7.0%, feedlot 4.0%. Under the 2006 Guidelines the tool uses 6.5% for every class except feedlot, which is 3.0%. Calves here are the forage-fed class, Ym 7.0 in Annex 10A.2. Milk-fed pre-weaning calves are a different animal: Annex 10A.2 gives them Ym 0.0 and a zero enteric emission factor, and the tool has no sub-category for them, so a herd with a large milk-fed calf population must enter Ym explicitly or it will be overstated.
 
 ## Bo
 
@@ -23,7 +23,7 @@ Maximum CH₄ producing capacity of manure (IPCC Vol.4 Ch.10 Table 10.16a, 2019R
 
 ## EF3_PRP
 
-N₂O emission factor for dung/urine on pasture, EF3PRP,CPP (IPCC Vol.4 Ch.11 Table 11.1, 2019R, **wet climate**: 0.006, range **0.000–0.027**). For dry climate use 0.002 (range 0.000–0.007). For aggregated-across-climates use 0.004 (range 0.000–0.014). 2006 = 0.02. The wide wet-climate range is genuine — EF3PRP is one of the most uncertain N₂O parameters and a dominant driver of pasture-N₂O uncertainty.
+N₂O emission factor for dung/urine on pasture, EF3PRP,CPP (IPCC Vol.4 Ch.11 Table 11.1, 2019R, **wet climate**: 0.006, range **0.000–0.027**). For dry climate use 0.002 (range 0.000–0.007). For aggregated-across-climates use 0.004 (range 0.000–0.014). 2006 = 0.02. The wide wet-climate range is genuine, EF3PRP is one of the most uncertain N₂O parameters and a dominant driver of pasture-N₂O uncertainty.
 
 ## EF4
 

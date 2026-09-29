@@ -6,7 +6,7 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
   ef_only <- uncertainty_decomposition$ef_only
 
   # IPCC 2006 Vol 1 Ch 3 Table 3.3 defines "% uncertainty" as the half-width of
-  # the 95% confidence interval divided by the mean — i.e. moe_pct, not cv_pct.
+  # the 95% confidence interval divided by the mean: i.e. moe_pct, not cv_pct.
   #
   # Andreas 2026-05-21 follow-up: the variable names produced by
   # calc_all_uncertainty() reflect the column names of the input frame, and
@@ -59,12 +59,12 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
 
   data.frame(
     `Emission category` = c(
-      "3.A.1 Enteric Fermentation — Cattle",
-      "3.B.1 Manure Management — Cattle (CH₄)",
-      "3.B.1 Manure Management — Cattle (N₂O direct)",
-      "3.B.5 Manure Management — Cattle (N₂O indirect)",
-      "3.D.1.c Direct N₂O — Pasture/Range/Paddock",
-      "3.D.2 Indirect N₂O — Pasture/Range/Paddock",
+      "3.A.1 Enteric Fermentation: Cattle",
+      "3.B.1 Manure Management: Cattle (CH₄)",
+      "3.B.1 Manure Management: Cattle (N₂O direct)",
+      "3.B.5 Manure Management: Cattle (N₂O indirect)",
+      "3.D.1.c Direct N₂O: Pasture/Range/Paddock",
+      "3.D.2 Indirect N₂O: Pasture/Range/Paddock",
       "Total CH₄", "Total N₂O", "Total CO₂eq"
     ),
     Gas = c("CH₄", "CH₄", "N₂O", "N₂O", "N₂O", "N₂O", "CH₄", "N₂O", "CO₂eq"),
@@ -74,7 +74,7 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
     `AD uncertainty (95% MoE %)`       = sapply(vars, function(v) get_moe(ad_only, v)),
     `EF uncertainty (95% MoE %)`       = sapply(vars, function(v) get_moe(ef_only, v)),
     `Combined uncertainty (95% MoE %)` = sapply(vars, function(v) get_moe(combined, v)),
-    # Asymmetric breakdown on the combined run — for skewed pathways the
+    # Asymmetric breakdown on the combined run: for skewed pathways the
     # +upper% and -lower% differ, which IPCC Vol.1 Ch.3 §3.7 explicitly
     # endorses reporting alongside the symmetric MoE.
     `Combined +upper (%)`              = sapply(vars, function(v) get_asym(combined, v, "upper")),
@@ -90,7 +90,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
                                 qa_caveats = NULL) {
   # Andreas 2026-05 #38: previously crashed when ipcc_table was NULL (which
   # happens whenever AD/EF decomposition didn't run, e.g. for custom uploads
-  # — see app_server.R line 982). Replace NULL/empty inputs with placeholder
+  #: see app_server.R line 982). Replace NULL/empty inputs with placeholder
   # data frames so the writer always succeeds.
   placeholder <- function(msg)
     data.frame(Note = msg, stringsAsFactors = FALSE)
@@ -149,7 +149,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
 
   # Full per-parameter input audit trail. This is the complete listing that the
   # Word report's section 13 table is capped against (officer print.rdocx is too
-  # slow on the full 500+ row table for a large inventory) — Excel handles it
+  # slow on the full 500+ row table for a large inventory): Excel handles it
   # instantly, so the exhaustive audit lives here.
   inputs_df <- if (!is.null(param_specs) && is.data.frame(param_specs) && nrow(param_specs) > 0)
     param_specs
@@ -188,7 +188,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   writexl::write_xlsx(sheets, path = filepath)
 }
 
-# Round 8: trend export — multi-sheet Excel for the Trend tab.
+# Round 8: trend export, multi-sheet Excel for the Trend tab.
 # Sheets: Trend_summary (year x metrics), Slope_and_delta (per-iter MC summary),
 # Sensitivity_per_year_*, Sensitivity_delta_*, Methodology.
 export_trend_xlsx <- function(results_table, slope, delta_total,
@@ -214,7 +214,7 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
               "Year-to-year correlation mode",
               "IPCC reference"),
     Value = c(as.character(Sys.time()),
-              "IPCC Tier 2 Uncertainty Calculator — Trend",
+              "IPCC Tier 2 Uncertainty Calculator: Trend",
               n_iter, year_corr,
               "IPCC 2019 Refinement Vol 1 Ch 3 §3.2.2.4 (year correlation) + §3.7 (trend reporting)"),
     stringsAsFactors = FALSE

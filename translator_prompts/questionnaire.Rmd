@@ -1,7 +1,7 @@
 ---
 title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
-subtitle: "Pre-Flight Questionnaire — GMH Uncertainty Translator"
-author: "CIAT / CGIAR Alliance — ClimateActionNetZero"
+subtitle: "Pre-Flight Questionnaire, GMH Uncertainty Translator"
+author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
   pdf_document:
     toc: false
@@ -43,7 +43,7 @@ linestretch: 1.2
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
-Fill this out **before** opening the Translator on [claude.ai](https://claude.ai/project/019e4594-d13d-761e-a6fb-71e242eb9804). When you start the chat, paste the contents of this filled page as your first message — Claude will use it to skip the warm-up questions and go straight to inspecting your data.
+Fill this out **before** opening the Translator on [claude.ai](https://claude.ai/project/019e4594-d13d-761e-a6fb-71e242eb9804). When you start the chat, paste the contents of this filled page as your first message, Claude will use it to skip the warm-up questions and go straight to inspecting your data.
 
 *Save this file as `my_inventory_questionnaire.docx` and type your answers directly into the form below. Italic lines are guidance and can be left in place.*
 
@@ -53,7 +53,7 @@ Fill this out **before** opening the Translator on [claude.ai](https://claude.ai
 
 - **Country:** ______________________________________________________
 
-- **Continental region** (tick one — drives the IPCC BW deviation benchmark):
+- **Continental region** (tick one: drives the IPCC BW deviation benchmark):
   [ ] africa &nbsp; [ ] asia &nbsp; [ ] europe &nbsp; [ ] americas &nbsp; [ ] oceania &nbsp; [ ] global
 
 - **Inventory year being prepared:** ______________________________________________________
@@ -65,11 +65,11 @@ Tick one:
 - [ ] **IPCC 2006 Guidelines** (still the default reporting requirement in many countries)
 - [ ] **IPCC 2019 Refinement** (newer; updated emission factors, more manure systems)
 
-*If unsure, ask your national focal point or pick 2006 — the app accepts both.*
+*If unsure, ask your national focal point or pick 2006: the app accepts both.*
 
 # 3. Cattle sub-categories
 
-*List the sub-categories your inventory splits cattle into and the approximate head count of each. You can use any names — Claude will map them to the app's controlled vocabulary.*
+*List the sub-categories your inventory splits cattle into and the approximate head count of each. You can use any names: Claude will map them to the app's controlled vocabulary.*
 
 | Sub-category name | Head count | Sex (M/F/mix) | Age class (adult / 1–3yr / calf) |
 |-------------------|------------|---------------|-----------------------------------|
@@ -98,7 +98,7 @@ Tick one:
 
 *Example: dairy cows: pasture 40%, solid_storage 35%, liquid_slurry 15%, lagoon 10% (sums to 100).*
 
-**Optional — is the allocation itself uncertain?** If yes, give a range per share (e.g. "pasture 40 %, lower 30 %, upper 55 %"). The app samples each MMS within its range and renormalises every Monte Carlo iteration so the totals still sum to 100 %. Leave blank if you are confident in the central allocation.
+**Optional: is the allocation itself uncertain?** If yes, give a range per share (e.g. "pasture 40 %, lower 30 %, upper 55 %"). The app samples each MMS within its range and renormalises every Monte Carlo iteration so the totals still sum to 100 %. Leave blank if you are confident in the central allocation.
 
 | Sub-category | System | Central % | Lower % | Upper % |
 |--------------|--------|-----------|---------|---------|
@@ -111,29 +111,29 @@ Tick one:
 
 **Activity data (the population number)**
 
-- [ ] Animal population (head count) — **strongly recommended**
+- [ ] Animal population (head count): **strongly recommended**
 
 **Animal characteristics**
 
-- [ ] Body weight (kg) — `BW`
-- [ ] Mature body weight (kg) — `MW`
-- [ ] Daily weight gain (kg/day) — `WG`
-- [ ] Fraction of females pregnant in the year (includes pregnant heifers) — `pct_pregnant`
+- [ ] Body weight (kg): `BW`
+- [ ] Mature body weight (kg): `MW`
+- [ ] Daily weight gain (kg/day): `WG`
+- [ ] Fraction of females pregnant in the year (includes pregnant heifers): `pct_pregnant`
 
 **Production (dairy only)**
 
-- [ ] Daily milk yield per lactating cow (kg/day) — `Milk`
-- [ ] Milk fat content (%) — `Fat`
-- [ ] Milk protein content (%) — `MilkPR`
+- [ ] Daily milk yield per lactating cow (kg/day): `Milk`
+- [ ] Milk fat content (%): `Fat`
+- [ ] Milk protein content (%): `MilkPR`
 
 **Feed**
 
-- [ ] Digestible energy of feed (% of gross energy) — `DE`
-- [ ] Crude protein in feed (%) — `CP`
+- [ ] Digestible energy of feed (% of gross energy): `DE`
+- [ ] Crude protein in feed (%): `CP`
 
 **Climate (optional)**
 
-- [ ] Mean winter temperature (°C) — `Tw`
+- [ ] Mean winter temperature (°C): `Tw`
 
 **IPCC equation coefficients** *(rarely measured locally; leave unticked unless your country has a published value)*
 
@@ -146,10 +146,10 @@ Tick one:
 
 Tick one (or combine if different sources for different parameters):
 
-- [ ] **(a) No uncertainty estimates** — use IPCC suggested ±% from the catalogue
-- [ ] **(b) Expert judgement ±%** — I'll write a single ±% next to each value
-- [ ] **(c) Measured confidence intervals** — I have explicit lower / upper bounds (or ± with sample size)
-- [ ] **(d) A mix** — I'll specify per parameter
+- [ ] **(a) No uncertainty estimates**: use IPCC suggested ±% from the catalogue
+- [ ] **(b) Expert judgement ±%**: I'll write a single ±% next to each value
+- [ ] **(c) Measured confidence intervals**: I have explicit lower / upper bounds (or ± with sample size)
+- [ ] **(d) A mix**: I'll specify per parameter
 
 # 7. Time series (optional)
 

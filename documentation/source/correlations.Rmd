@@ -6,7 +6,7 @@ output:
     theme: null
     highlight: null
     mathjax: null
-    pandoc_args: ["--metadata=title:Correlations — Find out more"]
+    pandoc_args: ["--metadata=title:Correlations, Find out more"]
 params:
   cache_dir: "www/docs/_cache"
 ---
@@ -55,7 +55,7 @@ The principle: when two input parameters tend to move together in nature, the Mo
 
 ## Visualising correlation
 
-Consider two parameters, with 1000 Monte Carlo samples of each, plotted as a scatter cloud — one point per iteration, the first parameter on the x-axis and the second on the y-axis. The three panels below show the same two marginal distributions under different correlation strengths:
+Consider two parameters, with 1000 Monte Carlo samples of each, plotted as a scatter cloud: one point per iteration, the first parameter on the x-axis and the second on the y-axis. The three panels below show the same two marginal distributions under different correlation strengths:
 
 ```{r fig-scatter-normals, fig.width = 9, fig.height = 3.2, fig.alt = "Three scatter plots showing independent, positively, and negatively correlated bivariate normal samples"}
 set.seed(7)
@@ -76,13 +76,13 @@ for (rho in c(0, 0.7, -0.7)) {
 
 In the centre panel, when parameter 1 takes a high value, parameter 2 tends to be high as well. The cloud tilts upward. In the right-hand panel the relationship is reversed: high values of parameter 1 occur with low values of parameter 2, and the cloud tilts downward.
 
-The marginal distribution of each parameter is identical across all three panels — the same range on each axis. Correlation does not change the distribution of either parameter on its own; it changes only which combinations of values occur together.
+The marginal distribution of each parameter is identical across all three panels: the same range on each axis. Correlation does not change the distribution of either parameter on its own; it changes only which combinations of values occur together.
 
 ## Preserving marginal distributions (Iman–Conover method)
 
 Real inventory parameters rarely follow symmetric normal distributions. Body weight is approximately symmetric, milk yield has a long right tail, and the methane conversion factor Y~m~ is bounded between approximately 5% and 8%. A bivariate-normal sampler with a target correlation cannot reproduce these shapes.
 
-The tool uses the Iman–Conover procedure (Iman & Conover 1982; IPCC 2006 Vol.1 Ch.3 §3.2.3.2). Each parameter is sampled from its specified marginal distribution (PERT, normal, lognormal, beta, etc. — as set in the Parameters sheet), and the samples are then re-ordered so that the *rank* correlation across pairs matches the target. The marginal distribution of each parameter is preserved exactly; only the joint pattern of ranks changes.
+The tool uses the Iman–Conover procedure (Iman & Conover 1982; IPCC 2006 Vol.1 Ch.3 §3.2.3.2). Each parameter is sampled from its specified marginal distribution (PERT, normal, lognormal, beta, etc.: as set in the Parameters sheet), and the samples are then re-ordered so that the *rank* correlation across pairs matches the target. The marginal distribution of each parameter is preserved exactly; only the joint pattern of ranks changes.
 
 The following panels show two parameters with identical right-skewed Beta distributions, sampled independently (left) and with rank correlation ρ = −0.5 imposed via Iman–Conover (right):
 
@@ -109,7 +109,7 @@ The right-hand cloud tilts downward, but the lopsided shape of each marginal axi
 
 Several pairs of IPCC Tier 2 input parameters are biologically correlated. The most pronounced is between digestible energy (`DE`) and the methane conversion factor `Ym`: when feed quality rises (higher `DE`), less of the ingested energy is lost as methane (lower `Ym`); when feed quality falls, `Ym` rises. The two parameters enter the enteric-CH~4~ equation as a product, so the joint behaviour of `DE × Ym` directly shapes the emissions distribution.
 
-When `DE` and `Ym` are sampled independently, a non-trivial share of Monte Carlo iterations falls on combinations that are not biologically plausible — for example, very high `DE` paired with very high `Ym`. The product is then artificially inflated in those iterations, widening the right tail of the resulting CH~4~ distribution.
+When `DE` and `Ym` are sampled independently, a non-trivial share of Monte Carlo iterations falls on combinations that are not biologically plausible: for example, very high `DE` paired with very high `Ym`. The product is then artificially inflated in those iterations, widening the right tail of the resulting CH~4~ distribution.
 
 Imposing ρ = −0.5 between `DE` and `Ym` excludes the implausible combinations and changes the shape of the product distribution as follows:
 
@@ -128,13 +128,13 @@ xlim <- range(c(prod_ind, prod_cor))
 par(mfrow = c(1, 2), mar = c(3.7, 3.7, 2.5, 0.6), mgp = c(2.2, 0.7, 0))
 hist(prod_ind, breaks = 50, col = "#94A3B8", border = "white",
      freq = FALSE, xlim = xlim, ylim = c(0, 0.012),
-     main = "DE × Ym — independent",
+     main = "DE × Ym: independent",
      xlab = "DE × Ym", ylab = "density",
      cex.main = 0.95, cex.lab = 0.9)
 abline(v = mean(prod_ind), col = "black", lwd = 2, lty = 2)
 hist(prod_cor, breaks = 50, col = "#2D6A4F", border = "white",
      freq = FALSE, xlim = xlim, ylim = c(0, 0.012),
-     main = "DE × Ym — correlated ρ = −0.5",
+     main = "DE × Ym: correlated ρ = −0.5",
      xlab = "DE × Ym", ylab = "density",
      cex.main = 0.95, cex.lab = 0.9)
 abline(v = mean(prod_cor), col = "black", lwd = 2, lty = 2)
@@ -192,7 +192,7 @@ knitr::kable(
 )
 ```
 
-The `DE ↔ Ym` correlation operates the same way in Country Y as in Country X. The absolute margins of error are wider here across all four modes because each individual parameter has wider uncertainty bounds in a less-surveyed pastoral system. The relative effect of switching correlations on — a few percentage points of additional MoE — is comparable to Country X: the underlying biological mechanism is identical, and only the per-parameter uncertainty differs.
+The `DE ↔ Ym` correlation operates the same way in Country Y as in Country X. The absolute margins of error are wider here across all four modes because each individual parameter has wider uncertainty bounds in a less-surveyed pastoral system. The relative effect of switching correlations on: a few percentage points of additional MoE, is comparable to Country X: the underlying biological mechanism is identical, and only the per-parameter uncertainty differs.
 
 The headline shift in both countries is shown side by side below:
 
@@ -280,9 +280,9 @@ The left-hand card on the Simulate tab offers four options:
 
 ## Emission-factor correlations (right-hand card)
 
-The Simulate tab includes two correlation cards. The left-hand card, described above, controls correlations between **activity-data** parameters (herd size, body weight, milk yield, feed quality — quantities measured from the population). The right-hand card controls correlations between **emission-factor coefficients** (Y~m~, B~o~, MCF, EF3, EF4, EF5 — fixed quantities sourced from published studies rather than from a per-population survey).
+The Simulate tab includes two correlation cards. The left-hand card, described above, controls correlations between **activity-data** parameters (herd size, body weight, milk yield, feed quality: quantities measured from the population). The right-hand card controls correlations between **emission-factor coefficients** (Y~m~, B~o~, MCF, EF3, EF4, EF5, fixed quantities sourced from published studies rather than from a per-population survey).
 
-The two cards are separated because the underlying mechanisms differ. Activity-data correlations arise from biological co-variation across animals and feed. Emission-factor correlations arise from shared methodological bias in the published values — for example, when several coefficients are calibrated against a common regional dataset.
+The two cards are separated because the underlying mechanisms differ. Activity-data correlations arise from biological co-variation across animals and feed. Emission-factor correlations arise from shared methodological bias in the published values: for example, when several coefficients are calibrated against a common regional dataset.
 
 ### The three coefficient blocks
 
@@ -361,7 +361,7 @@ Applying the energy-block EF correlation alone (ρ = 0.3) increases the margin o
 
 The block-structured EF correlation is appropriate only when there is reason to believe that several emission-factor coefficients share a common methodological bias. The IPCC defaults are aggregated across many independent studies, so no single bias dominates; when the user's emission factors are taken from IPCC defaults, the EF correlation should remain off. Similarly, if the emission factors are sourced from country-specific measurements performed at different laboratories or in different years, the corresponding errors can be treated as independent.
 
-EF correlation at ρ = 0.3 is reasonable when several coefficients within a block originate from a single methodological source — for example, when all energy-equation coefficients (Cfi, Ca, Y~m~, and others) are drawn from a single national feeding trial or a single regional rumen database. The slider interpretation displayed under each slider categorises ρ in four bands: 0 (independent), up to 0.15 (weak shared bias), 0.16 to 0.35 (moderate shared bias), and above 0.35 (strong shared bias requiring documented justification).
+EF correlation at ρ = 0.3 is reasonable when several coefficients within a block originate from a single methodological source: for example, when all energy-equation coefficients (Cfi, Ca, Y~m~, and others) are drawn from a single national feeding trial or a single regional rumen database. The slider interpretation displayed under each slider categorises ρ in four bands: 0 (independent), up to 0.15 (weak shared bias), 0.16 to 0.35 (moderate shared bias), and above 0.35 (strong shared bias requiring documented justification).
 
 The same reasoning applies to the manure-CH~4~ block (B~o~, MCF, ASH) and the manure-N block (EF3, EF4, EF5, Frac_GasMS, Frac_LeachMS, UE): engage a non-zero ρ only when the constituent coefficients are known to share a common source.
 
@@ -390,9 +390,9 @@ The Country X and Country Y examples in this document illustrate the typical mag
 <div class="related">
 ### Related material
 
-- [Methodology document](../methodology.pdf), §Correlation Structure — the full equations behind each preset pair, the Iman–Conover sampling procedure, and the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) with reasons.
-- [User Guide](../user_guide.pdf), §Correlations (Simulate tab) — step-by-step workflow including how to download the manual-entry CSV template.
-- IPCC 2006 Vol.1 Ch.3 §3.2.3.2 — the restricted-pairing rank-correlation procedure (Iman & Conover 1982) that the tool implements.
+- [Methodology document](../methodology.pdf), §Correlation Structure: the full equations behind each preset pair, the Iman–Conover sampling procedure, and the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) with reasons.
+- [User Guide](../user_guide.pdf), §Correlations (Simulate tab): step-by-step workflow including how to download the manual-entry CSV template.
+- IPCC 2006 Vol.1 Ch.3 §3.2.3.2: the restricted-pairing rank-correlation procedure (Iman & Conover 1982) that the tool implements.
 
 </div>
 

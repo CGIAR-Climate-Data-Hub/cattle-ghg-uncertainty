@@ -2,7 +2,7 @@
 # sensible end-to-end results.
 #
 # Andreas in the 2 Jun meeting said the examples worked; Lolita's worry is the
-# opposite — examples might be silently producing wrong numbers (factor-of-10
+# opposite: examples might be silently producing wrong numbers (factor-of-10
 # style). This script runs both through the same simulation pipeline as the
 # live app and prints hand-comparable per-head and total emission numbers.
 
@@ -82,9 +82,9 @@ run_example <- function(spec_fn, label) {
 }
 
 sim_x <- run_example(generate_country_x_example,
-                      "Country X — dairy smallholder (12 params, dairy/cows)")
+                      "Country X: dairy smallholder (12 params, dairy/cows)")
 sim_y <- run_example(generate_country_y_example,
-                      "Country Y — pastoral non-dairy (11 params, non_dairy/breeding_cows)")
+                      "Country Y: pastoral non-dairy (11 params, non_dairy/breeding_cows)")
 
 cat("\n", strrep("=", 70), "\n", sep = "")
 cat("DONE\n")

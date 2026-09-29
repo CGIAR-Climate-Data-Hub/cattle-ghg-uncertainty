@@ -52,17 +52,17 @@
   # Disambiguation: managed-storage (MS) vs pasture (PRP) N pathways are
   # different equations and pull from different IPCC tables.
   #   Managed storage (Vol.4 Ch.10):
-  #     Frac_GASMS    — Eq. 10.26 (volatilisation N losses, MS)
-  #     EF4 (MS path) — Eq. 10.27 (indirect N2O via volatilisation)
+  #     Frac_GASMS   : Eq. 10.26 (volatilisation N losses, MS)
+  #     EF4 (MS path): Eq. 10.27 (indirect N2O via volatilisation)
   #                      Default from Vol.4 Ch.11 Table 11.3
-  #     Frac_LEACH_H  — Eq. 10.28 (leaching N losses, MS).
+  #     Frac_LEACH_H : Eq. 10.28 (leaching N losses, MS).
   #                      Canonical alias exposed in docs: Frac_LeachMS.
-  #     EF5 (MS path) — Eq. 10.29 (indirect N2O via leaching)
+  #     EF5 (MS path): Eq. 10.29 (indirect N2O via leaching)
   #                      Default from Vol.4 Ch.11 Table 11.3
   #   Pasture / range / paddock (Vol.4 Ch.11):
-  #     EF3_PRP       — Eq. 11.1 (direct PRP N2O, default Table 11.1)
-  #     Frac_GASM_PRP — Eq. 11.9 (volatilisation, PRP)
-  #     Frac_LEACH_PRP — Eq. 11.10 (leaching, PRP)
+  #     EF3_PRP      : Eq. 11.1 (direct PRP N2O, default Table 11.1)
+  #     Frac_GASM_PRP: Eq. 11.9 (volatilisation, PRP)
+  #     Frac_LEACH_PRP: Eq. 11.10 (leaching, PRP)
   # 2006 vs 2019 Refinement values (verified against Vol.4 Ch.11 Tables 11.1
   # and 11.3, May 2026):
   #   EF4 (kg N2O-N / (kg NH3-N + NOx-N volatilised)):
@@ -76,7 +76,7 @@
   #     (wet) or 0.005 (dry).
   #   EF5 (kg N2O-N / kg N leached/runoff):
   #     2006   = 0.0075 (range 0.0005-0.025)
-  #     2019R  = 0.011  (range 0.000-0.020) — no climate disaggregation
+  #     2019R  = 0.011  (range 0.000-0.020): no climate disaggregation
   #   EF3_PRP, CPP (cattle, poultry, pigs):
   #     2006   = 0.02 (single value)
   #     2019R  = 0.004 aggregated (range 0.000-0.014)
@@ -87,9 +87,9 @@
   #     2006   = 0.20 (range 0.05-0.5)
   #     2019R  = 0.21 (range 0.00-0.31)
   #   FracLEACH-(H) (leaching/runoff in wet climates):
-  #     2006   = 0.30 (range 0.1-0.8) — applies only where precipitation
+  #     2006   = 0.30 (range 0.1-0.8): applies only where precipitation
   #              exceeds soil water holding capacity
-  #     2019R  = 0.24 (range 0.01-0.73) — wet climate only; 0 in dry
+  #     2019R  = 0.24 (range 0.01-0.73): wet climate only; 0 in dry
   EF3_PRP = 0.004,    # 2019R aggregated EF3_PRP,CPP (Vol.4 Ch.11 Table 11.1)
   Frac_GASMS = 0.21,  # 2019R aggregated FracGASM (Vol.4 Ch.11 Table 11.3); 2006 = 0.20
   EF4 = 0.010,        # 2019R aggregated (Vol.4 Ch.11 Table 11.3); 2006 = 0.010 (identical)
@@ -114,7 +114,7 @@ MMS_DEFAULTS <- .master_wide("MMS_DEFAULTS", "id")
 ##
 ## Andreas 28/5/26 #3 follow-up: scope reduced to BW only. The previous
 ## Milk / DE / Ym / Bo rows were heuristic mid-points derived from the
-## Annex 10A illustrative tables, not direct continental IPCC defaults —
+## Annex 10A illustrative tables, not direct continental IPCC defaults -
 ## Andreas's reviewer finding was that the QA tab claimed "IPCC default"
 ## values he could not locate in the guidelines. They have been removed.
 ##
@@ -124,13 +124,13 @@ MMS_DEFAULTS <- .master_wide("MMS_DEFAULTS", "id")
 ##   - non-dairy  : Vol.4 Ch.10 Annex Table 10A.2
 ##   - buffalo    : Vol.4 Ch.10 Annex Table 10A.3
 ## (the continental values below are illustrative midpoints across those
-## tables — country-specific BW is always expected to override).
+## tables: country-specific BW is always expected to override).
 ##
 ## Reinstating Milk / DE / Ym / Bo / MW benchmarks properly would require a
 ## multi-dimensional table (parameter × continent × IPCC version × production
 ## system × animal sub-category). 2019R further splits each region into low-
 ## and high-productivity systems. That is a much larger data-entry job
-## (deferred — see plan).
+## (deferred: see plan).
 # Built from defaults/defaults_master.csv, like every other default.
 #
 # This object was MISSED by the master migration: the export wrote its rows
@@ -262,7 +262,7 @@ get_mms_for_version <- function(version = "2006") {
 }
 
 ## Round 7 R1.12 / R1.13: per-MMS Frac_GasMS and Frac_LeachMS defaults from
-## IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22 — BOTH volatilisation (Frac_GasMS)
+## IPCC 2019 Refinement Vol.4 Ch.10 Table 10.22: BOTH volatilisation (Frac_GasMS)
 ## and leaching (Frac_LeachMS). (Corrected citation: leaching is Table 10.22, not
 ## 10.23; Table 10.23 is the N2:N2O loss ratio.) Values are the "Other Cattle"
 ## column of Table 10.22; bounds use the IPCC ranges where the table gives them,
@@ -289,7 +289,7 @@ get_mms_for_version <- function(version = "2006") {
 ##   deep_bedding gas 0.30->0.25, leach 0.02->0.035
 ##   composting   leach 0.02->0.06 (static-pile/windrow row, matches gas 0.65)
 ##   aerobic_treatment gas 0.40->0.85 (forced-aeration Other Cattle)
-##   lagoon       gas 0.78->0.35 (0.78 matched no cattle column — clear error)
+##   lagoon       gas 0.78->0.35 (0.78 matched no cattle column: clear error)
 ## (pasture stays 0/0: PRP volatilisation/leaching is the Frac_*_PRP catalogue
 ##  pathway, not a managed-storage fraction.)
 MMS_FRAC_DEFAULTS_2019 <- .master_wide("MMS_FRAC_DEFAULTS_2019", "mms_type")
@@ -470,7 +470,7 @@ PARAM_TYPES <- c("activity_data", "coefficient", "emission_factor")  # emission_
 #
 # .GE_BLOCK are the parameters that feed Gross Energy (IPCC Eq. 10.16) and
 # therefore every downstream source (enteric CH4, manure CH4, all N2O via Nex).
-# Tw is deliberately excluded — calc_nem() handles NA Tw gracefully (no
+# Tw is deliberately excluded: calc_nem() handles NA Tw gracefully (no
 # cold-climate adjustment when Tw is NA), so a blank Tw never breaks a run.
 # ==========================================================================
 .GE_BLOCK <- c("N", "BW", "MW", "WG", "Milk", "Fat", "pct_pregnant", "DE",
@@ -512,7 +512,7 @@ params_needed_for_sources <- function(sources) {
 # Cfi by sub-category, IPCC Table 10.4 (verified at source 2026-06-16). Strict
 # category reading adopted: 0.370 applies ONLY to mature breeding "bulls"; the
 # 0.322 category explicitly covers "all non-lactating cows, steers, heifers AND
-# calves" — so young/growing/calf males and feedlot stock take 0.322, not the
+# calves": so young/growing/calf males and feedlot stock take 0.322, not the
 # intact-bull uplift. (Resolves a prior R-table-vs-translator-prompt mismatch;
 # the prompt already used 0.322 for growing_males.)
 CFI_BY_SUBCAT <- .master_list("CFI_BY_SUBCAT")
@@ -744,7 +744,7 @@ basis_plain_table <- function(param_specs = NULL) {
 # pct_pregnant = 0 for males; pct_pregnant = 0 for pre-pubertal calves; working
 # hours = 0 for non-oxen). Returns a list(value, distribution, uncertainty_pct,
 # lower, upper, data_source); NULL for an unknown parameter. `N` has no IPCC
-# default (value = NA) — it is core activity data the user must always supply.
+# default (value = NA): it is core activity data the user must always supply.
 resolve_subcat_default <- function(sub_category, parameter,
                                    ipcc_version = "2019_refinement") {
   cat <- PARAM_CATALOGUE[PARAM_CATALOGUE$parameter == parameter, , drop = FALSE]

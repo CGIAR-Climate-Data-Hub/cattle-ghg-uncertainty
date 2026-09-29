@@ -271,7 +271,7 @@ check_bool <- function(id, section, description, condition,
 }
 
 # =============================================================================
-# Section A — IPCC equation chain at the golden case (deterministic)
+# Section A: IPCC equation chain at the golden case (deterministic)
 # =============================================================================
 section_A <- function() {
   cat("\n[A] Equation chain on golden case (n_iter=1, all distributions=constant)...\n")
@@ -342,19 +342,19 @@ section_A <- function() {
 
   # A18: aggregate via the simulation pipeline
   inv <- sim$inventory
-  check_close("A18", "A", "Total CO2eq (AR5) — inventory total",
+  check_close("A18", "A", "Total CO2eq (AR5): inventory total",
               inv$total_co2e[1], golden_ref$total_co2e_AR5)
 }
 
 # =============================================================================
-# Section B — sampler & marginal distributions
+# Section B: sampler & marginal distributions
 # =============================================================================
 section_B <- function() {
   cat("\n[B] Sampler & marginal distributions...\n")
   set.seed(123)
   n <- 50000
 
-  # B1 — sample_distribution mean ≈ analytical mean
+  # B1: sample_distribution mean ≈ analytical mean
   # For each marginal: pick mean=100, lower=80, upper=120 (symmetric where it makes sense)
   marg_mean_ok <- function(type, target_mean, lower, upper) {
     x <- sample_distribution(n, type, target_mean, lower, upper)
@@ -376,7 +376,7 @@ section_B <- function() {
              worst < 0.01,
              notes = sprintf("worst relative error %.4f", worst))
 
-  # B2 — correlated block reproduces target Spearman within 0.02
+  # B2: correlated block reproduces target Spearman within 0.02
   params <- data.frame(
     parameter = c("p1","p2","p3","p4","p5"),
     mean      = c(10, 20, 50, 100, 200),
@@ -394,7 +394,7 @@ section_B <- function() {
   samp <- .iman_conover_sample(n, params, target)
   realised <- cor(samp, method = "spearman")
   max_err <- max(abs(realised - target))
-  # Tolerance set to 0.04 — empirical max over a 5x5 Spearman matrix at
+  # Tolerance set to 0.04: empirical max over a 5x5 Spearman matrix at
   # n=50000 typically lands around 0.025-0.035; 0.04 is the 99th percentile
   # bound (SE per pair ≈ 1/sqrt(n) ≈ 0.0045, max over 10 off-diagonal pairs
   # ≈ 3 × SE under normal extrema).
@@ -403,7 +403,7 @@ section_B <- function() {
                max_err, 0, tol_abs = 0.04,
                notes = sprintf("max absolute deviation %.4f", max_err))
 
-  # B3 — AR(1) trend reordering reproduces target rho^|i-j|
+  # B3: AR(1) trend reordering reproduces target rho^|i-j|
   set.seed(99)
   spec <- data.frame(parameter="x", mean=100, lower=80, upper=120,
                      distribution="normal", param_type="coefficient",
@@ -417,7 +417,7 @@ section_B <- function() {
                max_err_ar1, 0, tol_abs = 0.04,
                notes = sprintf("max absolute deviation %.4f", max_err_ar1))
 
-  # B4 — per-MMS uncertainty sampler: empirical mean ≈ central value
+  # B4: per-MMS uncertainty sampler: empirical mean ≈ central value
   mr <- data.frame(
     mms_type        = c("pasture", "solid_storage"),
     MCF_pct         = c(1.5, 5.0),
@@ -438,7 +438,7 @@ section_B <- function() {
 }
 
 # =============================================================================
-# Section C — single-year app routes
+# Section C: single-year app routes
 # =============================================================================
 section_C <- function() {
   cat("\n[C] Single-year app routes (full inventory simulation pipeline)...\n")
@@ -453,12 +453,12 @@ section_C <- function() {
                                        seed = 42, pct_pregnant = 1)
   sim_AR6 <- run_inventory_simulation(sd, n_iter = 10, gwp = "AR6",
                                        seed = 42, pct_pregnant = 1)
-  # All 10 rows are identical because every distribution is "constant" — take
+  # All 10 rows are identical because every distribution is "constant": take
   # the first row so apply_filter() returns scalars rather than length-10
   # vectors.
   inv5 <- sim_AR5$inventory[1, , drop = FALSE]
 
-  # C1 — all 6 sources ticked → total_co2e matches hand-comp
+  # C1: all 6 sources ticked → total_co2e matches hand-comp
   check_close("C1", "C",
               "All 6 sources ticked → total_co2e equals hand-comp (AR5)",
               inv5$total_co2e[1], golden_ref$total_co2e_AR5)
@@ -482,41 +482,41 @@ section_C <- function() {
          co2e = ch4 * gwp_AR5$CH4 + n2o * gwp_AR5$N2O)
   }
 
-  # C2 — enteric_ch4 only
+  # C2: enteric_ch4 only
   r2 <- apply_filter(inv5, "enteric_ch4")
   check_close("C2", "C", "Source filter: enteric_ch4 only",
               r2$co2e, golden_ref$total_enteric_ch4 * 28)
 
-  # C3 — manure_ch4 only
+  # C3: manure_ch4 only
   r3 <- apply_filter(inv5, "manure_ch4")
   check_close("C3", "C", "Source filter: manure_ch4 only",
               r3$co2e, golden_ref$total_manure_ch4 * 28)
 
-  # C4 — manure N2O (direct+indirect) only — golden case has 100% pasture so MM N2O = 0
+  # C4: manure N2O (direct+indirect) only, golden case has 100% pasture so MM N2O = 0
   r4 <- apply_filter(inv5, c("manure_n2o_direct", "manure_n2o_indirect"))
   check_close("C4", "C", "Source filter: MM N2O only (golden case: 0 because 100% pasture)",
               r4$co2e, 0)
 
-  # C5 — pasture N2O (direct+indirect) only
+  # C5: pasture N2O (direct+indirect) only
   r5 <- apply_filter(inv5, c("pasture_n2o_direct", "pasture_n2o_indirect"))
   expected5 <- (golden_ref$total_direct_n2o_prp + golden_ref$total_indirect_n2o_prp) * 265
   check_close("C5", "C", "Source filter: PRP N2O only",
               r5$co2e, expected5)
 
-  # C6 — Andreas's regression: enteric + MM only (no PRP)
+  # C6: Andreas's regression: enteric + MM only (no PRP)
   r6 <- apply_filter(inv5, c("enteric_ch4", "manure_ch4",
                               "manure_n2o_direct", "manure_n2o_indirect"))
   expected6 <- golden_ref$total_enteric_ch4 * 28 +
                 golden_ref$total_manure_ch4  * 28
   check_close("C6", "C",
-              "Source filter: enteric+MM only (Andreas regression — no crash, correct sum)",
+              "Source filter: enteric+MM only (Andreas regression, no crash, correct sum)",
               r6$co2e, expected6)
 
-  # C7 — corr_mode = none: no warning when corr matrices are NULL (already in C1)
+  # C7: corr_mode = none: no warning when corr matrices are NULL (already in C1)
   check_bool("C7", "C", "corr_mode='none' runs without warning (golden case has no correlations)",
              TRUE, notes = "Verified implicitly by C1")
 
-  # C8 — corr_mode = "preset" (structural defaults)
+  # C8: corr_mode = "preset" (structural defaults)
   all_names <- c(sd[[1]]$param_specs$parameter)
   preset_mtx <- build_ipcc_preset_corr(all_names)
   sd_preset <- sd
@@ -541,7 +541,7 @@ section_C <- function() {
              "corr_mode='preset' (structural defaults) runs without error or warning",
              ok_preset)
 
-  # C9 — corr_mode = "timeseries": Spearman computed from time-series matches a
+  # C9: corr_mode = "timeseries": Spearman computed from time-series matches a
   # hand-built Spearman on the same data. Use Country Y because Country X has
   # perfectly linear Milk growth (constant first-differences → sd=0 → cor fails).
   ts <- generate_country_y_timeseries()
@@ -558,10 +558,10 @@ section_C <- function() {
                diff_ts, 0, tol_abs = 1e-6,
                notes = sprintf("max deviation %.2e", diff_ts))
 
-  # C10 — GWP = AR5 (default)
+  # C10: GWP = AR5 (default)
   check_close("C10", "C", "GWP = AR5 → total_co2e matches hand-comp",
               sim_AR5$inventory$total_co2e[1], golden_ref$total_co2e_AR5)
-  # C11 — GWP = AR6
+  # C11: GWP = AR6
   check_close("C11", "C", "GWP = AR6 → total_co2e matches hand-comp",
               sim_AR6$inventory$total_co2e[1], golden_ref$total_co2e_AR6,
               notes = "AR4-baseline also checked")
@@ -569,7 +569,7 @@ section_C <- function() {
   check_close("C11b","C", "GWP = AR4 → total_co2e matches hand-comp",
               sim_AR4$inventory$total_co2e[1], golden_ref$total_co2e_AR4)
 
-  # C12 — decomposition: AD-only / EF-only / combined produce non-NA IPCC table
+  # C12: decomposition: AD-only / EF-only / combined produce non-NA IPCC table
   # Build the same fix_params helper used by app_server.R
   fix_params <- function(s, fix_type) {
     ps <- s$param_specs
@@ -621,7 +621,7 @@ section_C <- function() {
              notes = sprintf("n_rows=%d, non-zero rows populated: %s",
                               n_rows, nonzero_rows_have_values))
 
-  # C13 — decomposition off: format_ipcc_table accepts NULL ipcc_table; export
+  # C13: decomposition off: format_ipcc_table accepts NULL ipcc_table; export
   # placeholders kick in.
   placeholder_ok <- tryCatch({
     tmp <- tempfile(fileext = ".xlsx")
@@ -634,7 +634,7 @@ section_C <- function() {
              "Decomposition OFF: export_results_xlsx gracefully emits placeholder sheet",
              placeholder_ok)
 
-  # C14 — comparison-run path: run_inventory_simulation with no corr produces
+  # C14: comparison-run path: run_inventory_simulation with no corr produces
   # a result that can sit alongside the main result without issue.
   set.seed(123)
   sim_nocorr <- run_inventory_simulation(sd_var, n_iter = 500, gwp = "AR5",
@@ -645,7 +645,7 @@ section_C <- function() {
              "Comparison-run (no correlations) produces valid result",
              comp_ok)
 
-  # C15 / C16 / C17 — correlation-effect regression guards (Andreas review,
+  # C15 / C16 / C17: correlation-effect regression guards (Andreas review,
   # 2026-06). Codifies the qualitative behaviour demonstrated by
   # R/_test_correlation_effect.R: the Iman-Conover sampler must (a) amplify
   # output SD for strong +rho on a 2-parameter product, (b) dampen output SD
@@ -721,7 +721,7 @@ section_C <- function() {
              abs(ratio_C17 - 1.0) <= 0.10,
              notes = sprintf("sd_ratio = %.3f (expected within 0.90-1.10)", ratio_C17))
 
-  # C18 — empty-TS-sheet silent no-op (Andreas June 2026 review).
+  # C18: empty-TS-sheet silent no-op (Andreas June 2026 review).
   # When parse_uploaded_template() returns corr_matrix = NULL (e.g. the
   # Parameter_TimeSeries sheet is empty), the run-button observer must NOT
   # quietly run with corr_matrix = NULL while input$corr_mode = "timeseries".
@@ -742,7 +742,7 @@ section_C <- function() {
              "Empty Parameter_TimeSeries → compute_corr_from_population returns NULL (Andreas June 2026: catches the silent no-op the UI gate now prevents)",
              is.null(empty_result))
 
-  # C19 — comparison-run-must-null-unified-matrix regression guard.
+  # C19: comparison-run-must-null-unified-matrix regression guard.
   # The June 2026 review found that the "Compare with/without correlations"
   # checkbox produced identical bars on Andreas' ZIM run because the
   # comparison-run code in app_server.R was nulling only the legacy
@@ -779,7 +779,7 @@ section_C <- function() {
                                         sim_legacy$inventory$total_co2e))
 
   # Now null unified_corr_matrix (the FIXED comparison code). MC result must
-  # differ — at least one parameter value must change at least one iteration.
+  # differ: at least one parameter value must change at least one iteration.
   sd_unified_null <- sd_uni
   sd_unified_null[[1]]$corr_matrix         <- NULL
   sd_unified_null[[1]]$ef_corr_matrix      <- NULL
@@ -797,7 +797,7 @@ section_C <- function() {
 }
 
 # =============================================================================
-# Section D — trend mode
+# Section D: trend mode
 # =============================================================================
 section_D <- function() {
   cat("\n[D] Trend-mode pipeline...\n")
@@ -880,7 +880,7 @@ section_D <- function() {
 }
 
 # =============================================================================
-# Section E — multi-sub-category
+# Section E: multi-sub-category
 # =============================================================================
 section_E <- function() {
   cat("\n[E] Multi-sub-category aggregation...\n")
@@ -924,7 +924,7 @@ section_E <- function() {
               "Two sub-categories (100k + 50k) total_co2e = 1.5 × golden",
               inv$total_co2e[1], expected_inv)
 
-  # E2 — per-group sensitivity prefixes present
+  # E2: per-group sensitivity prefixes present
   group_keys <- names(sim$by_system)
   has_prefixes <- all(grepl("\\|\\|", group_keys))
   check_bool("E2", "E",
@@ -933,12 +933,12 @@ section_E <- function() {
 }
 
 # =============================================================================
-# Section F — edge cases / negative tests
+# Section F: edge cases / negative tests
 # =============================================================================
 section_F <- function() {
   cat("\n[F] Edge cases / negative tests...\n")
 
-  # F1 — blank mean cell. We don't go through the Shiny observer (no input$ in
+  # F1: blank mean cell. We don't go through the Shiny observer (no input$ in
   # this harness) but verify that ensure_completeness OR a downstream gate
   # detects it. The simulation observer (app_server.R) has the pre-run gate;
   # here we just confirm the NA-mean condition is detectable.
@@ -949,7 +949,7 @@ section_F <- function() {
              "NA in mean is detectable (gate trigger in simulation observer)",
              length(na_mean_rows) > 0)
 
-  # F2 — MMS fractions do not sum to 100
+  # F2: MMS fractions do not sum to 100
   bad_manure <- data.frame(
     cattle_type = "dairy", aggregation_level = "golden", sub_category = "cows",
     mms_type = c("pasture","solid_storage"),
@@ -961,7 +961,7 @@ section_F <- function() {
              "validate_manure_sheet flags fractions summing to 95% as invalid",
              !v$valid)
 
-  # F3 — lower > upper
+  # F3: lower > upper
   bad_specs <- make_golden_specs(constant_dist = FALSE)
   bw_idx <- which(bad_specs$parameter == "BW")
   bad_specs$lower[bw_idx] <- 400  # > mean = 300
@@ -972,7 +972,7 @@ section_F <- function() {
              "validate_param_specs flags lower>upper as invalid",
              !v$valid)
 
-  # F4 — N = 0 → simulation completes; total_co2e = 0; no NaN
+  # F4: N = 0 → simulation completes; total_co2e = 0; no NaN
   zero_specs <- make_golden_specs()
   zero_specs$mean[zero_specs$parameter == "N"] <- 0
   zero_specs$lower[zero_specs$parameter == "N"] <- 0
@@ -991,7 +991,7 @@ section_F <- function() {
                all(co2e == 0) && all(is.finite(co2e)))
   }
 
-  # F5 — empty source selection: handled by the observer gate. Verify the
+  # F5: empty source selection: handled by the observer gate. Verify the
   # observer's guard expression yields the expected boolean.
   empty_srcs <- character(0)
   is_empty <- is.null(empty_srcs) || length(empty_srcs) == 0
@@ -999,7 +999,7 @@ section_F <- function() {
              "Empty source selection detectable by simulation observer gate",
              is_empty)
 
-  # F6 — source-aware gate dependency map (Andreas 2026-05-27). A CH4-only
+  # F6: source-aware gate dependency map (Andreas 2026-05-27). A CH4-only
   # selection must not require any manure-N2O / PRP parameter.
   ch4_needed <- params_needed_for_sources(c("enteric_ch4", "manure_ch4"))
   excluded   <- c("EF3_S", "Frac_GASMS", "Frac_LEACH_H",
@@ -1011,7 +1011,7 @@ section_F <- function() {
                all(c("Ym", "UE", "ASH", "Bo") %in% ch4_needed),
              notes = "CH4 needs Ym/UE/ASH/Bo; not the N2O EFs")
 
-  # F7 — the gate lets a CH4-only run through when only manure-N2O params are
+  # F7: the gate lets a CH4-only run through when only manure-N2O params are
   # blank. Mirror the observer's filter: na_block = NA-mean rows that are in
   # the needed set for the selected sources.
   specs_blank_n2o <- make_golden_specs()
@@ -1026,7 +1026,7 @@ section_F <- function() {
              na_block_ch4 == 0,
              notes = sprintf("blocking cells = %d", na_block_ch4))
 
-  # F8 — the gate still catches a genuinely-needed blank: blank Ym with
+  # F8: the gate still catches a genuinely-needed blank: blank Ym with
   # enteric selected must be flagged.
   specs_blank_ym <- make_golden_specs()
   specs_blank_ym$mean[specs_blank_ym$parameter == "Ym"] <- NA_real_
@@ -1038,7 +1038,7 @@ section_F <- function() {
              na_block_ym == 1,
              notes = sprintf("blocking cells = %d", na_block_ym))
 
-  # F9 — sub_category-key auto-match (Andreas 28/5/26 follow-up). Mimic the
+  # F9: sub_category-key auto-match (Andreas 28/5/26 follow-up). Mimic the
   # ZIM template's Parameters="DINT_heif" vs Manure_Management="DINT_heifer"
   # typo and assert resolve_sub_category_matches() returns the heifer MM key
   # as the unambiguous auto-match and surfaces it as a `warn` row.
@@ -1068,7 +1068,7 @@ section_F <- function() {
              notes = sprintf("matched key=%s; warn row present=%s",
                              sg$matched[heif_key], has_warn))
 
-  # F10 — sub_category-key ambiguity must produce a `fail` and NOT remap.
+  # F10: sub_category-key ambiguity must produce a `fail` and NOT remap.
   # Build a Parameters key that is distance <= 2 from two MM candidates.
   p_amb <- data.frame(
     cattle_type       = "beef",
@@ -1094,12 +1094,12 @@ section_F <- function() {
              notes = sprintf("no remap=%s, fail row present=%s",
                              no_remap, has_fail))
 
-  # F11 — multi-MMS direct/indirect N2O hand-comp end-to-end. Set up a single
+  # F11: multi-MMS direct/indirect N2O hand-comp end-to-end. Set up a single
   # sub-category with the Zim-style DINT_cow MMS allocation, run the engine
   # at the parameter means (constant distributions, n_iter = 1) and assert
   # the headline direct/indirect MM N2O numbers match the hand-computed
   # reference within 0.5%. This is the assertion the prior audit was missing
-  # — it pins down the multi-MMS path that the calculation-bug report hinges
+  #: it pins down the multi-MMS path that the calculation-bug report hinges
   # on.
   multi_specs <- make_golden_specs(constant_dist = TRUE)
   multi_specs$sub_category <- "DINT_cow"
@@ -1183,7 +1183,7 @@ section_F <- function() {
                inv_m$total_direct_n2o_mm, direct_mm_ref, err_dir,
                inv_m$total_indirect_n2o_mm, indirect_mm_ref, err_ind))
 
-  # F12 — MMS-allocation uncertainty (Andreas 28/5/26 #4). Sample the per-MMS
+  # F12: MMS-allocation uncertainty (Andreas 28/5/26 #4). Sample the per-MMS
   # fraction matrix on a 2-MMS system with wide bounds, run the simulation
   # with all per-parameter MC vars held constant, and assert:
   #   (a) row sums of the renormalised matrix == 1 to machine epsilon
@@ -1264,7 +1264,7 @@ section_F <- function() {
              is.finite(d_cv) && d_cv > 0.01 && is.finite(i_cv) && i_cv > 0.01,
              notes = sprintf("direct CV=%.4f, indirect CV=%.4f", d_cv, i_cv))
 
-  # F13 — QA/QC benchmark + asymmetric-bounds checks (Andreas 28/5/26 #3).
+  # F13: QA/QC benchmark + asymmetric-bounds checks (Andreas 28/5/26 #3).
   # Build a minimal Parameters frame and run_qaqc() with each scenario, then
   # inspect the returned rows.
 
@@ -1283,7 +1283,7 @@ section_F <- function() {
       stringsAsFactors  = FALSE)
   }
 
-  # F13a — BW deviation still fires for an off-value
+  # F13a: BW deviation still fires for an off-value
   bw_spec <- mk_qa_spec("BW", 1500, 1400, 1600, cattle_type = "dairy")
   qa_bw <- run_qaqc(bw_spec, region = "africa")
   bw_rows <- qa_bw[qa_bw$parameter == "BW" &
@@ -1298,7 +1298,7 @@ section_F <- function() {
                              paste(bw_rows$status, collapse = ","),
                              substr(bw_rows$message[1], 1, 90)))
 
-  # F13b — Milk deviation no longer fires
+  # F13b: Milk deviation no longer fires
   milk_spec <- mk_qa_spec("Milk", 0.5, 0.4, 0.6)
   qa_milk <- run_qaqc(milk_spec, region = "africa")
   milk_rows <- qa_milk[qa_milk$parameter == "Milk" &
@@ -1309,7 +1309,7 @@ section_F <- function() {
              notes = sprintf("benchmark_deviation rows for Milk: %d",
                              nrow(milk_rows)))
 
-  # F13c — EF4 asymmetric-bounds warning no longer fires on symmetric IPCC
+  # F13c: EF4 asymmetric-bounds warning no longer fires on symmetric IPCC
   # Table 11.3 range; EF5 similarly. EF3_PRP stays in ASYMMETRIC_PARAMS, so
   # an actually-symmetric range there should still trigger warn.
   ef4_spec <- mk_qa_spec("EF4", 0.010, 0.002, 0.018)
@@ -1332,7 +1332,7 @@ section_F <- function() {
              notes = sprintf("EF4 rows=%d; EF5 rows=%d; EF3_PRP rows=%d",
                              nrow(ef4_rows), nrow(ef5_rows), nrow(ef3p_rows)))
 
-  # F14 — Per-(cattle_type × source) breakdown (Andreas 28/5/26 #7).
+  # F14: Per-(cattle_type × source) breakdown (Andreas 28/5/26 #7).
   # Build a two-cattle-type inventory (dairy + other), run the simulation,
   # and exercise the per-source breakdown flextable.
   specs_dairy <- make_golden_specs(constant_dist = TRUE)
@@ -1388,7 +1388,7 @@ section_F <- function() {
                                           "Mean (t CO2eq)"), names(ft_df)),
                               collapse = ", ") else "no flextable")
 
-  # F14c — per-cattle_type CO2eq sums to (approximately) the inventory total
+  # F14c: per-cattle_type CO2eq sums to (approximately) the inventory total
   # under constant distributions (every iteration identical).
   inv1 <- as.list(sim_2ct$inventory[1, , drop = FALSE])
   by_ct <- list()
@@ -1406,7 +1406,7 @@ section_F <- function() {
              notes = sprintf("sum by ct = %.4g; inventory = %.4g",
                              sum_by_ct, inv1$total_co2e))
 
-  # F15 — Sensitivity labels carry sub-category (Andreas 28/5/26 #8).
+  # F15: Sensitivity labels carry sub-category (Andreas 28/5/26 #8).
   # Reuse the two-cattle-type setup built above (sim_2ct). Need a stochastic
   # input for sensitivity_analysis to compute non-NA SRC, so build a second
   # variant with one parameter varying (BW) per sub-category.
@@ -1442,7 +1442,7 @@ section_F <- function() {
                              has_dairy_cows, has_other_cows,
                              paste(head(param_labels, 4), collapse = "; ")))
 
-  # F15b — sens_group_of correctly extracts the sub_category suffix.
+  # F15b: sens_group_of correctly extracts the sub_category suffix.
   g1 <- sens_group_of("Ym (DINT_cow)")
   g2 <- sens_group_of("MCF_solid_storage (DINT_heif)")
   g3 <- sens_group_of("Ym")
@@ -1454,11 +1454,11 @@ section_F <- function() {
                              "MCF_solid_storage (DINT_heif)", g2,
                              "Ym", g3))
 
-  # F16 — AD-only decomposition invariant (Andreas 28/5/26 #9).
+  # F16: AD-only decomposition invariant (Andreas 28/5/26 #9).
   # With all coefficients frozen AND per-MMS sample matrices nulled, the
   # only source of iteration-to-iteration variance is N. For a single-
   # system inventory, emission_source = N × const, so
-  # CV(emission_source) == CV(N) for EVERY source — that's the invariant
+  # CV(emission_source) == CV(N) for EVERY source: that's the invariant
   # Andreas's complaint hinges on. Test it by replicating the observer's
   # fix_params AD-only path on the golden system.
   specs_ad <- make_golden_specs(constant_dist = FALSE)
@@ -1502,7 +1502,7 @@ section_F <- function() {
                                    collapse = ", "),
                              cv_max_dev))
 
-  # F17 — Excel sensitivity sheets populate AND parameter names are clean
+  # F17: Excel sensitivity sheets populate AND parameter names are clean
   # (no backticks from lm formula escaping, no R name-munging dots).
   # Andreas 28/5/26 #10 follow-up. Reuse the F15 setup (sd_sens with BW
   # varying in both sub-categories) so the sensitivity actually has signal.
@@ -1546,7 +1546,7 @@ section_F <- function() {
                              nrow(prcc_xls),
                              paste(head(prcc_xls$parameter, 3), collapse = "; ")))
 
-  # F18 — Inventory_Metadata Continental region (Andreas free-text P27).
+  # F18: Inventory_Metadata Continental region (Andreas free-text P27).
   # `normalise_metadata_region()` should:
   #   (a) keep an explicit valid region slug as-is,
   #   (b) auto-map a known country name to its continent,
@@ -1572,10 +1572,10 @@ section_F <- function() {
                              case_a$region, case_b$region,
                              case_c$region, case_d$region))
 
-  # F18b — actual parser-built metadata path. The new template emits the
+  # F18b: actual parser-built metadata path. The new template emits the
   # label "Continental region", which the transposed-layout parser turns
   # into `metadata$continental_region` (not `metadata$region`). Confirm
-  # the helper still finds the explicit pick — i.e. the user's explicit
+  # the helper still finds the explicit pick: i.e. the user's explicit
   # "global" choice is respected even when their country would otherwise
   # auto-map to africa.
   case_e <- normalise_metadata_region(
@@ -1592,7 +1592,7 @@ section_F <- function() {
              notes = sprintf("Zimbabwe + global -> %s; Zimbabwe + africa -> %s",
                              case_e$region, case_f$region))
 
-  # F19 — End-to-end metadata parsing for a legacy "Country / region" label.
+  # F19: End-to-end metadata parsing for a legacy "Country / region" label.
   # Andreas's Zim file uses the old single-cell convention. Probe via
   # parse_uploaded_template to confirm the parser now produces
   # metadata$country (no trailing underscore) AND region resolves to africa.
@@ -1623,12 +1623,12 @@ section_F <- function() {
            "uncertainty_template_ipcc2019_ZIM_v2.xlsx not found (looked in test_data/ and repo root)")
   }
 
-  # F20 — End-to-end custom-upload regression on Andreas's canonical Zim
+  # F20: End-to-end custom-upload regression on Andreas's canonical Zim
   # template. Mirrors _zim_verify.R, hard-wired tolerances. Protects against
   # silent regression of: (a) the auto-match of DINT_heif → DINT_heifer, (b)
   # the per-MMS / multi-sub-category direct N2O calculation, (c) per-
   # sub-category disaggregation in the simulation output. Skipped when the
-  # template file isn't on disk (the file is intentionally not committed —
+  # template file isn't on disk (the file is intentionally not committed -
   # it's Andreas's working data).
   zim_path <- if (file.exists("test_data/uncertainty_template_ipcc2019_ZIM_v2.xlsx"))
                 "test_data/uncertainty_template_ipcc2019_ZIM_v2.xlsx"
@@ -1645,7 +1645,7 @@ section_F <- function() {
       sys_groups_z <- unique(group_key_z)
       sg_resolve_z <- resolve_sub_category_matches(specs_z, manure_z)
 
-      # F20a — heifer auto-match fires for the DINT_heif typo.
+      # F20a: heifer auto-match fires for the DINT_heif typo.
       auto_match_fired <- any(sg_resolve_z$issues$status == "warn" &
                                 sg_resolve_z$issues$check == "sub_category_auto_match" &
                                 grepl("DINT_heif", sg_resolve_z$issues$message))
@@ -1653,10 +1653,10 @@ section_F <- function() {
                  "Zim template: heifer auto-match (DINT_heif → DINT_heifer) fires",
                  auto_match_fired,
                  notes = if (auto_match_fired) "auto-match issue raised as warning"
-                         else "auto-match NOT triggered — would cause N2O off-by-10")
+                         else "auto-match NOT triggered: would cause N2O off-by-10")
 
-      # F20b — full simulation runs and total_direct_n2o_mm is within tolerance
-      # of the @Risk reference (39.9 t). Tolerance: [20, 50] — generous because
+      # F20b: full simulation runs and total_direct_n2o_mm is within tolerance
+      # of the @Risk reference (39.9 t). Tolerance: [20, 50], generous because
       # Monte Carlo + tool/risk modelling differences. Below 10 → regression to
       # the pre-auto-match factor-of-10 bug.
       systems_data_z <- list()
@@ -1698,7 +1698,7 @@ section_F <- function() {
         error = function(e) NULL)
       if (!is.null(sim_z)) {
         n2o_direct <- mean(sim_z$inventory$total_direct_n2o_mm)
-        # Generous tolerance — protect against the factor-of-10 regression.
+        # Generous tolerance: protect against the factor-of-10 regression.
         ok_n2o <- n2o_direct >= 15 && n2o_direct <= 60
         check_bool("F20b", "F",
                    "Zim end-to-end: total_direct_n2o_mm in plausible band [15, 60] (vs @Risk 39.9)",
@@ -1706,7 +1706,7 @@ section_F <- function() {
                    notes = sprintf("mean = %.1f t (regression threshold: < 15 would indicate the auto-match fix is broken)",
                                    n2o_direct))
 
-        # F20c — per-sub-category disaggregation: by_system has 5 systems,
+        # F20c: per-sub-category disaggregation: by_system has 5 systems,
         # each with non-zero direct_n2o_mm_total. Protects against the "
         # disaggregation not working" report.
         n_sys <- length(sim_z$by_system)
@@ -1732,7 +1732,7 @@ section_F <- function() {
            "uncertainty_template_ipcc2019_ZIM_v2.xlsx not in repo root (intentionally untracked)")
   }
 
-  # F21 — Built-in examples (Country X dairy + Country Y pastoral) produce
+  # F21: Built-in examples (Country X dairy + Country Y pastoral) produce
   # per-head emission rates inside the IPCC Tier-2 plausible band. Protects
   # against the regression Andreas was worried about in the 2 Jun meeting:
   # "are the examples on the app silently wrong like the pre-fix Zim data was?"
@@ -1777,7 +1777,7 @@ section_F <- function() {
                                ent_per_head, mm_per_head, n2o_per_head))
   }
 
-  # F22 — Downloadable correlation-matrix template (Lolita 2026-06-02 review).
+  # F22: Downloadable correlation-matrix template (Lolita 2026-06-02 review).
   # Confirms generate_corr_matrix_template() produces a CSV that round-trips
   # correctly through the upload parser (read.csv with row.names = 1) and
   # that the example variant matches build_ipcc_preset_corr() element-for-
@@ -1804,7 +1804,7 @@ section_F <- function() {
              notes = sprintf("shape=%s diag=%s names=%s values=%s pairs=%s",
                              shape_ok, diag_ok, names_ok, values_ok, pairs_ok))
 
-  # F23 — "Find out more" Correlations topic page (Lolita 2026-06-03 / Pete
+  # F23: "Find out more" Correlations topic page (Lolita 2026-06-03 / Pete
   # ask). The HTML is generated by the manual build step (_build_help_docs.R)
   # and bundled under www/docs/. Skip gracefully when the file isn't on
   # disk (audit can run between rebuilds without flagging).
@@ -1834,7 +1834,7 @@ section_F <- function() {
            "www/docs/correlations.html not on disk (run _build_help_docs.R)")
   }
 
-  # F19b — Tornado user_reducible lookup handles labelled sub-category
+  # F19b: Tornado user_reducible lookup handles labelled sub-category
   # parameters. Strip " (sub_category)" suffix before catalogue lookup.
   labelled <- c("Ym (DINT_cow)", "BW (DINT_heif)", "Bo (DINT_GrM)",
                 "Cfi (DINT_cow)", "N (DINT_cow)")
@@ -1853,7 +1853,7 @@ section_F <- function() {
                              paste(reducible, collapse = ", "),
                              paste(expected, collapse = ", ")))
 
-  # F24 — regression guard for Andy's Zambia crash (2026-06-15):
+  # F24: regression guard for Andy's Zambia crash (2026-06-15):
   # an inconsistent CI where the central value sits OUTSIDE [lower, upper]
   # must not make the sampler return NaN. Before the fix, mc2d::rpert emitted
   # "mode < min or mode > max" + NaN, which later made sd() return NA and
@@ -1872,7 +1872,7 @@ section_F <- function() {
              notes = if (no_nan) "mode clamped into [lower,upper]; non-finite scrubbed"
                      else "NaN/Inf leaked from a degenerate parameterisation")
 
-  # F25 — sensitivity must survive a NaN/constant input column instead of
+  # F25: sensitivity must survive a NaN/constant input column instead of
   # throwing "undefined columns selected". Build inputs with one all-NaN
   # column and one constant column alongside two varying columns.
   set.seed(1)
@@ -1891,7 +1891,7 @@ section_F <- function() {
              notes = if (sens_ok) "2 varying columns kept; NaN + constant dropped"
                      else paste("error:", attr(sens_res, "err")))
 
-  # F26 — aggregate_sensitivity row subsample: on a run with more iterations
+  # F26: aggregate_sensitivity row subsample: on a run with more iterations
   # than max_rows, the SRC regression must run on the capped subsample (memory
   # guard that prevents the "server needed to reload" OOM during sensitivity on
   # the heaviest all-sources + correlations + decomposition run), while still
@@ -1917,7 +1917,7 @@ section_F <- function() {
              notes = if (cap_ok) "capped run ranks same params + flags subsample"
                      else "row cap not applied as expected")
 
-  # F27 — DE-domain clamp (2026-06-15): the IPCC net-energy-ratio equations
+  # F27: DE-domain clamp (2026-06-15): the IPCC net-energy-ratio equations
   # REM/REG (Eq 10.14/10.15) are empirical fits valid for ruminant DE in 45-85%
   # and REG crosses zero near DE = 37.6%. An UNtruncated normal draw on DE
   # (lower/upper only set the SD) wanders into the low tail and sends gross
@@ -1947,13 +1947,13 @@ section_F <- function() {
              else sprintf("DE range [%.1f, %.1f] left REM/REG domain",
                           min(de_col), max(de_col)))
 
-  # F28 — catalogue wet-climate guard (2026-06-16). The app auto-fills IPCC
+  # F28: catalogue wet-climate guard (2026-06-16). The app auto-fills IPCC
   # defaults from PARAM_CATALOGUE for any parameter the AI translator omits, so
   # the catalogue is the source of truth for ~64% of a typical inventory's
   # values. Lock the five manure/PRP N2O factors to the WET-CLIMATE defaults
   # (verified vs 2019R Vol.4 Ch.11 Tables 11.1/11.3) that match what the
   # translator emits today, so they can't silently drift back to the aggregated
-  # values — which would change every default-filled inventory's N2O result.
+  # values: which would change every default-filled inventory's N2O result.
   cat_row <- function(p) PARAM_CATALOGUE[PARAM_CATALOGUE$parameter == p, ]
   ef3 <- cat_row("EF3_PRP"); ef4 <- cat_row("EF4"); ef5 <- cat_row("EF5")
   fg  <- cat_row("Frac_GASM_PRP"); fl <- cat_row("Frac_LEACH_PRP")
@@ -1972,18 +1972,18 @@ section_F <- function() {
              notes = if (cat_ok) "EF3_PRP=0.006, EF4=0.014, EF5=0.011 + wet bounds"
                      else "catalogue N2O defaults drifted from the agreed wet-climate values")
 
-  # F29 — per-MMS coefficient guard (2026-06-16). MMS_DEFAULTS$ef3 and
+  # F29: per-MMS coefficient guard (2026-06-16). MMS_DEFAULTS$ef3 and
   # MMS_FRAC_DEFAULTS_2019 were corrected line-by-line against IPCC 2019R
   # Tables 10.21 / 10.22 ("Other Cattle" column). Lock the corrected values so
-  # they can't regress — these feed the blank-template examples now and the
+  # they can't regress: these feed the blank-template examples now and the
   # app's per-MMS default-fill under the sparse-overlay change. (MCF stays on the
-  # 2006 convention by design — see the MMS_DEFAULTS comment.)
+  # 2006 convention by design: see the MMS_DEFAULTS comment.)
   mms_ef3 <- function(id) MMS_DEFAULTS$ef3[MMS_DEFAULTS$id == id]
   fr <- function(id) mms_frac_defaults_2019(id)
   mms_ok <-
     eq(mms_ef3("solid_storage"), 0.010) && eq(mms_ef3("solid_storage_covered"), 0.010) &&
     eq(mms_ef3("dry_lot"), 0.02) && eq(mms_ef3("liquid_slurry"), 0.005) &&
-    # composting models Static Pile (forced aeration) throughout — 2026-09-10
+    # composting models Static Pile (forced aeration) throughout: 2026-09-10
     eq(mms_ef3("composting"), 0.010) &&
     eq(fr("lagoon")$frac_gas, 0.35) && eq(fr("aerobic_treatment")$frac_gas, 0.85) &&
     eq(fr("solid_storage_covered")$frac_gas, 0.22) &&
@@ -2000,7 +2000,7 @@ section_F <- function() {
              notes = if (mms_ok) "EF3 solid_storage=0.010, composting=0.010; lagoon Frac_Gas=0.35; aerobic=0.85; dry_lot leach=0.035"
                      else "a corrected MMS coefficient drifted from the IPCC Other-Cattle value")
 
-  # F29a — Frac_GasMS BOUNDS vs the published Table 10.22 ranges. F29 pinned the
+  # F29a: Frac_GasMS BOUNDS vs the published Table 10.22 ranges. F29 pinned the
   # central values only, which is how five rows kept a mechanical +-50% spread
   # from a superseded rule long after that rule was replaced (see the comment on
   # MMS_FRAC_DEFAULTS_2019). Lock the ranges too.
@@ -2021,7 +2021,7 @@ section_F <- function() {
              notes = if (bounds_ok) "9 of 9 gas ranges match Other Cattle; none is a mechanical +-50%"
                      else "a Frac_Gas bound drifted from the published IPCC range")
 
-  # F29b — MCF cells verified against 2006 Table 10.17 on 2026-09-10. MCF stays
+  # F29b: MCF cells verified against 2006 Table 10.17 on 2026-09-10. MCF stays
   # on the 2006 convention by design (2019R needs a per-MMS Bo the engine lacks),
   # but the individual cells had never been checked: dry_lot tropical was 5.0
   # against a published 2.0, solid_storage boreal was 3.0 against 2.0, and
@@ -2076,7 +2076,7 @@ section_F <- function() {
              notes = if (var_ok) "12/12 declared; slurry=with crust, bedding=>1mo, composting=static pile, digester=open storage"
                      else "a row has no declared IPCC variant, or a variant changed without its coefficients")
 
-  # F30 — sparse-overlay resolver. resolve_subcat_default() is the single source
+  # F30: sparse-overlay resolver. resolve_subcat_default() is the single source
   # of truth for the IPCC defaults the app fills when the AI translator omits a
   # cell. Verify the sex/age overrides, biological zeros, per-sub-cat pct_pregnant,
   # and generic catalogue fallback all resolve correctly.
@@ -3396,11 +3396,11 @@ section_F <- function() {
              else sprintf("scripts/build_translator_kit.R cannot source its own file list: %s",
                           if (exists("kit_err")) kit_err else "unknown error"))
 
-  # F31 — sparse-overlay writer integration (the safety net). Writing a SPARSE
+  # F31: sparse-overlay writer integration (the safety net). Writing a SPARSE
   # input (only the user's own rows + the MMS allocation) through
   # .translator_write_official_template must yield a COMPLETE template (every
   # sub-category x 25 parameters), with user values preserved and every omitted
-  # cell filled from the resolver / MMS tables — proving the gap-fill is correct
+  # cell filled from the resolver / MMS tables: proving the gap-fill is correct
   # end-to-end (write -> parse round-trip).
   if (requireNamespace("openxlsx", quietly = TRUE) &&
       exists(".translator_write_official_template") &&
@@ -3469,7 +3469,7 @@ section_F <- function() {
 }
 
 # =============================================================================
-# Section G — download outputs
+# Section G: download outputs
 # =============================================================================
 section_G <- function() {
   cat("\n[G] Download / export functions...\n")
@@ -3485,7 +3485,7 @@ section_G <- function() {
   unc <- calc_all_uncertainty(sim$inventory)
   ipcc <- format_ipcc_table(list(combined = unc, ad_only = unc, ef_only = unc))
 
-  # G1 — xlsx
+  # G1: xlsx
   xpath <- tempfile(fileext = ".xlsx")
   ok_x <- tryCatch({
     export_results_xlsx(sim$inventory, unc, sensitivity = NULL,
@@ -3499,7 +3499,7 @@ section_G <- function() {
              ok_x,
              notes = if (ok_x) sprintf("%d bytes", file.info(xpath)$size) else "")
 
-  # G2 — csv (we replicate the download_csv structure since the handler lives
+  # G2: csv (we replicate the download_csv structure since the handler lives
   # in app_server.R's downloadHandler)
   cpath <- tempfile(fileext = ".csv")
   ok_c <- tryCatch({
@@ -3511,7 +3511,7 @@ section_G <- function() {
              ok_c,
              notes = if (ok_c) sprintf("%d bytes", file.info(cpath)$size) else "")
 
-  # G3 — docx
+  # G3: docx
   dpath <- tempfile(fileext = ".docx")
   ok_d <- tryCatch({
     build_run_summary_docx(
@@ -3532,7 +3532,7 @@ section_G <- function() {
              ok_d,
              notes = if (ok_d) sprintf("%d bytes", file.info(dpath)$size) else "")
 
-  # G4 — methodology.Rmd Reporting section present (Andreas review round 2):
+  # G4: methodology.Rmd Reporting section present (Andreas review round 2):
   # CRT category map covering 3.A, 3.B, 3.D.
   meth_path <- if (file.exists("documentation/source/methodology.Rmd")) "documentation/source/methodology.Rmd"
                else if (file.exists("methodology.Rmd")) "methodology.Rmd"
@@ -3549,7 +3549,7 @@ section_G <- function() {
              notes = sprintf("3.A=%s 3.B=%s 3.D=%s",
                              has_crt_a, has_crt_b, has_crt_d))
 
-  # G5 — methodology.Rmd Reporting section contains the three-level
+  # G5: methodology.Rmd Reporting section contains the three-level
   # disaggregation guide (Level 1 / Level 2 / Level 3).
   has_l1 <- grepl("Level 1", meth_txt)
   has_l2 <- grepl("Level 2", meth_txt)
@@ -3570,7 +3570,7 @@ safe_run <- function(label, fn) {
     error = function(e) {
       cat("  *** Section ", label, " aborted: ", conditionMessage(e), "\n",
           sep = "")
-      record(label, label, sprintf("Section %s — unhandled error", label),
+      record(label, label, sprintf("Section %s: unhandled error", label),
              "completion", "error", "SKIP", conditionMessage(e))
     })
 }
@@ -3592,10 +3592,10 @@ fail <- sum(results_df$status == "FAIL")
 skip <- sum(results_df$status == "SKIP")
 total <- nrow(results_df)
 verdict <- if (fail == 0) "**AUDIT CLEAN**" else
-            sprintf("**%d FAILED** — see Bug Findings below", fail)
+            sprintf("**%d FAILED**: see Bug Findings below", fail)
 
 md <- c(
-  "# AUDIT_REPORT.md — Statistician's end-to-end audit",
+  "# AUDIT_REPORT.md: Statistician's end-to-end audit",
   "",
   sprintf("Generated %s by `_audit.R`.", format(Sys.time(), "%Y-%m-%d %H:%M %Z")),
   "",
@@ -3655,7 +3655,7 @@ if (fail > 0) {
   failures <- results_df[results_df$status == "FAIL", ]
   for (i in seq_len(nrow(failures))) {
     f <- failures[i, ]
-    md <- c(md, sprintf("### %s — %s", f$id, f$description), "",
+    md <- c(md, sprintf("### %s: %s", f$id, f$description), "",
                   sprintf("- Expected: `%s`", f$expected),
                   sprintf("- Actual:   `%s`", f$actual),
                   if (nzchar(f$notes)) sprintf("- Notes:    %s", f$notes) else "",
@@ -3674,14 +3674,14 @@ md <- c(md, "",
         "",
         "**2. Country X synthetic time-series has perfectly linear `Milk` growth (5 years × 0.2 kg/day, no noise).**",
         "",
-        "Location: `R/utils_ipcc_defaults.R::generate_country_x_timeseries()`. First-differencing collapses the `Milk` column to a constant (every diff = 0.2), which gives `sd = 0` and breaks any naive `cor()` call. The app's own `compute_correlation_from_timeseries()` handles this correctly (line 264 drops zero-variance columns), but the synthetic series is unrealistic — a real time series would have noise. Cheap fix: add a small jitter (±0.05) to one of the Milk values so the series exercises the auto-correlation path realistically.",
+        "Location: `R/utils_ipcc_defaults.R::generate_country_x_timeseries()`. First-differencing collapses the `Milk` column to a constant (every diff = 0.2), which gives `sd = 0` and breaks any naive `cor()` call. The app's own `compute_correlation_from_timeseries()` handles this correctly (line 264 drops zero-variance columns), but the synthetic series is unrealistic, a real time series would have noise. Cheap fix: add a small jitter (±0.05) to one of the Milk values so the series exercises the auto-correlation path realistically.",
         "",
         "## Methodology notes",
         "",
         "- Deterministic checks (Section A) use `n_iter = 1` with every parameter's distribution set to `\"constant\"`. The simulator collapses to a single deterministic call through the IPCC equation chain, which lets us compare each intermediate against a hand-computed reference value to within `TOL_REL = 1e-4` relative tolerance.",
         "- Monte Carlo convergence checks (Sections B, D) use `n_iter = 50,000` or `500` and compare empirical statistics (mean, Spearman rank correlation) against analytical expectations to within `TOL_MC = 0.02` absolute on correlations, `0.01` relative on means.",
-        "- The audit does NOT go through the Shiny `input$` / observer layer — it calls `run_inventory_simulation()`, `calc_*` functions, `validate_*` functions, and the export builders directly. UI rendering, button-click flow, and tooltip text are not exercised here. (If the calculation engine is correct, the UI shows correct numbers; the rendering layer's bugs would be a separate UX audit.)",
-        "- The hand-comp treats the equation forms as implemented in `R/calc_*.R`. The audit does not re-verify those equation forms against the IPCC source PDFs — that was the May-2026 IPCC alignment audit's scope.",
+        "- The audit does NOT go through the Shiny `input$` / observer layer: it calls `run_inventory_simulation()`, `calc_*` functions, `validate_*` functions, and the export builders directly. UI rendering, button-click flow, and tooltip text are not exercised here. (If the calculation engine is correct, the UI shows correct numbers; the rendering layer's bugs would be a separate UX audit.)",
+        "- The hand-comp treats the equation forms as implemented in `R/calc_*.R`. The audit does not re-verify those equation forms against the IPCC source PDFs: that was the May-2026 IPCC alignment audit's scope.",
         "",
         "## Reproducibility",
         "",

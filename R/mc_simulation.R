@@ -85,7 +85,7 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
     rep(if (is.null(default)) .cat_default(new_name) else default, n_iter)
   }
 
-  # R1.6: full IPCC variable rename — look up new IPCC names first, fall back to legacy
+  # R1.6: full IPCC variable rename, look up new IPCC names first, fall back to legacy
   results <- ghg_emissions_vec(
     # 0 rather than the master: no animals is safer than an invented herd.
     cattle_pop    = get_param_alt("N",       "cattle_pop",    0),
@@ -181,7 +181,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
                                       # callers). The Shiny observer wires this
                                       # to incProgress() so the websocket keeps
                                       # receiving traffic during a multi-minute
-                                      # run on a large inventory — without it the
+                                      # run on a large inventory: without it the
                                       # blocking loop goes silent and shinyapps.io
                                       # drops the connection (~180 s idle), which
                                       # is the "timed out after a few minutes"
@@ -196,7 +196,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
                                       # main + AD-only + EF-only + no-correlation
                                       # comparison) stays under the ~1 GB free tier.
                                       # `results` and `inventory` are ALWAYS kept at
-                                      # full n_iter — only `samples` is thinned, and
+                                      # full n_iter: only `samples` is thinned, and
                                       # it is used solely for the SRC/PRCC ranking
                                       # (already subsampled to 4000 in
                                       # aggregate_sensitivity) and the first-system
@@ -235,7 +235,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
     )
     # Memory cap: thin the retained input draws to keep_sample_rows so the
     # accumulator never holds full-n_iter samples for all systems at once
-    # (the OOM driver on the heavy Zambia run). results/inventory untouched —
+    # (the OOM driver on the heavy Zambia run). results/inventory untouched -
     # they keep the full iteration count behind every reported figure.
     if (!is.null(keep_sample_rows) && !is.null(sim$samples) &&
         nrow(sim$samples) > keep_sample_rows) {
@@ -249,7 +249,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
   }
 
   # Andreas 2026-05 #33: harden against an empty by_system (or one whose
-  # per-iteration result frame has zero rows — which produces the cryptic
+  # per-iteration result frame has zero rows: which produces the cryptic
   # "replacement has 0 rows, data has 5000" error when downstream code
   # assigns to a pre-allocated column). Bail out with a descriptive error
   # before the rowSums(sapply(...)) call instead.
@@ -263,12 +263,12 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
     stop("run_inventory_simulation: at least one system returned ",
          row_counts[row_counts != n_iter][1], " iterations instead of the ",
          "expected ", n_iter, ". This usually means a sampled parameter ",
-         "collapsed to length 0 — re-upload the template after checking ",
+         "collapsed to length 0: re-upload the template after checking ",
          "that every Parameters row has a numeric `mean`.")
   }
 
   # Sum across systems per iteration. Per-source columns kept *separately* for
-  # MM and PRP (Andreas 2026-05 #27, C1 value-boxes) — totals retained for
+  # MM and PRP (Andreas 2026-05 #27, C1 value-boxes): totals retained for
   # back-compat with consumers that still expect total_direct_n2o /
   # total_indirect_n2o.
   inventory_results <- data.frame(

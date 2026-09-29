@@ -148,10 +148,10 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
       "| `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s |",
       pc$parameter[i], pc$param_tier[i], pc$param_type[i], pc$unit[i],
       .tp_fmt_num(pc$ipcc_default[i]),
-      if (is.na(pc$suggested_uncertainty_pct[i])) "(asymmetric — use bounds)"
+      if (is.na(pc$suggested_uncertainty_pct[i])) "(asymmetric: use bounds)"
         else paste0(pc$suggested_uncertainty_pct[i], "%"),
       pc$suggested_distribution[i],
-      if (nzchar(pc$ipcc_ref[i])) pc$ipcc_ref[i] else "—",
+      if (nzchar(pc$ipcc_ref[i])) pc$ipcc_ref[i] else "-",
       alias_to(pc$parameter[i]),
       .tp_esc(def_for(pc$parameter[i]))))
   }
@@ -179,7 +179,7 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
     .tp_partial("subcat_overrides_intro", partials_dir), "",
     "| sub-category | Cfi (Table 10.4) | C (Eq 10.6) | Ym 2019R (Table 10.12) | Ym 2006 | BW | MW | WG | DE | CP | notes |",
     "|---|---|---|---|---|---|---|---|---|---|---|")
-  dash <- function(x) if (is.null(x)) "—" else .tp_fmt_num(x)
+  dash <- function(x) if (is.null(x)) "-" else .tp_fmt_num(x)
   for (sc in ANIMAL_SUBCATEGORIES) {
     lines <- c(lines, sprintf("| `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |", sc,
       dash(CFI_BY_SUBCAT[[sc]]), dash(C_GROWTH_BY_SUBCAT[[sc]]),
@@ -222,7 +222,7 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
   parameter         = "yes | the parameter code from param_catalogue.md",
   definition        = "no | optional human label (mirrors param_catalogue)",
   unit              = "no | optional unit (mirrors param_catalogue)",
-  value             = "yes | the central value — **the number the user is providing**",
+  value             = "yes | the central value: **the number the user is providing**",
   uncertainty_pct   = "one of (uncertainty_pct) or (lower/upper) | symmetric ±% half-width of 95% CI",
   lower_bound       = "no | catalogue reference bound, display only; the model writes bounds to `lower` / `upper`",
   upper_bound       = "no | catalogue reference bound, display only",
@@ -242,7 +242,7 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
   lower_fraction    = "no | min % for fraction_pct uncertainty (optional, enables per-MMS allocation sampling)",
   upper_fraction    = "no | max % for fraction_pct uncertainty",
   distribution_fraction = "no | distribution code for fraction_pct (default `pert`). Rows are renormalised per iteration so the simplex (sum = 100) is preserved.",
-  MCF_pct           = "yes | methane conversion factor in PERCENT (e.g. 5 for 5 %) — see climate-zone table",
+  MCF_pct           = "yes | methane conversion factor in PERCENT (e.g. 5 for 5 %): see climate-zone table",
   lower_mcf         = "no | for asymmetric ranges, percent",
   upper_mcf         = "no | for asymmetric ranges, percent",
   distribution_mcf  = "no | distribution code for MCF",
@@ -250,11 +250,11 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
   lower_ef3         = "no | ",
   upper_ef3         = "no | ",
   distribution_ef3  = "no | ",
-  Frac_GasMS_pct    = "yes | per-MMS volatilisation fraction in PERCENT (e.g. 45) — defaults from IPCC 2019 Table 10.22",
+  Frac_GasMS_pct    = "yes | per-MMS volatilisation fraction in PERCENT (e.g. 45): defaults from IPCC 2019 Table 10.22",
   lower_frac_gas    = "no | percent",
   upper_frac_gas    = "no | percent",
   distribution_frac_gas = "no | ",
-  Frac_LeachMS_pct  = "yes | per-MMS leaching fraction in PERCENT (e.g. 2) — defaults from IPCC 2019 Table 10.22",
+  Frac_LeachMS_pct  = "yes | per-MMS leaching fraction in PERCENT (e.g. 2): defaults from IPCC 2019 Table 10.22",
   lower_frac_leach  = "no | percent",
   upper_frac_leach  = "no | percent",
   distribution_frac_leach = "no | ")
@@ -286,13 +286,13 @@ build_template_schema_md <- function(partials_dir = .TP_PARTIALS_DIR) {
     "## Workbook overview", "",
     "| sheet | required? | purpose |",
     "|-------|-----------|---------|",
-    "| `_Lists` | optional (hidden) | dropdown vocabularies — created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |",
-    "| `README` | optional | human-readable quick-start — safe to omit |",
+    "| `_Lists` | optional (hidden) | dropdown vocabularies: created automatically when the user downloads the blank template; safe to omit when you (Claude) build a workbook from scratch |",
+    "| `README` | optional | human-readable quick-start: safe to omit |",
     "| `Inventory_Metadata` | **required** | country, region, year, IPCC version, species |",
     sprintf("| `Parameters` | **required** | the %d parameters per cattle sub-category |", nrow(PARAM_CATALOGUE)),
     "| `Manure_Management` | **required** | per-MMS allocation; per-group fractions must sum to 100% |",
     "| `Parameter_TimeSeries` | optional | 5+ years of annual values for auto-correlation |",
-    "| `Vocab` | optional | reference catalogue — safe to omit |",
+    "| `Vocab` | optional | reference catalogue: safe to omit |",
     "",
     "## Sheet: `Inventory_Metadata`", "",
     "Transposed (label/value) layout, one field per row starting at row 2. Column B is the label, column C is the value, column D a hint. The parser locates the value column by its header `Value`, so a workbook built from scratch may also use label in A and value in B.",
@@ -302,7 +302,7 @@ build_template_schema_md <- function(partials_dir = .TP_PARTIALS_DIR) {
   meta_notes <- c(
     country = "(free text) | e.g. `Zimbabwe`. Used in the report header.",
     region  = paste0("one of: ", paste(c("africa","asia","europe","americas","oceania","global"), collapse = " / "),
-                     " | Continental region — drives the BW plausibility benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2). Always set it from the country; never leave it to default."),
+                     " | Continental region: drives the BW plausibility benchmark (IPCC Vol.4 Ch.10 Annex 10A.1/10A.2). Always set it from the country; never leave it to default."),
     inventory_year = "(integer) | e.g. `2022`",
     species = paste0("one of: ", paste(SPECIES_OPTIONS, collapse = " / "), " | controlled vocabulary"),
     ipcc_version = paste0("one of: ", paste(IPCC_VERSIONS, collapse = " / "), " | drives MMS list filtering and the edition-specific Ym"),
@@ -323,7 +323,7 @@ build_template_schema_md <- function(partials_dir = .TP_PARTIALS_DIR) {
     "",
     "### Sub-category codes (ANIMAL_SUBCATEGORIES)", "")
   for (k in seq_along(ANIMAL_SUBCATEGORIES))
-    lines <- c(lines, sprintf("- `%s` — %s", ANIMAL_SUBCATEGORIES[k],
+    lines <- c(lines, sprintf("- `%s`: %s", ANIMAL_SUBCATEGORIES[k],
                               ANIMAL_SUBCATEGORY_LABELS[ANIMAL_SUBCATEGORIES[k]]))
 
   lines <- c(lines, "",
@@ -334,7 +334,7 @@ build_template_schema_md <- function(partials_dir = .TP_PARTIALS_DIR) {
     "",
     .tp_col_table(TEMPLATE_MM_COLS, .TP_MM_COL_NOTES),
     "",
-    "### MMS types — by IPCC version", "",
+    "### MMS types: by IPCC version", "",
     "| id | label | 2006? | 2019R? | MCF trop.moist | MCF trop.dry | MCF temperate | MCF boreal | EF3 |",
     "|----|-------|-------|--------|----------------|--------------|---------------|------------|-----|")
   mms <- MMS_DEFAULTS
@@ -368,7 +368,7 @@ build_template_schema_md <- function(partials_dir = .TP_PARTIALS_DIR) {
     "",
     "| col | header | notes |",
     "|-----|--------|-------|",
-    "| A | cattle_type | optional — blank = applies to all groups |",
+    "| A | cattle_type | optional: blank = applies to all groups |",
     "| B | aggregation_level | optional |",
     "| C | sub_category | optional |",
     "| D | year | required (integer) |",

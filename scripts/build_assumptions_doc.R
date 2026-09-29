@@ -143,4 +143,4 @@ P("All eight declared assumptions are rows of one file, defaults/defaults_master
 print(doc, target = out)
 cat("written:", out, "\n")
 x <- paste(readLines(unz(out, "word/document.xml"), warn = FALSE), collapse = "")
-cat("em dashes in document:", lengths(regmatches(x, gregexpr("—", x))), "\n")
+cat("em dashes in document:", lengths(regmatches(x, gregexpr("-", x))), "\n")

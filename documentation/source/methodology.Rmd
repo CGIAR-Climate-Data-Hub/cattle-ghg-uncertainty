@@ -1,7 +1,7 @@
 ---
 title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
 subtitle: "Technical Methodology: Equations, Monte Carlo Procedure, and Uncertainty Reporting"
-author: "CIAT / CGIAR Alliance — ClimateActionNetZero"
+author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
   pdf_document:
     toc: false
@@ -84,12 +84,12 @@ Under the Paris Agreement Enhanced Transparency Framework (ETF), national invent
 
 The tool covers six emission sources for cattle (or buffalo):
 
-1. **Enteric fermentation CH$_4$** — methane produced during enteric fermentation in the rumen
-2. **Manure management CH$_4$** — methane from anaerobic decomposition of manure in storage systems
-3. **Manure management N$_2$O (direct)** — direct nitrous oxide from nitrogen in managed manure
-4. **Manure management N$_2$O (indirect)** — indirect N$_2$O via atmospheric deposition and leaching from managed manure
-5. **Pasture/range/paddock N$_2$O (direct)** — direct N$_2$O from dung and urine deposited on pasture
-6. **Pasture/range/paddock N$_2$O (indirect)** — indirect N$_2$O from dung and urine on pasture
+1. **Enteric fermentation CH$_4$**: methane produced during enteric fermentation in the rumen
+2. **Manure management CH$_4$**: methane from anaerobic decomposition of manure in storage systems
+3. **Manure management N$_2$O (direct)**: direct nitrous oxide from nitrogen in managed manure
+4. **Manure management N$_2$O (indirect)**: indirect N$_2$O via atmospheric deposition and leaching from managed manure
+5. **Pasture/range/paddock N$_2$O (direct)**: direct N$_2$O from dung and urine deposited on pasture
+6. **Pasture/range/paddock N$_2$O (indirect)**: indirect N$_2$O from dung and urine on pasture
 
 The tool supports multiple cattle sub-categories (e.g. dairy cows, beef bulls, heifers, growing males, calves) within a single inventory run, with results aggregated to national totals and to per-cattle-type subtotals (dairy, non-dairy), and with a per-sub-category breakdown that users can use to represent production systems, regions, or animal classes.
 
@@ -111,7 +111,7 @@ Table \ref{tab:params} lists all parameters used in the calculation chain, their
 \small
 \setlength{\LTcapwidth}{\linewidth}
 \begin{longtable}{p{2.2cm} p{4.0cm} p{1.6cm} p{1.5cm} p{4.5cm} p{2.6cm}}
-\caption{Input parameters for the IPCC Tier 2 cattle GHG calculation chain — including IPCC defaults and source citations.\label{tab:params}} \\
+\caption{Input parameters for the IPCC Tier 2 cattle GHG calculation chain: including IPCC defaults and source citations.\label{tab:params}} \\
 \toprule
 \textbf{Variable} & \textbf{Definition} & \textbf{Unit} & \textbf{IPCC default} & \textbf{IPCC reference (equation / table)} & \textbf{Typical dist.} \\
 \midrule
@@ -130,32 +130,32 @@ Table \ref{tab:params} lists all parameters used in the calculation chain, their
 \texttt{BW} & Mean live body weight & kg/head & 270 & Eq.~10.3; Annex 10A.1 (Africa, low productivity) & Normal \\
 \texttt{Cfi} & Coefficient for $NE_m$ & MJ/kg$^{0.75}$/d & 0.386 (lact.) / 0.322 (non-lact.) / 0.370 (bulls) & Eq.~10.3; Table 10.4 (Updated) & Constant \\
 \texttt{Tw} & Mean winter temperature & °C & 20 (inert) & Eq.~10.2 (cold-climate Cfi adjustment) & Constant \\
-\texttt{Ca} & Activity coefficient & — & 0.00 (stall) / 0.17 (pasture flat) / 0.36 (large/hilly) & Eq.~10.4; Table 10.5 (Updated) & Constant \\
+\texttt{Ca} & Activity coefficient &: & 0.00 (stall) / 0.17 (pasture flat) / 0.36 (large/hilly) & Eq.~10.4; Table 10.5 (Updated) & Constant \\
 \texttt{WG} & Mean daily weight gain & kg/head/d & 0 (non-growing default) & Eq.~10.6 & Normal \\
 \texttt{MW} & Mature body weight & kg/head & 300 & Eq.~10.6; Annex 10A.2 & Normal \\
-\texttt{C} & Sex/condition coefficient for $NE_g$ & — & 0.8 (female) / 1.0 (castrate) / 1.2 (bull) & Eq.~10.6 & Constant \\
+\texttt{C} & Sex/condition coefficient for $NE_g$ &: & 0.8 (female) / 1.0 (castrate) / 1.2 (bull) & Eq.~10.6 & Constant \\
 \texttt{Milk} & Daily milk yield & kg/head/d & 1.2 (Africa, low productivity) & Eq.~10.8; Annex 10A.1 (Africa, low productivity) & Normal/Lognormal \\
 \texttt{MilkFat} & Milk fat content & \% & 4.3 (Africa, IPCC 2019R) & Eq.~10.8; Annex 10A.1 & Normal \\
-\texttt{pct\_pregnant} & Fraction of females pregnant / yr & — & 0.52 & Annex 10A.1 (Africa, low productivity) & Beta \\
+\texttt{pct\_pregnant} & Fraction of females pregnant / yr &: & 0.52 & Annex 10A.1 (Africa, low productivity) & Beta \\
 \texttt{MilkPR} & Milk protein content & \% & 3.6 ($\approx 1.9 + 0.4 \times$ \%Fat at Fat 4.3) & Eq.~10.33 (uses 6.38 milk-protein-to-N); Annex 10A.1--10A.3 & Normal \\
 \texttt{WorkHours} & Daily working hours & h/head/d & 0 (no work) & Eq.~10.11 & Constant \\
-\texttt{Cp} & Pregnancy coefficient & — & 0.10 (cattle) & Eq.~10.13; Table 10.7 (Updated) & Constant \\
+\texttt{Cp} & Pregnancy coefficient &: & 0.10 (cattle) & Eq.~10.13; Table 10.7 (Updated) & Constant \\
 \texttt{DE\_pct} & Digestible energy (\% of GE) & \% & 51.0 (Africa, low productivity) & Eq.~10.14--16; Annex 10A.1 (Africa, low productivity) & Normal \\
 \texttt{Ym} & Methane conversion factor & \% & 6.5 (lactating dairy cows, the catalogue default); resolved per sub-category: 7.0 non-dairy and multi-purpose, 4.0 feedlot under 2019R; 6.5 and 3.0 respectively under 2006 & Eq.~10.21; Table 10.12 (Updated), footnote 4 & Normal/PERT \\
-\texttt{UE} & Urinary energy (fraction of GE) & — & 0.04 (cattle) & Eq.~10.24 (footnote) & Constant \\
-\texttt{ASH} & Ash content of manure (fraction of DMI) & — & 0.08 (cattle; IPCC example 0.06 is pig-specific) & Eq.~10.24 & Constant \\
-\texttt{MMS\_fractions} & Fraction of manure in each MMS (deterministic; constrained to sum to 1 per sub-category). Optional per-row \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns on the Manure\_Management sheet enable per-iteration sampling within the user's bounds, renormalised to preserve the simplex; sampled fractions surface as \texttt{fraction\_<mms>} in the sensitivity tornado. & — & country-specific (Worksheet 10.A-9) & Eq.~10.23 & Deterministic (default) or per-MMS PERT/Normal/etc.\ with renormalisation \\
+\texttt{UE} & Urinary energy (fraction of GE) &: & 0.04 (cattle) & Eq.~10.24 (footnote) & Constant \\
+\texttt{ASH} & Ash content of manure (fraction of DMI) &: & 0.08 (cattle; IPCC example 0.06 is pig-specific) & Eq.~10.24 & Constant \\
+\texttt{MMS\_fractions} & Fraction of manure in each MMS (deterministic; constrained to sum to 1 per sub-category). Optional per-row \texttt{lower\_fraction} / \texttt{upper\_fraction} / \texttt{distribution\_fraction} columns on the Manure\_Management sheet enable per-iteration sampling within the user's bounds, renormalised to preserve the simplex; sampled fractions surface as \texttt{fraction\_<mms>} in the sensitivity tornado. &: & country-specific (Worksheet 10.A-9) & Eq.~10.23 & Deterministic (default) or per-MMS PERT/Normal/etc.\ with renormalisation \\
 \texttt{Bo} & Maximum CH$_4$ producing capacity & m$^3$ CH$_4$/kg VS & 0.13 (2019R ``Other regions, low productivity'' cattle); 2006 Africa = 0.10 & Eq.~10.23; Table 10.16(a) (Updated) & Normal \\
-\texttt{MCF} & Methane conversion factor (MMS) & — & per-MMS \& climate (e.g.\ 80\% lagoon tropical) & Eq.~10.23; Table 10.17 (Updated) & Normal/PERT \\
+\texttt{MCF} & Methane conversion factor (MMS) &: & per-MMS \& climate (e.g.\ 80\% lagoon tropical) & Eq.~10.23; Table 10.17 (Updated) & Normal/PERT \\
 \texttt{EF3} & Direct-N$_2$O EF (per MMS) & kg N$_2$O-N/kg N & per-MMS (e.g.\ 0.010 solid storage) & Eq.~10.25; Table 10.21 (Updated) & Lognormal/PERT \\
-\texttt{Frac\_GasMS} & Fraction N volatilised (MMS) & — & per-MMS, e.g.\ 0.45 solid storage (2019R) & Eq.~10.26; Table 10.22 (Updated) & PERT (preferred — IPCC ranges are asymmetric) / Normal \\
+\texttt{Frac\_GasMS} & Fraction N volatilised (MMS) &: & per-MMS, e.g.\ 0.45 solid storage (2019R) & Eq.~10.26; Table 10.22 (Updated) & PERT (preferred, IPCC ranges are asymmetric) / Normal \\
 \texttt{EF4} & EF for atmospheric deposition & kg N$_2$O-N/(kg NH$_3$-N+NO$_x$-N) & \textbf{0.014} (2019R wet climate, the shipped default); aggregated 0.010, dry 0.005; 2006 = 0.010 & Eq.~10.27; Vol.4 Ch.11 Table 11.3 (Updated) & PERT \\
-\texttt{Frac\_LeachMS} & Fraction N leached (MMS) & — & per-MMS, e.g.\ 0.02 solid storage & Eq.~10.28; Table 10.22 (Updated) & PERT \\
+\texttt{Frac\_LeachMS} & Fraction N leached (MMS) &: & per-MMS, e.g.\ 0.02 solid storage & Eq.~10.28; Table 10.22 (Updated) & PERT \\
 \texttt{EF5} & EF for leaching/runoff & kg N$_2$O-N/kg N & 0.011 (2019R); 2006 = 0.0075 & Eq.~10.29; Vol.4 Ch.11 Table 11.3 (Updated) & PERT \\
-\texttt{Frac\_PRP} & Fraction of dung and urine deposited on pasture & — & country-specific & Vol.4 Ch.11 Eq.~11.5 ($MS_{(T,PRP)}$) & Beta / PERT (assignable via the \texttt{distribution} column) \\
+\texttt{Frac\_PRP} & Fraction of dung and urine deposited on pasture &: & country-specific & Vol.4 Ch.11 Eq.~11.5 ($MS_{(T,PRP)}$) & Beta / PERT (assignable via the \texttt{distribution} column) \\
 \texttt{EF3\_PRP} & Direct N$_2$O EF, pasture (cattle/poultry/pigs) & kg N$_2$O-N/kg N & \textbf{0.006} (2019R wet climate, the shipped default); aggregated 0.004, dry 0.002; 2006 = 0.02 & Vol.4 Ch.11 Eq.~11.1; Table 11.1 (Updated) & PERT \\
-\texttt{Frac\_GasPRP} & Fraction N volatilised (PRP) & — & 0.21 (2019R FracGASM); 2006 = 0.20 & Vol.4 Ch.11 Eq.~11.9; Table 11.3 (Updated) & PERT (preferred — IPCC ranges are asymmetric) / Normal \\
-\texttt{Frac\_LeachPRP} & Fraction N leached (PRP) & — & 0.24 (2019R wet); 2006 = 0.30; dry = 0 & Vol.4 Ch.11 Eq.~11.10; Table 11.3 (Updated) & PERT \\
+\texttt{Frac\_GasPRP} & Fraction N volatilised (PRP) &: & 0.21 (2019R FracGASM); 2006 = 0.20 & Vol.4 Ch.11 Eq.~11.9; Table 11.3 (Updated) & PERT (preferred, IPCC ranges are asymmetric) / Normal \\
+\texttt{Frac\_LeachPRP} & Fraction N leached (PRP) &: & 0.24 (2019R wet); 2006 = 0.30; dry = 0 & Vol.4 Ch.11 Eq.~11.10; Table 11.3 (Updated) & PERT \\
 \end{longtable}
 \end{landscape}
 
@@ -171,7 +171,7 @@ The daily net energy requirement for maintenance ($NE_m$, MJ head$^{-1}$ day$^{-
 
 $$NE_m = C_{fi,\text{adj}} \times BW^{0.75}$$
 
-where $BW$ is the mean live body weight (kg head$^{-1}$) and $C_{fi}$ is a sex/condition coefficient (MJ kg$^{-0.75}$ day$^{-1}$). For open-lot cattle in colder climates the 2006 Guidelines (Vol.4 Ch.10, retained unchanged in the 2019 Refinement) prescribe a linear adjustment of $C_{fi}$ — IPCC Eq.~10.2, ``Coefficient for calculating net energy for maintenance'' — based on the mean daily winter temperature:
+where $BW$ is the mean live body weight (kg head$^{-1}$) and $C_{fi}$ is a sex/condition coefficient (MJ kg$^{-0.75}$ day$^{-1}$). For open-lot cattle in colder climates the 2006 Guidelines (Vol.4 Ch.10, retained unchanged in the 2019 Refinement) prescribe a linear adjustment of $C_{fi}$: IPCC Eq.~10.2, ``Coefficient for calculating net energy for maintenance'', based on the mean daily winter temperature:
 
 $$C_{fi,\text{adj}} = C_{fi} + 0.0048 \times (20 - T_w) \quad \text{when } T_w < 20\text{°C}$$
 
@@ -227,7 +227,7 @@ The ratio of net energy for growth to digestible energy consumed ($REG$) is give
 
 $$REG = 1.164 - (5.160 \times 10^{-3} \times DE) + (1.308 \times 10^{-5} \times DE^2) - \frac{37.4}{DE}$$
 
-where $DE$ is the digestible energy expressed as a percentage of gross energy. Both equations are empirical fits derived from ruminant data and are only valid over the digestibility range observed for ruminant diets. The 2019 Refinement (Vol.4 Ch.10, §10.2) documents that range as **45--85\%** (45--55\% for crop by-products and rangelands; 55--80\% for managed pasture and forage-based diets; 72--85\% for grain-based feedlot diets). Outside this range the fits extrapolate poorly: $REG$ passes through zero near $DE \approx 37.6\%$, and below that the $-37.4/DE$ term dominates and drives $REG$ negative. Because the gross-energy equation (below) divides by $REM$ and $REG$, an unconstrained low-$DE$ draw makes gross energy — and hence emissions — diverge or even turn negative.
+where $DE$ is the digestible energy expressed as a percentage of gross energy. Both equations are empirical fits derived from ruminant data and are only valid over the digestibility range observed for ruminant diets. The 2019 Refinement (Vol.4 Ch.10, §10.2) documents that range as **45--85\%** (45--55\% for crop by-products and rangelands; 55--80\% for managed pasture and forage-based diets; 72--85\% for grain-based feedlot diets). Outside this range the fits extrapolate poorly: $REG$ passes through zero near $DE \approx 37.6\%$, and below that the $-37.4/DE$ term dominates and drives $REG$ negative. Because the gross-energy equation (below) divides by $REM$ and $REG$, an unconstrained low-$DE$ draw makes gross energy, and hence emissions, diverge or even turn negative.
 
 To keep every Monte Carlo iteration inside the equations' valid domain, sampled $DE$ values are **clamped to $[45, 85]\%$** at the sampling stage (`generate_mc_samples`). This prevents non-physical iterations (the extreme positive and negative emission totals that would otherwise stretch the output histogram and pull the simulated mean above the 97.5\textsuperscript{th} percentile) without materially shifting the central estimate, since the clamp only trims the small fraction of the $DE$ distribution that falls outside the documented ruminant range. The earlier $DE > 0$ check is retained as defence-in-depth.
 
@@ -259,7 +259,7 @@ $$N_{\text{intake}} = \frac{GE}{18.45} \times \frac{\text{CP\%}}{6.25 \times 100
 
 where CP\% is the crude-protein content of the diet (the template column is labelled \texttt{CP}; the value supplied is the same percentage value used here).
 
-Nitrogen retained in body tissue and milk are calculated separately. For milk, the nitrogen content uses the **Jones factor for casein (6.38)** — distinct from the generic protein factor (6.25) used for feed and body tissue. The 6.38 factor and the 6.25 factor both appear inside IPCC 2006 Vol.4 Ch.10 Eq. 10.33 (N retention rates for cattle); the same equation is retained, with updated form, in the 2019 Refinement (also numbered 10.33):
+Nitrogen retained in body tissue and milk are calculated separately. For milk, the nitrogen content uses the **Jones factor for casein (6.38)**: distinct from the generic protein factor (6.25) used for feed and body tissue. The 6.38 factor and the 6.25 factor both appear inside IPCC 2006 Vol.4 Ch.10 Eq. 10.33 (N retention rates for cattle); the same equation is retained, with updated form, in the 2019 Refinement (also numbered 10.33):
 
 $$N_{\text{milk}} = \frac{\text{Milk} \times \text{MilkProtein\%}}{6.38 \times 100}$$
 
@@ -285,7 +285,7 @@ $$VS = \left[ GE \times (1 - DE/100) + (UE \times GE) \right] \times \left( \fra
 
 where $UE$ is the fraction of GE excreted as urinary energy (default 0.04 for cattle, IPCC Eq. 10.24 footnote) and ASH is the ash content of manure (default 0.08 for cattle).
 
-where $B_o$ is the maximum methane producing capacity (m$^3$ CH$_4$ kg$^{-1}$ VS), $0.67$ is the conversion factor from m$^3$ CH$_4$ to kg CH$_4$ (the density of methane at standard conditions, kg m$^{-3}$), $MS_s$ is the fraction of manure managed in system $s$, and $MCF_s$ is the methane conversion factor for system $s$ (fraction of $B_o$). The 2019 Refinement Table 10.17 (Updated) provides MCF defaults across 11 manure management systems — eight inherited from the 2006 Guidelines plus four added in 2019 (anaerobic digester / biogas, aerobic treatment, solid storage – covered/compacted, and burned for fuel). Default $B_o$ values for cattle are given in Table 10.16a. Per-MMS uncertainty in $MCF$ and in the manure fractions $MS_s$ is sampled independently — when the user supplies optional `lower_fraction` / `upper_fraction` / `distribution_fraction` columns on the Manure_Management sheet, each Monte Carlo iteration's $MS_s$ row is renormalised after sampling so the simplex constraint $\sum_s MS_s = 1$ is preserved exactly.
+where $B_o$ is the maximum methane producing capacity (m$^3$ CH$_4$ kg$^{-1}$ VS), $0.67$ is the conversion factor from m$^3$ CH$_4$ to kg CH$_4$ (the density of methane at standard conditions, kg m$^{-3}$), $MS_s$ is the fraction of manure managed in system $s$, and $MCF_s$ is the methane conversion factor for system $s$ (fraction of $B_o$). The 2019 Refinement Table 10.17 (Updated) provides MCF defaults across 11 manure management systems: eight inherited from the 2006 Guidelines plus four added in 2019 (anaerobic digester / biogas, aerobic treatment, solid storage – covered/compacted, and burned for fuel). Default $B_o$ values for cattle are given in Table 10.16a. Per-MMS uncertainty in $MCF$ and in the manure fractions $MS_s$ is sampled independently, when the user supplies optional `lower_fraction` / `upper_fraction` / `distribution_fraction` columns on the Manure_Management sheet, each Monte Carlo iteration's $MS_s$ row is renormalised after sampling so the simplex constraint $\sum_s MS_s = 1$ is preserved exactly.
 
 ## Manure Management N$_2$O (Direct)
 
@@ -301,10 +301,10 @@ $$EF_3 = \sum_s MS_s \times EF_{3,s}$$
 
 Indirect N$_2$O from managed manure arises from two pathways. Each pathway is split between an N-loss equation (in Vol.4 Ch.10) and an N$_2$O equation (in Vol.4 Ch.10, drawing EFs from Vol.4 Ch.11 Table 11.3):
 
-\textbf{Atmospheric deposition} of volatilised N — Frac\_GasMS from Eq. 10.26 multiplied by $EF_4$ in Eq. 10.27:
+\textbf{Atmospheric deposition} of volatilised N: Frac\_GasMS from Eq. 10.26 multiplied by $EF_4$ in Eq. 10.27:
 $$E_{\text{vol,mm}} = N_{\text{ex,annual}} \times \text{Frac\_GasMS} \times EF_4 \times \frac{44}{28}$$
 
-\textbf{Leaching and runoff} — Frac\_LeachMS from Eq. 10.28 multiplied by $EF_5$ in Eq. 10.29:
+\textbf{Leaching and runoff}: Frac\_LeachMS from Eq. 10.28 multiplied by $EF_5$ in Eq. 10.29:
 $$E_{\text{leach,mm}} = N_{\text{ex,annual}} \times \text{Frac\_LeachMS} \times EF_5 \times \frac{44}{28}$$
 
 where $EF_4$ (kg N$_2$O-N kg$^{-1}$ NH$_3$-N + NO$_x$-N volatilised) and $EF_5$ (kg N$_2$O-N kg$^{-1}$ N leached/runoff) are from IPCC Vol.4 Ch.11 Table 11.3. In the 2006 Guidelines $EF_4 = 0.010$ (range 0.002--0.05) and $EF_5 = 0.0075$ (range 0.0005--0.025). The 2019 Refinement keeps the aggregated $EF_4 = 0.010$ (range 0.002--0.018) and additionally provides climate-disaggregated values of 0.014 in wet climates (range 0.011--0.017) and 0.005 in dry climates (range 0.000--0.011); $EF_5$ is updated to 0.011 (range 0.000--0.020) with no climate disaggregation. Frac\_GasMS and Frac\_LeachMS are MMS- and country- or climate-specific fractions (defaults in Vol.4 Ch.10 Tables 10.22 and 10.23 of the 2019 Refinement).
@@ -327,9 +327,9 @@ Indirect N$_2$O from pasture deposition follows IPCC Vol.4 Ch.11 Eq. 11.9 (volat
 
 $$E_{\text{indirect,PRP}} = F_{\text{PRP}} \times \left( \text{Frac\_GasPRP} \times EF_4 + \text{Frac\_LeachPRP} \times EF_5 \right) \times \frac{44}{28}$$
 
-On the soil side of Eq.~11.9/11.10 the same role played by Frac\_GasMS and Frac\_LeachMS for managed manure is played by FracGASM and FracLEACH-(H) in IPCC Vol.4 Ch.11 Table 11.3 — Frac\_GasPRP corresponds to FracGASM (the fraction of applied/deposited N volatilised as NH$_3$ and NO$_x$) and Frac\_LeachPRP corresponds to FracLEACH-(H) (the fraction leached/runoff in regions with annual precipitation exceeding evapotranspiration).
+On the soil side of Eq.~11.9/11.10 the same role played by Frac\_GasMS and Frac\_LeachMS for managed manure is played by FracGASM and FracLEACH-(H) in IPCC Vol.4 Ch.11 Table 11.3: Frac\_GasPRP corresponds to FracGASM (the fraction of applied/deposited N volatilised as NH$_3$ and NO$_x$) and Frac\_LeachPRP corresponds to FracLEACH-(H) (the fraction leached/runoff in regions with annual precipitation exceeding evapotranspiration).
 
-Per IPCC Vol.4 Ch.11, where evapotranspiration exceeds precipitation, leaching may be assumed not to occur — in the tool, \texttt{Frac\_LeachPRP} may be set equal to zero in those climate cases.
+Per IPCC Vol.4 Ch.11, where evapotranspiration exceeds precipitation, leaching may be assumed not to occur: in the tool, \texttt{Frac\_LeachPRP} may be set equal to zero in those climate cases.
 
 ## GWP-Based CO$_2$eq Conversion
 
@@ -393,14 +393,14 @@ for a normal distribution, or equivalent transformations for lognormal and PERT.
 
 ## Correlated Sampling
 
-When parameters are correlated (e.g.\ body weight and mature weight are positively correlated; diet quality and methane conversion factor may be negatively correlated), ignoring correlation underestimates or overestimates combined uncertainty. The tool applies the same correlated-sampling procedure to every path that supplies a correlation matrix --- the structural-defaults preset, a manually uploaded matrix, and the matrix estimated automatically from a time-series upload all flow through the same algorithm.
+When parameters are correlated (e.g.\ body weight and mature weight are positively correlated; diet quality and methane conversion factor may be negatively correlated), ignoring correlation underestimates or overestimates combined uncertainty. The tool applies the same correlated-sampling procedure to every path that supplies a correlation matrix: the structural-defaults preset, a manually uploaded matrix, and the matrix estimated automatically from a time-series upload all flow through the same algorithm.
 
 \textbf{Procedure} (per IPCC Volume 1 Chapter 3 §3.2.3.2):
 
 1. For each parameter $j$, draw $n_{\text{iter}}$ independent samples from the parameter's own marginal distribution (normal, PERT, lognormal, beta, triangular, uniform, or constant, exactly as specified in the template).
 2. Reorder the columns of the resulting $n_{\text{iter}} \times p$ sample matrix so that the realised Spearman rank correlation between columns matches the target matrix $\boldsymbol{\Sigma}$ (implemented via \texttt{mc2d::cornode}, which performs the restricted-pairing operation IPCC §3.2.3.2 cites under ``restricted pairing methods that are included in many software packages'').
 
-This procedure is distribution-free: the marginal shapes are preserved exactly, regardless of whether the user has mixed normal / lognormal / PERT / beta parameters in the same correlation block. The target $\boldsymbol{\Sigma}$ is interpreted as a Spearman rank correlation matrix throughout --- the same convention the time-series matrix is computed under (Spearman rank correlation of the user's annual values, after detrending; see Section ``Correlation Structure'').
+This procedure is distribution-free: the marginal shapes are preserved exactly, regardless of whether the user has mixed normal / lognormal / PERT / beta parameters in the same correlation block. The target $\boldsymbol{\Sigma}$ is interpreted as a Spearman rank correlation matrix throughout, the same convention the time-series matrix is computed under (Spearman rank correlation of the user's annual values, after detrending; see Section ``Correlation Structure'').
 
 If $\boldsymbol{\Sigma}$ is not positive definite (e.g.\ a manually entered matrix that turns out to be inconsistent), the tool projects it onto the nearest positive-definite correlation matrix via \texttt{Matrix::nearPD(corr = TRUE)} and emits a warning whenever any individual entry is shifted by more than 0.01. The tool does \textit{not} silently fall back to uncorrelated sampling.
 
@@ -425,10 +425,10 @@ After all iterations, compute summary statistics from the distribution of record
 
 Monte Carlo estimates converge as $n_{\text{iter}} \to \infty$. For practical use:
 
-- **1,000 iterations** — suitable only for a quick test run to verify the model runs without errors. Do not report results from 1,000 iterations.
-- **10,000 iterations** — minimum recommended for any result intended for use. Convergence is generally adequate for inventories with up to 5 sub-categories and 30 parameters.
-- **25,000–30,000 iterations** — recommended for final reporting, especially when correlations are enabled or the inventory has many sub-categories or asymmetric distributions.
-- **50,000 iterations** — high-precision run; use when the 95\% CI bounds need to be stable to two significant figures.
+- **1,000 iterations**: suitable only for a quick test run to verify the model runs without errors. Do not report results from 1,000 iterations.
+- **10,000 iterations**: minimum recommended for any result intended for use. Convergence is generally adequate for inventories with up to 5 sub-categories and 30 parameters.
+- **25,000–30,000 iterations**: recommended for final reporting, especially when correlations are enabled or the inventory has many sub-categories or asymmetric distributions.
+- **50,000 iterations**: high-precision run; use when the 95\% CI bounds need to be stable to two significant figures.
 
 **Convergence check:** Re-run with a different random seed (e.g. 123 and 456). If the 95\% MoE changes by more than 1–2 percentage points, increase the number of iterations.
 
@@ -444,7 +444,7 @@ The 95\% CI is defined as the 2.5th and 97.5th percentiles of the Monte Carlo ou
 
 $$\text{CI}_{95} = [Q_{0.025},\ Q_{0.975}]$$
 
-This is a simulation-based (quantile) interval — it does not assume a normal distribution and is therefore valid for asymmetric emission distributions.
+This is a simulation-based (quantile) interval: it does not assume a normal distribution and is therefore valid for asymmetric emission distributions.
 
 ## Margin of Error (the IPCC reporting metric)
 
@@ -452,7 +452,7 @@ The margin of error (MoE\%) is the half-width of the 95\% CI expressed as a perc
 
 $$\text{MoE\%} = \frac{Q_{0.975} - Q_{0.025}}{2 \times \bar{x}} \times 100$$
 
-\textbf{MoE\% is the metric IPCC Vol.1 Ch.3 Table 3.3 requires} ("\% uncertainty" in that table is defined as the half-width of the 95\% CI divided by the mean). It is the headline number reported in the user-facing value boxes, in the IPCC Report tab, and in the Excel / Word downloads. Because MoE is derived from the empirical 2.5\% / 97.5\% quantiles of the Monte Carlo output, it correctly captures distribution skewness — for a perfectly normal distribution it reduces to $\approx 1.96 \times \text{CV\%}$, but for skewed distributions (lognormal EFs, PERT-bounded fractions, manure-N$_2$O sums) MoE and 1.96·CV differ.
+\textbf{MoE\% is the metric IPCC Vol.1 Ch.3 Table 3.3 requires} ("\% uncertainty" in that table is defined as the half-width of the 95\% CI divided by the mean). It is the headline number reported in the user-facing value boxes, in the IPCC Report tab, and in the Excel / Word downloads. Because MoE is derived from the empirical 2.5\% / 97.5\% quantiles of the Monte Carlo output, it correctly captures distribution skewness: for a perfectly normal distribution it reduces to $\approx 1.96 \times \text{CV\%}$, but for skewed distributions (lognormal EFs, PERT-bounded fractions, manure-N$_2$O sums) MoE and 1.96·CV differ.
 
 ## Coefficient of Variation (kept for reference, not reported as headline)
 
@@ -460,7 +460,7 @@ The coefficient of variation (CV\%) expresses uncertainty relative to the mean:
 
 $$\text{CV\%} = \frac{\sigma}{\bar{x}} \times 100$$
 
-where $\sigma$ is the standard deviation and $\bar{x}$ is the mean. CV\% is \textbf{still computed internally} for every emission source (kept in the underlying \texttt{calc\_all\_uncertainty()} data frame for advanced reproducibility) but it is no longer surfaced in any user-facing display — IPCC Annex 7 expects MoE\%, not CV\%. It is undefined (reported as NA) when the mean emission is zero (e.g.\ pasture N$_2$O for fully housed systems).
+where $\sigma$ is the standard deviation and $\bar{x}$ is the mean. CV\% is \textbf{still computed internally} for every emission source (kept in the underlying \texttt{calc\_all\_uncertainty()} data frame for advanced reproducibility) but it is no longer surfaced in any user-facing display: IPCC Annex 7 expects MoE\%, not CV\%. It is undefined (reported as NA) when the mean emission is zero (e.g.\ pasture N$_2$O for fully housed systems).
 
 ## IPCC Table 3.3 Format
 
@@ -479,9 +479,9 @@ The tool generates this table automatically after each simulation run. The Excel
 
 To separate the contributions of activity data (AD) uncertainty and emission factor (EF) uncertainty to the combined uncertainty, the tool performs three simulation runs:
 
-1. **Combined run** — all parameters varied according to their distributions. This is the primary result.
-2. **AD-only run** — emission factors fixed at their central values ($\sigma = 0$); only AD parameters vary. 95\% MoE from this run = AD uncertainty contribution.
-3. **EF-only run** — AD parameters fixed at their central values; only emission factors vary. 95\% MoE from this run = EF uncertainty contribution.
+1. **Combined run**: all parameters varied according to their distributions. This is the primary result.
+2. **AD-only run**: emission factors fixed at their central values ($\sigma = 0$); only AD parameters vary. 95\% MoE from this run = AD uncertainty contribution.
+3. **EF-only run**: AD parameters fixed at their central values; only emission factors vary. 95\% MoE from this run = EF uncertainty contribution.
 
 This approach correctly handles multi-group inventories by running all three simulations through the full multi-sub-category equation chain and aggregating to national totals before computing metrics.
 
@@ -526,14 +526,14 @@ PRCC measures the unique rank-correlation between each input and the output afte
 
 ## Tornado Chart Interpretation
 
-Each parameter label on the tornado chart is formatted as `<parameter> (<sub_category>)` — for example `Ym (DINT_cow)`, `BW (DINT_heif)`, `MCF_solid_storage (DINT_cow)`. The sub-category in parentheses identifies which animal group each influential parameter belongs to so that reduction efforts can be targeted at the specific sub-category that drives uncertainty rather than at the parameter in aggregate. The same labels appear in the rank-correlation table and the downloadable Word / Excel sensitivity sheets.
+Each parameter label on the tornado chart is formatted as `<parameter> (<sub_category>)`: for example `Ym (DINT_cow)`, `BW (DINT_heif)`, `MCF_solid_storage (DINT_cow)`. The sub-category in parentheses identifies which animal group each influential parameter belongs to so that reduction efforts can be targeted at the specific sub-category that drives uncertainty rather than at the parameter in aggregate. The same labels appear in the rank-correlation table and the downloadable Word / Excel sensitivity sheets.
 
 The tornado chart displays the top parameters ranked by $|\text{SRC}|$ or $|\text{PRCC}|$:
 
-- **Green bars** (positive coefficient) — increasing this parameter increases total emissions; reduction in uncertainty would directly reduce total emission uncertainty.
-- **Red bars** (negative coefficient) — increasing this parameter decreases total emissions.
-- **Dark (slate) bars** — IPCC-defined coefficients that cannot be improved by the national inventory compiler (e.g. GWP values, Cfi, Cp). Uncertainty in these parameters is irreducible without IPCC guidance changes.
-- **Bright (green/red) bars** — user-reducible parameters where better national data could meaningfully reduce inventory uncertainty.
+- **Green bars** (positive coefficient): increasing this parameter increases total emissions; reduction in uncertainty would directly reduce total emission uncertainty.
+- **Red bars** (negative coefficient): increasing this parameter decreases total emissions.
+- **Dark (slate) bars**: IPCC-defined coefficients that cannot be improved by the national inventory compiler (e.g. GWP values, Cfi, Cp). Uncertainty in these parameters is irreducible without IPCC guidance changes.
+- **Bright (green/red) bars**: user-reducible parameters where better national data could meaningfully reduce inventory uncertainty.
 
 \newpage
 
@@ -544,10 +544,10 @@ The tornado chart displays the top parameters ranked by $|\text{SRC}|$ or $|\tex
 Correlations between activity data parameters (e.g.\ body weight and mature weight, milk yield and milk fat content) are entered in the Tab~4 \emph{Activity-Data Correlations} card. Four modes are available; each is described in detail below.
 
 \begin{itemize}
-  \item \textbf{No correlations} (independence) — the default. All parameters are drawn independently. This is the conservative IPCC Approach 2 starting point and is appropriate when the inventory compiler has no defensible information about parameter co-movement.
-  \item \textbf{From template (auto, time-series)} — the matrix is computed automatically from the \texttt{Parameter\_TimeSeries} sheet of the upload using a \textbf{Spearman rank correlation} after detrending (first differences by default; linear and raw alternatives available). Spearman is preferred over Pearson because (i) it is robust to skewed marginals (Ym, Bo, milk yield), (ii) it matches the rank-correlation target the sampler reproduces (per IPCC Vol.1 Ch.3 §3.2.3.2), and (iii) it is the preferred option when the user wants the \emph{rank} dependence preserved rather than a linear product-moment relationship that can be distorted by outliers. Requires $\ge$ 5 annual rows and $\ge$ 2 non-constant numeric columns to produce a usable matrix; otherwise the option is greyed out (see ``UI gating'' below).
-  \item \textbf{Structural-defaults preset} — a small set of expert-elicited pairs drawn from the IPCC equation structure and the published livestock literature (see Section~``Structural-Defaults Preset'' below). Independent of the upload's time-series, so this is the option that works for single-year inventories without historical data.
-  \item \textbf{Manual entry} — the user uploads a square symmetric CSV. The diagonal must be 1; entries are interpreted as Spearman rank correlations on $[-1, +1]$; the matrix is projected onto the nearest positive-definite correlation matrix if needed, with a warning if any entry shifts by more than $0.01$.
+  \item \textbf{No correlations} (independence): the default. All parameters are drawn independently. This is the conservative IPCC Approach 2 starting point and is appropriate when the inventory compiler has no defensible information about parameter co-movement.
+  \item \textbf{From template (auto, time-series)}: the matrix is computed automatically from the \texttt{Parameter\_TimeSeries} sheet of the upload using a \textbf{Spearman rank correlation} after detrending (first differences by default; linear and raw alternatives available). Spearman is preferred over Pearson because (i) it is robust to skewed marginals (Ym, Bo, milk yield), (ii) it matches the rank-correlation target the sampler reproduces (per IPCC Vol.1 Ch.3 §3.2.3.2), and (iii) it is the preferred option when the user wants the \emph{rank} dependence preserved rather than a linear product-moment relationship that can be distorted by outliers. Requires $\ge$ 5 annual rows and $\ge$ 2 non-constant numeric columns to produce a usable matrix; otherwise the option is greyed out (see ``UI gating'' below).
+  \item \textbf{Structural-defaults preset}: a small set of expert-elicited pairs drawn from the IPCC equation structure and the published livestock literature (see Section~``Structural-Defaults Preset'' below). Independent of the upload's time-series, so this is the option that works for single-year inventories without historical data.
+  \item \textbf{Manual entry}: the user uploads a square symmetric CSV. The diagonal must be 1; entries are interpreted as Spearman rank correlations on $[-1, +1]$; the matrix is projected onto the nearest positive-definite correlation matrix if needed, with a warning if any entry shifts by more than $0.01$.
 \end{itemize}
 
 \textit{UI gating.} Modes whose prerequisites are missing are greyed out automatically and cannot be selected: ``From template'' is disabled when the upload has no usable \texttt{Parameter\_TimeSeries} sheet, ``Manual entry'' is disabled until the user uploads a CSV matrix, and ``Structural defaults'' is disabled until a template (built-in example or custom upload) is loaded. The Run button additionally blocks the simulation with an explicit error if a no-op mode somehow slips through. These gates prevent the silent fall-back to ``no correlations'' that would otherwise occur when a mode is selected without the data it needs.
@@ -559,11 +559,11 @@ Correlations between activity data parameters (e.g.\ body weight and mature weig
 Emission factors that share systematic bias because they come from the same measurement literature (e.g.\ all rumen-fermentation coefficients from one regional database, or all NH$_3$ volatilisation parameters from one experimental programme) can be assigned correlations in the Tab~4 \emph{Coefficient Correlations} card. Two modes are available:
 
 \begin{itemize}
-  \item \textbf{No EF correlations} (default) — coefficients are sampled independently. The standard IPCC Approach 2 assumption and the right default when each emission factor comes from its own study.
-  \item \textbf{Block-structured EF correlation} — coefficients are grouped into three blocks (energy-equation, manure-CH$_4$, manure-N), each with its own within-block $\rho$ slider in $[0, 0.5]$. Cross-block correlation is always zero because the three measurement literatures are independent. All three sliders default to $0$, so this mode does nothing until the user actively moves at least one slider; an inline warning surfaces if the user selects ``block-structured'' but leaves all sliders at zero.
+  \item \textbf{No EF correlations} (default): coefficients are sampled independently. The standard IPCC Approach 2 assumption and the right default when each emission factor comes from its own study.
+  \item \textbf{Block-structured EF correlation}: coefficients are grouped into three blocks (energy-equation, manure-CH$_4$, manure-N), each with its own within-block $\rho$ slider in $[0, 0.5]$. Cross-block correlation is always zero because the three measurement literatures are independent. All three sliders default to $0$, so this mode does nothing until the user actively moves at least one slider; an inline warning surfaces if the user selects ``block-structured'' but leaves all sliders at zero.
 \end{itemize}
 
-The same correlated-sampling procedure used for activity data (Section ``Correlated Sampling'' above) is applied to the coefficient block --- no special-case sampler. Setting a within-block slider to $\rho = 0.3$ typically widens the 95\% uncertainty interval by a further few percent on top of any activity-data correlation effect; setting it to $\rho = 0.5$ (the slider maximum) approximately doubles that.
+The same correlated-sampling procedure used for activity data (Section ``Correlated Sampling'' above) is applied to the coefficient block: no special-case sampler. Setting a within-block slider to $\rho = 0.3$ typically widens the 95\% uncertainty interval by a further few percent on top of any activity-data correlation effect; setting it to $\rho = 0.5$ (the slider maximum) approximately doubles that.
 
 ## Structural-Defaults Preset (Expert-Elicited)
 
@@ -592,11 +592,11 @@ DE $\leftrightarrow$ Ym       & $-0.50$ & The IPCC 2019 Refinement treats Ym as 
 
 ## Cross-Block Correlations
 
-The preset and the manual / time-series matrices support cross-block correlations (i.e. correlations between an activity-data parameter and a coefficient — for example BW $\leftrightarrow$ Cfi). This is implemented via a single unified correlation matrix that spans the union of all parameter names; the sampler draws from one multivariate distribution covering both blocks rather than two independent block-level distributions. Independence within and across blocks is the default.
+The preset and the manual / time-series matrices support cross-block correlations (i.e. correlations between an activity-data parameter and a coefficient: for example BW $\leftrightarrow$ Cfi). This is implemented via a single unified correlation matrix that spans the union of all parameter names; the sampler draws from one multivariate distribution covering both blocks rather than two independent block-level distributions. Independence within and across blocks is the default.
 
 ## Time-Series Correlation Matrix
 
-When the user uploads a \texttt{Parameter\_TimeSeries} sheet, the correlation matrix is computed automatically as a \textbf{Spearman} rank correlation of the annual values, after \textbf{detrending} (first differences by default, with a UI option to switch to linear detrend or raw series). Detrending separates shared long-run growth --- which is not the year-to-year joint uncertainty Approach 2 is meant to capture --- from genuine parameter co-movement. The resulting matrix is then projected onto the nearest positive-definite correlation matrix via \texttt{Matrix::nearPD(corr = TRUE)} so it can be supplied directly to the sampler described in the ``Correlated Sampling'' section above.
+When the user uploads a \texttt{Parameter\_TimeSeries} sheet, the correlation matrix is computed automatically as a \textbf{Spearman} rank correlation of the annual values, after \textbf{detrending} (first differences by default, with a UI option to switch to linear detrend or raw series). Detrending separates shared long-run growth (which is not the year-to-year joint uncertainty Approach 2 is meant to capture) from genuine parameter co-movement. The resulting matrix is then projected onto the nearest positive-definite correlation matrix via \texttt{Matrix::nearPD(corr = TRUE)} so it can be supplied directly to the sampler described in the ``Correlated Sampling'' section above.
 
 ## Year-to-Year Coefficient Correlation (Trend Mode)
 
@@ -609,8 +609,8 @@ The tool exposes three options on the Simulate tab when Trend mode is selected. 
 \toprule
 \textbf{Option} & \textbf{What happens inside one Monte Carlo iteration} \\
 \midrule
-\textbf{Fully correlated (default)} & The coefficient draw for year $t$ is the \textit{same} as for year 0. If Ym is drawn at 6.2\% for year 0, it is 6.2\% for every other year in that iteration. The trend then reflects activity-data changes only — coefficient uncertainty cancels when subtracting two years. Matches IPCC 2019 §3.2.2.4 default behaviour and the Ogle et al. (2003) ``identical random seed'' construction cited in V1 Ch3 Box 3.2. \\[6pt]
-\textbf{Partial (AR(1), $\rho=0.7$)} & Coefficients drift slowly between years with a rank correlation of $\rho^{|i-j|}$ between year $i$ and year $j$ ($\rho = 0.7$). Independent samples are drawn for each year from the coefficient's marginal and then reordered across years so the realised Spearman rank correlation matches the AR(1) target --- the same restricted-pairing procedure used within a year (per IPCC Vol.1 Ch.3 §3.2.3.2), applied across years. Neighbouring years share most of the same observational basis but the coefficient can move over a decade. Appropriate when the EF is re-estimated periodically (e.g.\ every 3--5 years). \\[6pt]
+\textbf{Fully correlated (default)} & The coefficient draw for year $t$ is the \textit{same} as for year 0. If Ym is drawn at 6.2\% for year 0, it is 6.2\% for every other year in that iteration. The trend then reflects activity-data changes only: coefficient uncertainty cancels when subtracting two years. Matches IPCC 2019 §3.2.2.4 default behaviour and the Ogle et al. (2003) ``identical random seed'' construction cited in V1 Ch3 Box 3.2. \\[6pt]
+\textbf{Partial (AR(1), $\rho=0.7$)} & Coefficients drift slowly between years with a rank correlation of $\rho^{|i-j|}$ between year $i$ and year $j$ ($\rho = 0.7$). Independent samples are drawn for each year from the coefficient's marginal and then reordered across years so the realised Spearman rank correlation matches the AR(1) target: the same restricted-pairing procedure used within a year (per IPCC Vol.1 Ch.3 §3.2.3.2), applied across years. Neighbouring years share most of the same observational basis but the coefficient can move over a decade. Appropriate when the EF is re-estimated periodically (e.g.\ every 3--5 years). \\[6pt]
 \textbf{Independent} & Each year gets a fresh, independent coefficient draw. Maximises the EF contribution to trend uncertainty. Realistic only when every emission factor is genuinely re-measured with new field data every year, which is uncommon for national inventories. \\
 \bottomrule
 \end{tabular}
@@ -640,19 +640,19 @@ The tool includes a QA/QC module (\texttt{R/utils\_qaqc.R}) that runs a series o
 \end{tabular}
 \end{center}
 
-The Pass / Warn / Fail thresholds for benchmark deviation apply \textbf{only to body weight (\texttt{BW})}, the single parameter for which the tool holds a defensible continental IPCC default lookup: Vol.4 Ch.10 Annex Table 10A.1 (dairy cows), Annex Table 10A.2 (other cattle), or Annex Table 10A.3 (buffalo). Earlier versions of the tool also flagged deviations on Milk, MW, DE, Ym, and Bo against heuristic mid-points derived from the same Annex 10A illustrative tables; these were removed (Andreas Wilkes review, May 2026) because those mid-points were not directly citable to a published IPCC default and a reviewer auditing the QA tab could not locate them in the guidelines. The \texttt{ipcc\_default} column of \texttt{PARAM\_CATALOGUE} is still used to auto-fill missing values and is sourced from Vol.4 Ch.10 (Tables 10.4, 10.5, 10.7, 10.11, 10.12, 10.16(a), 10.17, 10.21, 10.22, 10.23) and Vol.4 Ch.11 (Tables 11.1, 11.3) — it is just no longer used as a deviation benchmark for parameters other than BW. Reinstating per-parameter benchmarks properly would require a multi-dimensional table indexed by continent, IPCC version (2006 vs 2019R), production system, and animal sub-category; that is deferred to a future release. Auto-filled parameters are listed in a banner on Tab~1 immediately after data upload; they should be replaced with country-specific values wherever possible, because both the central estimate and the propagated uncertainty depend on them.
+The Pass / Warn / Fail thresholds for benchmark deviation apply \textbf{only to body weight (\texttt{BW})}, the single parameter for which the tool holds a defensible continental IPCC default lookup: Vol.4 Ch.10 Annex Table 10A.1 (dairy cows), Annex Table 10A.2 (other cattle), or Annex Table 10A.3 (buffalo). Earlier versions of the tool also flagged deviations on Milk, MW, DE, Ym, and Bo against heuristic mid-points derived from the same Annex 10A illustrative tables; these were removed (Andreas Wilkes review, May 2026) because those mid-points were not directly citable to a published IPCC default and a reviewer auditing the QA tab could not locate them in the guidelines. The \texttt{ipcc\_default} column of \texttt{PARAM\_CATALOGUE} is still used to auto-fill missing values and is sourced from Vol.4 Ch.10 (Tables 10.4, 10.5, 10.7, 10.11, 10.12, 10.16(a), 10.17, 10.21, 10.22, 10.23) and Vol.4 Ch.11 (Tables 11.1, 11.3), it is just no longer used as a deviation benchmark for parameters other than BW. Reinstating per-parameter benchmarks properly would require a multi-dimensional table indexed by continent, IPCC version (2006 vs 2019R), production system, and animal sub-category; that is deferred to a future release. Auto-filled parameters are listed in a banner on Tab~1 immediately after data upload; they should be replaced with country-specific values wherever possible, because both the central estimate and the propagated uncertainty depend on them.
 
 \newpage
 
 # Verification of Calculation Accuracy
 
-The previous section describes the checks the tool applies to the user's \emph{inputs}. This section describes how the tool's \emph{calculation engine} — the implementation of the IPCC equation chain and the Monte Carlo sampler — has itself been verified to produce correct numbers. Input validation and calculation verification are complementary: the former guards against bad data going in, the latter guarantees the equations are implemented correctly.
+The previous section describes the checks the tool applies to the user's \emph{inputs}. This section describes how the tool's \emph{calculation engine}: the implementation of the IPCC equation chain and the Monte Carlo sampler, has itself been verified to produce correct numbers. Input validation and calculation verification are complementary: the former guards against bad data going in, the latter guarantees the equations are implemented correctly.
 
 ## Equation-chain verification against manual calculation
 
 The core of the verification is a fixed, fully worked test case. For a single representative animal with a complete set of fixed parameters, every intermediate quantity in the IPCC Tier 2 chain was computed independently by hand and in a spreadsheet, directly from the published equations: the net-energy terms ($NE_m$, $NE_a$, $NE_g$, $NE_l$, $NE_w$, $NE_p$), the energy ratios ($REM$, $REG$), gross energy intake ($GE$), the enteric emission factor ($EF_1$), volatile-solid excretion ($VS$), nitrogen excretion ($N_{\text{ex}}$), and all four manure- and pasture-N$_2$O pathways, through to the inventory totals (total CH$_4$, total N$_2$O, and total CO$_2$eq under each GWP basis).
 
-The tool's computed value for each of these quantities must match the independently calculated reference to a relative tolerance of $1 \times 10^{-4}$. These comparisons are encoded as automated assertions that run on every build, so any future change to the calculation code that altered a result — even slightly — would be caught immediately. This is the primary guarantee that the equations in Section "IPCC Tier 2 Emission Equations" are implemented exactly as written.
+The tool's computed value for each of these quantities must match the independently calculated reference to a relative tolerance of $1 \times 10^{-4}$. These comparisons are encoded as automated assertions that run on every build, so any future change to the calculation code that altered a result: even slightly, would be caught immediately. This is the primary guarantee that the equations in Section "IPCC Tier 2 Emission Equations" are implemented exactly as written.
 
 ## Cross-comparison with an independent Monte Carlo package
 
@@ -668,24 +668,24 @@ A regression guard retained in the automated test suite keeps the manure-N$_2$O 
 The two verification activities above are part of a broader automated test suite (91 checks at the time of writing) that is run before each release and deployment. The checks are organised into seven groups:
 
 \begin{itemize}
-  \item \textbf{A — IPCC equation chain:} every intermediate and total against the hand-calculated reference case (Section "Equation-chain verification" above).
-  \item \textbf{B — Monte Carlo sampler:} empirical means of the sampled marginals match their analytical means; realised Spearman rank correlations match the requested targets; the AR(1) year-to-year correlation structure behaves as specified.
-  \item \textbf{C — Application routes:} emission-source filtering (all sources, enteric only, manure CH$_4$ only, N$_2$O only), the three GWP bases (AR4 / AR5 / AR6), the correlation modes, and the AD / EF / combined uncertainty decomposition.
-  \item \textbf{D — Trend (multi-year) pipeline:} the full / partial / independent year-to-year coefficient-correlation modes produce valid multi-year results.
-  \item \textbf{E — Multi-sub-category aggregation:} per-sub-category emissions sum correctly to national totals and scale as expected with population.
-  \item \textbf{F — Edge cases and validators:} missing-value handling, manure-management fraction bounds, lower/upper-bound consistency, zero-population handling, and the multi-system N$_2$O calculations.
-  \item \textbf{G — Outputs:} the Excel and Word/CSV downloads and the correlation-matrix round-trip produce well-formed, internally consistent files.
+  \item \textbf{A: IPCC equation chain:} every intermediate and total against the hand-calculated reference case (Section "Equation-chain verification" above).
+  \item \textbf{B: Monte Carlo sampler:} empirical means of the sampled marginals match their analytical means; realised Spearman rank correlations match the requested targets; the AR(1) year-to-year correlation structure behaves as specified.
+  \item \textbf{C: Application routes:} emission-source filtering (all sources, enteric only, manure CH$_4$ only, N$_2$O only), the three GWP bases (AR4 / AR5 / AR6), the correlation modes, and the AD / EF / combined uncertainty decomposition.
+  \item \textbf{D: Trend (multi-year) pipeline:} the full / partial / independent year-to-year coefficient-correlation modes produce valid multi-year results.
+  \item \textbf{E: Multi-sub-category aggregation:} per-sub-category emissions sum correctly to national totals and scale as expected with population.
+  \item \textbf{F: Edge cases and validators:} missing-value handling, manure-management fraction bounds, lower/upper-bound consistency, zero-population handling, and the multi-system N$_2$O calculations.
+  \item \textbf{G: Outputs:} the Excel and Word/CSV downloads and the correlation-matrix round-trip produce well-formed, internally consistent files.
 \end{itemize}
 
 The full multi-sub-category inventory chain must pass all checks before the tool is published.
 
 ## Verification of IPCC default values and uncertainty ranges
 
-Every IPCC default value and uncertainty range pre-loaded in the tool — the energy-equation coefficients, the methane conversion factor $Y_m$, the maximum methane producing capacity $B_o$, the manure-system MCF values, and the N$_2$O emission factors and volatilisation / leaching fractions ($EF_3$, $EF_4$, $EF_5$, FracGASM, FracLEACH) — has been checked line-by-line against the IPCC 2019 Refinement source text (Volume 4, Chapter 10 and Chapter 11). This review confirmed the central values and corrected two pre-loaded uncertainty ranges ($B_o$ and the pasture direct-N$_2$O factor $EF_{3,\text{PRP}}$) to match the climate-specific ranges in Tables 10.16a and 11.1.
+Every IPCC default value and uncertainty range pre-loaded in the tool: the energy-equation coefficients, the methane conversion factor $Y_m$, the maximum methane producing capacity $B_o$, the manure-system MCF values, and the N$_2$O emission factors and volatilisation / leaching fractions ($EF_3$, $EF_4$, $EF_5$, FracGASM, FracLEACH), has been checked line-by-line against the IPCC 2019 Refinement source text (Volume 4, Chapter 10 and Chapter 11). This review confirmed the central values and corrected two pre-loaded uncertainty ranges ($B_o$ and the pasture direct-N$_2$O factor $EF_{3,\text{PRP}}$) to match the climate-specific ranges in Tables 10.16a and 11.1.
 
 ## Reproducibility
 
-Each simulation is driven by an explicit random seed, so any run can be reproduced exactly by re-supplying the same inputs and seed. The convergence guidance in Section "Recommended Iteration Count and Convergence" — re-running with a second seed and checking that the 95\% margin of error is stable — lets a user confirm that a reported result is converged rather than an artefact of a particular random draw.
+Each simulation is driven by an explicit random seed, so any run can be reproduced exactly by re-supplying the same inputs and seed. The convergence guidance in Section "Recommended Iteration Count and Convergence": re-running with a second seed and checking that the 95\% margin of error is stable, lets a user confirm that a reported result is converged rather than an artefact of a particular random draw.
 
 \newpage
 
@@ -723,9 +723,9 @@ Country-specific options in the CRTs may include reporting of emissions at the l
 
 To facilitate uncertainty analysis at these different levels of disaggregation, the default outputs in the tool are produced at three disaggregation levels concurrently:
 
-- \textbf{Level 1} — disaggregated by cattle type (dairy, non-dairy), emission source (3.A, 3.B, 3.D) and gas (CH$_4$, N$_2$O). Available in the IPCC Report tab and the headline summary of the Word / Excel run-summary.
-- \textbf{Level 2} — Level 1 plus a user-defined second level (production system, region) using the template's \texttt{cattle\_type} and \texttt{region} fields. Available in the per-cattle-type results section of the Word run-summary.
-- \textbf{Level 3} — Level 2 plus cattle sub-categories (dairy\_cow, heifer, bull, etc.). Available in the per-(cattle type $\times$ emission source) breakdown of the Word run-summary and the per-sub-category CSV download from the IPCC Report tab.
+- \textbf{Level 1}: disaggregated by cattle type (dairy, non-dairy), emission source (3.A, 3.B, 3.D) and gas (CH$_4$, N$_2$O). Available in the IPCC Report tab and the headline summary of the Word / Excel run-summary.
+- \textbf{Level 2}: Level 1 plus a user-defined second level (production system, region) using the template's \texttt{cattle\_type} and \texttt{region} fields. Available in the per-cattle-type results section of the Word run-summary.
+- \textbf{Level 3}: Level 2 plus cattle sub-categories (dairy\_cow, heifer, bull, etc.). Available in the per-(cattle type $\times$ emission source) breakdown of the Word run-summary and the per-sub-category CSV download from the IPCC Report tab.
 
 A user-selectable toggle to choose the reporting disaggregation level for the whole tool is not implemented in this release; the three levels are produced concurrently in their respective output channels. A single-toggle option may be added in a future version after feedback from UNFCCC partners on the right default level.
 
@@ -754,7 +754,7 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 
 \vspace{6pt}
 \hangindent=1.5em
-\noindent Iman, R.L., and Conover, W.J. (1982). A distribution-free approach to inducing rank correlation among input variables. *Communications in Statistics — Simulation and Computation*, 11(3), 311--334. (The restricted-pairing algorithm explicitly cited in IPCC 2006 Vol.1 Ch.3 §3.2.3.2 and used by this tool whenever a Spearman correlation matrix is estimated from a time series.)
+\noindent Iman, R.L., and Conover, W.J. (1982). A distribution-free approach to inducing rank correlation among input variables. *Communications in Statistics: Simulation and Computation*, 11(3), 311--334. (The restricted-pairing algorithm explicitly cited in IPCC 2006 Vol.1 Ch.3 §3.2.3.2 and used by this tool whenever a Spearman correlation matrix is estimated from a time series.)
 
 \vspace{6pt}
 \hangindent=1.5em
@@ -793,14 +793,14 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 
 \vspace{6pt}
 \hangindent=1.5em
-\noindent Bates, D., and Maechler, M. (2024). \emph{Matrix}: Sparse and Dense Matrix Classes and Methods. R package. (\texttt{Matrix::nearPD} — projection to the nearest positive-definite correlation matrix when a user-supplied $\boldsymbol{\Sigma}$ is not positive-definite.)
+\noindent Bates, D., and Maechler, M. (2024). \emph{Matrix}: Sparse and Dense Matrix Classes and Methods. R package. (\texttt{Matrix::nearPD}, projection to the nearest positive-definite correlation matrix when a user-supplied $\boldsymbol{\Sigma}$ is not positive-definite.)
 
 ---
 
 \vspace{12pt}
 \begin{center}
 \textcolor{cgiargreen}{\rule{14cm}{0.5pt}}\\[4pt]
-\textcolor{darkgrey}{\small\textit{This document was prepared by CIAT / CGIAR Alliance — ClimateActionNetZero.}}\\
+\textcolor{darkgrey}{\small\textit{This document was prepared by CIAT / CGIAR Alliance: ClimateActionNetZero.}}\\
 \textcolor{darkgrey}{\small\textit{Funded by the Global Methane Hub. Version 1.0.}}\\
 \textcolor{cgiargreen}{\rule{14cm}{0.5pt}}
 \end{center}

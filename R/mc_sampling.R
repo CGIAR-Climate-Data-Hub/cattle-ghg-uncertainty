@@ -1,6 +1,6 @@
 # Monte Carlo Sampling Engine
 # Correlated sampling uses the rank-correlation-preserving restricted-pairing
-# procedure per IPCC Vol.1 Ch.3 §3.2.3.2 — independent draws from each
+# procedure per IPCC Vol.1 Ch.3 §3.2.3.2: independent draws from each
 # parameter's marginal distribution, then column reordering so the resulting
 # Spearman rank correlation matches the target matrix. Distribution-free, so
 # the marginal shapes (PERT / lognormal / beta / normal / uniform) are
@@ -12,7 +12,7 @@
 # changing the correlations to enforce positive-definiteness.
 # 2026-05 follow-up #2: tol lowered from 0.05 to 0.01 so users are told about
 # shifts that matter (a 0.05 shift to a correlation of 0.30 is a 17% relative
-# change — large enough to affect MC results).
+# change: large enough to affect MC results).
 .repair_corr <- function(m, label = "correlation matrix", tol = 0.01) {
   fixed <- as.matrix(Matrix::nearPD(m, corr = TRUE)$mat)
   if (is.matrix(m) && all(dim(m) == dim(fixed))) {
@@ -41,9 +41,9 @@ make_uniform_corr <- function(n, rho) {
 # 2026-05 audit follow-up: block-structured EF correlation.
 # Groups the IPCC coefficients into three blocks that share a measurement /
 # methodological provenance, and lets each block carry its own within-block
-# correlation. Cross-block entries are zero (the three literatures —
+# correlation. Cross-block entries are zero (the three literatures -
 # energy-equation rumen studies, BMP / lagoon studies, NH3/N2O volatilisation
-# studies — are independent).
+# studies: are independent).
 .EF_BLOCKS <- list(
   # Energy-equation coefficients (IPCC Eq 10.3 / 10.4 / 10.16 / 10.21 family)
   energy   = c("Cfi", "Ca", "C", "C_growth", "Cp", "Ym", "Ym_pct"),
@@ -124,7 +124,7 @@ make_block_corr <- function(param_names, rho_by_block) {
 # managed pasture; 72-85% grain-fed feedlot). REG crosses zero near DE = 37.6%,
 # so an untruncated normal draw in the low tail (e.g. DE = 38%) sends gross
 # energy GE = [.../REM + NEg/REG] / (DE/100) toward +/-infinity and produces
-# impossible — even negative — emissions, which stretch the output histogram
+# impossible: even negative, emissions, which stretch the output histogram
 # and pull the mean above the 97.5th percentile. Clamping DE to the documented
 # range keeps every iteration inside the equations' valid domain. Both the IPCC
 # ("DE") and legacy ("DE_pct") column spellings are covered.
@@ -219,7 +219,7 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
   }
 
   # Emission factors: correlated, independent, or pre-sampled (R1.14 trend mode).
-  # Same rank-correlation-preserving procedure as the AD block — the EF block no
+  # Same rank-correlation-preserving procedure as the AD block: the EF block no
   # longer has a special-case sampler.
   if (n_ef > 0) {
     if (!is.null(pre_sampled_coefficients) &&
@@ -251,12 +251,12 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
 # the sampler reproduces exactly (per IPCC Vol.1 Ch.3 §3.2.3.2), and detrending
 # separates shared long-run growth from year-to-year parameter co-movement
 # (IPCC V1 Ch3 p.26 lists "time series techniques can be used to analyse or
-# simulate temporal autocorrelation" — implying detrending first).
+# simulate temporal autocorrelation": implying detrending first).
 #
 # `detrend` options:
-#   "first_diff" (default) — take year-on-year differences before correlation
-#   "linear"               — subtract a fitted linear trend
-#   "none"                 — raw series (legacy behaviour)
+#   "first_diff" (default): take year-on-year differences before correlation
+#   "linear"              : subtract a fitted linear trend
+#   "none"                : raw series (legacy behaviour)
 compute_correlation_from_timeseries <- function(pop_data,
                                                  detrend = c("first_diff","linear","none")) {
   detrend <- match.arg(detrend)
@@ -337,7 +337,7 @@ sample_per_mms_param <- function(mms_rows, value_col, lower_col, upper_col,
 # Convention: the `rho` values below are Spearman rank correlations, the target
 # preserved by the sampler in mc_simulation.R per IPCC Vol.1 Ch.3 §3.2.3.2.
 #
-# Pure function — no rv dependency. Returns a named partial matrix containing
+# Pure function: no rv dependency. Returns a named partial matrix containing
 # only the pairs whose endpoints exist in `all_param_names`. Pairs missing from
 # the spec are silently dropped.
 #
@@ -403,7 +403,7 @@ PRESET_PAIRS <- list(
   # from 0.60 to 0.30 for the same reason; June 2026 continues to 0.
 )
 
-# Legacy alias table — accept Round-3 names so the helper finds pairs even if
+# Legacy alias table: accept Round-3 names so the helper finds pairs even if
 # the user uploaded a pre-rename template.
 .PRESET_ALIASES <- list(
   DE_pct = "DE", Ym_pct = "Ym", CP_pct = "CP",

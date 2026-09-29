@@ -2,7 +2,7 @@
 # Source: IPCC 2006 Guidelines, Volume 4, Chapter 10, Eq 10.23-10.24
 
 # Volatile Solids excretion rate (Eq 10.24) - kg DM/head/day
-# C1: DE (was DE_pct), ASH (was ash) — IPCC software-aligned names.
+# C1: DE (was DE_pct), ASH (was ash), IPCC software-aligned names.
 # Andreas 2026-05 audit follow-up: bounds checks. ASH and UE are fractions
 # in [0, 1]; out-of-range values silently produce wrong VS otherwise.
 calc_volatile_solids <- function(ge, DE,

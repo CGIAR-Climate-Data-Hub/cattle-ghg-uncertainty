@@ -39,7 +39,7 @@ app_server <- function(input, output, session) {
     # matrix via corr_matrix_upload (reset to FALSE on any new template load).
     ts_available     = FALSE,
     manual_uploaded  = FALSE,
-    sim_view = "settings"   # R1.5: "settings" or "results" — drives Tab 5 panel toggle
+    sim_view = "settings"   # R1.5: "settings" or "results", drives Tab 5 panel toggle
   )
 
   # --- Language-switch state preservation (lang_state_* in i18n.R) ------------
@@ -78,7 +78,7 @@ app_server <- function(input, output, session) {
     session$sendCustomMessage("lang_do_reload", list(lang = info$lang))
   }, ignoreInit = TRUE)
 
-  # B4: Home page Resources link — switch to the Resources tab AND scroll to
+  # B4: Home page Resources link, switch to the Resources tab AND scroll to
   # the Tool-specific resources card (id="downloads-card" in app_ui.R) so the
   # methodology/user-guide download buttons are in view immediately. The JS
   # handler in app_ui.R wraps scrollIntoView in setTimeout(150ms) to give the
@@ -195,7 +195,7 @@ app_server <- function(input, output, session) {
   # Bump rv$param_specs_bulk_token to force a full re-render of the
   # uncertainty table (Tab 3). Call this AFTER every BULK replacement of
   # rv$param_specs (file load, example load, quickset apply/undo, etc.).
-  # Do NOT call from cell-edit observers — those go through the
+  # Do NOT call from cell-edit observers: those go through the
   # proxy_unc / replaceData path which preserves the user's search filter
   # and paging across edits.
   .bump_unc_token <- function() {
@@ -212,7 +212,7 @@ app_server <- function(input, output, session) {
   }
 
   # 2026-06: hardcode first-difference detrending. The user-facing "Treatment
-  # of trends" selectInput was retired — the alternative options ("linear",
+  # of trends" selectInput was retired: the alternative options ("linear",
   # "none") were rarely the right call and not a choice an Excel-fluent
   # inventory compiler should be asked to make. compute_corr_from_population()
   # still accepts the parameter; we just don't surface it as a UI choice.
@@ -237,10 +237,10 @@ app_server <- function(input, output, session) {
       rv$corr_matrix <- .compute_corr_now(rv$population)
       # Manure-management allocation with 4 MMS types + per-MMS uncertainty so
       # the IPCC Table 3.3 EF column varies across N2O pathways (otherwise
-      # every N2O row collapses to the same Nex-dominated MoE — looks like a
+      # every N2O row collapses to the same Nex-dominated MoE: looks like a
       # bug but is actually structural for single-MMS inventories).
       rv$manure_data <- generate_country_x_manure()
-      rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded — 12 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
+      rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded: 12 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
       .bump_unc_token()
@@ -248,7 +248,7 @@ app_server <- function(input, output, session) {
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
       rv$manure_data <- generate_country_y_manure()
-      rv$sim_log <- "Country Y (hypothetical pastoral non-dairy) example data loaded — 11 parameters, non_dairy / breeding_cows; 2 MMS types (pasture / solid_storage); 5-year synthetic time-series populated for correlation auto-mode.\n"
+      rv$sim_log <- "Country Y (hypothetical pastoral non-dairy) example data loaded: 11 parameters, non_dairy / breeding_cows; 2 MMS types (pasture / solid_storage); 5-year synthetic time-series populated for correlation auto-mode.\n"
     }
     # Flag any missing core parameters immediately so the Tab 1 notice appears
     # without needing to run the simulation first.
@@ -259,7 +259,7 @@ app_server <- function(input, output, session) {
     rv$ts_available    <- !is.null(rv$corr_matrix)
     rv$manual_uploaded <- FALSE
     rv$upload_status     <- list(type = "success",
-                                 message = sprintf("%s example loaded — %d parameters (with example time-series)",
+                                 message = sprintf("%s example loaded: %d parameters (with example time-series)",
                                    if (name == "country_x") "Country X" else "Country Y",
                                    nrow(rv$param_specs)))
   }
@@ -270,7 +270,7 @@ app_server <- function(input, output, session) {
   })
 
   # T1.1 fix: surface upload errors and successes visibly on Tab 1.
-  # Previously errors only landed in rv$sim_log (Tab 5) — invisible to a user on Tab 1,
+  # Previously errors only landed in rv$sim_log (Tab 5): invisible to a user on Tab 1,
   # who would see the Country X example data still there and assume the upload silently failed.
   observeEvent(input$data_upload, {
     req(input$data_upload)
@@ -301,7 +301,7 @@ app_server <- function(input, output, session) {
       if (!is.null(parsed$metadata) && nzchar(parsed$metadata$country %||% ""))
         msg <- paste0(msg, " (country: ", parsed$metadata$country, ")")
       if (!is.null(parsed$corr_matrix))
-        msg <- paste0(msg, " — correlation matrix loaded from Parameter_TimeSeries (",
+        msg <- paste0(msg, ": correlation matrix loaded from Parameter_TimeSeries (",
                       nrow(parsed$corr_matrix), " parameters)")
 
       # Flag missing core parameters immediately so Tab 1 shows the notice.
@@ -330,7 +330,7 @@ app_server <- function(input, output, session) {
     })
   })
 
-  # Parameter data table — R1.3: imputed rows rendered in red bold
+  # Parameter data table: R1.3: imputed rows rendered in red bold
   # Round 6b #4: add hover tooltip on imputed rows showing default + IPCC ref
   output$param_table <- DT::renderDT({
     req(rv$param_specs)
@@ -451,7 +451,42 @@ app_server <- function(input, output, session) {
     ps
   }
 
-  # Edit parameter table in place — with bidirectional cascade (T1.8, T1.11a)
+  # Beta feedback 2026-09 (APickering #6/#8): shared validator for the two
+  # categorical columns of the editable parameter tables (Tab 1 and Tab 3).
+  # Returns list(ok, value): ok = FALSE means the edit was rejected (a
+  # notification has already been shown); value carries the normalised
+  # replacement (lower-cased, legacy aliases resolved), NULL for columns
+  # this validator does not cover.
+  .validate_categorical_edit <- function(edit_col, new_value) {
+    if (!edit_col %in% c("distribution", "param_type"))
+      return(list(ok = TRUE, value = NULL))
+    v <- tolower(trimws(as.character(new_value)))
+    if (edit_col == "distribution") {
+      valid <- c("normal", "posnorm", "lognormal", "beta", "triangular",
+                 "pert", "uniform", "constant", "tnorm_0_1")
+      if (v == "const") v <- "constant"  # legacy alias
+      if (!v %in% valid) {
+        showNotification(
+          sprintf("distribution must be one of: %s. Got '%s'; edit ignored.",
+                  paste(valid, collapse = ", "), new_value),
+          type = "error", duration = 8)
+        return(list(ok = FALSE, value = NULL))
+      }
+      return(list(ok = TRUE, value = v))
+    }
+    # param_type (Round 7 R1.16 validation, now shared by both tables)
+    if (v == "emission_factor") v <- "coefficient"  # legacy alias
+    if (!v %in% c("activity_data", "coefficient")) {
+      showNotification(
+        sprintf("param_type must be 'activity_data' or 'coefficient'; got '%s'. Edit ignored.",
+                new_value),
+        type = "error", duration = 6)
+      return(list(ok = FALSE, value = NULL))
+    }
+    list(ok = TRUE, value = v)
+  }
+
+  # Edit parameter table in place: with bidirectional cascade (T1.8, T1.11a)
   # Edits to uncertainty_pct  -> recompute lower/upper from mean
   # Edits to lower or upper   -> recompute uncertainty_pct from the symmetric half-width
   # Edits to mean             -> recompute lower/upper from existing uncertainty_pct
@@ -461,6 +496,14 @@ app_server <- function(input, output, session) {
     cols     <- names(rv$param_specs)
     edit_col <- cols[info$col + 1]
     row      <- info$row
+
+    # Beta feedback 2026-09 (APickering #6/#8): free-text edits to the two
+    # categorical columns caused typos ("nromal") that only surfaced as an
+    # upload/run failure much later. Validate here and snap back invalid
+    # values with a message listing the accepted options.
+    checked <- .validate_categorical_edit(edit_col, info$value)
+    if (isFALSE(checked$ok)) return()
+    if (!is.null(checked$value)) info$value <- checked$value
 
     # Apply the edit
     rv$param_specs[row, edit_col] <- DT::coerceValue(
@@ -497,7 +540,7 @@ app_server <- function(input, output, session) {
     # Cross-tab sync: a Tab 1 edit should be reflected on Tab 3 the next
     # time the user looks at it, but WITHOUT discarding Tab 3's filter
     # state. Push the update via the Tab 3 proxy. (proxy_unc is defined
-    # below where the Tab 3 renderDT lives — Shiny is fine with the
+    # below where the Tab 3 renderDT lives: Shiny is fine with the
     # late binding because this observer fires after the session has
     # finished initialising.)
     if (exists("proxy_unc", inherits = TRUE)) {
@@ -510,7 +553,7 @@ app_server <- function(input, output, session) {
     }
   })
 
-  # Validation — surfaces upload status (success/failure) AND data validation errors
+  # Validation: surfaces upload status (success/failure) AND data validation errors
   output$validation_status <- renderUI({
     blocks <- list()
     # Show upload status banner if present (T1.1: makes upload errors visible)
@@ -761,9 +804,9 @@ app_server <- function(input, output, session) {
     )
   })
 
-  # Tab 1 (Data Input) inline notice — shown immediately when data is loaded.
+  # Tab 1 (Data Input) inline notice: shown immediately when data is loaded.
   # A simpler amber card than the Tab 2 DT: lists imputed parameter names and
-  # the IPCC default value used. No DT needed — the full details are on Tab 2.
+  # the IPCC default value used. No DT needed: the full details are on Tab 2.
   output$imputed_params_notice_tab1 <- renderUI({
     rows <- imputed_rows()
     if (is.null(rows) || nrow(rows) == 0) return(NULL)
@@ -791,7 +834,7 @@ app_server <- function(input, output, session) {
             ref_val <- if ("ipcc_ref" %in% names(rows) && nzchar(rows$ipcc_ref[i] %||% ""))
               rows$ipcc_ref[i] else {
                 cat_row <- PARAM_CATALOGUE[PARAM_CATALOGUE$parameter == rows$parameter[i], ]
-                if (nrow(cat_row) > 0) cat_row$ipcc_ref[1] else "—"
+                if (nrow(cat_row) > 0) cat_row$ipcc_ref[1] else "-"
               }
             tags$tr(style = if (i %% 2 == 0) "background:rgba(245,158,11,0.08);" else "",
               tags$td(style = "padding:4px 8px; font-weight:600;", rows$parameter[i]),
@@ -894,7 +937,7 @@ app_server <- function(input, output, session) {
   # Uncertainty table.
   # Andreas 2026-06-02 review (round 1): when a user searched the table for
   # a parameter (e.g. "MW") and edited a cell, the whole DT re-rendered from
-  # scratch and the search filter was cleared — forcing a fresh search for
+  # scratch and the search filter was cleared: forcing a fresh search for
   # every edit on large inventories. stateSave = TRUE alone wasn't enough
   # because Shiny's reactivity tears down the DataTable instance on every
   # rv$param_specs change, and the saved-state restore races with the
@@ -904,7 +947,7 @@ app_server <- function(input, output, session) {
   # Switched to a dataTableProxy: the initial render only fires on bulk
   # data changes (file load, example load, quickset apply, reset). Cell
   # edits go through DT::replaceData(proxy, ...) which mutates the live
-  # DataTable instance in-place — search filter, paging, and ordering
+  # DataTable instance in-place: search filter, paging, and ordering
   # are preserved natively. rv$unc_render_token is bumped at every
   # bulk-replacement of rv$param_specs to force the initial render path.
   .unc_visible_cols <- c("parameter", "mean", "uncertainty_pct",
@@ -951,19 +994,13 @@ app_server <- function(input, output, session) {
     row      <- info$row
     if (is.na(edit_col)) return()
 
+    # Categorical-column validation shared with the Tab 1 table (beta
+    # feedback 2026-09, APickering #6/#8): covers param_type (Round 7
+    # R1.16) and distribution.
     new_value <- info$value
-    if (edit_col == "param_type") {
-      vt <- tolower(trimws(as.character(new_value)))
-      if (vt == "emission_factor") vt <- "coefficient"  # legacy alias
-      if (!vt %in% c("activity_data", "coefficient")) {
-        showNotification(
-          sprintf("param_type must be 'activity_data' or 'coefficient' — got '%s'. Edit ignored.",
-                  new_value),
-          type = "error", duration = 6)
-        return()
-      }
-      new_value <- vt
-    }
+    checked <- .validate_categorical_edit(edit_col, new_value)
+    if (isFALSE(checked$ok)) return()
+    if (!is.null(checked$value)) new_value <- checked$value
 
     rv$param_specs[row, edit_col] <- DT::coerceValue(
       new_value, rv$param_specs[row, edit_col])
@@ -997,7 +1034,7 @@ app_server <- function(input, output, session) {
     rv$param_specs <- ps
 
     # Push the updated data to the live DT instance via the proxy. This
-    # preserves the user's search filter, page, and ordering — they don't
+    # preserves the user's search filter, page, and ordering: they don't
     # get bounced back to the top of the table after every edit. The
     # output$uncertainty_table render path is gated on rv$unc_render_token
     # which we deliberately do NOT bump here.
@@ -1009,7 +1046,7 @@ app_server <- function(input, output, session) {
 
   # Template downloads. Round 7.1: filename and MMS dropdown reflect the
   # IPCC version picked via input$template_version. Andreas 2026-05 follow-up:
-  # no default — user must pick a version explicitly. If they click a Download
+  # no default: user must pick a version explicitly. If they click a Download
   # button without choosing, surface a Shiny notification and abort the
   # download.
   .selected_ipcc_version <- function() input$template_version
@@ -1048,8 +1085,8 @@ app_server <- function(input, output, session) {
   )
 
   # Lolita 2026-06-02 review: downloadable correlation-matrix templates for
-  # the "Advanced — manual entry" mode. Two flavours — blank (identity) and
-  # pre-filled with the structural-defaults pairs — so users have a concrete
+  # the "Advanced: manual entry" mode. Two flavours, blank (identity) and
+  # pre-filled with the structural-defaults pairs: so users have a concrete
   # starting CSV with the canonical PARAM_CATALOGUE names already in place.
   # Prevents typos in row/column headers that would otherwise be silently
   # dropped by expand_corr_matrix().
@@ -1064,7 +1101,7 @@ app_server <- function(input, output, session) {
 
   # --- CORRELATIONS ---
 
-  # T4.1 / Round 7 R1.15: structural-defaults preset — sparse matrix with documented
+  # T4.1 / Round 7 R1.15: structural-defaults preset, sparse matrix with documented
   # structural pairs only. Renamed 2026-05 from "IPCC-guidance preset" after the
   # statistical audit: the IPCC publishes no numerical correlation values; this
   # preset is expert-elicited from biological / statistical relationships in the
@@ -1096,7 +1133,7 @@ app_server <- function(input, output, session) {
       # recompute from the current population data so the heatmap and the MC
       # both reflect the time-series, not whatever matrix the previous mode
       # left behind. If no time-series is available, leave rv$corr_matrix NULL
-      # — the gated radio will keep this option disabled, but if a stale state
+      #: the gated radio will keep this option disabled, but if a stale state
       # reaches here we explicitly clear rather than carrying a wrong matrix.
       if (!is.null(rv$population)) {
         rv$corr_matrix <- .compute_corr_now(rv$population)
@@ -1109,7 +1146,7 @@ app_server <- function(input, output, session) {
       # already uploaded one earlier, keep it.
       if (!isTRUE(rv$manual_uploaded)) rv$corr_matrix <- NULL
     } else if (input$corr_mode == "none") {
-      # Don't wipe an uploaded matrix — just don't apply it (sim observer reads input$corr_mode)
+      # Don't wipe an uploaded matrix: just don't apply it (sim observer reads input$corr_mode)
     }
   }, ignoreInit = TRUE)
 
@@ -1140,7 +1177,7 @@ app_server <- function(input, output, session) {
   })
 
   # Round 6a #5: render the "Compare with/without correlations" checkbox
-  # disabled when no correlations are selected on Tab 4 — the comparison
+  # disabled when no correlations are selected on Tab 4: the comparison
   # run would otherwise be identical to the main run and waste compute time.
   output$run_comparison_ui <- renderUI({
     no_ad_corr <- is.null(input$corr_mode) || input$corr_mode == "none"
@@ -1190,7 +1227,7 @@ app_server <- function(input, output, session) {
     # NOTE on manual: this mode is now ALWAYS selectable (the file picker
     # lives inside the manual conditionalPanel, so users need to enter the
     # mode to reach the upload). The simulation observer blocks the run if
-    # the user selected manual without actually uploading a matrix — that's
+    # the user selected manual without actually uploading a matrix: that's
     # where the safety check lives now, not here.
     if ((current_mode == "timeseries" && !ts_ok) ||
         (current_mode == "preset"     && !has_template)) {
@@ -1255,7 +1292,7 @@ app_server <- function(input, output, session) {
     disabled_values <- c()
     if (!ts_ok)        disabled_values <- c(disabled_values, "timeseries")
     if (!has_template) disabled_values <- c(disabled_values, "preset")
-    # "manual" intentionally NOT in disabled_values — see comment above the
+    # "manual" intentionally NOT in disabled_values: see comment above the
     # radioButtons() call. The simulation observer blocks the run if manual
     # is selected without an uploaded matrix.
     js_disable <- if (length(disabled_values) > 0) {
@@ -1318,8 +1355,8 @@ app_server <- function(input, output, session) {
     }
   })
 
-  # EF correlation matrix — built from UI inputs whenever they change.
-  # 2026-05 audit follow-up: only two modes survive — "none" (IPCC default)
+  # EF correlation matrix: built from UI inputs whenever they change.
+  # 2026-05 audit follow-up: only two modes survive, "none" (IPCC default)
   # and "block" (within-literature correlations, cross-block zero). The
   # legacy "uniform" single-ρ option was removed because applying one ρ to
   # 13 coefficients drawn from three unrelated measurement literatures
@@ -1350,10 +1387,10 @@ app_server <- function(input, output, session) {
   # can read the slider state without consulting docs.
   .rho_band <- function(rho) {
     if (is.null(rho) || !is.finite(rho)) return("")
-    if (rho == 0)         return("Currently: 0.00 — independent within the block (no shared bias assumed).")
-    if (rho <= 0.15)      return(sprintf("Currently: %.2f — weak shared bias.", rho))
-    if (rho <= 0.35)      return(sprintf("Currently: %.2f — moderate shared bias (typical when one literature dominates).", rho))
-                          sprintf("Currently: %.2f — strong shared bias (requires documented justification).", rho)
+    if (rho == 0)         return("Currently: 0.00, independent within the block (no shared bias assumed).")
+    if (rho <= 0.15)      return(sprintf("Currently: %.2f, weak shared bias.", rho))
+    if (rho <= 0.35)      return(sprintf("Currently: %.2f, moderate shared bias (typical when one literature dominates).", rho))
+                          sprintf("Currently: %.2f, strong shared bias (requires documented justification).", rho)
   }
   output$ef_rho_energy_interp   <- renderText(.rho_band(input$ef_rho_energy))
   output$ef_rho_manureCH_interp <- renderText(.rho_band(input$ef_rho_manureCH))
@@ -1382,7 +1419,7 @@ app_server <- function(input, output, session) {
         plotly::layout(title = t("corr_ef_no_corr"),
                        xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
     } else {
-      title_str <- sprintf("%s — energy=%.2f, manureCH=%.2f, manureN=%.2f",
+      title_str <- sprintf("%s: energy=%.2f, manureCH=%.2f, manureN=%.2f",
                            t("corr_heatmap_title_ef"),
                            input$ef_rho_energy   %||% 0,
                            input$ef_rho_manureCH %||% 0,
@@ -1400,7 +1437,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$run_sim, {
     req(rv$param_specs)
 
-    # Block run if no analysis mode selected — navigate to Data Input (where the toggle lives).
+    # Block run if no analysis mode selected: navigate to Data Input (where the toggle lives).
     if (is.null(input$analysis_mode) || !nzchar(input$analysis_mode)) {
       showNotification(
         "Please choose an analysis mode (Single year or Trend) at the top of the Data Input tab before running.",
@@ -1413,11 +1450,11 @@ app_server <- function(input, output, session) {
 
     # Round 9: defensive no-op. Trend mode shows a different Run button
     # ('run_trend') via conditionalPanel, so clicking the single-year button
-    # in trend mode shouldn't be possible — but if it is, we bail with a
+    # in trend mode shouldn't be possible: but if it is, we bail with a
     # message rather than running a single-year sim against trend settings.
     if (input$analysis_mode == "trend") {
       showNotification(
-        "Trend mode is selected on the Home page. Click 'Run Trend Analysis' on this tab instead — the single-year Run is only used for analysis_mode = 'single'.",
+        "Trend mode is selected on the Home page. Click 'Run Trend Analysis' on this tab instead: the single-year Run is only used for analysis_mode = 'single'.",
         type = "warning", duration = 8)
       return()
     }
@@ -1449,7 +1486,7 @@ app_server <- function(input, output, session) {
     }
     if (isTRUE(input$corr_mode == "manual") && !isTRUE(rv$manual_uploaded)) {
       showNotification(
-        "Correlation mode is 'Advanced — manual entry' but no CSV matrix has been uploaded. Either upload a manual matrix, or switch the mode on Tab 4 before running.",
+        "Correlation mode is 'Advanced: manual entry' but no CSV matrix has been uploaded. Either upload a manual matrix, or switch the mode on Tab 4 before running.",
         type = "error", duration = 12)
       rv$sim_log <- paste0(rv$sim_log,
         "Run blocked: corr_mode='manual' selected but no matrix uploaded.\n")
@@ -1487,7 +1524,7 @@ app_server <- function(input, output, session) {
     # Andreas 2026-05-26 follow-up: block the run when the user has left a
     # required `mean` cell blank (NA after parsing). ensure_completeness()
     # above auto-fills entirely-missing parameter rows from IPCC defaults but
-    # cannot help here — the parameter row exists, the user just hasn't typed
+    # cannot help here: the parameter row exists, the user just hasn't typed
     # a number into it. Without this guard the NA flows into rnorm() at
     # sampling time, produces NA draws, and trips `if (milk_yield > 0)` /
     # `if (weight_gain > 0)` inside calc_n_excretion / calc_neg with the
@@ -1527,7 +1564,7 @@ app_server <- function(input, output, session) {
     # and the simulation crashes at quantile() with the unhelpful
     # 'missing values and NaN's not allowed' error after 20 000+ iterations.
     # The QA/QC tab catches the same issue but users sometimes skip QA
-    # and go straight to Run — so duplicate the check here, source-aware
+    # and go straight to Run: so duplicate the check here, source-aware
     # (only flag rows for parameters used by the selected emission sources).
     ps_check <- rv$param_specs
     has_b <- !is.na(ps_check$mean) & !is.na(ps_check$lower) & !is.na(ps_check$upper)
@@ -1550,7 +1587,7 @@ app_server <- function(input, output, session) {
         paste0("Cannot run simulation: %d Parameters row(s) have bounds ",
                "that don't bracket the mean (lower > mean OR mean > upper). ",
                "These would produce NaN samples and crash the run. Fix on ",
-               "Tab 1 or Tab 3 — also check the QA/QC tab for the full list. ",
+               "Tab 1 or Tab 3: also check the QA/QC tab for the full list. ",
                "Rows: %s"),
         length(bad_idx),
         if (nchar(preview_txt) > 400) paste0(substr(preview_txt, 1, 400), " ...")
@@ -1588,7 +1625,7 @@ app_server <- function(input, output, session) {
         # tryCatch error handler runs AFTER the stack has unwound, so
         # sys.calls() there only shows Shiny scaffolding (useless for
         # debugging if(NA) errors). withCallingHandlers runs BEFORE unwinding
-        # — we snap sys.calls() there and stash it for the tryCatch logger.
+        #: we snap sys.calls() there and stash it for the tryCatch logger.
         captured_stack <- character(0)
         tryCatch(withCallingHandlers({
 
@@ -1640,7 +1677,7 @@ app_server <- function(input, output, session) {
             showNotification(
               "Sub-category key ambiguous between Parameters and Manure_Management. See simulation log for details.",
               type = "error", duration = NULL)
-            stop("Ambiguous sub-category key — run blocked.", call. = FALSE)
+            stop("Ambiguous sub-category key: run blocked.", call. = FALSE)
           }
 
           auto_rows <- sg_issues[sg_issues$status == "warn" &
@@ -1739,7 +1776,7 @@ app_server <- function(input, output, session) {
                 # Andreas 2026-05 follow-up (C4 / C6): sample per-MMS MCF /
                 # EF3 / Frac_GasMS / Frac_LeachMS uncertainty from the
                 # lower / upper / distribution columns on the manure sheet.
-                # Was previously dropped — only central values were used as
+                # Was previously dropped: only central values were used as
                 # deterministic per-iteration constants, so MCF never showed
                 # up in the MM-CH4 tornado despite huge bounds in real data.
                 mc_n_iter <- n_iter_val
@@ -1784,7 +1821,7 @@ app_server <- function(input, output, session) {
                 # the central value, the sampler degenerates to a constant
                 # row (matching the prior deterministic behaviour). Each
                 # iteration row is then divided by 100 and renormalised so
-                # it sums to 1 — keeps the values on the simplex (Option A
+                # it sums to 1: keeps the values on the simplex (Option A
                 # from the design Q: independent sample + renormalise).
                 if (any(c("lower_fraction", "upper_fraction",
                            "distribution_fraction") %in% names(mms_rows))) {
@@ -1846,7 +1883,7 @@ app_server <- function(input, output, session) {
             # load when corr_mtx_active is already populated from the example's
             # synthetic time-series). Without isTRUE, `NA != "none"` returns NA,
             # `NA && TRUE` returns NA, and `if (NA)` throws "missing value where
-            # TRUE/FALSE needed" — the exact error users reported on Country X.
+            # TRUE/FALSE needed": the exact error users reported on Country X.
             unified_corr <- if (isTRUE(input$corr_mode != "none") && !is.null(corr_mtx_active)) {
               expand_corr_matrix(corr_mtx_active, all_names)
             } else NULL
@@ -1855,7 +1892,7 @@ app_server <- function(input, output, session) {
               expand_corr_matrix(corr_mtx_active, coef_names)
             } else NULL
 
-            # AD block has only cattle_pop — within-block correlation is meaningless.
+            # AD block has only cattle_pop: within-block correlation is meaningless.
             corr <- NULL
 
             # If time-series matrix is available, prefer it over uniform-rho.
@@ -1885,16 +1922,16 @@ app_server <- function(input, output, session) {
           n_sys <- length(sys_groups)
 
           # Duration heads-up for large runs. A big inventory (many sub-
-          # categories) at high iteration counts — especially with the 3x
-          # decomposition — can take several minutes. Tell the user to be
+          # categories) at high iteration counts: especially with the 3x
+          # decomposition: can take several minutes. Tell the user to be
           # patient and keep the tab open, so a slow-but-working run isn't
-          # mistaken for a hang. Framed around patience only — NO mention of
+          # mistaken for a hang. Framed around patience only: NO mention of
           # iteration counts to reduce or of hosting/server limits.
           decomp_mult <- if (isTRUE(input$run_decomposition)) 3L else 1L
           run_cost <- as.numeric(n_iter_val) * n_sys * decomp_mult
           if (run_cost >= 1.5e6) {
             showNotification(
-              paste0("Large run in progress — this may take a few minutes. ",
+              paste0("Large run in progress: this may take a few minutes. ",
                      "Please keep this browser tab open; the progress bar ",
                      "will keep updating until it finishes."),
               type = "message", duration = 12)
@@ -1913,7 +1950,7 @@ app_server <- function(input, output, session) {
             function(done, total) {
               frac <- if (total > 0) done / total else 1
               setProgress(span_lo + (span_hi - span_lo) * frac,
-                          detail = sprintf("%s — sub-category %d of %d…",
+                          detail = sprintf("%s: sub-category %d of %d…",
                                            label, done, total))
             }
           }
@@ -1921,7 +1958,7 @@ app_server <- function(input, output, session) {
             systems_data, n_iter = n_iter_val,
             gwp = input$gwp_version, seed = input$seed,
             # Andreas 2026-05 follow-up: Tw is now sourced exclusively from
-            # the Parameters template (per sub-category) — the UI input was
+            # the Parameters template (per sub-category): the UI input was
             # removed. pct_pregnant is still read here as a single global
             # value (Cp pro-rate applies inventory-wide).
             pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
@@ -1930,7 +1967,7 @@ app_server <- function(input, output, session) {
             sampler = "iman_conover",
             progress_cb = keepalive_cb(0.48, 0.88, "Main run"),
             # Cap retained input draws (memory): the full-n_iter results behind
-            # every reported figure are unaffected — only the samples used for
+            # every reported figure are unaffected: only the samples used for
             # the sensitivity ranking / density plots are thinned.
             keep_sample_rows = 4000L
           )
@@ -1947,7 +1984,7 @@ app_server <- function(input, output, session) {
           # built in run_inventory_simulation() uses `total_enteric_ch4`,
           # `total_manure_ch4`, `total_direct_n2o_mm`, ..., a different
           # convention. The single-year run filters BOTH frames through
-          # .apply_source_selection() below — so the function has to accept
+          # .apply_source_selection() below: so the function has to accept
           # either naming. Previously it knew only the per-system names, so
           # when applied to the inventory frame every column lookup returned
           # NULL, the arithmetic collapsed to length 0, and downstream code
@@ -1969,7 +2006,7 @@ app_server <- function(input, output, session) {
                       .col_or_zero(df, "manure_ch4_total",  "total_manure_ch4")
                     else 0)
             # Andreas 2026-05 #27: pasture direct and indirect are separate IPCC
-            # reporting categories — splitting the single legacy `pasture_n2o`
+            # reporting categories: splitting the single legacy `pasture_n2o`
             # checkbox into two. Old `pasture_n2o` kept as a back-compat alias
             # for any saved bookmarks / URLs.
             legacy_pasture <- "pasture_n2o" %in% srcs
@@ -2033,8 +2070,8 @@ app_server <- function(input, output, session) {
 
           # ---- Stage 4: decomposition (AD-only + EF-only, multi-group safe) ----
           # Run two additional full-inventory simulations with parameters locked:
-          #   AD-only  — all emission-factor/coefficient params fixed at their means
-          #   EF-only  — all activity-data params fixed at their means
+          #   AD-only : all emission-factor/coefficient params fixed at their means
+          #   EF-only : all activity-data params fixed at their means
           # Works for any number of cattle groups because it uses the same
           # run_inventory_simulation() pipeline as the main run.
           if (isTRUE(input$run_decomposition)) {
@@ -2054,13 +2091,13 @@ app_server <- function(input, output, session) {
                 # Andreas 28/5/26 #9: per-MMS sample matrices (mcf_samples,
                 # ef3_samples, frac_gas_samples, frac_leach_samples) and the
                 # MMS-allocation sample matrix (mms_fraction_samples) all
-                # carry coefficient-side variance — they were leaking
+                # carry coefficient-side variance: they were leaking
                 # iteration-to-iteration MCF / EF3 / Frac variation into the
                 # AD-only run, so AD-only CV differed across emission sources
                 # even though N was the only AD parameter. Null them here so
                 # the AD-only run sees deterministic per-MMS values
                 # (mcf_values / ef3_values / frac_gas_values / frac_leach_values
-                # / mms_fractions are still respected — they are the central
+                # / mms_fractions are still respected: they are the central
                 # values used when the matrices are NULL).
                 sd$mcf_samples           <- NULL
                 sd$ef3_samples           <- NULL
@@ -2071,7 +2108,7 @@ app_server <- function(input, output, session) {
               if (fix_type == "activity_data") {
                 sd$corr_matrix         <- NULL
                 sd$unified_corr_matrix <- NULL
-                # Per-MMS sample matrices STAY active in the EF-only run —
+                # Per-MMS sample matrices STAY active in the EF-only run -
                 # they are coefficient-side variance and are exactly what
                 # the EF-only run is meant to expose.
               }
@@ -2090,7 +2127,7 @@ app_server <- function(input, output, session) {
             )
             # Keep only the summary metrics; free the AD-only sample/result
             # matrices before the EF-only pass so the three full simulations
-            # don't sit in memory simultaneously (free tier is ~1 GB RAM —
+            # don't sit in memory simultaneously (free tier is ~1 GB RAM -
             # holding all three risks an out-of-memory abort on a large run).
             ad_unc <- calc_all_uncertainty(ad_result$inventory)
             rm(systems_ad, ad_result); invisible(gc(FALSE))
@@ -2129,7 +2166,7 @@ app_server <- function(input, output, session) {
           # ---- Stage 5: sensitivity analysis ----
           # For multi-group inventories, combine each group's parameter samples
           # and regress against the TOTAL inventory CO2eq. Aggregate sensitivity
-          # rankings — not rankings for the first group only.
+          # rankings: not rankings for the first group only.
           # Andreas 28/5/26 #8: column labels now read "param (sub_category)"
           # so the tornado clearly identifies which animal sub-category each
           # influential parameter belongs to (e.g. "Ym (DINT_cow)" vs
@@ -2141,7 +2178,7 @@ app_server <- function(input, output, session) {
           # system only.
 
           setProgress(0.92, detail = "Running sensitivity analysis...")
-          # Sensitivity is a SECONDARY analysis — isolate it so a failure here
+          # Sensitivity is a SECONDARY analysis: isolate it so a failure here
           # leaves the main results (Tab 5) and the IPCC report (Tab 7) intact.
           # Before this guard, an error inside aggregate_sensitivity (e.g. the
           # "undefined columns selected" crash from a NaN/degenerate sample
@@ -2227,9 +2264,9 @@ app_server <- function(input, output, session) {
 
           # Round 6a #6: flip directly to the results panel on every successful
           # run (not just the first one) and surface a short toast that doesn't
-          # mention scrolling — the page already swaps to the results view.
+          # mention scrolling: the page already swaps to the results view.
           rv$sim_view <- "results"
-          showNotification("Simulation complete — results displayed.",
+          showNotification("Simulation complete: results displayed.",
                            type = "message", duration = 4)
 
         },
@@ -2252,11 +2289,11 @@ app_server <- function(input, output, session) {
             else "")
           rv$sim_error <- e$message
           rv$sim_running <- FALSE
-          # Make the failure visible — previously the error only landed in the
+          # Make the failure visible: previously the error only landed in the
           # Tab 5 sim log, so users could click Simulate and see nothing happen.
           showNotification(
             paste0("Simulation failed: ", e$message,
-                   " — see the Run log on Tab 5 for the full call trace."),
+                   ": see the Run log on Tab 5 for the full call trace."),
             type = "error", duration = NULL)
         })
       }
@@ -2322,7 +2359,7 @@ app_server <- function(input, output, session) {
       tags$div(
         style = "color:#2D6A4F; font-weight:600; margin-top:8px;",
         icon("check-circle"),
-        sprintf(" Complete — %d system(s) simulated.", n_sys)
+        sprintf(" Complete: %d system(s) simulated.", n_sys)
       )
     } else {
       tags$div(style = "color:#6B6B6B; margin-top:8px;", "Ready to run.")
@@ -2343,7 +2380,7 @@ app_server <- function(input, output, session) {
     if (nrow(row) > 0) paste0(round(row$mean, 3), " t") else "---"
   })
 
-  # Andreas 2026-05 C1: per-IPCC-source value boxes — mirrors the IPCC
+  # Andreas 2026-05 C1: per-IPCC-source value boxes, mirrors the IPCC
   # reporting categories (enteric CH₄, manure CH₄, MM N₂O total, PRP N₂O total).
   # Column names refer to inventory aggregator output (mc_simulation.R
   # run_inventory_simulation), not per-system results.
@@ -2351,7 +2388,7 @@ app_server <- function(input, output, session) {
   # Andreas 28/5/26 #6: per-source value boxes now include a 95 % MoE
   # suffix (e.g. "1,234 t · ±12 %") so the headline uncertainty is visible
   # without drilling into the by-system table. IPCC uses MoE % (the half-
-  # width of the 95 % CI as a fraction of the mean), not CV — confirmed by
+  # width of the 95 % CI as a fraction of the mean), not CV: confirmed by
   # IPCC 2006 Vol.1 Ch.3 Table 3.3.
   .moe_suffix <- function(row) {
     if (nrow(row) == 0 || is.na(row$moe_pct)) return("")
@@ -2368,7 +2405,7 @@ app_server <- function(input, output, session) {
     if (nrow(rows) == 0) return("---")
     s <- sum(rows$mean, na.rm = TRUE)
     # MoE on a sum of (positively correlated) per-iteration vectors is not
-    # the sum of MoEs — compute it from the per-iteration combined series
+    # the sum of MoEs: compute it from the per-iteration combined series
     # in the inventory frame when available; otherwise fall back to the
     # max of the contributing MoEs as a conservative estimate.
     moe_str <- ""
@@ -2414,7 +2451,7 @@ app_server <- function(input, output, session) {
   })
 
   # Andreas 28/5/26 #6: the value box previously titled "Total CV (%)" now
-  # shows the inventory-total 95 % MoE — IPCC's reporting convention. CV is
+  # shows the inventory-total 95 % MoE: IPCC's reporting convention. CV is
   # still available alongside MoE in the by-system / by-category tables for
   # users who want both.
   output$vb_moe_total <- renderText({
@@ -2525,7 +2562,7 @@ app_server <- function(input, output, session) {
     skew_label <- if (abs(d$skew_val) < 0.5) "symmetric"
                   else if (d$skew_val  > 0)   "right-skewed (expected)"
                   else                          "left-skewed"
-    skew_note  <- if (abs(d$skew_val) > 3) " — extreme, check draws" else ""
+    skew_note  <- if (abs(d$skew_val) > 3) ": extreme, check draws" else ""
 
     iter_warning <- if (d$n < 10000) {
       div(style = paste0("background:#FEF3C7; border-left:4px solid #F59E0B;",
@@ -2546,7 +2583,7 @@ app_server <- function(input, output, session) {
         "Precision (MCSE)",
         paste0("Monte Carlo Standard Error: measures how much the reported mean would shift if ",
                "you re-ran with a different random seed. Aim for < 0.5% of the mean (green). ",
-               "At 10,000 iterations a typical livestock-inventory MCSE is ~0.2% — comfortably inside the green band. ",
+               "At 10,000 iterations a typical livestock-inventory MCSE is ~0.2%: comfortably inside the green band. ",
                "At 1,000 iterations it would be ~0.6%, which is borderline; raise the iteration count if you see this."),
         sprintf("%.2f%% of mean", d$mcse_pct),
         mcse_s
@@ -2570,7 +2607,7 @@ app_server <- function(input, output, session) {
       make_diag_badge(
         "Distribution Skew",
         paste0("Measures the asymmetry of the simulated emission distribution. ",
-               "Positive (right-skewed) is normal and expected when emission factors follow lognormal distributions — this is not a problem. ",
+               "Positive (right-skewed) is normal and expected when emission factors follow lognormal distributions: this is not a problem. ",
                "Values beyond ±3 may indicate extreme outlier draws; if so, review your input uncertainty bounds."),
         sprintf("%.2f (%s%s)", d$skew_val, skew_label, skew_note),
         "info"
@@ -2752,9 +2789,9 @@ app_server <- function(input, output, session) {
 
     # Always also compute a cattle_type lookup. If the level IS cattle_type,
     # group names ARE the cattle_types. Otherwise build a mapping by
-    # re-parsing sys_names — a sub_category / aggregation_level group could
+    # re-parsing sys_names: a sub_category / aggregation_level group could
     # technically span multiple cattle_types, but in practice one group key
-    # maps cleanly to one cattle_type. Fall back to "—" if ambiguous.
+    # maps cleanly to one cattle_type. Fall back to "-" if ambiguous.
     cattle_type_of <- if (level == "cattle_type") {
       setNames(names(agg), names(agg))
     } else {
@@ -2764,7 +2801,7 @@ app_server <- function(input, output, session) {
       kk <- sapply(parts, function(p)
         if (length(p) >= max(idx, 1) && nzchar(p[idx])) p[idx] else
           paste(p, collapse = " / "))
-      ct <- sapply(parts, function(p) if (length(p) >= 1) p[1] else "—")
+      ct <- sapply(parts, function(p) if (length(p) >= 1) p[1] else "-")
       uniq_ct_per_group <- tapply(ct, kk, function(x) {
         u <- unique(x); if (length(u) == 1) u else paste(u, collapse = " / ")
       })
@@ -2788,7 +2825,7 @@ app_server <- function(input, output, session) {
     for (gn in names(agg)) {
       res <- agg[[gn]]
       ct <- cattle_type_of[gn]
-      if (is.na(ct) || !nzchar(ct)) ct <- "—"
+      if (is.na(ct) || !nzchar(ct)) ct <- "-"
       for (s in sources) {
         raw <- res[[s$col]]
         if (is.null(raw) || all(raw == 0)) next
@@ -2826,7 +2863,7 @@ app_server <- function(input, output, session) {
                   options = list(pageLength = 30, scrollX = TRUE))
   })
 
-  # Comparison card in Results tab — only rendered when comparison data exists
+  # Comparison card in Results tab: only rendered when comparison data exists
   output$comparison_card <- renderUI({
     if (is.null(rv$comparison_result)) return(NULL)
     bslib::card(
@@ -2899,7 +2936,7 @@ app_server <- function(input, output, session) {
     if (is.null(df) || !"variable" %in% names(df)) return(NULL)
 
     groups <- unique(sapply(df$variable, .sens_group))
-    if (length(groups) <= 1) return(NULL)   # single group — no filter needed
+    if (length(groups) <= 1) return(NULL)   # single group: no filter needed
 
     div(style = "min-width: 280px;",
       tags$label("Animal groups shown", class = "control-label"),
@@ -2967,7 +3004,7 @@ app_server <- function(input, output, session) {
                                     method = "both")
     }
 
-    # Group filter — only apply when the dropdown is rendered (multi-group runs).
+    # Group filter: only apply when the dropdown is rendered (multi-group runs).
     sel_groups <- input$sens_groups
     if (is.null(raw) || is.null(sel_groups)) return(raw)
 
@@ -2997,9 +3034,9 @@ app_server <- function(input, output, session) {
           x = 0.5, y = 0.5, xref = "paper", yref = "paper",
           font = list(size = 13, color = "#555")))))
     }
-    # When PRCC was skipped (too many parameters — multi-group inventory),
+    # When PRCC was skipped (too many parameters: multi-group inventory),
     # fall back to SRC. The reason is shown as a caption above the chart
-    # (output$tornado_note), not as an in-plot annotation — the old top
+    # (output$tornado_note), not as an in-plot annotation: the old top
     # annotation collided with the chart title and the plotly toolbar.
     sens <- if (input$sens_method == "prcc" && is.null(sens_data$prcc) &&
                 !is.null(sens_data$src)) {
@@ -3039,7 +3076,7 @@ app_server <- function(input, output, session) {
                     hovertext = ifelse(top10$reducible, "User-reducible", "IPCC coefficient"),
                     hoverinfo = "x+y+text") %>%
       plotly::layout(
-        title = paste0("Top Parameters — ", toupper(val_col), view_label),
+        title = paste0("Top Parameters: ", toupper(val_col), view_label),
         margin = list(t = 48),  # room so the title clears the plotly toolbar
         xaxis = list(title = val_col), yaxis = list(title = ""),
         annotations = list(list(
@@ -3094,7 +3131,7 @@ app_server <- function(input, output, session) {
                   options = list(pageLength = 10, dom = 't'))
   })
 
-  # T1.4 + R1.7: parameter glossary — variable names are now IPCC-aligned, so the
+  # T1.4 + R1.7: parameter glossary, variable names are now IPCC-aligned, so the
   # separate ipcc_software_name column is dropped (redundant). "Our column"
   # renamed to "Variable name".
   # The declared basis: which IPCC row each family of defaults comes from.
@@ -3129,7 +3166,7 @@ app_server <- function(input, output, session) {
     is_fr <- identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
                              ifnotfound = "en"), "fr")
     # Swap French definitions / units when the user picked French. IPCC codes
-    # (Ym, Bo, EF3_PRP, …) and table refs stay verbatim — see R/i18n.R.
+    # (Ym, Bo, EF3_PRP, …) and table refs stay verbatim: see R/i18n.R.
     if (is_fr) {
       fr_def <- .PARAM_DEFINITIONS_FR[cat$parameter]
       fr_unit <- .PARAM_UNITS_FR[cat$parameter]
@@ -3168,10 +3205,34 @@ app_server <- function(input, output, session) {
   # visible even when the server is busy running a simulation.
   outputOptions(output, "definitions_table", suspendWhenHidden = FALSE)
 
+  # Beta feedback 2026-09 (APickering): plain-language glossary of the
+  # statistical terms used across the tabs. Strings live in R/i18n.R
+  # (stat_*_term / stat_*_def), so the table follows the session language.
+  output$stat_glossary_table <- DT::renderDT({
+    ids <- c("mc", "iter", "dist", "mean", "sd", "ci", "moe", "pctile",
+             "corr", "sens", "src", "prcc", "adef", "seed", "conv")
+    gl <- data.frame(
+      term       = vapply(ids, function(i) t(paste0("stat_", i, "_term")),
+                          character(1)),
+      definition = vapply(ids, function(i) t(paste0("stat_", i, "_def")),
+                          character(1)),
+      stringsAsFactors = FALSE
+    )
+    DT::datatable(
+      gl,
+      rownames = FALSE,
+      colnames = setNames(c("term", "definition"),
+                          c(t("stat_col_term"), t("stat_col_def"))),
+      options = list(pageLength = -1, dom = "t", scrollX = TRUE),
+      class = "compact stripe"
+    )
+  })
+  outputOptions(output, "stat_glossary_table", suspendWhenHidden = FALSE)
+
   # Perf (2026-06): the IPCC Report histograms ship their data to the browser as
   # plotly `type="histogram"` (binned client-side). Sending every Monte Carlo
   # draw (up to ~150k points across the source panels) made the tab slow to
-  # open, so we DOWNSAMPLE each panel to .HIST_MAX_PTS points first — the
+  # open, so we DOWNSAMPLE each panel to .HIST_MAX_PTS points first: the
   # distribution shape is identical at a few thousand i.i.d. draws, and the data
   # transferred drops ~5-10x. (An earlier attempt to pre-bin server-side as bar
   # traces broke the plotly::subplot grid layout, so we keep the native
@@ -3281,7 +3342,7 @@ app_server <- function(input, output, session) {
       rv$sensitivity$prcc
     } else NULL
     if (is.null(sens) || nrow(sens) == 0)
-      return(placeholder("No input parameters had variance — tornado chart cannot be built."))
+      return(placeholder("No input parameters had variance: tornado chart cannot be built."))
 
     val_col <- if ("src" %in% names(sens)) "src"
                else if ("prcc" %in% names(sens)) "prcc"
@@ -3295,7 +3356,7 @@ app_server <- function(input, output, session) {
                     x = top10[[val_col]], type = "bar", orientation = "h",
                     marker = list(color = ifelse(top10[[val_col]] > 0,
                                                  "#2D6A4F", "#C1121F"))) |>
-      plotly::layout(title = paste0("Top 10 — ", toupper(val_col)),
+      plotly::layout(title = paste0("Top 10, ", toupper(val_col)),
                      xaxis = list(title = val_col),
                      yaxis = list(title = ""))
   })
@@ -3360,7 +3421,7 @@ app_server <- function(input, output, session) {
     }
   )
 
-  # Andreas 2026-05 #36, C10: CSV layout — emission category in column A,
+  # Andreas 2026-05 #36, C10: CSV layout, emission category in column A,
   # pasture direct + indirect kept as separate rows (not collapsed into
   # total N₂O), and the variable->category mapping made explicit.
   output$download_csv <- downloadHandler(
@@ -3471,7 +3532,7 @@ app_server <- function(input, output, session) {
       # is loaded after shiny in this app and masks shiny's validate() with
       # its own single-argument JSON-validator. A bare `validate(need(...),
       # need(...))` resolves to jsonlite::validate(), which rejects the
-      # second need() as an "unused argument" — producing a 500 on the
+      # second need() as an "unused argument": producing a 500 on the
       # download handler. Same applies to the three trend downloads below.
       shiny::validate(
         shiny::need(!is.null(rv$mc_results),  "Run a Monte Carlo simulation on Tab 5 before downloading the Word summary."),
@@ -3515,7 +3576,7 @@ app_server <- function(input, output, session) {
   )
 
   # ====================================================================
-  # F / T4.22 / TT.6: Trend tab — multi-year inventory uncertainty
+  # F / T4.22 / TT.6: Trend tab, multi-year inventory uncertainty
   # ====================================================================
   # Round 8: rv_trend now caches per-year MC samples + delta + slope so the
   # trend tab can compute sensitivity and produce Excel/CSV/Word reports.
@@ -3550,7 +3611,7 @@ app_server <- function(input, output, session) {
                  "Country X / Country Y examples on Tab 1.")
           }
           # Round 9: trend uses the same n_iter slider as single-year. Source
-          # selection from Tab 5 also applies — trend now honours
+          # selection from Tab 5 also applies: trend now honours
           # input$emission_sources just like the single-year flow.
           yc <- if (!is.null(input$year_corr) && nzchar(input$year_corr)) input$year_corr else "full"
           gv <- if (!is.null(input$gwp_version) && nzchar(input$gwp_version)) input$gwp_version else "AR5"
@@ -3607,7 +3668,7 @@ app_server <- function(input, output, session) {
         n_par <- ncol(rv$population) - 1
         div(style = "font-size:0.85rem; color:#1B4332; background:#D8F3DC; padding:8px 10px; border-radius:6px;",
             icon("check-circle"),
-            sprintf(" Using time-series from loaded template — %d years × %d parameters. ",
+            sprintf(" Using time-series from loaded template: %d years × %d parameters. ",
                     n_yrs, n_par),
             "Click Run to compute the trend, or upload a CSV above to override.")
       } else {
@@ -3633,7 +3694,7 @@ app_server <- function(input, output, session) {
 
   # Helper: format a signed percent with sign (+1.2% / -1.2%)
   .fmt_signed_pct <- function(x, digits = 1) {
-    if (is.null(x) || length(x) == 0 || is.na(x)) return("—")
+    if (is.null(x) || length(x) == 0 || is.na(x)) return("-")
     s <- formatC(x, digits = digits, format = "f")
     if (x > 0) paste0("+", s, "%") else paste0(s, "%")
   }
@@ -3652,7 +3713,7 @@ app_server <- function(input, output, session) {
   output$vb_trend_slope <- renderText({
     req(rv_trend$slope)
     s <- rv_trend$slope$mean
-    if (is.null(s) || is.na(s)) return("—")
+    if (is.null(s) || is.na(s)) return("-")
     sign_str <- if (s > 0) "+" else ""
     paste0(sign_str, format(round(s, 0), big.mark = ","), " t/yr")
   })
@@ -3682,7 +3743,7 @@ app_server <- function(input, output, session) {
   output$vb_trend_yoy <- renderText({
     req(rv_trend$results)
     yoy <- rv_trend$results$YoY_pct[!is.na(rv_trend$results$YoY_pct)]
-    if (length(yoy) == 0) return("—")
+    if (length(yoy) == 0) return("-")
     biggest <- yoy[which.max(abs(yoy))]
     .fmt_signed_pct(biggest, 1)
   })
@@ -3690,13 +3751,13 @@ app_server <- function(input, output, session) {
     req(rv_trend$results)
     df <- rv_trend$results
     yoy <- df$YoY_pct[!is.na(df$YoY_pct)]
-    if (length(yoy) == 0) return("—")
+    if (length(yoy) == 0) return("-")
     idx <- which.max(abs(yoy))
     yr  <- df$Year[!is.na(df$YoY_pct)][idx]
     sprintf("Largest year-over-year change (%d)", yr)
   })
 
-  # Inline summary line below the value boxes — mirrors the single-year
+  # Inline summary line below the value boxes: mirrors the single-year
   # output$vb_co2e_inline pattern.
   output$vb_trend_inline <- renderText({
     req(rv_trend$results, rv_trend$year_corr)
@@ -3709,7 +3770,7 @@ app_server <- function(input, output, session) {
             min(df$Year), max(df$Year), nrow(df), yc_label)
   })
 
-  # Δ Y_N − Y_1 distribution histogram — visualises the uncertainty on the
+  # Δ Y_N − Y_1 distribution histogram: visualises the uncertainty on the
   # trend itself (the per-iteration distribution of the absolute change).
   # Mirrors the single-year output$results_histogram.
   output$trend_delta_histogram <- plotly::renderPlotly({
@@ -3722,7 +3783,7 @@ app_server <- function(input, output, session) {
                     marker = list(color = fill_above,
                                    line = list(color = "#1B4332", width = 1))) %>%
       plotly::layout(
-        title = list(text = "Distribution of Δ Y_N − Y_1 (t CO₂eq) — uncertainty on the trend itself",
+        title = list(text = "Distribution of Δ Y_N − Y_1 (t CO₂eq): uncertainty on the trend itself",
                      font = list(size = 12)),
         xaxis = list(title = "ΔCO₂eq (t)"),
         yaxis = list(title = "Frequency"),
@@ -3737,7 +3798,7 @@ app_server <- function(input, output, session) {
       )
   })
 
-  # Year-over-year % change bar chart — quick visual of the per-year
+  # Year-over-year % change bar chart: quick visual of the per-year
   # bumpiness; complements the trend chart which shows levels.
   output$trend_yoy_chart <- plotly::renderPlotly({
     req(rv_trend$results)
@@ -3797,7 +3858,7 @@ app_server <- function(input, output, session) {
       )
   })
 
-  # Round 8 — Trend sensitivity (per-year + delta)
+  # Round 8: Trend sensitivity (per-year + delta)
 
   trend_sens_per_year <- reactive({
     req(rv_trend$samples_by_year, rv_trend$co2e_by_year)
@@ -3825,7 +3886,7 @@ app_server <- function(input, output, session) {
   })
 
   # Round 9 follow-up: trend tornado now matches the single-year tornado
-  # (output$tornado_chart) — coloured by user_reducible × sign, with a hover
+  # (output$tornado_chart): coloured by user_reducible × sign, with a hover
   # text and a bottom-right legend annotation explaining the colour scheme.
   # The bare-parameter strip in the trend-driver case (e.g. "W_y1" / "W_yN")
   # is split on the suffix so reducibility lookup hits PARAM_CATALOGUE.
@@ -3860,7 +3921,7 @@ app_server <- function(input, output, session) {
     # Map parameter -> user_reducible. For trend-driver names like "W_y1" or
     # "Cfi_yN" strip the year suffix; for multi-system labels with the
     # sub-category in parentheses (e.g. "Ym (DINT_cow)") strip the
-    # parenthesised suffix too — both must be stripped before the
+    # parenthesised suffix too: both must be stripped before the
     # catalogue lookup.
     bare_name <- sub(" \\([^()]+\\)\\s*$", "", top10$parameter)
     bare_name <- gsub("_(y1|yN)$", "", bare_name)
@@ -3957,12 +4018,12 @@ app_server <- function(input, output, session) {
 
   output$trend_tornado_per_year <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_per_year(),
-                         "Top 10 drivers — latest year")
+                         "Top 10 drivers: latest year")
   })
 
   output$trend_tornado_delta <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers — Δ Y_N − Y_1")
+                         "Top 10 drivers: Δ Y_N − Y_1")
   })
 
   # Round 9: mirror outputs for the IPCC Report tab. Shiny requires unique
@@ -4003,22 +4064,22 @@ app_server <- function(input, output, session) {
   })
   output$trend_tornado_per_year_report <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_per_year(),
-                         "Top 10 drivers — latest year")
+                         "Top 10 drivers: latest year")
   })
   output$trend_tornado_delta_report <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers — Δ Y_N − Y_1")
+                         "Top 10 drivers: Δ Y_N − Y_1")
   })
   # Round 9 follow-up: third copy of the trend tornadoes for Tab 6 (Sensitivity)
   # since each Shiny output ID can render in only one UI element. All three
   # copies (Tab 5 results, Tab 6, Tab 7 report) read from the same reactives.
   output$trend_tornado_per_year_sens <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_per_year(),
-                         "Top 10 drivers — latest year")
+                         "Top 10 drivers: latest year")
   })
   output$trend_tornado_delta_sens <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers — Δ Y_N − Y_1")
+                         "Top 10 drivers: Δ Y_N − Y_1")
   })
   # Round 9 follow-up: rankings tables (Top 15) for trend mode, mirroring
   # the single-year output$sensitivity_table. Both SRC and PRCC columns
@@ -4031,7 +4092,7 @@ app_server <- function(input, output, session) {
     .trend_sens_table(trend_sens_delta())
   })
 
-  # Round 8 — Trend downloads (Excel / CSV / Word)
+  # Round 8: Trend downloads (Excel / CSV / Word)
 
   .trend_filename <- function(ext) {
     yc <- if (!is.null(rv_trend$year_corr)) rv_trend$year_corr else "trend"
@@ -4088,7 +4149,7 @@ app_server <- function(input, output, session) {
     }
   )
 
-  # Round 8 — Contact / Feedback. The form is rendered as raw HTML+JS in
+  # Round 8: Contact / Feedback. The form is rendered as raw HTML+JS in
   # R/utils_contact.R via contact_form_html(); submission happens browser-side
   # (Web3Forms free tier blocks server-side POSTs). No Shiny observer needed.
 

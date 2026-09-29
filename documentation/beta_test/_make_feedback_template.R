@@ -6,30 +6,30 @@ wb <- createWorkbook()
 addWorksheet(wb, "Instructions")
 writeData(wb, "Instructions", data.frame(
   ` ` = c(
-    "IPCC Tier 2 Livestock GHG Uncertainty Calculator — Beta Testing Feedback Form",
+    "IPCC Tier 2 Livestock GHG Uncertainty Calculator: Beta Testing Feedback Form",
     "",
     "HOW TO USE THIS TEMPLATE",
     "1. Fill in one row per comment in the 'Feedback' sheet.",
     "2. Use the Type dropdown to classify your comment:",
-    "   Bug          — the tool crashes, produces wrong numbers, or behaves unexpectedly",
-    "   Correction   — something is factually incorrect (method, equation, reference) or not IPCC-compliant",
-    "   Enhancement  — a feature that would make the tool more useful",
-    "   General      — a general comment or question, or feedback from user experience such as a challenge that you were later able to overcome",
+    "   Bug         : the tool crashes, produces wrong numbers, or behaves unexpectedly",
+    "   Correction  : something is factually incorrect (method, equation, reference) or not IPCC-compliant",
+    "   Enhancement : a feature that would make the tool more useful",
+    "   General     : a general comment or question, or feedback from user experience such as a challenge that you were later able to overcome",
     "3. Use Severity to indicate urgency (Critical = must fix before release).",
     "4. In 'Suggested fix', note the expected behaviour or your proposed solution.",
     "5. Save your completed file and email it to m.lolita@cgiar.org.",
-    "6. Multiple reviewers: combine sheets by appending rows — the Reviewer name column keeps them distinct.",
+    "6. Multiple reviewers: combine sheets by appending rows, the Reviewer name column keeps them distinct.",
     "",
     "COLUMN DEFINITIONS",
-    "Reviewer name   — Your full name",
-    "Date            — Date of the observation (YYYY-MM-DD)",
-    "Tab             — Which app tab (Home, Definitions, Resources, Data Input, QA/QC, Uncertainty, Correlations, Simulate, Sensitivity, IPCC Report, Contact)",
-    "Screen element  — The specific button, table, chart, or text that the comment relates to",
-    "Type            — Bug / Correction / Enhancement / General",
-    "Severity        — Critical / High / Medium / Low",
-    "Description     — What you observed or what the problem is",
-    "Suggested fix   — What the correct behaviour should be, or your proposed solution",
-    "Status          — Leave blank; will be filled by the development team"
+    "Reviewer name  : Your full name",
+    "Date           : Date of the observation (YYYY-MM-DD)",
+    "Tab            : Which app tab (Home, Definitions, Resources, Data Input, QA/QC, Uncertainty, Correlations, Simulate, Sensitivity, IPCC Report, Contact)",
+    "Screen element : The specific button, table, chart, or text that the comment relates to",
+    "Type           : Bug / Correction / Enhancement / General",
+    "Severity       : Critical / High / Medium / Low",
+    "Description    : What you observed or what the problem is",
+    "Suggested fix  : What the correct behaviour should be, or your proposed solution",
+    "Status         : Leave blank; will be filled by the development team"
   )
 ), colNames = FALSE)
 
@@ -58,13 +58,13 @@ even_style <- createStyle(fgFill = "#F7F5F0")
 for (r in seq(2, 51, by = 2))
   addStyle(wb, "Feedback", even_style, rows = r, cols = 1:9, gridExpand = TRUE)
 
-# Data validation — Type column (E)
+# Data validation: Type column (E)
 dataValidation(wb, "Feedback", col = 5, rows = 2:200, type = "list",
                value = '"Bug,Correction,Enhancement,General"')
-# Data validation — Severity column (F)
+# Data validation: Severity column (F)
 dataValidation(wb, "Feedback", col = 6, rows = 2:200, type = "list",
                value = '"Critical,High,Medium,Low"')
-# Data validation — Tab column (C)
+# Data validation: Tab column (C)
 dataValidation(wb, "Feedback", col = 3, rows = 2:200, type = "list",
                value = '"Home,Definitions,Resources,Data Input,QA/QC,Uncertainty,Correlations,Simulate,Sensitivity,IPCC Report,Contact,General (whole app)"')
 
@@ -85,16 +85,16 @@ writeData(wb, "Type_definitions", data.frame(
   Type      = c("Bug", "Correction", "Enhancement", "General"),
   Type_def  = c(
     "The tool crashes, produces wrong output, or behaves unexpectedly",
-    "Something is factually incorrect — wrong equation, wrong IPCC reference, wrong number",
+    "Something is factually incorrect: wrong equation, wrong IPCC reference, wrong number",
     "A feature that would make the tool more useful or easier to use",
     "A general observation, question, or comment"
   ),
   Severity  = c("Critical", "High", "Medium", "Low"),
   Sev_def   = c(
-    "Must fix before any external release — calculation error or crash",
-    "Should fix before external release — significant usability or accuracy issue",
-    "Can fix in next iteration — minor issue that does not block use",
-    "Nice to have — cosmetic or very minor improvement"
+    "Must fix before any external release: calculation error or crash",
+    "Should fix before external release: significant usability or accuracy issue",
+    "Can fix in next iteration: minor issue that does not block use",
+    "Nice to have: cosmetic or very minor improvement"
   ),
   check.names = FALSE
 ))
@@ -103,6 +103,6 @@ addStyle(wb, "Type_definitions", createStyle(wrapText = TRUE), rows = 1:5, cols 
 addStyle(wb, "Type_definitions", createStyle(textDecoration = "bold", fgFill = "#D8F3DC"),
          rows = 1, cols = 1:4, gridExpand = TRUE)
 
-# NOTE: run from the repo root — `Rscript documentation/beta_test/_make_feedback_template.R`
+# NOTE: run from the repo root, `Rscript documentation/beta_test/_make_feedback_template.R`
 saveWorkbook(wb, "documentation/beta_test/beta_feedback_template.xlsx", overwrite = TRUE)
 cat("Saved: documentation/beta_test/beta_feedback_template.xlsx\n")

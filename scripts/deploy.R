@@ -60,7 +60,7 @@ if (!identical(Sys.getenv("DEPLOY_SKIP_GATE", ""), "1")) {
 # Notify any newly-approved users (diff config/approved_users.csv against
 # the local snapshot, send a SendGrid welcome to each new email). This
 # runs BEFORE the deploy so the welcome arrives at the moment the user
-# is approved, not after the deploy finishes. Best-effort — failures
+# is approved, not after the deploy finishes. Best-effort: failures
 # don't block the deploy.
 tryCatch(source("scripts/notify_approved.R"),
          error = function(e) message("notify_approved skipped: ",

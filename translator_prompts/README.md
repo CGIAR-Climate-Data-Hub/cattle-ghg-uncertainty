@@ -1,4 +1,4 @@
-# translator_prompts — knowledge base for the in-app AI Translator
+# translator_prompts: knowledge base for the in-app AI Translator
 
 The system prompt sent to Claude on every translator call is assembled by `R/openai_client.R::assemble_translator_system_prompt()` from six sections. Since 2026-09-17 the three GENERATED sections are built at runtime from the app's own R objects (`R/translator_prompt_build.R`), so a change to the defaults master or the workbook layout reaches the model on the next app start with no rebuild. The `.md` copies in this folder exist for the DIY kit and for review diffs.
 

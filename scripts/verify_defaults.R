@@ -146,7 +146,7 @@ message("row universe: ", nrow(M), " cells from ",
 # ---------------------------------------------------------------------------
 norm <- function(x) {
   x <- trimws(gsub("[`*%]", "", as.character(x)))
-  x[x %in% c("", "-", "—", "(none)", "NA", "n/a")] <- NA
+  x[x %in% c("", "-", "-", "(none)", "NA", "n/a")] <- NA
   n <- suppressWarnings(as.numeric(x))
   ifelse(is.na(n), x, format(n, trim = TRUE, scientific = FALSE,
                              drop0trailing = TRUE))

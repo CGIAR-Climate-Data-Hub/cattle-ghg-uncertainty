@@ -1,4 +1,4 @@
-# In-app AI translator chat — UI + server logic.
+# In-app AI translator chat: UI + server logic.
 #
 # Renders inside the Resources tab. Two visible states:
 #   (a) Logged out  -> magic-link login panel.
@@ -44,7 +44,7 @@ translator_chat_ui <- function() {
 }
 
 # ============================================================================
-# SERVER — install with translator_chat_server(input, output, session, rv)
+# SERVER: install with translator_chat_server(input, output, session, rv)
 #         from inside app_server().
 # ============================================================================
 
@@ -63,7 +63,7 @@ translator_chat_ui <- function() {
     # .translator_force_template() caches each per-aggregation-level
     # batch's parsed JSON here keyed by aggregation_level. On a retry
     # after a failed batch, successful batches are reused without firing
-    # a fresh API call (saves the output-token cost — Anthropic only
+    # a fresh API call (saves the output-token cost: Anthropic only
     # caches inputs, not outputs). Cleared on successful merge / Reset
     # conversation / new file upload. Since 2026-09-17 a part is cached
     # only after the merge has validated it, and the cache is persisted in
@@ -99,7 +99,7 @@ translator_chat_server <- function(input, output, session) {
 
   # ---- Session-restore from cookie (runs once on Shiny session start) ------
   # If the browser already has a valid translator_session cookie, the user
-  # is signed back in immediately — no magic link required. The Cookie:
+  # is signed back in immediately: no magic link required. The Cookie:
   # header is on session$request$HTTP_COOKIE; we parse + HMAC-verify it
   # in pure R (no JS round-trip needed for restore).
   observeEvent(session$clientData$url_protocol, {
@@ -164,7 +164,7 @@ translator_chat_server <- function(input, output, session) {
     } else {
       state$user_email <- NULL
       state$login_status <- paste0(
-        "Thanks — your request to access the AI translator (",
+        "Thanks: your request to access the AI translator (",
         email,
         ") has been forwarded to the administrator for approval. You'll receive an email once approved.")
       auth_notify_admin_of_request(email)
@@ -179,7 +179,7 @@ translator_chat_server <- function(input, output, session) {
     # perl = TRUE is required so `\s` inside the character class is parsed
     # as the whitespace shortcut. R's default TRE engine treats `\s` in
     # `[^@\s]` as the literal characters `\` and `s`, which rejected every
-    # email containing the letter "s" — CGIAR addresses (.../@cgiar.org)
+    # email containing the letter "s": CGIAR addresses (.../@cgiar.org)
     # happen to have no 's' before the @, so the bug only surfaced on
     # external addresses.
     if (!grepl("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email, perl = TRUE)) {
@@ -319,7 +319,7 @@ translator_chat_server <- function(input, output, session) {
   # If the user's message looks like a trigger ('produce the template',
   # 'generate it', 'go ahead', etc.), AND the AI has been gathering
   # info for at least one round, we shortcut to the json_schema force-
-  # template path — no separate button needed. Otherwise it's a normal
+  # template path: no separate button needed. Otherwise it's a normal
   # chat round (clarifying questions, mapping discussion).
   observeEvent(input$translator_send, {
     req(state$user_email)
@@ -377,7 +377,7 @@ translator_chat_server <- function(input, output, session) {
     conversation_delete(state$user_email)
     # If the user clicked Reset while a request was mid-flight (or the
     # spinner got stuck for any other reason), drop it. translatorStreamEnd
-    # also wipes the active streaming bubble reference — safe to call when
+    # also wipes the active streaming bubble reference: safe to call when
     # there's no active stream.
     tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
              error = function(e) NULL)
@@ -414,7 +414,7 @@ translator_chat_server <- function(input, output, session) {
   # That separation is critical: when state$messages changes (e.g. on
   # upload, the user msg gets appended), this output re-renders. If the
   # stream_target lived in here, the re-render would replace its DOM
-  # while chunks were streaming into it — the bubble would be detached
+  # while chunks were streaming into it: the bubble would be detached
   # mid-stream and the user would see 10 seconds of silence until the
   # final state$messages update brought everything back at once. By
   # keeping stream_target outside, the live bubble persists across
@@ -424,7 +424,7 @@ translator_chat_server <- function(input, output, session) {
       return(tags$p(style = "color:#888; font-style:italic;",
                     t("ai_empty_messages")))
     msgs <- lapply(state$messages, function(m) {
-      # User vs AI bubble distinction — standard chat convention:
+      # User vs AI bubble distinction: standard chat convention:
       #   user  : light blue, right-aligned
       #   AI    : light green (CGIAR brand), left-aligned
       bubble_style <- if (m$role == "user")
@@ -481,7 +481,7 @@ translator_chat_server <- function(input, output, session) {
 
   # Reactive flag the conditionalPanel watches to decide whether to show
   # the "Download translated template" button. TRUE only when the saved
-  # template JSON parses AND has a non-empty parameters array — so the
+  # template JSON parses AND has a non-empty parameters array: so the
   # button never appears with a payload that would download as a
   # malformed .json.
   output$translator_template_ready <- reactive({
@@ -522,11 +522,11 @@ translator_chat_server <- function(input, output, session) {
 
   # ---- Spend display REMOVED 2026-06 ---------------------------------------
   # The user-facing 'Your usage' line, the admin 'Pilot budget' line, and
-  # the admin stats card have all been removed at user request — the local
+  # the admin stats card have all been removed at user request: the local
   # CSV resets on every shinyapps.io container recycle, so the numbers
   # were misleading. Ground-truth spend lives in OpenAI's billing
   # dashboard at https://platform.openai.com/usage. The internal
-  # budget_would_exceed() cap-check still runs in .translator_send() —
+  # budget_would_exceed() cap-check still runs in .translator_send() -
   # see usage_log.R. It's a best-effort soft cap; the real hard ceiling
   # is set on the OpenAI account.
 
@@ -563,7 +563,7 @@ translator_chat_server <- function(input, output, session) {
       } else if (.translator_template_is_well_formed(j)) {
         .translator_write_template_xlsx(j, file)
       } else {
-        # Should be unreachable — the button gate already validated.
+        # Should be unreachable: the button gate already validated.
         writeLines("{}", file)
       }
       # Tell the browser the file is written, so the amber "building"
@@ -644,7 +644,7 @@ translator_chat_server <- function(input, output, session) {
     # Static scroller wraps both the reactive message list AND the
     # streaming target. translator_stream_target lives OUTSIDE
     # output$translator_messages so it survives re-renders triggered by
-    # state$messages changes — chunks stream into it visibly in real time.
+    # state$messages changes: chunks stream into it visibly in real time.
     # See the long comment on output$translator_messages.
     tags$div(
       `data-translator-scroller` = "true",
@@ -695,7 +695,7 @@ translator_chat_server <- function(input, output, session) {
       actionButton("translator_send", t("btn_ai_send"), class = "btn-success",
                    style = "min-width:80px; height:42px;")
     ),
-    # Secondary action row — Produce | Reset | Stop | Download.
+    # Secondary action row: Produce | Reset | Stop | Download.
     # The chat-trigger detection ("produce the template", "go ahead",
     # etc.) still works, but the explicit button gives the user clear
     # control over when emission fires and prevents accidental triggers
@@ -714,7 +714,7 @@ translator_chat_server <- function(input, output, session) {
                    class = "btn-outline-secondary",
                    style = "font-size:0.82rem;",
                    title = t("tip_ai_reset")),
-      # Stop button — escape hatch when the AI is generating a template
+      # Stop button: escape hatch when the AI is generating a template
       # and the Shiny event loop is blocked on the OpenAI call. Plain
       # JS onclick (window.location.reload) bypasses the blocked R
       # session entirely. The OpenAI call continues in the background
@@ -996,25 +996,25 @@ translator_chat_server <- function(input, output, session) {
     "find the row a label refers to, ask before defaulting to IPCC values:\n\n",
     paste0("- ", detected, collapse = "\n"),
     "\n\nDo NOT substitute IPCC defaults for any parameter on this ",
-    "list — the user's file has a value for it.\n\n---\n\n")
+    "list: the user's file has a value for it.\n\n---\n\n")
   exploration_block <- paste0(
-    "## STEP 1 OF 3 — EXPLORATION (your task this turn)\n\n",
+    "## STEP 1 OF 3: EXPLORATION (your task this turn)\n\n",
     "Your ONLY job in this turn is to produce a structured exploration ",
     "report describing what's in this file. **Do NOT propose final ",
     "mappings yet. Do NOT produce a JSON template.** The user will ",
     "answer your section D questions in Step 2 (Clarification), and ",
     "only then click Produce template now for Step 3 (Emission). ",
-    "Producing a template now would be wrong — you don't have the ",
+    "Producing a template now would be wrong: you don't have the ",
     "clarifications yet.\n\n",
     "Output the following FOUR sections, in order, with verbatim ",
     "section headers `### A.`, `### B.`, `### C.`, `### D.`:\n\n",
     "### A. File shape\n\n",
     "For each sheet, classify the layout pattern (pick one):\n",
-    "- `column-oriented` — one row per sub-category, one column per parameter (e.g. row 1 = Cows; cols = N, BW, MW, …)\n",
-    "- `wide-stacked` — one row per parameter, columns repeat across sub-categories and mean/lower/upper triples (e.g. row = LW; cols = Cows mean, Cows Lower CI, Cows Upper CI, Bulls mean, …)\n",
-    "- `parameter-labeled` — a `parameter` column + `sub-category` column + mean/lower/upper triple\n",
-    "- `reference-table` — vocab / dropdown lists / catalogues, NOT data to extract\n",
-    "- `calc-sheet` — derived / computed (e.g. NRC calculations behind an aggregated value)\n\n",
+    "- `column-oriented`: one row per sub-category, one column per parameter (e.g. row 1 = Cows; cols = N, BW, MW, …)\n",
+    "- `wide-stacked`: one row per parameter, columns repeat across sub-categories and mean/lower/upper triples (e.g. row = LW; cols = Cows mean, Cows Lower CI, Cows Upper CI, Bulls mean, …)\n",
+    "- `parameter-labeled`: a `parameter` column + `sub-category` column + mean/lower/upper triple\n",
+    "- `reference-table`: vocab / dropdown lists / catalogues, NOT data to extract\n",
+    "- `calc-sheet`: derived / computed (e.g. NRC calculations behind an aggregated value)\n\n",
     "### B. Inventory of values found\n\n",
     "For EVERY (parameter, sub-category) pair you can identify, list:\n",
     "`parameter | sub-category (raw label as in file) | sheet | row | col | mean | lower (if present) | upper (if present) | units | qualifier (e.g. 'Local breed only', or blank)`.\n\n",
@@ -1022,18 +1022,18 @@ translator_chat_server <- function(input, output, session) {
     "scan above. If you cannot find a row a label points to, say so ",
     "in section D rather than skipping silently.\n\n",
     "### C. Inventory of GAPS\n\n",
-    "List every IPCC catalogue parameter that is NOT in the file. These will need IPCC defaults at emission time. Be exhaustive — ",
+    "List every IPCC catalogue parameter that is NOT in the file. These will need IPCC defaults at emission time. Be exhaustive: ",
     paste(PARAM_CATALOGUE$parameter, collapse = " / "),
     ", minus what's in section B.\n\n",
     "### D. Ambiguities to ask the user\n\n",
     "Enumerate every ambiguity you'd like the user to resolve before ",
-    "emission. Don't propose answers — just list the questions. ",
+    "emission. Don't propose answers: just list the questions. ",
     "Common ambiguities to look for:\n",
     "- Sub-category vocabulary mapping (raw label → template controlled vocabulary)\n",
     "- Unit conversions (kg vs lb, % vs fraction, L vs kg of milk, °C vs °F)\n",
     "- Biological zeros (does the file's Milk row apply only to lactating cows?)\n",
     "- MMS code meanings (PIT → liquid slurry or solid storage?)\n",
-    "- Breed disaggregation (Local vs Cross — treat together or split?)\n",
+    "- Breed disaggregation (Local vs Cross: treat together or split?)\n",
     "- Sheet purpose (is Sheet2 a separate dataset or a calc behind Sheet1?)\n",
     "- Per-sub-cat vs herd-wide allocations (MMS rows apply to everyone or per group?)\n\n",
     "End with a one-line prompt to the user: \"Please answer the section D questions, then click **Produce template now** when ready.\"\n\n",
@@ -1057,10 +1057,10 @@ translator_chat_server <- function(input, output, session) {
     if (parsed$n_total_sheets == 1L) "" else "s",
     exploration_block, detect_block, file_block)
   display <- if (parsed$n_total_sheets == 1L)
-    sprintf("Uploaded %s (%d rows × %d columns sent). Step 1 of 3 — the AI will now explore your file and report what it found.",
+    sprintf("Uploaded %s (%d rows × %d columns sent). Step 1 of 3: the AI will now explore your file and report what it found.",
             file_name, nrow(parsed$sheets[[1]]$preview), ncol(parsed$sheets[[1]]$preview))
   else
-    sprintf("Uploaded %s (%d sheets sent: %s). Step 1 of 3 — the AI will now explore your file and report what it found.",
+    sprintf("Uploaded %s (%d sheets sent: %s). Step 1 of 3: the AI will now explore your file and report what it found.",
             file_name, parsed$n_total_sheets,
             paste(sapply(parsed$sheets, `[[`, "name"), collapse = ", "))
   list(content = content, display = display)
@@ -1071,7 +1071,7 @@ translator_chat_server <- function(input, output, session) {
 #
 # Returns:
 #   $kind          "csv" or "xlsx"
-#   $sheets        list of list(name, n_rows, n_cols, preview) — one
+#   $sheets        list of list(name, n_rows, n_cols, preview): one
 #                  entry per non-empty sheet (or one entry for csv)
 #   $n_total_sheets  count of non-empty sheets found
 #
@@ -1106,7 +1106,7 @@ translator_chat_server <- function(input, output, session) {
   for (s in sheet_names) {
     df <- tryCatch(readxl::read_excel(path, sheet = s), error = function(e) NULL)
     if (is.null(df) || nrow(df) == 0 || ncol(df) == 0) next
-    # Drop sheets that have zero non-NA cells — pure empty placeholders.
+    # Drop sheets that have zero non-NA cells: pure empty placeholders.
     if (sum(!is.na(df)) == 0) next
     out[[length(out) + 1]] <- list(
       name    = s,
@@ -1221,7 +1221,7 @@ translator_chat_server <- function(input, output, session) {
   sep <- paste("|", paste(rep("---", ncol(df)), collapse = " | "), "|")
   # 2026-06-10: matches the 1000-row preview cap in .translator_read_upload.
   # Truncating here below the read cap would silently drop rows the AI was
-  # meant to see — defeats the point of the higher preview limit.
+  # meant to see: defeats the point of the higher preview limit.
   rows <- vapply(seq_len(min(nrow(df), 1000L)), function(i) {
     paste("|", paste(sapply(df[i, ], function(x) {
       v <- if (is.na(x)) "" else as.character(x)
@@ -1234,7 +1234,7 @@ translator_chat_server <- function(input, output, session) {
 # Render a sheet as a structured JSON object the LLM can navigate by
 # (sheet, row, column). Replaces the markdown table because Andy's Zambia
 # inventory (26 sub-categories) was losing rows in the flat markdown
-# representation — the model couldn't reliably look up a specific row by
+# representation: the model couldn't reliably look up a specific row by
 # number once the sheet exceeded ~30 rows.
 #
 # Output shape (one sheet):
@@ -1286,7 +1286,7 @@ translator_chat_server <- function(input, output, session) {
   # Drop fully-empty rows (every cell NA/blank): they would serialise as
   # "<row>": {} and carry zero information, yet this prefix is paid on every
   # cold cache-write. Keep the Excel row-number keys for the surviving rows
-  # (sparse keys are already the design — the model looks rows up by number
+  # (sparse keys are already the design: the model looks rows up by number
   # rather than iterating, so omitting blanks changes nothing it relies on).
   nonempty <- vapply(row_vals, function(x) length(x) > 0L, logical(1))
   rows <- setNames(row_vals[nonempty], row_keys[nonempty])
@@ -1308,7 +1308,7 @@ translator_chat_server <- function(input, output, session) {
   state$last_error <- NULL
   on.exit({
     state$pending <- FALSE
-    # Always tell the browser to drop the active streaming bubble — the
+    # Always tell the browser to drop the active streaming bubble: the
     # server-side renderUI will replace it (or leave a blank when there's
     # an error). Safe to call even if the bubble was never created.
     tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
@@ -1323,7 +1323,7 @@ translator_chat_server <- function(input, output, session) {
     # a numeric cap and wants the in-app gate.
     state$last_error <- paste0(
       "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly — ",
+      "We've been notified and will restore service shortly: ",
       "please try again later or contact the administrator.")
     return()
   }
@@ -1373,7 +1373,7 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  # Log the spend — Anthropic prompt caching has 90% off on cache reads
+  # Log the spend: Anthropic prompt caching has 90% off on cache reads
   # and a 25% surcharge on cache writes (first turn only).
   # See R/anthropic_client.R::anthropic_cost_usd.
   .translator_log_usage(state, resp, stage = stage,
@@ -1383,7 +1383,7 @@ translator_chat_server <- function(input, output, session) {
   # promote it if it actually parses + has the expected shape. If the AI
   # emitted a block but it's malformed (JS-style comments, JS expressions
   # like `4.5*1.032`, `// for brevity not shown` placeholders, or
-  # truncated mid-stream), don't promote — but DO tell the user, otherwise
+  # truncated mid-stream), don't promote: but DO tell the user, otherwise
   # they see the AI's confident "template-ready" reply and no download
   # button with no explanation.
   reply_text <- resp$reply
@@ -1421,7 +1421,7 @@ translator_chat_server <- function(input, output, session) {
         "The AI tried to emit a template but the format wasn't valid JSON ",
         "(usually because of JS-style comments, math expressions, or ",
         "'for brevity' placeholders inside the block). Click 'Produce ",
-        "template now' below — that uses Anthropic's tool-input-schema mode and ",
+        "template now' below: that uses Anthropic's tool-input-schema mode and ",
         "is guaranteed to produce a downloadable .xlsx.")
     }
   }
@@ -1431,7 +1431,7 @@ translator_chat_server <- function(input, output, session) {
   # handler) gets replaced by the freshly-rendered history.
   #
   # Numbered-question display filter: when the AI's reply is dominated
-  # by a numbered list (e.g. "Section D — Ambiguities" with 4-10
+  # by a numbered list (e.g. "Section D: Ambiguities" with 4-10
   # clarification questions wrapped in 200 words of preamble +
   # postamble), set display to just the numbered items. The full reply
   # stays in `content` so the chat-bubble expander surfaces it on
@@ -1448,7 +1448,7 @@ translator_chat_server <- function(input, output, session) {
   # If a valid template-ready block came through in this reply, post a
   # separate small AI message pointing the user at the green Download
   # button. The previous reply mixed natural-language with the JSON, so
-  # the user can miss the "click to download" cue — this dedicated
+  # the user can miss the "click to download" cue: this dedicated
   # message is the clear next step.
   if (template_just_ready) .translator_append_download_hint(state)
 
@@ -1484,7 +1484,7 @@ translator_chat_server <- function(input, output, session) {
     role    = "assistant",
     content = "(download hint)",
     display = paste0(
-      "Your translated template is ready — click the green ",
+      "Your translated template is ready: click the green ",
       "'Download template (.xlsx)' button below to get the file.\n\n",
       "Important: before uploading it on the 1. Data Input tab, ",
       "please open the .xlsx and spot-check the AI's work against ",
@@ -1495,7 +1495,7 @@ translator_chat_server <- function(input, output, session) {
       "- the manure-management percentages match what you intended\n\n",
       "Any IPCC default values the AI applied (when your raw data ",
       "didn't include them) will be flagged in amber on the 2. QA/QC ",
-      "tab — review those carefully too. The AI is a draft assistant, ",
+      "tab: review those carefully too. The AI is a draft assistant, ",
       "not a verified source."))
 }
 
@@ -1530,7 +1530,7 @@ translator_chat_server <- function(input, output, session) {
   if (budget_would_exceed()) {
     state$last_error <- paste0(
       "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly — ",
+      "We've been notified and will restore service shortly: ",
       "please try again later or contact the administrator.")
     return()
   }
@@ -1567,7 +1567,7 @@ translator_chat_server <- function(input, output, session) {
   # costs nothing.
   info("Analysing your inventory structure...")
   discovery_request <- paste(
-    "STEP 3 OF 3 — EMISSION SETUP. Before producing the filled template,",
+    "STEP 3 OF 3: EMISSION SETUP. Before producing the filled template,",
     "the in-app handler needs you to enumerate two things from this",
     "conversation:",
     "",
@@ -1579,12 +1579,12 @@ translator_chat_server <- function(input, output, session) {
     "  2. The inventory_metadata object: country, region (the continent,",
     "     from the country), year (integer), species (cattle_dairy /",
     "     cattle_non_dairy / cattle_mixed), ipcc_version (2006 /",
-    "     2019_refinement), prepared_by (string), notes (string — include",
+    "     2019_refinement), prepared_by (string), notes (string: include",
     "     any caveats from the conversation).",
     "",
     "Call the emit_inventory_piece tool exactly once with mode = 'enumerate'.",
     "Do NOT emit any parameters, manure_management, or time-series rows",
-    "here — those come in per-aggregation-level follow-up calls.",
+    "here: those come in per-aggregation-level follow-up calls.",
     sep = "\n")
   discovery_msgs <- anthropic_build_messages(
     system_prompt, history = state$messages,
@@ -1594,7 +1594,7 @@ translator_chat_server <- function(input, output, session) {
       discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb))
 
   if (!is.null(enum_resp$error)) {
-    # Discovery itself failed — fall back to the monolithic path.
+    # Discovery itself failed: fall back to the monolithic path.
     message("translator: discovery call failed (", enum_resp$error,
             "), falling back to monolithic emission")
     .translator_force_template_single(state, session)
@@ -1669,7 +1669,7 @@ translator_chat_server <- function(input, output, session) {
     total_chars <- 0L
 
     batch_nudge <- sprintf(paste(
-      "STEP 3 OF 3 — BATCH %d OF %d (aggregation_level = '%s').",
+      "STEP 3 OF 3: BATCH %d OF %d (aggregation_level = '%s').",
       "",
       "Emit ONLY the parameters, manure_management, and",
       "parameter_timeseries rows for aggregation_level = '%s'. Do NOT",
@@ -1691,7 +1691,7 @@ translator_chat_server <- function(input, output, session) {
       "",
       "Within those year rows, fill ONLY the parameter columns that",
       "CHANGE across years. Leave a column blank wherever its value",
-      "is the same in every year — that constant value is already on",
+      "is the same in every year: that constant value is already on",
       "the Parameters sheet, and the app's correlation step discards",
       "flat (zero-variance) series, so repeating it adds cost with no",
       "effect. Keep the year rows; carry only the columns with real",
@@ -1713,7 +1713,7 @@ translator_chat_server <- function(input, output, session) {
 
     if (!is.null(batch_resp$error)) {
       state$last_error <- sprintf(
-        "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry — the %d batch(es) that already succeeded are kept and won't be re-billed.",
+        "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry, the %d batch(es) that already succeeded are kept and won't be re-billed.",
         i, length(agg_levels), level, batch_resp$error, length(state$batch_parts))
       return()
     }
@@ -1726,7 +1726,7 @@ translator_chat_server <- function(input, output, session) {
     bad <- .translator_validate_piece(batch_parsed, "batch")
     if (!is.null(bad)) {
       state$last_error <- sprintf(
-        "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry — the %d batch(es) that already succeeded are kept and won't be re-billed.",
+        "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
         i, level, bad, length(state$batch_parts))
       return()
     }
@@ -1741,7 +1741,7 @@ translator_chat_server <- function(input, output, session) {
       message("translator: batch '", level, "' has ZERO user_file rows; retrying once")
       info(sprintf("Batch %s came back with catalogue defaults only; asking the AI to use the file values...", level))
       retry_msgs <- c(batch_msgs, list(list(role = "user", content = paste0(
-        "REJECTED — every parameters row you emitted for '", level, "' is tagged ",
+        "REJECTED: every parameters row you emitted for '", level, "' is tagged ",
         "data_source = 'ipcc_default' or lacks the tag, yet the uploaded file ",
         "carries values for this production system. Re-emit the batch for '",
         level, "' now: for every parameter present in the file use the file's ",
@@ -1830,7 +1830,7 @@ translator_chat_server <- function(input, output, session) {
                "file has multi-year activity data, this means the AI didn't",
                "extract it. The downloaded template will still work but the",
                "calculator won't be able to run correlation-based",
-               "uncertainty modes. Click 'Produce template now' to retry —",
+               "uncertainty modes. Click 'Produce template now' to retry -",
                "the batches that already succeeded won't be re-billed."))
   }
   download_hint <- sprintf(paste(
@@ -1861,14 +1861,14 @@ translator_chat_server <- function(input, output, session) {
 # Legacy single-call force-template path. Used by .translator_force_template()
 # above when the discovery stage returns ≤2 aggregation_levels (or fails).
 # The three retry loops (parse / coverage / defaults-only) and the sub-
-# category strip post-processing are correct on small inventories — kept
+# category strip post-processing are correct on small inventories: kept
 # unchanged here.
 .translator_force_template_single <- function(state, session) {
   state$pending <- TRUE
   state$last_error <- NULL
   on.exit({
     state$pending <- FALSE
-    # Hide the JS spinner — force-template is non-streaming so
+    # Hide the JS spinner: force-template is non-streaming so
     # translatorStreamStart never fires; we have to clear the spinner
     # explicitly. translatorStreamEnd is a safe no-op when there's no
     # active bubble.
@@ -1883,7 +1883,7 @@ translator_chat_server <- function(input, output, session) {
     # a numeric cap and wants the in-app gate.
     state$last_error <- paste0(
       "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly — ",
+      "We've been notified and will restore service shortly: ",
       "please try again later or contact the administrator.")
     return()
   }
@@ -1896,19 +1896,19 @@ translator_chat_server <- function(input, output, session) {
   }
 
   # Build the message list and inject the hard-requirements prompt as
-  # the FINAL user turn (not stored in state$messages — keeps the chat
+  # the FINAL user turn (not stored in state$messages: keeps the chat
   # visible to the user clean, just nudges the API call). Includes the
   # explicit row-count + completeness + strict-JSON checklist that
   # previously lived in the (now-removed) force-template button's
   # observeEvent.
   hard_requirements <- paste(
-    "STEP 3 OF 3 — EMISSION. Produce the final filled template JSON now.",
+    "STEP 3 OF 3: EMISSION. Produce the final filled template JSON now.",
     "",
     "Earlier in this conversation you produced an exploration report",
     "with FOUR sections (A: file shape, B: inventory of values found,",
     "C: gaps, D: ambiguities to ask the user). The user has answered",
     "section D's questions in subsequent messages. NOW produce the JSON",
-    "template as a MECHANICAL TRANSLATION of B + C + biological zeros —",
+    "template as a MECHANICAL TRANSLATION of B + C + biological zeros -",
     "not a re-derivation from scratch.",
     "",
     "The translation rule, applied row-by-row:",
@@ -1934,9 +1934,9 @@ translator_chat_server <- function(input, output, session) {
     "now' after explicit exploration + clarification. Their request is",
     "'emit the B/C/zero translation', NOT 'fill everything with catalogue",
     "defaults'. If you emit an all-IPCC-defaults grid, your output is",
-    "REJECTED and the user gets a failure message — your work is wasted.",
+    "REJECTED and the user gets a failure message: your work is wasted.",
     "",
-    "HARD REQUIREMENTS — your output is rejected if any of these fail:",
+    "HARD REQUIREMENTS: your output is rejected if any of these fail:",
     "",
     "1. SOURCE-OF-TRUTH HIERARCHY (most important rule). For every",
     "   parameter x sub-category, your `value` field MUST come from",
@@ -1956,7 +1956,7 @@ translator_chat_server <- function(input, output, session) {
     "   You MUST set `data_source` on EVERY parameters row to ONE of:",
     "     - \"user_file\"          (value from the uploaded file)",
     "     - \"user_chat\"          (value the user typed in chat)",
-    "     - \"ipcc_default\"       (catalogue default — only when neither",
+    "     - \"ipcc_default\"       (catalogue default: only when neither",
     "                              file nor chat provided a value)",
     "     - \"biological_zero\"    (e.g. Milk=0 for bulls, hours=0 for cows)",
     "     - \"placeholder\"        (e.g. N=1 for sub-categories the user",
@@ -1967,7 +1967,7 @@ translator_chat_server <- function(input, output, session) {
     "   Call the emit_inventory_piece tool exactly once with mode = 'full'.",
     "",
     "2. SUB-CATEGORIES. Emit EXACTLY the sub-categories the user mapped",
-    sprintf("   in chat — not the canonical %d from the catalogue. If the user",
+    sprintf("   in chat: not the canonical %d from the catalogue. If the user",
             length(.translator_subcategory_vocab())),
     "   corrected 'Cows' to `other_cows` (not `dairy_cows`), then",
     "   `dairy_cows` MUST NOT appear anywhere in `parameters` or",
@@ -1987,7 +1987,7 @@ translator_chat_server <- function(input, output, session) {
     "",
     sprintf("4. For each sub-category, fill ALL %d parameters from the IPCC", nrow(PARAM_CATALOGUE)),
     paste0("   catalogue (", paste(PARAM_CATALOGUE$parameter, collapse = ", "), ")"),
-    "   — but honour rule 1: user-supplied values OVERRIDE defaults.",
+    "  : but honour rule 1: user-supplied values OVERRIDE defaults.",
     "",
     "5. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
     "   upper bounds (Lower CI / Upper CI / lower / upper / ci_lower",
@@ -2005,7 +2005,7 @@ translator_chat_server <- function(input, output, session) {
     "   If the user's file gives BOUNDS for the MMS allocation (e.g.",
     "   'pasture 35% (range 28-42%)'), include them as lower_fraction /",
     "   upper_fraction with distribution_fraction='pert'. Without these,",
-    "   MMS allocation contributes zero uncertainty to the simulation —",
+    "   MMS allocation contributes zero uncertainty to the simulation -",
     "   which silently throws away a real source of inventory",
     "   uncertainty. Same applies to the coefficients: if the user has",
     "   country-specific bounds for MCF, EF3, Frac_GasMS_pct, or",
@@ -2026,13 +2026,13 @@ translator_chat_server <- function(input, output, session) {
 
   # Try once; if the JSON parses, use it. If not (truncation, schema
   # mismatch, etc.), retry ONCE before giving up. Two attempts is a
-  # reasonable trade-off between robustness and budget — strict json_schema
+  # reasonable trade-off between robustness and budget: strict json_schema
   # mode almost always returns valid JSON; failures are usually max_tokens
   # truncation on very large inventories, which a retry won't fix but a
   # retry is cheap and catches transient OpenAI hiccups.
   # Stream-aware progress callback: forward each JSON chunk's size to
   # the client so the progress bubble's elapsed counter can also show
-  # 'X chars received' — gives the user concrete feedback that the AI
+  # 'X chars received': gives the user concrete feedback that the AI
   # is producing output (not stuck waiting on OpenAI).
   total_chars <- 0L
   on_chunk_cb <- function(text) {
@@ -2044,7 +2044,7 @@ translator_chat_server <- function(input, output, session) {
   resp <- NULL
   for (attempt in seq_len(2)) {
     resp <- anthropic_chat_template_force(msgs, on_chunk = on_chunk_cb)
-    if (!is.null(resp$error)) break  # hard error — don't retry
+    if (!is.null(resp$error)) break  # hard error: don't retry
     if (.translator_template_is_well_formed(resp$reply)) break
     if (attempt == 1L)
       message("translator: force-template attempt 1 produced unparseable JSON, retrying once.")
@@ -2055,13 +2055,13 @@ translator_chat_server <- function(input, output, session) {
     return()
   }
 
-  # Log the spend regardless of whether the JSON parsed — we still paid
+  # Log the spend regardless of whether the JSON parsed: we still paid
   # for the tokens.
   .translator_log_usage(state, resp, stage = "full", expect_warm = TRUE)
 
   if (!.translator_template_is_well_formed(resp$reply)) {
     # Both attempts produced unparseable / incomplete JSON. Don't set
-    # last_template_json — the download button stays hidden, so the user
+    # last_template_json: the download button stays hidden, so the user
     # never gets the malformed .json file with the warning toast.
     # Diagnostic hint: if completion_tokens is near the 64K tool-output
     # ceiling, the response was almost certainly truncated.
@@ -2073,7 +2073,7 @@ translator_chat_server <- function(input, output, session) {
              "first, then start a new conversation for the beef ones (or ",
              "vice versa). The two .xlsx files can be merged by hand afterwards.")
     else
-      " Click 'Produce template now' again — this is sometimes a transient AI-service hiccup."
+      " Click 'Produce template now' again: this is sometimes a transient AI-service hiccup."
     state$last_error <- paste0(
       "Couldn't produce a complete template from the AI's response.",
       hint)
@@ -2109,7 +2109,7 @@ translator_chat_server <- function(input, output, session) {
   if (length(missing_subcats) > 0 && length(output_subcats) > 0) {
     message("translator: force-template missing sub-categories: ",
             paste(missing_subcats, collapse = ", "),
-            " — retrying with explicit list.")
+            ": retrying with explicit list.")
     # Push an extra user message that NAMES every missing sub-category.
     msgs_retry <- c(msgs, list(list(
       role    = "user",
@@ -2166,15 +2166,15 @@ translator_chat_server <- function(input, output, session) {
   if (file_was_uploaded && user_file_rows == 0L &&
         length(output_subcats) > 0L) {
     message("translator: force-template emitted ZERO user_file rows ",
-            "despite uploaded file — retrying with explicit demand.")
+            "despite uploaded file: retrying with explicit demand.")
     msgs_retry_vals <- c(msgs, list(list(
       role    = "user",
       content = paste0(
-        "REJECTED — your output has ZERO rows tagged ",
+        "REJECTED: your output has ZERO rows tagged ",
         "data_source = 'user_file'. The user uploaded a file with ",
         "specific values for parameters like BW / MW / WG / pct_pregnant ",
         "/ DE / CP / Milk / Fat / hours / MMS allocation. You did NOT ",
-        "use any of those values — you emitted catalogue defaults across ",
+        "use any of those values: you emitted catalogue defaults across ",
         "the board. This is the Step-5b failure mode the system prompt ",
         "warns about. Re-emit the complete template-ready JSON now and: ",
         "(1) For EVERY parameter present in the user's uploaded file: ",
@@ -2243,7 +2243,7 @@ translator_chat_server <- function(input, output, session) {
   }
 
   # Final coverage messages (after auto-retry). Only surface a warning
-  # if something is STILL wrong — the retry may have fixed everything.
+  # if something is STILL wrong: the retry may have fixed everything.
   coverage_msgs <- character(0)
   if (!is.null(parsed_check)) {
     if (length(missing_subcats) > 0)
@@ -2263,7 +2263,7 @@ translator_chat_server <- function(input, output, session) {
     if (length(missing_in_mm) > 0 && length(sc_mm) > 0)
       coverage_msgs <- c(coverage_msgs, paste0(
         "Manure_Management only covers ", paste(sc_mm, collapse = ", "),
-        " — manure CH4/N2O for ", paste(missing_in_mm, collapse = ", "),
+        ": manure CH4/N2O for ", paste(missing_in_mm, collapse = ", "),
         " will be zero. Retry 'Produce template now' or add the MMS ",
         "rows yourself."))
   }
@@ -2296,7 +2296,7 @@ translator_chat_server <- function(input, output, session) {
 }
 
 # Write the AI's template-ready JSON to an .xlsx that LOOKS LIKE THE
-# OFFICIAL INPUT TEMPLATE — same column ordering, header colours,
+# OFFICIAL INPUT TEMPLATE: same column ordering, header colours,
 # tab colours, sheet names, README / Vocab / _Lists sheets.
 #
 # Strategy: call the existing generate_template_openxlsx() helper to
@@ -2311,7 +2311,7 @@ translator_chat_server <- function(input, output, session) {
 # sub-category in the AI's JSON we either overwrite that block (first
 # sub-category) or append a new block below (subsequent sub-categories).
 # Appended blocks share the column structure but only get basic styling
-# — acceptable tradeoff for now.
+#: acceptable tradeoff for now.
 #
 # Falls back to a raw .json dump if the JSON is malformed (so the user
 # never loses the AI's work). The download handler checks JSON validity
@@ -2330,11 +2330,11 @@ translator_chat_server <- function(input, output, session) {
   # captures the FULL call stack (R function names + line numbers) into
   # shinyapps.io logs. The previous tryCatch only logged
   # conditionMessage(), which on the Zambia run produced just "no such
-  # index at level 1" with no clue where it came from — local repros
+  # index at level 1" with no clue where it came from: local repros
   # of the same input data succeeded. The withCallingHandlers below
   # snapshots sys.calls() at the throw site BEFORE control unwinds to
   # the tryCatch's error handler, so the next failure pinpoints the
-  # exact line. Kept in permanently — silent on the happy path,
+  # exact line. Kept in permanently: silent on the happy path,
   # informative on regression.
   writer_trace <- NULL
   ok <- tryCatch(
@@ -2356,7 +2356,7 @@ translator_chat_server <- function(input, output, session) {
     error = function(e) {
       message("translator: official-template write failed: ",
               conditionMessage(e),
-              " — falling back to simple xlsx.\n",
+              ": falling back to simple xlsx.\n",
               "Writer call stack (innermost last):\n  > ",
               writer_trace %||% "(no stack captured)")
       FALSE
@@ -2366,13 +2366,13 @@ translator_chat_server <- function(input, output, session) {
   invisible(NULL)
 }
 
-# Primary writer — overlays AI values onto the official blank template.
+# Primary writer: overlays AI values onto the official blank template.
 .translator_write_official_template <- function(parsed, file_path) {
   if (!exists("generate_template_openxlsx") || !exists("PARAM_CATALOGUE"))
     stop("template-generation helpers not available")
 
   # Defense-in-depth: if the merge produced list-of-records (heterogeneous
-  # schema across batches), coerce to data.frames here too — the writer's
+  # schema across batches), coerce to data.frames here too: the writer's
   # is.data.frame() gates would otherwise drop those sheets silently.
   parsed$parameters           <- .translator_records_to_df(parsed$parameters)
   parsed$manure_management    <- .translator_records_to_df(parsed$manure_management)
@@ -2462,7 +2462,7 @@ translator_chat_server <- function(input, output, session) {
         p_name <- PARAM_CATALOGUE$parameter[i]
         # Find AI's row matching this (cattle_type, agg_level, sub_cat,
         # parameter). Earlier this mask only filtered on
-        # (sub_category, parameter) — which silently contaminated rows
+        # (sub_category, parameter): which silently contaminated rows
         # whenever the same sub_category code appeared in multiple
         # aggregation_levels (e.g. `dairy_cows` in both commercial_dairy
         # and emergent_dairy; `other_cows` in all three beef systems).
@@ -2488,7 +2488,7 @@ translator_chat_server <- function(input, output, session) {
         openxlsx::writeData(wb, "Parameters", sub_cat,     startRow = r,
                             startCol = 3, colNames = FALSE)
 
-        # For sub-category blocks AFTER the first, the row is blank — we
+        # For sub-category blocks AFTER the first, the row is blank: we
         # need to write the static info cells (parameter / definition /
         # unit / param_type / ipcc_ref) too.
         if (k > 1L) {
@@ -2514,16 +2514,16 @@ translator_chat_server <- function(input, output, session) {
         # Column layout in the official template:
         #   7  = value (yellow user-data cell)
         #   8  = uncertainty_pct (symmetric ±% input)
-        #   9  = lower_bound (catalogue reference — display only)
-        #   10 = upper_bound (catalogue reference — display only)
+        #   9  = lower_bound (catalogue reference: display only)
+        #   10 = upper_bound (catalogue reference: display only)
         #   11 = distribution
-        #   12 = lower (asymmetric override — what the simulator reads)
-        #   13 = upper (asymmetric override — what the simulator reads)
+        #   12 = lower (asymmetric override: what the simulator reads)
+        #   13 = upper (asymmetric override: what the simulator reads)
         #   16 = data_source
         #
         # The AI's bounds MUST go into cols 12/13 so the simulator picks
         # them up. Previously they were written to 9/10 (the catalogue
-        # display columns) and the simulator saw NA in 12/13 — which the
+        # display columns) and the simulator saw NA in 12/13: which the
         # NA-bounds guard in sample_distribution() turned into NA samples
         # for every row, eventually crashing the quantile() convergence
         # check on total_co2e. Cols 9/10 keep the catalogue default
@@ -2564,7 +2564,7 @@ translator_chat_server <- function(input, output, session) {
           else if (identical(tolower(as.character(v_dist)), "constant")) .put_param(13, v_mean)
           .put_param(16, ai$data_source %||% "AI translator")
         } else {
-          # Gap parameter — the AI/overlay didn't supply this (parameter,
+          # Gap parameter: the AI/overlay didn't supply this (parameter,
           # sub-category). Backfill the IPCC catalogue default so the row is a
           # valid "ipcc_default" entry instead of a blank cell that upload
           # validation rejects with "Invalid distribution:".
@@ -2573,10 +2573,10 @@ translator_chat_server <- function(input, output, session) {
           # only pre-fills the FIRST sub-category block, and for asymmetric
           # params it writes an Excel FORMULA into the simulator-read cols
           # 12/13 that carries no cached value until the file is opened in
-          # Excel — so an unopened file would sample NA bounds. Writing
+          # Excel: so an unopened file would sample NA bounds. Writing
           # explicit NUMBERS here (idempotent for block 1) makes all blocks
           # uniform and simulator-safe: value + uncertainty% + distribution,
-          # plus concrete lower/upper — asymmetric params take the catalogue's
+          # plus concrete lower/upper: asymmetric params take the catalogue's
           # explicit bounds, symmetric params take value ± uncertainty%.
           # Use the SUB-CATEGORY-AWARE default, not the bare catalogue row.
           # resolve_subcat_default() knows each sub-category's sex and age, so
@@ -2634,7 +2634,7 @@ translator_chat_server <- function(input, output, session) {
       .put_mm(3, mm$sub_category[i])
       .put_mm(4, mm$mms_type[i])
       .put_mm(5, mm$fraction_pct[i])
-      # Fraction bounds — col 6/7/8. Sampled by the simulator if present;
+      # Fraction bounds: col 6/7/8. Sampled by the simulator if present;
       # absent/equal-to-central → deterministic. The user often has
       # uncertainty on the MMS allocation in the source file; this row
       # propagates it through.
@@ -2732,7 +2732,7 @@ translator_chat_server <- function(input, output, session) {
 
   # ---------- Parameter_TimeSeries -----------------------------------------
   # Optional multi-year activity-data table. The blank template puts
-  # banner @ row 1, headers @ 2, desc @ 3, units @ 4 — so data rows
+  # banner @ row 1, headers @ 2, desc @ 3, units @ 4: so data rows
   # start at row 5. Columns:
   #   1 cattle_type    2 aggregation_level    3 sub_category    4 year
   #   5 N    6 BW    7 MW    8 WG    9 Milk   10 Fat
@@ -2769,7 +2769,7 @@ translator_chat_server <- function(input, output, session) {
   openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
 }
 
-# Fallback writer — used only when the official template builder errors
+# Fallback writer: used only when the official template builder errors
 # (missing helper, dependency problem, etc.). Produces a 3-sheet xlsx
 # with the AI's data but no styling. Better than nothing.
 .translator_write_simple_xlsx <- function(parsed, file_path) {
@@ -2814,7 +2814,7 @@ translator_chat_server <- function(input, output, session) {
 }
 
 # Extract just the numbered clarification items from an AI reply, when
-# the reply is dominated by a numbered list (e.g. "Section D —
+# the reply is dominated by a numbered list (e.g. "Section D -
 # Ambiguities" with 4-10 questions wrapped in 200 words of preamble and
 # postamble). Returns the extracted block, or NULL when the filter
 # decides the reply is mostly prose and should display as-is.
@@ -2875,7 +2875,7 @@ translator_chat_server <- function(input, output, session) {
                   collapse = "\n\n")
   # 30% gate: extracted block must be substantial relative to the full
   # reply. Otherwise the AI is mostly explaining and the numbered list
-  # is incidental — show the full prose instead.
+  # is incidental: show the full prose instead.
   if (nchar(joined) < 0.30 * total_chars) return(NULL)
   joined
 }
@@ -2941,7 +2941,7 @@ translator_chat_server <- function(input, output, session) {
     # Collapse the >2 blank lines the strip might leave behind.
     visible <- gsub("\\n{3,}", "\n\n", trimws(visible))
     return(list(visible = if (nzchar(visible)) visible
-                            else "Template ready — click the green download button below to get the .xlsx.",
+                            else "Template ready: click the green download button below to get the .xlsx.",
                 hidden = trimws(inner),
                 summary = "Show structure / details"))
   }
@@ -2964,7 +2964,7 @@ translator_chat_server <- function(input, output, session) {
 # Scan the conversation history for canonical sub-category names and
 # return the de-duplicated set. Used by .translator_force_template to
 # detect when the AI silently dropped sub-categories from its output
-# (a common failure mode — the AI emits one "representative" sub-cat
+# (a common failure mode: the AI emits one "representative" sub-cat
 # and ignores the rest, even when the chat clearly listed all 8). The
 # controlled vocabulary comes from translator_prompts/template_schema.md.
 #
@@ -3106,7 +3106,7 @@ translator_chat_server <- function(input, output, session) {
 # scalar, length>N vector (we keep the first element), list-of-1,
 # nested list, even a 1-row data.frame fragment. The writeData call
 # below used to throw "no such index at level 1" when a cell value
-# was a list-column (production-only — local repros couldn't trigger
+# was a list-column (production-only: local repros couldn't trigger
 # it because the local data came from a flattened simple_xlsx).
 .translator_scalar <- function(v) {
   if (is.null(v))           return(NA)
@@ -3121,7 +3121,7 @@ translator_chat_server <- function(input, output, session) {
 # Returns NULL on empty / unrecognized input.
 #
 # Why: jsonlite::fromJSON(simplifyVector = TRUE) does not always simplify
-# a JSON array-of-objects into a data.frame — if the objects have a
+# a JSON array-of-objects into a data.frame: if the objects have a
 # heterogeneous key set (one batch has lower_mcf, another doesn't), the
 # result stays a list-of-named-lists. Downstream writers gate sheet
 # emission on is.data.frame() so list-of-records meant the sheet was

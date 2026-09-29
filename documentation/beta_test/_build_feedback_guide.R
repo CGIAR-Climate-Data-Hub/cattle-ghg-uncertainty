@@ -11,7 +11,7 @@ tb <- if (nzchar(h)) dirname(h) else file.path(Sys.getenv("LOCALAPPDATA"),
 if (dir.exists(tb)) Sys.setenv(PATH = paste(tb, Sys.getenv("PATH"), sep = .Platform$path.sep))
 
 src <- "documentation/beta_test/feedback_guide.Rmd"
-if (!file.exists(src)) stop("Not found: ", src, " — run from the repo root.")
+if (!file.exists(src)) stop("Not found: ", src, ", run from the repo root.")
 for (fmt in c("word_document", "pdf_document")) {
   out <- tryCatch(rmarkdown::render(src, output_format = fmt, quiet = TRUE, envir = new.env()),
                   error = function(e) { message("FAILED ", fmt, ": ", conditionMessage(e)); NULL })

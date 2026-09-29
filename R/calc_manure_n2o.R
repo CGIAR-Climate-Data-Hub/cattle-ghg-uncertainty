@@ -2,7 +2,7 @@
 # Source: IPCC 2006 Guidelines, Volume 4, Chapter 10 (Eq 10.25-10.34) & Chapter 11
 
 # Nitrogen excretion rate - kg N/head/year (simplified from Eq 10.31-10.34).
-# C1: DE (was DE_pct), CP (was CP_pct) — IPCC software-aligned names.
+# C1: DE (was DE_pct), CP (was CP_pct), IPCC software-aligned names.
 # Andreas 2026-05 follow-up: `MilkPR` (milk protein %) is now a function
 # argument instead of a hardcoded 3.3 constant. Users can override it
 # per sub-category via the Parameters template. The default reads the
@@ -21,7 +21,7 @@ calc_n_excretion <- function(ge, CP, milk_yield = 0, pct_pregnant = 0,
   # IPCC 2006 / 2019 Refinement Vol.4 Ch.10 Eq 10.32 (N intake rates for cattle):
   #   N_intake = (GE / 18.45) * (CP% / 100) / 6.25
   # i.e. dry-matter feed mass (GE / 18.45) * protein fraction (CP% / 100) /
-  # protein-to-N ratio (6.25). NO `DE` factor — that belongs in the volatile-
+  # protein-to-N ratio (6.25). NO `DE` factor: that belongs in the volatile-
   # solids equation (Eq 10.24), where we want the UN-digested fraction.
   # Earlier code wrote N_intake = (GE * DE / 100) / 18.45 * ... which mixed
   # the DE factor in here and under-estimated N intake by ~25-30%, causing
@@ -83,7 +83,7 @@ calc_direct_n2o_mm <- function(Nex, mms_fractions, ef3_values) {
 #   (a) `frac_gas_values` / `frac_leach_values` as named vectors keyed by
 #       mms_type (post-Round-7 calling convention), OR
 #   (b) `frac_gas` / `frac_leach` as scalars (pre-Round-7 broadcast convention,
-#       still accepted for back-compat — the wrapper builds constant vectors).
+#       still accepted for back-compat: the wrapper builds constant vectors).
 calc_indirect_n2o_mm <- function(Nex, mms_fractions,
                                   frac_gas_values  = NULL,
                                   frac_leach_values = NULL,

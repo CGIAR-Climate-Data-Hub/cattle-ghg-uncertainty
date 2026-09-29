@@ -38,7 +38,7 @@
   ft <- flextable::padding(ft, padding = 3, part = "all")
   ft <- flextable::border_inner(ft, officer::fp_border(color = .BORDER, width = 0.5))
   ft <- flextable::border_outer(ft, officer::fp_border(color = .BORDER, width = 0.5))
-  # Alternating row backgrounds (skip if fewer than 2 body rows — seq() would
+  # Alternating row backgrounds (skip if fewer than 2 body rows: seq() would
   # error with `wrong sign in 'by' argument` for a 1-row table).
   body_rows <- nrow(ft$body$dataset)
   if (body_rows >= 2L) {
@@ -51,7 +51,7 @@
   ft
 }
 
-# Headings — use officer's default 'heading N' styles (which Word renders with
+# Headings: use officer's default 'heading N' styles (which Word renders with
 # the document's heading style) but coerced to our green colour via fp_par.
 .add_h1 <- function(doc, text) {
   officer::body_add_fpar(doc, officer::fpar(
@@ -115,7 +115,7 @@
 # Append a centred logo row matching the app's home-page logo bar:
 # Alliance of Bioversity & CIAT, CGIAR Climate Action Programme, and the Global
 # Methane Hub. Each logo is shown at a common height with its width set from the
-# PNG's true aspect ratio (so none is stretched — the climate-action wordmark is
+# PNG's true aspect ratio (so none is stretched: the climate-action wordmark is
 # ~3.8:1, much wider than the others). Missing PNGs are skipped silently so the
 # Word build never errors when a logo hasn't been staged in www/.
 .add_logo_footer <- function(doc) {
@@ -164,7 +164,7 @@
 
 .pretty_var <- function(v) {
   # Andreas 2026-05 #37, #39: every IPCC emission source must appear as its
-  # own row in the Word Section 4 table — including pasture direct and
+  # own row in the Word Section 4 table: including pasture direct and
   # indirect, which were missing.
   map <- c(
     total_co2e             = "Total CO2eq",
@@ -204,7 +204,7 @@
 }
 
 # ============================================================================
-# SINGLE-YEAR REPORT — build_run_summary_docx() (redesigned)
+# SINGLE-YEAR REPORT: build_run_summary_docx() (redesigned)
 # ============================================================================
 
 build_run_summary_docx <- function(path,
@@ -366,7 +366,7 @@ build_run_summary_docx <- function(path,
     doc <- officer::body_add_gg(doc, value = comp_plot, width = 5.5, height = 3.0)
   }
 
-  # ---- Sensitivity ranking — top 10 drivers ------------------------------
+  # ---- Sensitivity ranking: top 10 drivers ------------------------------
   sens_ft <- .sensitivity_flextable(sensitivity, top_n = 10L)
   if (!is.null(sens_ft)) {
     doc <- .add_h2(doc, "8. Sensitivity ranking: top 10 drivers")
@@ -538,7 +538,7 @@ build_run_summary_docx <- function(path,
 }
 
 # ============================================================================
-# TREND REPORT — build_trend_summary_docx() (new, Round 8)
+# TREND REPORT: build_trend_summary_docx() (new, Round 8)
 # ============================================================================
 
 build_trend_summary_docx <- function(path,
@@ -595,14 +595,14 @@ build_trend_summary_docx <- function(path,
     doc <- officer::body_add_gg(doc, value = trend_plot, width = 5.5, height = 3.2)
   }
 
-  # Round 9b §3a — Year-over-year % change bar chart.
+  # Round 9b §3a: Year-over-year % change bar chart.
   yoy_plot <- .gg_yoy_chart(trend_results)
   if (!is.null(yoy_plot)) {
     doc <- .add_h3(doc, "Year-over-year % change")
     doc <- officer::body_add_gg(doc, value = yoy_plot, width = 5.5, height = 2.8)
   }
 
-  # Round 9b §3b — Distribution of ΔY_N − Y_1, the uncertainty on the trend.
+  # Round 9b §3b: Distribution of ΔY_N − Y_1, the uncertainty on the trend.
   delta_plot <- .gg_delta_distribution(delta_total)
   if (!is.null(delta_plot)) {
     doc <- .add_h3(doc, "Distribution of ΔY_N − Y_1")
@@ -639,7 +639,7 @@ build_trend_summary_docx <- function(path,
       doc <- officer::body_add_gg(doc, value = dl_plot, width = 5.5, height = 3.0)
   }
 
-  # Round 9b §5a — Full sensitivity rankings (all parameters).
+  # Round 9b §5a: Full sensitivity rankings (all parameters).
   full_py <- .sensitivity_flextable(sensitivity_per_year, top_n = Inf)
   full_dl <- .sensitivity_flextable(sensitivity_delta,    top_n = Inf)
   if (!is.null(full_py) || !is.null(full_dl)) {
@@ -657,7 +657,7 @@ build_trend_summary_docx <- function(path,
     doc <- .add_landscape_break(doc)
   }
 
-  # Round 9b §6 — Input parameter documentation.
+  # Round 9b §6: Input parameter documentation.
   inputs_ft <- .inputs_doc_flextable(param_specs)
   if (!is.null(inputs_ft)) {
     doc <- .add_h2(doc, "6. Input parameter documentation")
@@ -860,11 +860,11 @@ build_trend_summary_docx <- function(path,
   if (nrow(keep) == 0) keep <- uncertainty
 
   # Andreas 28/5/26 #6: drop the CV column from the user-facing per-source
-  # table so the Word report leads with 95% MoE — the IPCC Vol.1 Ch.3 Table
+  # table so the Word report leads with 95% MoE: the IPCC Vol.1 Ch.3 Table
   # 3.3 convention. `cv_pct` is still in the underlying uncertainty frame for
   # any downstream consumer that wants it.
   # Andreas 2026-06-02 review: include the asymmetric half-widths
-  # (+upper% / -lower%) alongside the symmetric MoE — many emission
+  # (+upper% / -lower%) alongside the symmetric MoE: many emission
   # distributions are skewed (lognormal EFs, PERT-bounded fractions,
   # manure-N2O sums) and reporting the two sides separately is what users
   # may need to populate the asymmetric-bounds version of IPCC Table 3.3.
@@ -891,7 +891,7 @@ build_trend_summary_docx <- function(path,
 }
 
 # Andreas 2026-05 C11 / 28/5/26 #6: per-reporting-category AD or EF
-# uncertainty table for the Word exec summary. `kind` is "AD" or "EF" —
+# uncertainty table for the Word exec summary. `kind` is "AD" or "EF" -
 # picks the matching column from the IPCC summary table and trims to the
 # per-source rows. The IPCC table columns were renamed to
 # "AD uncertainty (95% MoE %)" / "EF uncertainty (95% MoE %)" so this
@@ -981,7 +981,7 @@ build_trend_summary_docx <- function(path,
   flextable::flextable(df)
 }
 
-# Round 9b §5 — Per-cattle-type / aggregation-level / sub-category breakdown.
+# Round 9b §5: Per-cattle-type / aggregation-level / sub-category breakdown.
 # Mirrors the live results_by_system table at each aggregation level. Returns
 # NULL if mc_results$by_system is missing; otherwise a named list of
 # flextables keyed by the aggregation level.
@@ -1043,7 +1043,7 @@ build_trend_summary_docx <- function(path,
   )
 }
 
-# Andreas 28/5/26 #7.2 + #7.3 — per-(cattle_type × emission source) breakdown
+# Andreas 28/5/26 #7.2 + #7.3: per-(cattle_type × emission source) breakdown
 # with raw t CH4 / t N2O and t CO2eq side-by-side. Mirrors the in-app
 # results_by_category table when the aggregation level is cattle_type.
 .per_source_breakdown_flextable <- function(mc_results, gwp_version = "AR5") {
@@ -1114,9 +1114,9 @@ build_trend_summary_docx <- function(path,
   flextable::flextable(do.call(rbind, rows))
 }
 
-# Round 9b §13 — Input parameter documentation. Mirrors inputs_doc_table.
+# Round 9b §13: Input parameter documentation. Mirrors inputs_doc_table.
 # Perf (2026-06): the input-documentation table is the single biggest driver of
-# Word build time on large inventories — for the 32-sub-category Zambia run it is
+# Word build time on large inventories: for the 32-sub-category Zambia run it is
 # 576 rows, and officer's print.rdocx runs several whole-document regex passes
 # whose cost scales with the table's WML size (~25 s of the ~33 s build). Cap the
 # rows shown in the Word doc; the COMPLETE per-parameter listing ships in the
@@ -1147,7 +1147,7 @@ WORD_SENS_MAX <- 50L
   flextable::flextable(df)
 }
 
-# Round 9b §12 — MC diagnostics summary (badges as a table).
+# Round 9b §12: MC diagnostics summary (badges as a table).
 .diagnostics_flextable <- function(diagnostics) {
   if (is.null(diagnostics)) return(NULL)
   d <- diagnostics
@@ -1268,7 +1268,7 @@ WORD_SENS_MAX <- 50L
       v <- inv[[col]]
       if (length(v) > 0 && stats::sd(v, na.rm = TRUE) > 0) {
         # Subsample for the histogram (shape is stable; keeps the combined
-        # long data frame small — up to 7 sources x n_iter otherwise).
+        # long data frame small: up to 7 sources x n_iter otherwise).
         vs <- if (length(v) > 4000L) v[seq_len(4000L)] else v
         parts[[length(parts) + 1L]] <- data.frame(value = vs, source = lab)
       }
@@ -1286,7 +1286,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme(strip.text = ggplot2::element_text(face = "bold"))
 }
 
-# Round 8: trend chart for the trend Word doc — line + 95% CI ribbon
+# Round 8: trend chart for the trend Word doc, line + 95% CI ribbon
 .gg_trend_chart <- function(trend_results) {
   if (is.null(trend_results) || nrow(trend_results) == 0) return(NULL)
   ggplot2::ggplot(trend_results,
@@ -1300,7 +1300,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme_minimal(base_size = 10)
 }
 
-# Round 9b §6 — AD / EF / Combined 95 % MoE for total CO2eq, total CH4,
+# Round 9b §6: AD / EF / Combined 95 % MoE for total CO2eq, total CH4,
 # total N2O. Mirrors output$decomposition_plot in app_server.R.
 # Andreas 28/5/26 #6: switched from cv_pct to moe_pct so the Word report
 # tracks the IPCC reporting convention (Vol.1 Ch.3 Table 3.3).
@@ -1348,7 +1348,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme(legend.position = "bottom")
 }
 
-# Round 9b §7 — Effect of correlations on 95 % MoE (with vs without).
+# Round 9b §7: Effect of correlations on 95 % MoE (with vs without).
 # Mirrors output$comparison_plot. Reads the live uncertainty frame and the
 # comparison-run uncertainty frame. Andreas 28/5/26 #6: cv_pct → moe_pct.
 .gg_comparison <- function(uncertainty_with, uncertainty_without) {
@@ -1390,7 +1390,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme(legend.position = "bottom")
 }
 
-# Round 9b §11 — Per-parameter density plots (up to 12). Mirrors the live
+# Round 9b §11: Per-parameter density plots (up to 12). Mirrors the live
 # output$report_input_densities. Takes the first by_system block's `samples`
 # data frame (parameter columns, n_iter rows).
 .gg_input_densities <- function(samples_df, n_max = 12) {
@@ -1417,7 +1417,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme(strip.text = ggplot2::element_text(face = "bold"))
 }
 
-# Round 9b §12 — MC convergence: running mean + 2.5/97.5% bands across
+# Round 9b §12: MC convergence: running mean + 2.5/97.5% bands across
 # iterations. Mirrors output$convergence_plot. Reads rv$diagnostics$trace.
 .gg_convergence <- function(diagnostics) {
   if (is.null(diagnostics) || is.null(diagnostics$trace)) return(NULL)
@@ -1447,7 +1447,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme_minimal(base_size = 10)
 }
 
-# Round 9b §3a — Year-over-year % change bar chart for the trend report.
+# Round 9b §3a: Year-over-year % change bar chart for the trend report.
 # Mirrors output$trend_yoy_chart.
 .gg_yoy_chart <- function(trend_results) {
   if (is.null(trend_results) || !"YoY_pct" %in% names(trend_results)) return(NULL)
@@ -1469,7 +1469,7 @@ WORD_SENS_MAX <- 50L
     ggplot2::theme_minimal(base_size = 10)
 }
 
-# Round 9b §3b — Distribution of Δ Y_N − Y_1 from the per-iteration delta
+# Round 9b §3b: Distribution of Δ Y_N − Y_1 from the per-iteration delta
 # samples. Mirrors output$trend_delta_histogram.
 .gg_delta_distribution <- function(delta_total) {
   if (is.null(delta_total) || is.null(delta_total$per_iter)) return(NULL)

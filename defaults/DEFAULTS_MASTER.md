@@ -42,7 +42,7 @@ A compiler cannot vary these from their data, so these are the only ones shown o
 | **Manure system variant** | One IPCC sub-type per manure system, named on every row of the manure-system table | Liquid slurry WITH versus without a natural crust; composting static pile versus in-vessel versus windrow; solid storage plain versus bulking agent versus additives; deep bedding with versus without mixing | `MCF`, `EF3`, `FRAC` | 2019R Vol.4 Ch.10 Tables 10.17, 10.21 and 10.22 | IPCC splits several systems into variants whose coefficients differ by a factor of two or more. Every coefficient on one of our rows comes from the single variant that row declares, so the row describes one real system rather than a blend. |
 | **Species** | Cattle | Buffalo (Bo 0.10) | `Bo`, `Cp`, `ASH` | 2019R Vol.4 Ch.10 Table 10.16A (Updated); Table 10.7 (Updated) | The tool is a cattle tool. Buffalo values differ and are not carried. |
 
-### Resolved, not assumed (2) -- internal record only
+### Resolved, not assumed (2): internal record only
 
 **These are deliberately NOT shown to users as assumptions.** The tool works them out rather than assuming them, so presenting them alongside the rows above would misdescribe it. Kept here so the distinction itself is on the record.
 

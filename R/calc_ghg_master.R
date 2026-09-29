@@ -56,7 +56,7 @@ ghg_emissions <- function(
   manure_ch4_head <- calc_manure_ch4(VS, Bo, mms_fractions, mcf_values)
   manure_ch4_total <- (manure_ch4_head * cattle_pop) / 1000
 
-  # N excretion and N2O. DE no longer passed — see calc_n_excretion comments.
+  # N excretion and N2O. DE no longer passed: see calc_n_excretion comments.
   Nex <- calc_n_excretion(ge, CP, milk_yield, pct_pregnant, weight_gain,
                            MilkPR = MilkPR)
   pct_pasture <- ifelse("pasture" %in% names(mms_fractions),
@@ -159,7 +159,7 @@ ghg_emissions_vec <- function(
   # remaining loop is over the handful of MMS *types* (not iterations).
   #
   # The scalar ghg_emissions() and all calc_*() helpers are intentionally left
-  # untouched — they remain the reference the audit (deterministic golden case)
+  # untouched: they remain the reference the audit (deterministic golden case)
   # and the equivalence test check against. This function reproduces their
   # output bit-for-bit.
   #

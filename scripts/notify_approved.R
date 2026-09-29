@@ -14,7 +14,7 @@
 # user gets their welcome email even if the deploy step fails later.
 #
 # Safe to re-run: if nothing changed, no email is sent. SendGrid
-# failures are non-fatal — the deploy proceeds regardless.
+# failures are non-fatal: the deploy proceeds regardless.
 
 if (basename(getwd()) == "scripts") setwd("..")
 
@@ -22,7 +22,7 @@ if (basename(getwd()) == "scripts") setwd("..")
   body <- list(
     personalizations = list(list(
       to      = list(list(email = to_email)),
-      subject = "You're approved — IPCC Tier 2 Livestock GHG Uncertainty Calculator"
+      subject = "You're approved: IPCC Tier 2 Livestock GHG Uncertainty Calculator"
     )),
     from    = list(email = from_email, name = from_name),
     content = list(list(
@@ -42,7 +42,7 @@ if (basename(getwd()) == "scripts") setwd("..")
         "clarifying questions, and produces a downloadable .xlsx ready to ",
         "upload to the Data Input tab.\n\n",
         "Once you sign in, it is remembered indefinitely on that ",
-        "browser — you only do this once per browser. To sign out, ",
+        "browser: you only do this once per browser. To sign out, ",
         "clear the site data in your browser settings.\n\n",
         "If you run into anything, just reply to this email.\n\n",
         "Thanks,\n",
@@ -77,7 +77,7 @@ snapshot_csv <- "runtime/.approved_users_snapshot.csv"
 if (!dir.exists("runtime")) dir.create("runtime")
 
 if (!file.exists(current_csv)) {
-  message("notify_approved: ", current_csv, " not found — skipping notify pass.")
+  message("notify_approved: ", current_csv, " not found, skipping notify pass.")
 } else {
   current_emails <- tolower(trimws(readLines(current_csv, warn = FALSE)))
   current_emails <- current_emails[nzchar(current_emails)]
@@ -91,11 +91,11 @@ if (!file.exists(current_csv)) {
   new_emails <- setdiff(current_emails, snapshot_emails)
 
   if (length(new_emails) == 0) {
-    message("notify_approved: no new approved users since last deploy — skipping.")
+    message("notify_approved: no new approved users since last deploy, skipping.")
   } else {
     sg_key <- Sys.getenv("SENDGRID_API_KEY", unset = "")
     if (!nzchar(sg_key)) {
-      message("notify_approved: SENDGRID_API_KEY not set — skipping welcome ",
+      message("notify_approved: SENDGRID_API_KEY not set, skipping welcome ",
               "emails. Would have notified: ",
               paste(new_emails, collapse = ", "))
     } else {
@@ -106,7 +106,7 @@ if (!file.exists(current_csv)) {
         "APP_BASE_URL",
         unset = "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/")
       message("notify_approved: ", length(new_emails),
-              " new approved user(s) — sending welcome emails…")
+              " new approved user(s): sending welcome emails…")
       for (e in new_emails) .notify_send_one(e, sg_key, from_email,
                                               from_name, app_url)
     }
