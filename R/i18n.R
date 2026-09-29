@@ -278,33 +278,27 @@ lang_state_take <- function(token) {
                               fr = "Méthodologie, guide utilisateur & téléchargements →"),
 
   # "Before you start" card
-  before_you_will_need = list(en = "You will need:",
-                                fr = "Ce dont vous aurez besoin :"),
+  # Reframed 2026-09-29: this was a "You will need" list mirrored by a
+  # "What this tool does NOT do" list, which repeated the same boundaries
+  # twice and read like boilerplate. Same three limits, folded into the
+  # bullet each one belongs to, as a division of labour.
+  before_you_will_need = list(en = "What you bring:",
+                                fr = "Ce que vous apportez :"),
   before_li1 = list(
-    en = "A Tier 2 input dataset for the inventory year(s) you wish to assess: animal sub-categories with population, body weights, feed quality, and manure-management shares.",
-    fr = "Un jeu de données d'entrée Niveau 2 pour l'année (ou les années) d'inventaire à évaluer : sous-catégories animales avec population, poids vifs, qualité de l'alimentation et répartition de la gestion du fumier."
+    en = "Your Tier 2 dataset for the inventory year or years you want to assess: animal sub-categories with population, body weights, feed quality and manure-management shares. The calculation follows the IPCC Tier 2 equation chain, so Tier 1 inventories and country-specific methods fall outside what it can analyse.",
+    fr = "Votre jeu de données Niveau 2 pour la ou les années d'inventaire à évaluer : sous-catégories animales avec population, poids vifs, qualité de l'alimentation et répartition de la gestion du fumier. Le calcul suit l'enchaînement d'équations IPCC Niveau 2 ; les inventaires Niveau 1 et les méthodes nationales spécifiques sortent donc de son champ d'analyse."
   ),
   before_li2_html = list(
-    en = "A defensible estimate of the uncertainty in each input (typically ±% half-width of the 95 % CI, or lower / upper bounds for asymmetric parameters). The tool <strong>does not</strong> estimate input uncertainties for you.",
-    fr = "Une estimation défendable de l'incertitude de chaque entrée (généralement la demi-largeur ±% de l'IC à 95 %, ou les bornes inférieure/supérieure pour les paramètres asymétriques). L'outil <strong>n'estime pas</strong> les incertitudes d'entrée à votre place."
+    en = "An uncertainty range for each input, usually the ±% half-width of the 95 % CI, or explicit lower and upper bounds for asymmetric parameters. Judging those ranges depends on your data and its sources, so that call stays with you: the tool <strong>propagates the uncertainty you give it</strong> rather than estimating it.",
+    fr = "Une plage d'incertitude pour chaque entrée, généralement la demi-largeur ±% de l'IC à 95 %, ou des bornes inférieure et supérieure explicites pour les paramètres asymétriques. Juger ces plages dépend de vos données et de leurs sources : cette décision vous revient. L'outil <strong>propage l'incertitude que vous lui fournissez</strong>, il ne l'estime pas."
   ),
   before_li3 = list(
-    en = "Optional but recommended: multi-year time series of activity data, used to compute correlations automatically.",
-    fr = "Facultatif mais recommandé : séries temporelles pluriannuelles de données d'activité, utilisées pour calculer automatiquement les corrélations."
+    en = "Your own sub-category structure. The tool simulates whatever grouping you define and reports against it; how your herd is split into categories stays your decision.",
+    fr = "Votre propre structure de sous-catégories. L'outil simule le découpage que vous définissez et produit ses résultats en conséquence ; la répartition de votre cheptel en catégories reste votre décision."
   ),
-  before_not_do_label = list(en = "What this tool does NOT do:",
-                                fr = "Ce que cet outil NE fait PAS :"),
-  not_do_li1 = list(
-    en = "It does not collect data or estimate input uncertainties: those must be supplied by the user.",
-    fr = "Il ne collecte pas les données et n'estime pas les incertitudes d'entrée : celles-ci doivent être fournies par l'utilisateur."
-  ),
-  not_do_li2 = list(
-    en = "It does not produce Tier 1 estimates and is not designed for uncertainty analysis of country-specific Tier 2 methods: the IPCC Tier 2 equation chain is required.",
-    fr = "Il ne produit pas d'estimations Niveau 1 et n'est pas conçu pour l'analyse d'incertitude des méthodes Niveau 2 spécifiques à un pays : l'enchaînement d'équations IPCC Niveau 2 est requis."
-  ),
-  not_do_li3 = list(
-    en = "It does not validate your country's IPCC categorisation choices: sub-category structure is the user's responsibility.",
-    fr = "Il ne valide pas les choix de catégorisation IPCC de votre pays : la structure des sous-catégories relève de l'utilisateur."
+  before_li4 = list(
+    en = "Optionally, a multi-year time series of activity data. Supply one and the tool derives the parameter correlations for you.",
+    fr = "Facultativement, une série temporelle pluriannuelle de données d'activité. Si vous en fournissez une, l'outil en déduit les corrélations entre paramètres."
   ),
 
   # =====================================================================

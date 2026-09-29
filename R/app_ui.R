@@ -106,10 +106,47 @@ app_ui <- function(request = NULL) {
          // Beta feedback 2026-09 (APickering #3): the navbar is sticky
          // (www/custom.css) so the step tabs stay reachable; past 60px of
          // scroll, compact the title banner so the bar stays slim.
+         // Keep DataTables' FixedHeader pinned BELOW the sticky navbar
+         // instead of underneath it. The navbar height is not a constant: it
+         // compacts past 60px of scroll, and its tab row wraps to a second
+         // line on narrow windows, so measure it rather than hard-coding.
+         function _syncTableHeaderOffset() {
+           var nb = document.querySelector('.navbar');
+           if (!nb || !window.jQuery || !jQuery.fn.dataTable) return;
+           var h = nb.offsetHeight;
+           try {
+             jQuery.fn.dataTable.tables({ api: true }).every(function () {
+               if (this.fixedHeader) this.fixedHeader.headerOffset(h);
+             });
+           } catch (e) { /* no FixedHeader tables on this tab */ }
+         }
+         // Hysteresis, not a single threshold. The navbar is `position:
+         // sticky`, so it still occupies space in the flow: compacting it
+         // makes it shorter, the page content shifts up, scrollY drops back
+         // below the threshold, it un-compacts, the content shifts down
+         // again. With one cut-off that loop is a visible shake at exactly
+         // the scroll position where the two states meet. Compacting only
+         // above 160 and restoring only below 40 leaves a dead band far
+         // wider than the ~45px height change, so neither switch can
+         // re-trigger the other.
+         var _navCompact = false;
          window.addEventListener('scroll', function() {
            var nb = document.querySelector('.navbar');
-           if (nb) nb.classList.toggle('navbar-compact', window.scrollY > 60);
+           if (!nb) return;
+           var y = window.scrollY;
+           if (!_navCompact && y > 160) {
+             _navCompact = true; nb.classList.add('navbar-compact');
+           } else if (_navCompact && y < 40) {
+             _navCompact = false; nb.classList.remove('navbar-compact');
+           }
+           _syncTableHeaderOffset();
          }, { passive: true });
+         window.addEventListener('resize', _syncTableHeaderOffset);
+         // Tables render after the tab does, so re-sync once things settle.
+         window.addEventListener('load', function () {
+           setTimeout(_syncTableHeaderOffset, 400);
+           setTimeout(_syncTableHeaderOffset, 1500);
+         });
          // 2026-06: after the magic-link auth flow consumes a ?token=...
          // query parameter, server sends this to clean it out of the
          // browser URL so the token doesn't sit in browser history.
@@ -913,15 +950,11 @@ app_ui <- function(request = NULL) {
            }
          });"
       ))),
-      # Floating "Feedback" button: fixed bottom-right, visible on every tab
-      # AND on the pre-login screen (it lives in the navbar header, outside
-      # every nav_panel). Opens the feedback modal (see R/app_server.R).
-      actionButton(
-        inputId = "fb_open",
-        label   = tagList(icon("comment-dots"),
-                          tags$span(class = "fb-label", t("fb_button"))),
-        class   = "fb-fab"
-      )
+      # The floating bottom-right "Feedback" button was removed 2026-09-29 at
+      # the owner's request. The Contact / Feedback tab remains the route for
+      # users. The modal and its observer (input$fb_open, R/app_server.R) are
+      # left in place but now have no trigger; restoring the button is just
+      # this actionButton coming back.
     ),
     fillable = FALSE,
 
@@ -1066,13 +1099,8 @@ app_ui <- function(request = NULL) {
             tags$ul(
               tags$li(t("before_li1")),
               tags$li(HTML(t("before_li2_html"))),
-              tags$li(t("before_li3"))
-            ),
-            tags$p(tags$strong(t("before_not_do_label"))),
-            tags$ul(
-              tags$li(t("not_do_li1")),
-              tags$li(t("not_do_li2")),
-              tags$li(t("not_do_li3"))
+              tags$li(t("before_li3")),
+              tags$li(t("before_li4"))
             )
           )
         ),

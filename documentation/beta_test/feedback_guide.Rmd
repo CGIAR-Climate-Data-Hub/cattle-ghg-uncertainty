@@ -112,7 +112,7 @@ Save the completed `beta_feedback_template.xlsx` and **email it to `M.Lolita@cgi
 
 ## Two things you might notice (and can ignore)
 
-- The green **"Feedback" button** at the bottom-right of the app is for quick, one-off bug reports once the tool is in wider use. For this structured review, please use the **Excel form** above instead.
+- The **Contact / Feedback tab** in the app is for quick, one-off questions and bug reports once the tool is in wider use. For this structured review, please use the **Excel form** above instead.
 - **`questionnaire.md` / `questionnaire.docx`** (in the Resources area) is a data-preparation form for the *AI Translator*: it is **not** this feedback form. You can ignore it for the review.
 
 ## What makes feedback most useful
