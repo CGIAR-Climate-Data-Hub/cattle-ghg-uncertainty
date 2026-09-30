@@ -121,8 +121,7 @@ For `Ca`, pick the value from the feeding-situation list above based on what the
 
 ## param_type
 
-- **activity_data** = `N` only (animal population). This column describes Parameters-sheet rows, and `N` is the only one of them IPCC counts as activity data.
-  - Note: IPCC also counts the manure management system split as activity data (Vol.4 Ch.10.4.4 / 10.5.5), but that lives on the Manure_Management sheet as `fraction_pct` and has no `param_type` column. So the rule for THIS column is still `N` only.
+- **activity_data** = `N` only (animal population). This is the one true activity-data variable.
 - **coefficient** = everything else (production parameters, energy/methane/N₂O coefficients).
 
 ## Distribution codes accepted

@@ -4,7 +4,7 @@
   "generated": [
     {
       "file": "param_catalogue.md",
-      "sha256": "eb412335c223e835e7613a4f3ed59db038fd293379b52796a0afd99bf64cee13"
+      "sha256": "20fb2269188daeb16a2ae2e9c7d08613cdf75ded60ff13b728c353182f524e3d"
     },
     {
       "file": "template_schema.md",
@@ -15,6 +15,6 @@
       "sha256": "47f4f34eb86762c185ad3e599d6d9aa17d42e70bc2282ec5b4dd8a9435fafa0c"
     }
   ],
-  "commit": "2514712",
-  "generated_at": "2026-09-30T09:25:04Z"
+  "commit": "aa046af",
+  "generated_at": "2026-09-29T15:25:33Z"
 }

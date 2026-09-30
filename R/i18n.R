@@ -1015,8 +1015,8 @@ lang_state_take <- function(token) {
   ),
   stat_adef_term = list(en = "AD / EF decomposition", fr = "Décomposition AD / FE"),
   stat_adef_def = list(
-    en = "Splits the combined uncertainty into the share coming from activity data (AD: the animal population, plus the manure management system split for the manure sources) and the share from emission factors (EF: the per-head coefficients), by re-running the simulation with one side held fixed at a time. This is the AD/EF split IPCC Table 3.3 reports.",
-    fr = "Sépare l'incertitude combinée entre la part venant des données d'activité (AD : la population animale, plus la répartition entre systèmes de gestion du fumier pour les sources liées au fumier) et la part venant des facteurs d'émission (FE : les coefficients par tête), en relançant la simulation avec un côté fixé à la fois. C'est la répartition AD/FE du Tableau 3.3 IPCC."
+    en = "Splits the combined uncertainty into the share coming from activity data (AD: the animal population) and the share from emission factors (EF: the per-head coefficients), by re-running the simulation with one group held fixed at a time. This is the AD/EF split IPCC Table 3.3 reports.",
+    fr = "Sépare l'incertitude combinée entre la part venant des données d'activité (AD : la population animale) et la part venant des facteurs d'émission (FE : les coefficients par tête), en relançant la simulation avec un groupe fixé à la fois. C'est la répartition AD/FE du Tableau 3.3 IPCC."
   ),
   stat_seed_term = list(en = "Random seed", fr = "Graine aléatoire"),
   stat_seed_def = list(
@@ -1166,8 +1166,8 @@ lang_state_take <- function(token) {
   ad_ef_convention_label = list(en = "AD vs EF column convention:",
                                   fr = "Convention des colonnes AD vs FE :"),
   ad_ef_convention_body = list(
-    en = "AD covers the two inputs IPCC counts as activity data for cattle: the animal population (N) and, for the manure sources, how the manure is split between management systems (the fraction_pct column of the Manure_Management sheet). EF covers the per-head coefficients that combine into the emission factor (live weight, feed quality, Ym, Bo, MCF, EF3, EF3_PRP and the rest). IPCC Vol.4 Ch.10.4.4 and 10.5.5 list livestock populations and manure management system usage as the two activity data for manure management; Ch.10.3.3 makes population the only one for enteric fermentation. IPCC Vol.1 Ch.3 Eq.3.2b is what allows each column to be a composite of several inputs.",
-    fr = "AD couvre les deux entrées que l'IPCC considère comme données d'activité pour les bovins : la population animale (N) et, pour les sources liées au fumier, la répartition du fumier entre systèmes de gestion (colonne fraction_pct de la feuille Manure_Management). FE couvre les coefficients par tête qui composent le facteur d'émission (poids vif, qualité de l'alimentation, Ym, Bo, MCF, EF3, EF3_PRP et les autres). L'IPCC Vol.4 Ch.10.4.4 et 10.5.5 citent les populations animales et l'utilisation des systèmes de gestion du fumier comme les deux données d'activité pour la gestion du fumier ; le Ch.10.3.3 fait de la population la seule pour la fermentation entérique. L'équation 3.2b du Vol.1 Ch.3 est ce qui permet à chaque colonne d'agréger plusieurs entrées."
+    en = "in this version, AD = population uncertainty only (N), and EF = the per-head emission factor uncertainty driven by the IPCC coefficients (live weight, feed quality, Ym, Bo, EF3_PRP, etc.). This matches IPCC Volume 1 Chapter 3 reporting conventions.",
+    fr = "dans cette version, AD = incertitude de population uniquement (N), et FE = incertitude du facteur d'émission par tête, pilotée par les coefficients IPCC (poids vif, qualité de l'alimentation, Ym, Bo, EF3_PRP, etc.). Cela correspond aux conventions de rapport IPCC Volume 1 Chapitre 3."
   ),
   card_ipcc_table_h = list(en = "IPCC Table 3.3 - Uncertainty Report",
                               fr = "Tableau IPCC 3.3 : Rapport d'incertitude"),
