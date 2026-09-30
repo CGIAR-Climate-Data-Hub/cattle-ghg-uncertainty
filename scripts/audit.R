@@ -3692,15 +3692,17 @@ section_F <- function() {
   f63_fail <- tryCatch({
     pr <- assemble_translator_system_prompt("translator_prompts")
     miss <- c("Relative-uncertainty rule", "Per-MMS uncertainty rule",
+              "Named-distribution rule",
               "Relative spread applied per row",
-              "Per-MMS spreads carried, not dropped")
+              "Per-MMS spreads carried, not dropped",
+              "Distributions are the file's, not yours")
     miss[!vapply(miss, function(k) grepl(k, pr, fixed = TRUE), logical(1))]
   }, error = function(e) conditionMessage(e))
   f63_ok <- length(f63_fail) == 0L
   check_bool("F63", "F",
-             "The relative-spread and per-MMS-uncertainty rules are in the assembled system prompt",
+             "The relative-spread, per-MMS-uncertainty and named-distribution rules are in the assembled system prompt",
              f63_ok,
-             notes = if (f63_ok) "both rules and both self-checks present"
+             notes = if (f63_ok) "all three rules and all three self-checks present"
                      else paste("missing:", paste(f63_fail, collapse = ", ")))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
