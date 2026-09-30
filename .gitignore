@@ -192,3 +192,10 @@ config/approved_users.csv
 # Returned beta feedback files name their reviewer: local only, like the
 # rest of the reviewer correspondence.
 documentation/beta_test/beta_feedback_template_for_uncertainty_tool_*.xlsx
+
+# 2026-09-30: workshop/ is local working material for the training sessions
+# (a Python content builder, a generated simdata.rds, __pycache__). It was
+# untracked, and a blanket `git add -A` swept it into a commit by mistake;
+# this keeps that from recurring. Nothing here is read by the app. Delete
+# this line if the workshop materials should live in the repo after all.
+workshop/
