@@ -52,6 +52,13 @@ __pycache__/
 *.code-workspace
 .vscode/
 
+# Private local notes. Gitignored, and they have no business on the host
+# either: they name reviewers and quote their comments. Nothing outside www/
+# is served over HTTP, so this is not a disclosure, but there is no reason to
+# ship them. Caught 2026-09-30, when the bundle listing showed CLAUDE.local.md.
+CLAUDE.local.md
+*.local.md
+
 # Backup file from the May 2026 audit
 *.pre_audit_2026_05_bak
 
