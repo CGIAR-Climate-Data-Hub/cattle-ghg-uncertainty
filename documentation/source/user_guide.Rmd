@@ -121,7 +121,7 @@ The Monte Carlo simulations can be run for enteric fermentation alone, or for en
 
 Before opening the tool, assemble the following:
 
-1. **Activity data**: For each animal sub-category, the population (N), body weight (BW), weight gain (WG), milk yield (for cows), milk fat %, digestible energy (DE%), manure management system (MMS) fractions, and other Tier 2 inputs.
+1. **Herd and feed inputs**: For each animal sub-category, the population (N), body weight (BW), weight gain (WG), milk yield (for cows), milk fat %, digestible energy (DE%), manure management system (MMS) fractions, and other Tier 2 inputs. Note that in IPCC's terms only two of these are activity data, the population and the MMS fractions; the rest are coefficients that combine into the emission factor. The distinction matters only for the AD/EF decomposition, described later in this guide.
 
 2. **Uncertainty ranges**: For each parameter, an estimate of its uncertainty, typically either:
    - A percentage uncertainty (e.g. ±20% representing the half-width of a 95% confidence interval), or
@@ -325,7 +325,7 @@ Two optional rows appear for every sub-category in the Parameters sheet:
 
 \textbf{Refer to the guidance in the IPCC Guidelines Vol.1 Ch.3. In brief:}
 
-\textbf{For activity data (N, BW, milk yields):}
+\textbf{For measured herd data (N, BW, milk yields):}
 
 - \textbf{Survey-based estimates}: If populations are estimated from representative livestock surveys, the survey sampling error may provide a direct estimate of uncertainty. The 95% confidence interval from a survey translates directly to the \texttt{lower} and \texttt{upper} bounds (or to \texttt{uncertainty\_pct} if symmetric).
 - \textbf{Expert elicitation}: Ask the data provider to give a range within which they are 95\% confident the true value falls.
@@ -346,7 +346,7 @@ If you genuinely have no information about a parameter's uncertainty, a reasonab
 \toprule
 \textbf{Distribution} & \textbf{Shape} & \textbf{Best for} \\
 \midrule
-Normal & Symmetric bell curve & Activity data (N, BW) with symmetric measurement errors \\
+Normal & Symmetric bell curve & Measured herd data (N, BW) with symmetric measurement errors \\
 PERT & Smooth bounded curve & Emission factors with a min, mode, and max \\
 Triangular & Peaked triangle & Clear most-likely value with known hard limits \\
 Uniform & Flat (equal probability) & Conservative fallback when only bounds are known \\
@@ -484,7 +484,7 @@ You can edit values directly in the table. Clicking a cell opens an edit field.
 
 Two quick-set buttons are available for rapid exploration:
 \begin{itemize}
-  \item \textbf{Set all activity data to Normal ±15\%}: Sets N, BW, and other activity data parameters to a Normal distribution with ±15\% uncertainty. Click again to undo.
+  \item \textbf{Set all activity data to Normal ±15\%}: Sets every parameter whose \texttt{param\_type} is \texttt{activity\_data} to a Normal distribution with ±15\% uncertainty. On the Parameters sheet that is the population (\texttt{N}) alone, since every other row there is a coefficient. Click again to undo.
   \item \textbf{Set all coefficients to PERT}: Sets emission factors and other coefficients to PERT distribution. Click again to undo.
 \end{itemize}
 
@@ -638,7 +638,7 @@ Before clicking Run, configure:
 
 ## Trend mode: year-to-year coefficient correlation
 
-If you picked \textbf{Trend} analysis mode on Tab 1, an extra control appears on Tab 5: \textbf{Year-to-year correlation}. It governs how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next \emph{within a single Monte Carlo iteration}. Activity data (N, BW, Milk, \ldots) is always re-sampled fresh each year, this setting only affects the per-head coefficients.
+If you picked \textbf{Trend} analysis mode on Tab 1, an extra control appears on Tab 5: \textbf{Year-to-year correlation}. It governs how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next \emph{within a single Monte Carlo iteration}. The population (N) is always re-sampled fresh each year; this setting affects every other per-head parameter, body weight and milk yield included, because those are coefficients.
 
 \textbf{Why does this matter?} If your country uses the same emission factors for the whole inventory time series (e.g.\ when Tier 2 EFs were estimated using one dataset and applied to all inventory years), then a high-Ym draw in your base year should also be a high-Ym draw in the current year. The coefficient uncertainty then cancels when you compare the two years, so the trend uncertainty reflects only the activity-data changes. This is what IPCC Vol.1 Ch.3 §3.2.3 calls a ``Type A'' sensitivity. If you instead treated EFs as independent across years, you would artificially inflate the trend uncertainty.
 
@@ -697,12 +697,16 @@ After a successful run, five value boxes show:
 
 If "Run uncertainty decomposition (AD/EF/Combined)" was checked, the results include a bar chart with the 95\% MoE on the y-axis (IPCC reporting convention) under three configurations:
 \begin{itemize}
-  \item \textbf{AD uncertainty}: Driven by activity data only (N, BW, Milk, WG) with all emission factors fixed at their means
-  \item \textbf{EF uncertainty}: Driven by emission factors and coefficients only with activity data fixed at means
-  \item \textbf{Combined uncertainty}: Both sources varying together
+  \item \textbf{AD uncertainty}: Driven by activity data only, with every emission factor and coefficient fixed at its mean
+  \item \textbf{EF uncertainty}: Driven by the emission factors and coefficients only, with activity data fixed at its mean
+  \item \textbf{Combined uncertainty}: Both sides varying together
 \end{itemize}
 
-If AD uncertainty dominates, improving livestock population surveys would most effectively reduce total uncertainty. If EF uncertainty dominates, investing in country-specific EF measurement studies would be more impactful.
+\textbf{What counts as activity data here.} Two inputs, because that is what IPCC counts for cattle. The first is the animal population (\texttt{N}). The second is the manure management system split, the \texttt{fraction\_pct} column of the Manure\_Management sheet, which is activity data for the manure sources only. IPCC Vol.4 Ch.10.4.4 and 10.5.5 are explicit: the uncertainty-assessment sections for manure management carry two activity-data headings, livestock populations and manure management system usage. For enteric fermentation, Ch.10.3.3 makes population the only activity data, so enteric methane's AD bar reflects population alone.
+
+Everything else you enter on the Parameters sheet, including body weight, weight gain, milk yield and milk fat, is a coefficient. Those feed into the emission factor rather than the activity data, which is why they are held fixed in the AD-only run. This surprises people, because several of them are measured herd characteristics rather than IPCC defaults. The distinction IPCC draws is about the role a number plays in the equation, not about where you got it.
+
+If AD uncertainty dominates, improving the livestock population survey, or the survey of how manure is managed, would most effectively reduce total uncertainty. If EF uncertainty dominates, investing in country-specific coefficient measurement would be more impactful.
 
 ## By-system and by-category breakdown
 
@@ -804,7 +808,7 @@ To illustrate the workflow, the following example uses the Country X built-in da
 
 **Step 2: QA/QC**: Go to Tab 2. All parameters should pass; any Warn flags on \texttt{BW} would compare against the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3), and Warn flags on other parameters reflect non-fatal structural conditions (asymmetric-bounds reminder, sub-category auto-match, etc.), a deliberate country-specific value can be documented in the inventory report rather than corrected.
 
-**Step 3: Uncertainty**: Go to Tab 3. Note that activity data (N, BW, Milk, WG, Fat) use Normal distributions and coefficients (Ym, DE, Bo, etc.) use PERT or lognormal distributions.
+**Step 3: Uncertainty**: Go to Tab 3. Note that the measured herd inputs (N, BW, Milk, WG, Fat) use Normal distributions while the IPCC coefficients (Ym, DE, Bo, etc.) use PERT or lognormal distributions.
 
 **Step 4: Correlations**: Go to Tab 4. Select "From template (auto, time-series)", the example dataset includes a 5-year time series from which a Spearman rank correlation matrix is computed automatically (first-difference detrending is applied internally to strip shared long-run growth). The matrix is sampled using Iman--Conover restricted pairing. Leave the right-hand card at "No EF correlations" for the default run.
 

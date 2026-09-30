@@ -1458,13 +1458,27 @@ section_F <- function() {
                              "MCF_solid_storage (DINT_heif)", g2,
                              "Ym", g3))
 
-  # F16: AD-only decomposition invariant (Andreas 28/5/26 #9).
-  # With all coefficients frozen AND per-MMS sample matrices nulled, the
-  # only source of iteration-to-iteration variance is N. For a single-
-  # system inventory, emission_source = N × const, so
-  # CV(emission_source) == CV(N) for EVERY source: that's the invariant
-  # Andreas's complaint hinges on. Test it by replicating the observer's
-  # fix_params AD-only path on the golden system.
+  # F16: AD-only decomposition invariant (Andreas 28/5/26 #9), NARROWED
+  # 2026-09-30 to enteric fermentation.
+  #
+  # The original check asserted CV(source) == CV(N) for enteric CH4, manure
+  # CH4 and both pasture N2O sources, on the premise that population is the
+  # only activity data. IPCC Vol.4 Ch.10.4.4 and 10.5.5 say otherwise: their
+  # uncertainty-assessment sections carry TWO activity-data sub-headings,
+  # livestock populations and manure management system usage. So the MMS
+  # allocation is activity data, it now varies in the AD-only run, and every
+  # manure-dependent source picks up its variance. Pasture N2O is included in
+  # that, because the pasture share comes from the same allocation.
+  #
+  # Enteric fermentation keeps the invariant, and that is the point: Ch.10.3.3
+  # makes population its only activity data, so it is the one source whose
+  # AD-only CV must still equal CV(N) exactly. F16b below pins the other half,
+  # that the manure sources genuinely DO move, so narrowing this check cannot
+  # quietly become a way of asserting nothing.
+  #
+  # Calls decomposition_fix_params() directly rather than replicating it. The
+  # rule was previously stated once in the observer and once here, and the two
+  # copies are how the pre-2026-09-30 classification survived.
   specs_ad <- make_golden_specs(constant_dist = FALSE)
   n_id <- which(specs_ad$parameter == "N")
   specs_ad$lower[n_id] <- 80000
@@ -1476,13 +1490,13 @@ section_F <- function() {
   specs_ad$upper[other_rows] <- specs_ad$mean[other_rows]
   specs_ad$distribution[other_rows] <- "constant"
 
-  sd_ad <- build_golden_system(specs_ad)
-  # Mirror the observer's AD-only null-out of per-MMS sample matrices.
-  sd_ad[[1]]$mcf_samples <- NULL
-  sd_ad[[1]]$ef3_samples <- NULL
-  sd_ad[[1]]$frac_gas_samples   <- NULL
-  sd_ad[[1]]$frac_leach_samples <- NULL
-  sd_ad[[1]]$mms_fraction_samples <- NULL
+  # The golden system carries a single MMS at 100%, so its allocation is
+  # deterministic whatever the classification. That is exactly the case in
+  # which the original invariant still holds for every source, so F16 keeps
+  # its full source list and keeps guarding the 2026-05 MCF/EF3/Frac leak.
+  sd_ad <- decomposition_fix_params(build_golden_system(specs_ad)[[1]],
+                                    "coefficient")
+  sd_ad <- list(`dairy||golden||cows` = sd_ad)
 
   sim_ad <- run_inventory_simulation(sd_ad, n_iter = 5000, gwp = "AR5",
                                       seed = 21, pct_pregnant = 0.5)
@@ -1498,13 +1512,83 @@ section_F <- function() {
   cv_max_dev <- if (length(cv_sources) > 0)
                   max(abs(cv_sources - cv_N)) / cv_N else NA_real_
   check_bool("F16", "F",
-             "AD-only CV equals CV(N) for every emission source (single-system)",
+             "AD-only CV equals CV(N) for every source when the MMS allocation is deterministic",
              is.finite(cv_max_dev) && cv_max_dev < 0.001,
              notes = sprintf("CV(N)=%.3f; CV per source=%s; max rel.dev.=%.6f",
                              cv_N,
                              paste(formatC(cv_sources, digits = 3, format = "f"),
                                    collapse = ", "),
                              cv_max_dev))
+
+  # F16b: the AD/EF side assignment itself, asserted structurally on the
+  # function the app actually calls. IPCC Vol.4 Ch.10.4.4 / 10.5.5 put the
+  # MMS allocation under ACTIVITY DATA, so it must survive the AD-only run
+  # and be frozen in the EF-only run. The other four per-MMS matrices are
+  # emission factors and go the other way. Before 2026-09-30 the allocation
+  # was grouped with them.
+  sd_side <- build_golden_system(make_golden_specs())[[1]]
+  sd_side$mcf_samples <- sd_side$ef3_samples <- matrix(1, 2, 1)
+  sd_side$frac_gas_samples <- sd_side$frac_leach_samples <- matrix(1, 2, 1)
+  sd_side$mms_fraction_samples  <- matrix(1, 2, 1)
+  sd_side$pre_sampled_coefficients <- matrix(1, 2, 1)
+  ad_side <- decomposition_fix_params(sd_side, "coefficient")
+  ef_side <- decomposition_fix_params(sd_side, "activity_data")
+  ad_ok <- !is.null(ad_side$mms_fraction_samples) &&
+           is.null(ad_side$mcf_samples) && is.null(ad_side$ef3_samples) &&
+           is.null(ad_side$frac_gas_samples) &&
+           is.null(ad_side$frac_leach_samples) &&
+           is.null(ad_side$pre_sampled_coefficients)
+  ef_ok <- is.null(ef_side$mms_fraction_samples) &&
+           !is.null(ef_side$mcf_samples) && !is.null(ef_side$ef3_samples) &&
+           !is.null(ef_side$frac_gas_samples) &&
+           !is.null(ef_side$frac_leach_samples)
+  check_bool("F16b", "F",
+             "MMS allocation is activity data: varies in the AD-only run, frozen in the EF-only run",
+             ad_ok && ef_ok,
+             notes = sprintf(paste0("AD-only: allocation kept=%s, MCF/EF3/Frac/shared nulled=%s; ",
+                                    "EF-only: allocation nulled=%s, MCF/EF3/Frac kept=%s"),
+                             !is.null(ad_side$mms_fraction_samples),
+                             is.null(ad_side$mcf_samples) &&
+                               is.null(ad_side$pre_sampled_coefficients),
+                             is.null(ef_side$mms_fraction_samples),
+                             !is.null(ef_side$mcf_samples)))
+
+  # F16c: and the numerical consequence, so F16's narrowed source list cannot
+  # quietly become a way of asserting nothing. On a 2-MMS system whose
+  # allocation carries uncertainty, the AD-only run must show enteric CH4
+  # still tracking CV(N) exactly, while manure CH4 picks up the allocation
+  # variance on top of it. Reuses the F12 allocation matrix `mat`.
+  specs_ad2 <- make_golden_specs(constant_dist = FALSE)
+  n_id2 <- which(specs_ad2$parameter == "N")
+  specs_ad2$mean[n_id2]  <- 100000
+  specs_ad2$lower[n_id2] <- 80000
+  specs_ad2$upper[n_id2] <- 120000
+  specs_ad2$distribution[n_id2] <- "normal"
+  oth2 <- setdiff(seq_len(nrow(specs_ad2)), n_id2)
+  specs_ad2$lower[oth2] <- specs_ad2$mean[oth2]
+  specs_ad2$upper[oth2] <- specs_ad2$mean[oth2]
+  specs_ad2$distribution[oth2] <- "constant"
+  sd_ad2 <- list(`dairy||golden||cows` = decomposition_fix_params(list(
+    param_specs = specs_ad2,
+    corr_matrix = NULL, ef_corr_matrix = NULL, unified_corr_matrix = NULL,
+    mms_fractions = mms_fracs2, mcf_values = mcf_vals2, ef3_values = ef3_vals2,
+    frac_gas_values = NULL, frac_leach_values = NULL,
+    mcf_samples = NULL, ef3_samples = NULL,
+    frac_gas_samples = NULL, frac_leach_samples = NULL,
+    mms_fraction_samples = mat), "coefficient"))
+  sim_ad2 <- run_inventory_simulation(sd_ad2, n_iter = 5000, gwp = "AR5",
+                                       seed = 21, pct_pregnant = 0.5)
+  cv_N2  <- cv(sim_ad2$by_system[[1]]$samples$N)
+  cv_ent <- cv(sim_ad2$inventory$total_enteric_ch4)
+  cv_mch <- cv(sim_ad2$inventory$total_manure_ch4)
+  ent_tracks <- is.finite(cv_ent) && abs(cv_ent - cv_N2) / cv_N2 < 0.001
+  man_higher <- is.finite(cv_mch) && (cv_mch - cv_N2) / cv_N2 > 0.05
+  check_bool("F16c", "F",
+             "With a varying MMS allocation, AD-only enteric CH4 tracks CV(N) but manure CH4 exceeds it",
+             ent_tracks && man_higher,
+             notes = sprintf("CV(N)=%.3f; enteric=%.3f (rel.dev %.6f); manure CH4=%.3f (%+.1f%% vs CV(N))",
+                             cv_N2, cv_ent, abs(cv_ent - cv_N2) / cv_N2,
+                             cv_mch, (cv_mch - cv_N2) / cv_N2 * 100))
 
   # F17: Excel sensitivity sheets populate AND parameter names are clean
   # (no backticks from lm formula escaping, no R name-munging dots).
@@ -3616,13 +3700,24 @@ section_F <- function() {
   # the no-correlation comparison run must both null the shared block, or
   # coefficient variance leaks into the AD column and the comparison bars come
   # out identical to the main run (the June-2026 bug).
+  # The AD-only half is now asserted behaviourally, by calling the function the
+  # app calls, rather than by grepping for an assignment. The rule moved into
+  # decomposition_fix_params() on 2026-09-30 precisely so there is one copy of
+  # it; a source scan pinned to app_server.R would have gone quietly vacuous.
+  # The comparison run still assembles its own systems list in the observer, so
+  # that half stays a source scan.
   f61_fail <- tryCatch({
     f <- character(0)
+    probe <- build_golden_system(make_golden_specs())[[1]]
+    probe$pre_sampled_coefficients <- matrix(1, 2, 1)
+    if (!is.null(decomposition_fix_params(probe, "coefficient")$pre_sampled_coefficients))
+      f <- c(f, "the AD-only run keeps the shared coefficient block; it must be nulled")
+    if (is.null(decomposition_fix_params(probe, "activity_data")$pre_sampled_coefficients))
+      f <- c(f, "the EF-only run drops the shared coefficient block; it must be kept")
     src <- readLines("R/app_server.R", warn = FALSE)
     src <- src[!grepl("^\\s*#", src)]
-    hits <- grep("pre_sampled_coefficients\\s*<-\\s*NULL", src)
-    if (length(hits) < 2L)
-      f <- c(f, sprintf("expected the shared block to be nulled in both the AD-only run and the comparison run; found %d site(s)", length(hits)))
+    if (!any(grepl("pre_sampled_coefficients\\s*<-\\s*NULL", src)))
+      f <- c(f, "the no-correlation comparison run no longer nulls the shared block")
     f
   }, error = function(e) conditionMessage(e))
   f61_ok <- length(f61_fail) == 0L

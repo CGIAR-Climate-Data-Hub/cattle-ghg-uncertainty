@@ -517,9 +517,17 @@ To separate the contributions of activity data (AD) uncertainty and emission fac
 
 This approach correctly handles multi-group inventories by running all three simulations through the full multi-sub-category equation chain and aggregating to national totals before computing metrics.
 
-The decomposition reveals whether uncertainty reduction efforts should focus on improving animal population surveys (AD) or on refining emission factor estimates (EF).
+The decomposition reveals whether uncertainty reduction efforts should focus on improving the activity data, meaning the animal population survey and the survey of manure management system usage, or on refining the emission factor estimates.
 
-\textit{Implementation note.} The AD-only run pins ALL coefficient-side variance, not only the Parameters-sheet rows. The per-MMS sample matrices used for MCF, EF3, Frac\_GasMS, Frac\_LeachMS, and (when supplied) the MMS-allocation $MS_s$ fractions are nulled out for the AD-only sub-run so iteration-to-iteration variation in those quantities cannot leak into the AD-only result. As a result, AD-only CV equals CV(N) for every emission source in a single-sub-category inventory and varies across sources only through the Herfindahl-like concentration of each source over multiple sub-categories.
+\textit{Which inputs count as activity data.} IPCC, not the tool, decides this. Vol.4 Ch.10.4.4 (manure CH$_4$) and Ch.10.5.5 (manure N$_2$O) are the uncertainty-assessment sections for manure management, and each carries exactly two activity-data sub-headings: \textsc{activity data -- livestock populations} and \textsc{activity data -- manure management system usage}, the latter with indicative ranges of 10\% or less where one system dominates and 25\% to 50\% where usage is varied. Ch.10.4.3 and 10.5.3 open the same way, naming ``(1) animal population data; and (2) manure management system usage data''. The 2019 Refinement records 10.4.4 as ``No refinement''. For enteric fermentation, Ch.10.3.3 makes population the only activity data.
+
+Accordingly the AD-only run varies the population $N$ and the MMS-allocation $MS_s$ fractions, and pins everything else: the Parameters-sheet coefficients, the per-MMS matrices for MCF, EF3, Frac\_GasMS and Frac\_LeachMS, and the cross-group shared coefficient draws. The EF-only run does the reverse. Note that $N_{ex}$ is \emph{not} activity data despite a sentence in the time-series subsection calling it one: it is defined in Ch.10.5.2, Choice of emission factors.
+
+The obvious objection, that Approach 1 offers two columns while this inventory has some thirty inputs, is answered by Vol.1 Ch.3 Eq.3.2b: ``both AD and EF can be the result of several different parameters''. Each column is a composite, and the sectoral guidance decides the membership.
+
+\textit{Consequence for reading the table.} Enteric fermentation is the one source whose AD-only CV equals CV(N) exactly, because population is its only activity data. Every manure-dependent source, including pasture N$_2$O (the pasture share is itself part of the allocation), carries the allocation's uncertainty in the AD column as well. Where the Manure\_Management sheet leaves \texttt{lower\_fraction} and \texttt{upper\_fraction} blank the allocation is deterministic, and then every source again reduces to CV(N).
+
+\textit{History.} Before 2026-09-30 the MMS allocation was pinned in the AD-only run alongside the four emission-factor matrices, which placed its uncertainty in the EF column. On the built-in Country X example the correction moves manure CH$_4$'s AD figure from 10.0\% to 17.8\% and its EF figure from 39.1\% to 36.1\%. The combined column is unchanged, as it must be: the correction moves variance between columns rather than creating any.
 
 \newpage
 
@@ -676,7 +684,7 @@ Partitioning on the full tuple also guarantees that the marginal distributions w
 
 When the tool is run in \textbf{Trend mode} (multi-year inventory), an additional decision arises: within a single Monte Carlo iteration, how should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next? IPCC Volume 1 Chapter 3 Section 3.2.3.2 (Trend Analysis) and 2019 Refinement §3.2.2.4 discuss this explicitly: emission factor uncertainties are typically estimated once for an inventory series and reused across years (correlated), while activity data is normally re-estimated each year and treated as independent across years.
 
-The tool exposes three options on the Simulate tab when Trend mode is selected. Activity data ($N$, $BW$, $WG$, Milk, \ldots) is re-sampled fresh each year regardless of this setting:
+The tool exposes three options on the Simulate tab when Trend mode is selected. The population $N$ is re-sampled fresh each year regardless of this setting; every other per-head parameter, $BW$, $WG$ and Milk included, is a coefficient and follows the choice below:
 
 \begin{center}
 \begin{tabular}{p{4.0cm} p{9.0cm}}
@@ -775,7 +783,7 @@ In the case of a hybrid Approach 1 / Approach 2, IPCC 2006 Table 3.3 (see also t
 - Emission-factor uncertainty (Column F);
 - Combined uncertainty (Column G).
 
-The tool reports all three figures for each cattle emission source via the IPCC Report tab and the Excel / Word downloads. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; coefficient (EF) = the IPCC equation parameters that combine into the per-head emission factor (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, Frac\_GasMS, Frac\_LeachMS, Frac\_PRP, EF3\_PRP, Frac\_GasPRP, Frac\_LeachPRP).
+The tool reports all three figures for each cattle emission source via the IPCC Report tab and the Excel / Word downloads. The activity-data vs emission-factor split follows IPCC Vol.4 Ch.10: AD = the animal population (N), plus the manure management system allocation $MS_s$ for the manure sources; EF = the IPCC equation parameters that combine into the per-head emission factor (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, Frac\_GasMS, Frac\_LeachMS, Frac\_PRP, EF3\_PRP, Frac\_GasPRP, Frac\_LeachPRP). See the implementation note in Section ``Uncertainty Decomposition'' for the citations.
 
 ## UNFCCC Common Reporting Tables Category Map
 

@@ -1887,7 +1887,7 @@ app_ui <- function(request = NULL) {
                               bslib::tooltip(
                                 span(icon("circle-question"),
                                      style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                                "How should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, …) move from one year to the next within a single Monte Carlo iteration? IPCC V1 Ch3 §3.2.3 (Trend section) says emission factors are typically estimated once and reused across years, so the default is full correlation. Activity data (N, BW, Milk, …) are always re-estimated each year regardless of this setting.",
+                                "How should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, …) move from one year to the next within a single Monte Carlo iteration? IPCC V1 Ch3 §3.2.3 (Trend section) says emission factors are typically estimated once and reused across years, so the default is full correlation. The animal population (N) is always re-estimated each year regardless of this setting; every other per-head parameter, body weight and milk yield included, is a coefficient and follows the choice made here.",
                                 placement = "right"
                               )
                             ),
@@ -1901,8 +1901,8 @@ app_ui <- function(request = NULL) {
                   tags$ul(style = "padding-left:18px; margin:0;",
                     tags$li(tags$strong("Fully correlated coefficients (IPCC 2019 default)"),
                             ": same coefficient draw is reused for every year within one Monte Carlo iteration. ",
-                            "Trend uncertainty then reflects only the year-to-year changes in your activity data ",
-                            "(N, BW, Milk, …); coefficient uncertainty cancels because Ym is the same in 2010 and 2022. ",
+                            "Trend uncertainty then reflects only the year-to-year changes in the animal population; ",
+                            "coefficient uncertainty cancels because Ym is the same in 2010 and 2022. ",
                             tags$em("Pick this if your emission factors are IPCC defaults or come from a single estimation programme reused across the whole inventory series.")),
                     tags$li(tags$strong("Partial (AR(1), ρ=0.7)"),
                             ": coefficient draws drift slowly between years (last year's value gets 70% weight, a fresh draw 30%). ",
