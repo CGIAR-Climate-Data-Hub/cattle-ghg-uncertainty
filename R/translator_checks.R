@@ -127,6 +127,74 @@ translator_consistency_checks <- function(param_specs, manure = NULL) {
                         col, length(vals), paste(by_val, collapse = "; ")))
       }
     }
+
+    # 6. One bound pair reused across every manure row (Andreas, 2026-09-30).
+    #    On the Zambia file the source gave a RELATIVE MoE of +/-50 % per
+    #    share; the translator wrote lower = 0, upper = 50 on every row
+    #    instead, so a 40 % dry-lot share and a 1.25 % digester share were
+    #    given the same bounds. Every existing check passed it: the bounds
+    #    bracket each mean and the centrals still sum to 100. The tell is
+    #    that one bound pair repeats across rows whose centrals differ.
+    if (all(c("lower_fraction", "upper_fraction") %in% names(mm))) {
+      lo <- suppressWarnings(as.numeric(mm$lower_fraction))
+      hi <- suppressWarnings(as.numeric(mm$upper_fraction))
+      ok <- !is.na(lo) & !is.na(hi) & !is.na(fr)
+      if (sum(ok) >= 3L) {
+        pair <- paste(round(lo[ok], 6), round(hi[ok], 6), sep = "|")
+        # EVERY repeated pair is examined, not just the commonest one. A
+        # partly-corrected file can carry the error on a minority of rows
+        # while some larger, entirely legitimate group sits above it: on the
+        # Zambia file, once the 102 worst rows were fixed, the largest group
+        # became 32 rows that correctly share both a bound pair AND a share,
+        # which hid 21 rows that were still wrong.
+        for (pv in names(table(pair))) {
+          sel  <- which(pair == pv)
+          n_sh <- length(sel)
+          # Only a finding when the shares those rows carry actually differ:
+          # several systems genuinely sitting at the same share may
+          # legitimately share bounds, and that is not a mistake.
+          if (n_sh < 3L) next
+          cen <- unique(round(fr[ok][sel], 6))
+          if (length(cen) < 2L) next
+          b  <- as.numeric(strsplit(pv, "|", fixed = TRUE)[[1]])
+          bg <- max(fr[ok][sel])
+          add("Manure_Management",
+              sprintf(paste0("%d of %d manure rows carry the same bounds (%s to %s) on shares that differ (%s). ",
+                             "If the source gives a relative uncertainty, say +/-50%%, the bounds should be a ",
+                             "percentage OF EACH SHARE, so a %s%% share becomes %s to %s, not %s to %s."),
+                      n_sh, sum(ok), fmt(b[1]), fmt(b[2]),
+                      paste(fmt(utils::head(sort(cen), 3)), collapse = ", "),
+                      fmt(bg), fmt(bg * 0.5), fmt(bg * 1.5), fmt(b[1]), fmt(b[2])))
+        }
+      }
+    }
+
+    # 7. A per-MMS coefficient given a central value but no bounds anywhere
+    #    (Andreas, 2026-09-30). The engine treats a blank bound pair as
+    #    EXACTLY KNOWN: sample_per_mms_param() returns a zero-variance column,
+    #    so the source's stated uncertainty is dropped rather than replaced by
+    #    a default. On the Zambia file MCF came through correctly but its
+    #    +/-25 % did not, and nothing said so.
+    for (col in coef_cols) {
+      lo_col <- switch(col, MCF_pct = "lower_mcf", EF3 = "lower_ef3",
+                       Frac_GasMS_pct = "lower_frac_gas",
+                       Frac_LeachMS_pct = "lower_frac_leach", NULL)
+      hi_col <- switch(col, MCF_pct = "upper_mcf", EF3 = "upper_ef3",
+                       Frac_GasMS_pct = "upper_frac_gas",
+                       Frac_LeachMS_pct = "upper_frac_leach", NULL)
+      if (is.null(lo_col)) next
+      v <- suppressWarnings(as.numeric(mm[[col]]))
+      n_val <- sum(!is.na(v))
+      if (n_val == 0L) next
+      lo <- if (lo_col %in% names(mm)) suppressWarnings(as.numeric(mm[[lo_col]])) else rep(NA_real_, nrow(mm))
+      hi <- if (hi_col %in% names(mm)) suppressWarnings(as.numeric(mm[[hi_col]])) else rep(NA_real_, nrow(mm))
+      if (all(is.na(lo)) && all(is.na(hi)))
+        add("Manure_Management",
+            sprintf(paste0("%s has a value on %d row(s) but no lower or upper bound on any of them, so the tool will ",
+                           "treat it as exactly known and its uncertainty will not reach the result. If the source ",
+                           "gives a range for it, add %s and %s."),
+                    col, n_val, lo_col, hi_col))
+    }
   }
 
   if (!length(out))
