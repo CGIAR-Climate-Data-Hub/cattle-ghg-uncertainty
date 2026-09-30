@@ -5,6 +5,6 @@ account: mlolita26
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17265378
-bundleId: 12623012
+bundleId: 12626683
 url: https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/
 version: 1
