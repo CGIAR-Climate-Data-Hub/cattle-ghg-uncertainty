@@ -630,6 +630,48 @@ The preset and the manual / time-series matrices support cross-block correlation
 
 When the user uploads a \texttt{Parameter\_TimeSeries} sheet, the correlation matrix is computed automatically as a \textbf{Spearman} rank correlation of the annual values, after \textbf{detrending} (first differences by default, with a UI option to switch to linear detrend or raw series). Detrending separates shared long-run growth (which is not the year-to-year joint uncertainty Approach 2 is meant to capture) from genuine parameter co-movement. The resulting matrix is then projected onto the nearest positive-definite correlation matrix via \texttt{Matrix::nearPD(corr = TRUE)} so it can be supplied directly to the sampler described in the ``Correlated Sampling'' section above.
 
+## Across-Group Coefficient Correlation
+
+An inventory is normally disaggregated into groups (cattle type $\times$ production system $\times$ animal sub-category). A second decision then arises, exactly parallel to the year-to-year decision described in the next section: within a single Monte Carlo iteration, when two groups use the \textit{same} value for a coefficient, should they receive the same draw or separate draws?
+
+The question is not cosmetic. Uncertainty in a shared estimate is \textbf{systematic}. If the true $Y_m$ is 7.0 rather than the 6.5 applied to every group, every group is wrong in the same direction, by the same relative amount, simultaneously; nothing cancels in the sum. Drawing it independently per group asserts instead that the published figure is re-drawn afresh for each sub-category, and the resulting errors partially cancel. Because the cancellation goes as $1/\sqrt{N}$, the reported uncertainty then falls as the inventory is split more finely.
+
+The magnitude is large. Holding the herd, the parameters and the uncertainty inputs fixed and varying only the number of groups:
+
+\begin{center}
+\begin{tabular}{r r r}
+\toprule
+\textbf{Groups} & \textbf{Mean (t CO$_2$eq)} & \textbf{95\% MoE} \\
+\midrule
+1   & 1{,}188{,}109 & 25.1\% \\
+4   & 1{,}189{,}861 & 12.5\% \\
+16  & 1{,}188{,}003 & 6.3\% \\
+64  & 1{,}188{,}164 & 3.1\% \\
+251 & 1{,}188{,}033 & 1.5\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The mean is stable throughout; only the uncertainty moves, and it moves purely with a reporting choice.
+
+IPCC 2019 Refinement Vol.1 Ch.3 addresses this directly. It warns that subcategories ``can be highly correlated, because either the AD are derived from the same source or the EFs have parameters in common''; it states that ``in the case of full correlation among categories, aggregation of these categories is the recommended procedure''; and it recommends Approach 2 ``where partial correlations are known to exist and are relevant''. It also gives the general rule, in the context of the time dimension: ``emission factors (and other estimation parameters) uncertainties will tend to be correlated between years while activity data will tend to be uncorrelated between years.''
+
+\textbf{The rule the tool applies.} Groups carrying an identical estimate for a coefficient share a single draw; activity data stays independent. Formally, for each coefficient the groups are partitioned by their (mean, lower bound, upper bound, distribution) tuple; every group within a partition receives the same per-iteration draw, and separate partitions are drawn independently. Population $N$ is never shared.
+
+Three properties follow:
+
+\begin{itemize}
+  \item \textbf{Shared IPCC defaults are handled automatically.} Every group that fell back to the catalogue carries the identical value, forms one partition, and is therefore fully correlated, which is the only defensible treatment of a single published number.
+  \item \textbf{Block structures are handled by the same mechanism.} An inventory with one value per agro-region forms one partition per region: correlated within a region, independent between regions, with no configuration.
+  \item \textbf{It is self-correcting.} A compiler who genuinely estimated a coefficient separately per group has entered different numbers, so those groups land in different partitions and remain independent. An identical value is the evidence of a shared source.
+\end{itemize}
+
+Partitioning on the full tuple also guarantees that the marginal distributions within a partition are identical, which is the precondition for sharing sampled values directly rather than sharing ranks.
+
+\textbf{Verification.} Because IPCC states that full correlation should be equivalent to aggregation, the implementation has a hard acceptance property: splitting an inventory into more groups must not change the reported uncertainty. With sharing enabled the table above becomes approximately flat (25.1\% on one group, 22.7\% on 251). The residual decline is the genuinely independent activity-data component averaging out, and is quantitatively consistent with the 10\% uncertainty placed on $N$ in that test: $\sqrt{25.1^2 - 22.7^2} \approx 10.7\%$.
+
+\textbf{Scope.} Only full sharing is implemented. Partial sharing ($0 < \rho < 1$), appropriate where a shared systematic component coexists with independent per-group sampling error, is not offered: it requires an $n_{\text{iter}} \times n_{\text{groups}}$ matrix per parameter held simultaneously, which is not feasible within the hosting memory budget at the group counts where the issue matters most. IPCC positions partial correlation as a refinement to apply ``where known to exist and relevant''.
+
 ## Year-to-Year Coefficient Correlation (Trend Mode)
 
 When the tool is run in \textbf{Trend mode} (multi-year inventory), an additional decision arises: within a single Monte Carlo iteration, how should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next? IPCC Volume 1 Chapter 3 Section 3.2.3.2 (Trend Analysis) and 2019 Refinement §3.2.2.4 discuss this explicitly: emission factor uncertainties are typically estimated once for an inventory series and reused across years (correlated), while activity data is normally re-estimated each year and treated as independent across years.

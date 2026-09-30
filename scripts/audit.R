@@ -750,10 +750,14 @@ section_C <- function() {
   # that actually carries the preset / time-series / manual matrices since
   # the Round 7 unified-matrix refactor. The fix nulls unified_corr_matrix
   # too. This test codifies the underlying invariant: in a systems_data
-  # entry, the *only* correlation slot read by run_inventory_simulation
-  # for the default (Iman-Conover) sampler is unified_corr_matrix; nulling
-  # corr_matrix alone must NOT change the MC result if unified_corr_matrix
-  # is set.
+  # entry, nulling corr_matrix alone must NOT change the MC result if
+  # unified_corr_matrix is set.
+  #
+  # 2026-09 amendment: unified_corr_matrix is no longer the ONLY correlation
+  # slot the sampler reads. pre_sampled_coefficients now carries cross-group
+  # coefficient sharing, which is a correlation in every sense that matters
+  # here, and the comparison run must null it too or the June-2026 identical
+  # bars come straight back. F58 below pins that.
   sd_uni <- build_golden_system()
   sd_uni[[1]]$param_specs <- make_golden_specs(constant_dist = FALSE)
   sd_uni[[1]]$param_specs$lower <- sd_uni[[1]]$param_specs$mean * 0.9
@@ -3510,6 +3514,123 @@ section_F <- function() {
              f57_ok,
              notes = if (f57_ok) "GE and DMI use get_param_measured; .cat_default cannot zero them"
                      else "GE or DMI can reach .cat_default(), which returns 0 and would empty the inventory")
+
+  # ---------------------------------------------------------------------
+  # F58-F61 -- cross-group coefficient sharing, added 2026-09.
+  #
+  # Groups that hold the same estimate for a coefficient must share one draw.
+  # Without it the reported MoE falls as 1/sqrt(number of groups): 25.1 % on
+  # one group became 1.5 % on 251, with the herd and every input unchanged.
+  # These checks pin the behaviour and the silent ways it can break.
+  # ---------------------------------------------------------------------
+  .cg_specs <- function(n_groups) {
+    b <- make_golden_specs(constant_dist = FALSE)
+    b$lower <- b$mean * 0.9; b$upper <- b$mean * 1.1
+    n_row <- which(b$parameter == "N")
+    do.call(rbind, lapply(seq_len(n_groups), function(i) {
+      s <- b
+      s$mean[n_row]  <- b$mean[n_row] / n_groups
+      s$lower[n_row] <- s$mean[n_row] * 0.9
+      s$upper[n_row] <- s$mean[n_row] * 1.1
+      s$cattle_type <- "dairy"; s$aggregation_level <- paste0("g", i)
+      s$sub_category <- "cows"; s
+    }))
+  }
+  .cg_run <- function(n_groups, share, n_iter = 2000L) {
+    specs <- .cg_specs(n_groups)
+    gk <- paste(specs$cattle_type, specs$aggregation_level, specs$sub_category, sep = "||")
+    blocks <- if (share)
+      build_shared_coefficient_draws(specs, n_iter, seed = 7, group_keys = gk)$blocks
+      else list()
+    fb <- default_mms_fallback(); sysd <- list()
+    for (k in unique(gk)) sysd[[k]] <- list(param_specs = specs[gk == k, ],
+      corr_matrix = NULL, ef_corr_matrix = NULL, unified_corr_matrix = NULL,
+      mms_fractions = fb$fractions, mcf_values = fb$mcf, ef3_values = fb$ef3,
+      pre_sampled_coefficients = blocks[[k]])
+    u <- calc_all_uncertainty(run_inventory_simulation(
+      sysd, n_iter = n_iter, gwp = "AR5", seed = 42)$inventory)
+    u$moe_pct[u$variable == "total_co2e"]
+  }
+
+  # F58 -- THE property, and it is IPCC's own: full correlation among
+  # sub-categories should give the same answer as aggregating them, so
+  # splitting an inventory must not move the reported uncertainty.
+  f58_fail <- tryCatch({
+    f <- character(0)
+    one <- .cg_run(1L, TRUE)
+    for (n in c(8L, 32L)) {
+      got <- .cg_run(n, TRUE)
+      # The residual decline is the genuinely independent activity-data
+      # component averaging out, which is correct; the collapse is not.
+      if (!is.finite(got) || got < one * 0.7)
+        f <- c(f, sprintf("%d groups gave %.1f%% against %.1f%% on one group", n, got, one))
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  f58_ok <- length(f58_fail) == 0L
+  check_bool("F58", "F",
+             "Splitting an inventory into more groups does not collapse the reported uncertainty",
+             f58_ok,
+             notes = if (f58_ok) "MoE stays within 30% of the single-group figure at 8 and 32 groups"
+                     else paste(utils::head(f58_fail, 2), collapse = "; "))
+
+  # F59 -- and the failure it guards against is real: without sharing the
+  # same inventory does collapse. If this ever stops failing, F58 is vacuous.
+  f59_ok <- tryCatch({
+    one <- .cg_run(1L, FALSE); many <- .cg_run(32L, FALSE)
+    is.finite(one) && is.finite(many) && many < one * 0.5
+  }, error = function(e) FALSE)
+  check_bool("F59", "F",
+             "Without sharing, splitting the same inventory demonstrably does collapse it (guards F58 against being vacuous)",
+             f59_ok,
+             notes = if (f59_ok) "independent sampling still shrinks the MoE, so F58 is testing something"
+                     else "independent and shared now agree, so F58 proves nothing")
+
+  # F60 -- the detector must be self-correcting. A group whose value genuinely
+  # differs is a different estimate and must NOT be pooled with the others.
+  f60_fail <- tryCatch({
+    f <- character(0)
+    specs <- .cg_specs(4L)
+    sh <- detect_shared_parameters(specs)
+    if (!length(sh)) f <- c(f, "nothing detected on four identical groups")
+    if (!is.null(sh[["Ym"]]) && length(sh[["Ym"]][[1]]) != 4L)
+      f <- c(f, "identical groups were not pooled")
+    if ("N" %in% names(sh)) f <- c(f, "activity data was pooled; it must stay independent")
+    i <- specs$parameter == "Ym" & specs$aggregation_level == "g3"
+    specs$mean[i] <- specs$mean[i] * 1.2
+    specs$lower[i] <- specs$mean[i] * 0.9; specs$upper[i] <- specs$mean[i] * 1.1
+    sh2 <- detect_shared_parameters(specs)
+    pooled <- unlist(sh2[["Ym"]])
+    if (any(grepl("||g3||", pooled, fixed = TRUE)))
+      f <- c(f, "a group with a different value was still pooled")
+    f
+  }, error = function(e) conditionMessage(e))
+  f60_ok <- length(f60_fail) == 0L
+  check_bool("F60", "F",
+             "Sharing is detected from identical estimates only, and never for activity data",
+             f60_ok,
+             notes = if (f60_ok) "identical groups pool; a differing group drops out; N never pools"
+                     else paste(utils::head(f60_fail, 3), collapse = "; "))
+
+  # F61 -- the two silent-breakage guards. The AD-only decomposition run and
+  # the no-correlation comparison run must both null the shared block, or
+  # coefficient variance leaks into the AD column and the comparison bars come
+  # out identical to the main run (the June-2026 bug).
+  f61_fail <- tryCatch({
+    f <- character(0)
+    src <- readLines("R/app_server.R", warn = FALSE)
+    src <- src[!grepl("^\\s*#", src)]
+    hits <- grep("pre_sampled_coefficients\\s*<-\\s*NULL", src)
+    if (length(hits) < 2L)
+      f <- c(f, sprintf("expected the shared block to be nulled in both the AD-only run and the comparison run; found %d site(s)", length(hits)))
+    f
+  }, error = function(e) conditionMessage(e))
+  f61_ok <- length(f61_fail) == 0L
+  check_bool("F61", "F",
+             "The shared coefficient block is nulled for the AD-only run and for the no-correlation comparison run",
+             f61_ok,
+             notes = if (f61_ok) "both sites present"
+                     else paste(f61_fail, collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

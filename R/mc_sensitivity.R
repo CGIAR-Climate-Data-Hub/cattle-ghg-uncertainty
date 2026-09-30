@@ -173,6 +173,53 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   if (length(blocks) == 0) return(NULL)
   combined <- if (length(blocks) == 1) blocks[[1]] else do.call(cbind, blocks)
 
+  # Cross-group sharing (2026-09) makes the per-group columns of a shared
+  # coefficient NUMERICALLY IDENTICAL. Left alone that is a silent failure,
+  # not a loud one: lm() aliases the duplicate columns so calc_src() quietly
+  # returns fewer rows than it was given, and calc_prcc()'s residual
+  # regression gets ~zero residuals and returns NaN. The existing zero-variance
+  # guard does not catch it, because it tests the OUTPUT.
+  #
+  # Collapse duplicates to one column and name it for the parameter rather
+  # than for any single group. That is also the more honest answer: a
+  # coefficient shared by 251 groups is one driver of the uncertainty, and
+  # belongs in the tornado once, not 251 times.
+  if (ncol(combined) > 1L) {
+    sig  <- apply(combined, 2L, function(col) paste0(col, collapse = "\r"))
+    dups <- duplicated(sig)
+    if (any(dups)) {
+      keep_i <- which(!dups)
+      n_share <- vapply(sig[keep_i], function(s) sum(sig == s), integer(1))
+      nm <- colnames(combined)[keep_i]
+      base <- sub("\\s*\\(.*\\)$", "", nm)
+      # "DE (cows)" shared by several groups becomes
+      # "DE = 65.4 (shared by 251 groups)".
+      #
+      # The value is part of the label, not decoration. An inventory can hold
+      # several regional estimates of the same coefficient, each shared by its
+      # own set of groups. Naming them all "GE (shared by 112 groups)" produced
+      # colliding rows that data.frame() then silently made unique as
+      # "GE (shared by 112 groups).3", which tells the reader nothing. Each
+      # partition is defined by a distinct value, so the value distinguishes
+      # them and says which estimate the row is about.
+      # Formatted one value at a time. format() on a vector picks a single
+      # layout for all of it, so a column of body weights next to a column of
+      # Ym values would render both in scientific notation ("6.31e+00").
+      val <- vapply(colMeans(combined[, keep_i, drop = FALSE]),
+                    function(v) format(signif(v, 3L), trim = TRUE,
+                                       scientific = FALSE, drop0trailing = TRUE),
+                    character(1))
+      nm <- ifelse(n_share > 1L,
+                   paste0(base, " = ", val,
+                          " (shared by ", n_share, " groups)"),
+                   nm)
+      combined <- combined[, keep_i, drop = FALSE]
+      # Safety net: never leave uniquification to data.frame(), which would
+      # append a bare index and hide a collision instead of reporting one.
+      colnames(combined) <- make.unique(nm, sep = " #")
+    }
+  }
+
   # Row subsample for the sensitivity regression ONLY. On a large multi-system
   # inventory the combined design matrix is ~n_iter x (15 x n_systems) columns;
   # the SRC lm() on a full 10,000-row x ~685-column matrix peaks several hundred

@@ -169,6 +169,34 @@ lang_state_take <- function(token) {
     fr = "Monte Carlo Approche 2 · Alliance CGIAR / Bioversity-CIAT · financé par le Global Methane Hub"
   ),
 
+  # ---- Cross-group coefficient sharing (2026-09) -----------------------
+  crossgroup_label = list(
+    en = "Inputs shared between groups",
+    fr = "Entrées partagées entre groupes"),
+  crossgroup_shared = list(
+    en = "Treat a shared value as one estimate (recommended)",
+    fr = "Traiter une valeur partagée comme une seule estimation (recommandé)"),
+  crossgroup_shared_help = list(
+    en = "Where several groups carry the same number for a coefficient, it is one estimate applied several times, so its error moves every group in the same direction at once. This is the IPCC treatment and it keeps the reported uncertainty independent of how finely you split the inventory.",
+    fr = "Lorsque plusieurs groupes portent le même nombre pour un coefficient, il s'agit d'une seule estimation appliquée plusieurs fois : son erreur déplace donc tous les groupes dans le même sens en même temps. C'est le traitement IPCC, et il rend l'incertitude rapportée indépendante de la finesse du découpage de l'inventaire."),
+  crossgroup_independent = list(
+    en = "Treat every group independently",
+    fr = "Traiter chaque groupe indépendamment"),
+  crossgroup_independent_help = list(
+    en = "Each group redraws every coefficient on its own. Correct only if each group's values were estimated separately. On a shared estimate this understates the uncertainty, and increasingly so the more groups there are.",
+    fr = "Chaque groupe retire lui-même chaque coefficient. Correct uniquement si les valeurs de chaque groupe ont été estimées séparément. Sur une estimation partagée, cela sous-estime l'incertitude, d'autant plus que les groupes sont nombreux."),
+  crossgroup_detected_none = list(
+    en = "No coefficient is shared between groups in this inventory, so this setting changes nothing.",
+    fr = "Aucun coefficient n'est partagé entre les groupes de cet inventaire : ce réglage ne change donc rien."),
+  crossgroup_exclusive = list(
+    en = "For a coefficient that is shared, sharing takes the place of the correlation mode chosen above: a value cannot be drawn once for every group and separately correlated inside each one at the same time. Coefficients that are not shared, and the activity data, still follow the mode above. Sharing is the larger of the two effects, which is why it takes precedence.",
+    fr = "Pour un coefficient partagé, le partage remplace le mode de corrélation choisi ci-dessus : une valeur ne peut pas être tirée une seule fois pour tous les groupes et corrélée séparément à l'intérieur de chacun en même temps. Les coefficients non partagés, ainsi que les données d'activité, suivent toujours le mode ci-dessus. Le partage est le plus important des deux effets, d'où sa priorité."),
+  crossgroup_detected_pre = list(
+    en = "Detected: ", fr = "Détecté : "),
+  crossgroup_detected_body = list(
+    en = "%d coefficients are used identically across groups in this inventory (%s). They will be drawn once and applied to every group that shares them.",
+    fr = "%d coefficients sont utilisés à l'identique entre groupes dans cet inventaire (%s). Ils seront tirés une fois puis appliqués à chaque groupe qui les partage."),
+
   # ---- Measured-intake route (GE / DMI), 2026-09 -----------------------
   # Route labels. These appear in the results table and in every export, so
   # a reader can tell how each group reached gross energy without opening
@@ -749,9 +777,19 @@ lang_state_take <- function(token) {
 
   info_corr_about_label = list(en = "What is this page about?", fr = "De quoi parle cette page ?"),
   info_corr_about_body = list(
-    en = "Real-world uncertainties don't usually live in separate boxes. If your body-weight estimate is off because the census missed some animals, your population estimate is probably off too. Telling the tool which parameters move together: when you have evidence, gives a more honest uncertainty range. If you don't have evidence, leave everything on \"No correlations\": that gives a conservative, defensible answer.",
-    fr = "Les incertitudes du monde réel ne vivent pas dans des compartiments séparés. Si votre estimation de poids vif est biaisée parce que le recensement a manqué des animaux, votre estimation de population l'est probablement aussi. Indiquer à l'outil quels paramètres bougent ensemble : lorsque vous avez des preuves, donne une plage d'incertitude plus honnête. Sans preuves, laissez tout sur « Pas de corrélations » : cela donne une réponse prudente et défendable."
+    en = "Real-world uncertainties don't usually live in separate boxes, and they overlap in two different ways. The first is inside a single group. If your body-weight estimate is off because the census missed some animals, your population estimate is probably off too. Telling the tool which parameters move together: when you have evidence, gives a more honest uncertainty range. If you don't have evidence, leave everything on \"No correlations\": for parameters inside one group that gives a conservative, defensible answer. The second way is between groups, and it is covered in its own block below.",
+    fr = "Les incertitudes du monde réel ne vivent pas dans des compartiments séparés, et elles se recoupent de deux façons différentes. La première se situe à l'intérieur d'un même groupe. Si votre estimation de poids vif est biaisée parce que le recensement a manqué des animaux, votre estimation de population l'est probablement aussi. Indiquer à l'outil quels paramètres bougent ensemble : lorsque vous avez des preuves, donne une plage d'incertitude plus honnête. Sans preuves, laissez tout sur « Pas de corrélations » : pour des paramètres au sein d'un même groupe, cela donne une réponse prudente et défendable. La seconde se situe entre les groupes, et elle est traitée dans son propre bloc ci-dessous."
   ),
+
+  # The second idea, kept out of the "which option do I pick?" list below
+  # because that list is about choosing an activity-data mode, whereas this
+  # is a separate switch with a different and usually larger effect.
+  info_corr_shared_label = list(
+    en = "The other kind: one estimate used in several groups",
+    fr = "L'autre type : une seule estimation utilisée dans plusieurs groupes"),
+  info_corr_shared_body = list(
+    en = "A number can also be shared. One IPCC default for Ym, or one regional body weight applied to fifty groups, is still a single estimate. If it turns out to be wrong, all fifty groups are wrong in the same direction at the same time and nothing averages out. Drawing it separately for each group hides that, and hides more of it the more finely the inventory is split. The \"Inputs shared between groups\" setting in the activity data card on the left handles this, and the recommended option is the right answer for nearly everyone. Expect the reported uncertainty to go up when it is on: that is the correction, not a fault. The effect is usually much larger than the one described above, so if you change only one setting on this page, change that one.",
+    fr = "Un nombre peut aussi être partagé. Une valeur IPCC par défaut pour Ym, ou un seul poids vif régional appliqué à cinquante groupes, reste une seule estimation. Si elle est fausse, les cinquante groupes sont faux dans le même sens en même temps et rien ne se compense. La tirer séparément pour chaque groupe masque ce phénomène, d'autant plus que l'inventaire est découpé finement. Le réglage « Entrées partagées entre groupes », dans la carte des données d'activité à gauche, traite ce cas, et l'option recommandée convient à presque tout le monde. Attendez-vous à ce que l'incertitude rapportée augmente lorsqu'il est actif : c'est la correction, pas un défaut. L'effet est généralement bien plus important que celui décrit ci-dessus ; si vous ne modifiez qu'un seul réglage sur cette page, modifiez celui-là."),
   info_corr_quickguide = list(en = "Quick guide: which option do I pick?",
                                 fr = "Guide rapide : quelle option choisir ?"),
   info_corr_q1 = list(en = "Do you have ≥5 years of national time-series data in your upload? → ",

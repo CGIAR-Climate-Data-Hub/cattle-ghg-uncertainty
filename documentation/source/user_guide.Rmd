@@ -498,7 +498,25 @@ These are useful for a first exploratory run. Refine individual parameters befor
 
 ## Why correlations matter
 
-If multiple parameters tend to move together (e.g. larger animals also tend to produce more milk), ignoring this relationship underestimates the uncertainty in the total emission estimate. For most Tier 2 analyses, ignoring correlations (the default "No correlations" setting) is a reasonable simplifying assumption. IPCC Approach 2 guidance recommends including known correlations where they exist.
+There are two different things called "correlation" on this page, and they matter to very different degrees.
+
+\textbf{Between parameters, within a group.} If two parameters tend to move together (e.g. larger animals also tend to produce more milk), ignoring the relationship understates the uncertainty in the total. For most Tier 2 analyses this is a modest effect, typically a few percentage points, and ignoring it is a reasonable simplifying assumption. IPCC Approach 2 guidance recommends including known correlations where they exist.
+
+\textbf{Between groups, for the same parameter.} This one is not modest. If several of your groups carry the \textit{same} number for a coefficient, because it came from one IPCC default or one regional study, then that is a single estimate applied many times. If it is wrong, every group is wrong in the same direction at once, and nothing cancels. Sampling each group independently instead makes the errors average each other out, and the reported uncertainty falls as the inventory is split more finely.
+
+The size of this effect is easy to underestimate. On a test inventory where the herd, the parameters and the uncertainty inputs were all held fixed and \textit{only} the number of groups changed, the reported 95\% margin of error fell from 25.1\% on a single group to 1.5\% on 251 groups. Nothing about the data had changed; only the disaggregation had. This is why \textbf{Inputs shared between groups} defaults to treating a shared value as one estimate, and why you should normally leave it there. IPCC 2019 Refinement Vol.1 Ch.3 makes the same point: subcategories "can be highly correlated, because either the AD are derived from the same source or the EFs have parameters in common".
+
+## Inputs shared between groups
+
+This setting sits below the correlation heatmap and has two options.
+
+\textbf{Treat a shared value as one estimate} (the default, and the right answer for nearly every inventory). Where several groups carry the same number for a coefficient, the tool draws it once and applies that draw to all of them. Their errors then move together, which is what actually happens when one estimate is reused.
+
+\textbf{Treat every group independently}. Each group redraws every coefficient on its own. This is correct only when each group's values really were estimated separately, which is unusual. It is kept so you can reproduce a previous run or see the size of the effect on your own data.
+
+Underneath the control, the tool tells you what it found, for example \textit{"14 coefficients are used identically across groups in this inventory (Ym, Bo, EF3, ...)"}. If that list is empty, nothing in your inventory is shared and the setting changes nothing.
+
+Two things to expect. First, the reported margin of error will usually be \textbf{larger} with the default than with independent groups. That is the correction, not a regression: the smaller figure was an artefact of splitting the inventory. Second, the tool decides what is shared by looking for identical values, so if you genuinely have a separate estimate per group, enter your own numbers and those groups will be treated independently automatically.
 
 ## Quick guide: which option do I pick?
 

@@ -1340,6 +1340,26 @@ app_server <- function(input, output, session) {
     }
   })
 
+  # What the cross-group detector found, shown live so the setting is a
+  # judgement the user can check rather than a black box. Runs off the loaded
+  # parameter table, so it updates as soon as an inventory is loaded and does
+  # not wait for a simulation.
+  output$crossgroup_detected <- renderUI({
+    ps <- rv$param_specs
+    if (is.null(ps) || !nrow(ps)) return(NULL)
+    sh <- tryCatch(detect_shared_parameters(ps), error = function(e) list())
+    box <- function(...) div(
+      style = paste("font-size:0.85rem; margin-top:8px; padding:8px 10px;",
+                    "border-left:3px solid #2D6A4F; background:#D8F3DC;",
+                    "border-radius:4px; color:#1B4332;"), ...)
+    if (!length(sh)) return(box(t("crossgroup_detected_none")))
+    nm <- names(sh)
+    shown <- paste(utils::head(nm, 6), collapse = ", ")
+    if (length(nm) > 6) shown <- paste0(shown, ", ...")
+    box(tags$strong(t("crossgroup_detected_pre")),
+        sprintf(t("crossgroup_detected_body"), length(nm), shown))
+  })
+
   output$corr_ts_status <- renderUI({
     if (is.null(rv$corr_matrix)) {
       div(style = "font-size:0.85rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px;",
@@ -1718,6 +1738,22 @@ app_server <- function(input, output, session) {
           default_mcf_vals  <- .mms_fb$mcf
           default_ef3_vals  <- .mms_fb$ef3
 
+          # Cross-group coefficient sharing (2026-09). Drawn ONCE, before the
+          # group loop, so that groups holding the same estimate for a
+          # coefficient move together instead of averaging each other out.
+          # Without this the reported MoE falls as 1/sqrt(number of groups),
+          # i.e. the headline figure depends on how finely the inventory was
+          # disaggregated rather than on the data. See the block comment above
+          # build_shared_coefficient_draws() in R/mc_sampling.R.
+          #
+          # The per-system seed set inside the loop is unaffected: it governs
+          # only the columns each system still draws for itself.
+          shared_draws <- if (identical(input$crossgroup_mode %||% "shared", "shared")) {
+            build_shared_coefficient_draws(specs, as.integer(input$n_iter),
+                                           seed = input$seed, group_keys = group_key)
+          } else list(blocks = list(), summary = NULL)
+          rv$shared_summary <- shared_draws$summary
+
           for (sg in sys_groups) {
             sys_specs <- specs[group_key == sg, ]
 
@@ -1914,7 +1950,10 @@ app_server <- function(input, output, session) {
               mcf_samples = mcf_samples, ef3_samples = ef3_samples,
               frac_gas_samples = fg_samples, frac_leach_samples = fl_samples,
               # Andreas 28/5/26 #4: per-iteration MMS allocation samples
-              mms_fraction_samples = fraction_samples
+              mms_fraction_samples = fraction_samples,
+              # Shared coefficient draws for this group (NULL when the group
+              # shares nothing, or when the user chose independent groups).
+              pre_sampled_coefficients = shared_draws$blocks[[sg]]
             )
           }
 
@@ -2104,6 +2143,12 @@ app_server <- function(input, output, session) {
                 sd$frac_gas_samples      <- NULL
                 sd$frac_leach_samples    <- NULL
                 sd$mms_fraction_samples  <- NULL
+                # Cross-group shared coefficient draws are pure coefficient
+                # variance, exactly like the per-MMS matrices above. Leaving
+                # them in the AD-only run would leak that variance into the
+                # activity-data column of IPCC Table 3.3, the same class of
+                # bug as the 2026-05 per-MMS leak.
+                sd$pre_sampled_coefficients <- NULL
               }
               if (fix_type == "activity_data") {
                 sd$corr_matrix         <- NULL
@@ -2226,6 +2271,11 @@ app_server <- function(input, output, session) {
               s$corr_matrix         <- NULL
               s$ef_corr_matrix      <- NULL
               s$unified_corr_matrix <- NULL
+              # Cross-group sharing is a correlation too, and the comparison
+              # run exists to show the inventory WITHOUT correlations. Leaving
+              # it in would reproduce the June-2026 bug where the comparison
+              # bars came out identical to the main run.
+              s$pre_sampled_coefficients <- NULL
               s
             })
             nocorr_result <- run_inventory_simulation(

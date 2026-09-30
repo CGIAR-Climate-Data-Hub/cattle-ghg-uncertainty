@@ -233,10 +233,27 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
   # Same rank-correlation-preserving procedure as the AD block: the EF block no
   # longer has a special-case sampler.
   if (n_ef > 0) {
-    if (!is.null(pre_sampled_coefficients) &&
-        nrow(pre_sampled_coefficients) == n_iter &&
-        all(ef_params$parameter %in% colnames(pre_sampled_coefficients))) {
+    # Partial blocks are honoured, not discarded. This used to require EVERY
+    # coefficient to be present, so one heterogeneous group missing (say) Milk
+    # silently threw the whole block away and sampled independently, with no
+    # warning. The unified path above already uses intersect(); the two paths
+    # behaving differently was itself a trap. Cross-group sharing supplies only
+    # the parameters that are actually shared, so a partial block is now the
+    # normal case rather than an error.
+    shared_cn <- if (!is.null(pre_sampled_coefficients) &&
+                     nrow(pre_sampled_coefficients) == n_iter)
+      intersect(ef_params$parameter, colnames(pre_sampled_coefficients)) else character(0)
+    if (length(shared_cn) == nrow(ef_params)) {
       ef_samples <- pre_sampled_coefficients[, ef_params$parameter, drop = FALSE]
+    } else if (length(shared_cn) > 0) {
+      use_ef_corr <- !is.null(ef_corr_matrix) &&
+                     nrow(ef_corr_matrix) == n_ef && ncol(ef_corr_matrix) == n_ef
+      ef_samples <- if (use_ef_corr) {
+        .iman_conover_sample(n_iter, ef_params, ef_corr_matrix)
+      } else {
+        .indep_sample(n_iter, ef_params)
+      }
+      for (cn in shared_cn) ef_samples[, cn] <- pre_sampled_coefficients[, cn]
     } else {
       use_ef_corr <- !is.null(ef_corr_matrix) &&
                      nrow(ef_corr_matrix) == n_ef && ncol(ef_corr_matrix) == n_ef
@@ -473,4 +490,170 @@ expand_corr_matrix <- function(partial_corr, all_param_names) {
 
   full[common, common] <- partial_corr[common, common]
   .repair_corr(full, "expanded partial correlation matrix")
+}
+
+# ===========================================================================
+# Cross-group coefficient sharing (2026-09)
+# ===========================================================================
+#
+# THE PROBLEM. Each sub-category group is sampled independently. When several
+# groups carry the SAME underlying estimate for a coefficient, that is the
+# wrong model, and the reported uncertainty collapses as the inventory is
+# split more finely. Measured on the Country X example, same herd and same
+# inputs throughout, only the number of groups changing:
+#
+#     1 group -> 25.1 % MoE      16 groups ->  6.3 %
+#     4 groups -> 12.5 %         251 groups ->  1.5 %
+#
+# Exact 1/sqrt(N) decay, i.e. the headline number depended on a reporting
+# choice rather than on the data.
+#
+# WHY IT IS WRONG. Uncertainty in a shared estimate is systematic: if the true
+# Ym is 7.0 rather than 6.5, every group using 6.5 is wrong in the same
+# direction at once, and nothing cancels. Sampling it independently per group
+# asserts that the IPCC figure is redrawn for each sub-category, which is an
+# artefact of the loop rather than a statement about the world.
+#
+# IPCC 2019R Vol.1 Ch.3 is explicit: "The subcategories can be highly
+# correlated, because either the AD are derived from the same source or the
+# EFs have parameters in common", and, for the time dimension, "emission
+# factor ... uncertainties will tend to be correlated between years while
+# activity data will tend to be uncorrelated between years". The group
+# dimension is the direct analogue, and trend mode already implements exactly
+# that rule across years (.pre_sample_coefficients in R/trend_tab.R).
+#
+# THE RULE. Groups carrying an identical estimate for a coefficient share one
+# draw; activity data stays independent. Partitioning on the full
+# (mean, lower, upper, distribution) tuple means the marginals are identical
+# BY CONSTRUCTION, which is the precondition for sharing raw values rather
+# than having to share ranks.
+#
+# It is also self-correcting: a user with genuinely independent per-group
+# coefficients has entered different numbers, so those groups land in
+# different partitions and stay independent. An identical value is the
+# evidence of a shared source.
+
+# Signature used to decide "these groups hold the same estimate".
+# Rounded rather than compared with ==, because lower/upper are recomputed as
+# mean * (1 +/- pct/100) in more than one place and will not be bit-equal.
+.shared_signature <- function(mean_v, lower_v, upper_v, dist_v, digits = 10) {
+  f <- function(x) ifelse(is.na(x), "NA", formatC(round(as.numeric(x), digits),
+                                                  format = "f", digits = digits))
+  paste(f(mean_v), f(lower_v), f(upper_v),
+        ifelse(is.na(dist_v), "NA", as.character(dist_v)), sep = "|")
+}
+
+# Which coefficients are shared, and by which groups.
+#
+# param_specs is the FULL multi-group frame (not one group's slice).
+# Returns a named list: parameter -> list of character vectors, each vector
+# being the group keys that share one estimate. Partitions of size 1 are
+# dropped, because a parameter held by a single group has nothing to share.
+detect_shared_parameters <- function(param_specs, group_keys = NULL) {
+  if (is.null(param_specs) || !nrow(param_specs)) return(list())
+  if (is.null(group_keys)) {
+    sub <- if ("sub_category" %in% names(param_specs)) param_specs$sub_category
+           else rep("", nrow(param_specs))
+    group_keys <- if (all(c("cattle_type", "aggregation_level") %in% names(param_specs)))
+      paste(param_specs$cattle_type, param_specs$aggregation_level, sub, sep = "||")
+    else rep("group1", nrow(param_specs))
+  }
+  pt <- if ("param_type" %in% names(param_specs)) param_specs$param_type else NA
+  pt[is.na(pt)] <- "coefficient"
+  keep <- pt == "coefficient"            # activity data stays independent
+  if (!any(keep)) return(list())
+
+  ps <- param_specs[keep, , drop = FALSE]
+  gk <- group_keys[keep]
+  sig <- .shared_signature(ps$mean, ps$lower, ps$upper, ps$distribution)
+
+  out <- list()
+  for (p in unique(ps$parameter)) {
+    i <- ps$parameter == p
+    parts <- split(gk[i], sig[i])
+    parts <- lapply(parts, unique)
+    parts <- parts[vapply(parts, length, integer(1)) >= 2L]
+    if (length(parts)) out[[p]] <- unname(parts)
+  }
+  out
+}
+
+# Draw the shared coefficients once and hand every group its own block.
+#
+# Returns list(blocks, summary):
+#   blocks  named list, group key -> n_iter x k matrix with colnames, suitable
+#           for passing straight to generate_mc_samples(pre_sampled_coefficients=)
+#   summary data.frame(parameter, n_groups, n_estimates) for the UI and the log
+#
+# One draw per (parameter, partition). Groups in the same partition receive the
+# same column, which is what makes their errors move together.
+build_shared_coefficient_draws <- function(param_specs, n_iter, seed = NULL,
+                                           group_keys = NULL) {
+  shared <- detect_shared_parameters(param_specs, group_keys)
+  if (!length(shared)) return(list(blocks = list(), summary = NULL))
+
+  if (is.null(group_keys)) {
+    sub <- if ("sub_category" %in% names(param_specs)) param_specs$sub_category
+           else rep("", nrow(param_specs))
+    group_keys <- paste(param_specs$cattle_type, param_specs$aggregation_level,
+                        sub, sep = "||")
+  }
+  if (!is.null(seed)) set.seed(seed)
+
+  # Each group is recorded as the LIST OF DRAW IDS it uses, not as a matrix.
+  # Materialising a matrix per group costs n_iter x n_coef doubles per group,
+  # which on the 812-group Colombian fixture at 10,000 iterations is over 1 GB
+  # and would OOM the deployment tier. Building them after the fact lets groups
+  # that use exactly the same draws share one matrix object (see below).
+  per_group <- list(); summ <- list(); draws <- list()
+  for (p in names(shared)) {
+    parts <- shared[[p]]
+    n_g <- 0L
+    for (pi in seq_along(parts)) {
+      part <- parts[[pi]]
+      row <- which(param_specs$parameter == p & group_keys %in% part)[1]
+      if (is.na(row)) next
+      id <- paste0(p, "#", pi)
+      draws[[id]] <- sample_distribution(n_iter, param_specs$distribution[row],
+                                         param_specs$mean[row],
+                                         param_specs$lower[row],
+                                         param_specs$upper[row])
+      for (g in part) per_group[[g]] <- c(per_group[[g]], id)
+      n_g <- n_g + length(part)
+    }
+    summ[[p]] <- data.frame(parameter = p, n_groups = n_g,
+                            n_estimates = length(parts), stringsAsFactors = FALSE)
+  }
+
+  # Groups that draw on the same estimates get the SAME matrix object rather
+  # than a copy of it. generate_mc_samples() only ever reads the block, so no
+  # group can modify another's, and R never copies it. On the Colombian
+  # fixture the distinct blocks are a small fraction of the 812 groups.
+  # The parameter loop above is deterministic, so two groups with the same
+  # draws always list them in the same order and land on the same signature.
+  # One column per parameter. A group can only sit in one partition per
+  # parameter, so this is a no-op on well-formed input. It matters when a
+  # sheet lists the same parameter twice for one group with different values:
+  # without it the block would carry two columns of the same name, and
+  # generate_mc_samples() indexes the block by name, which silently resolves
+  # to whichever came first. Keeping the last occurrence matches how the
+  # per-group sampler treats a repeated row.
+  per_group <- lapply(per_group, function(ids) {
+    p <- sub("#[0-9]+$", "", ids)
+    ids[!duplicated(p, fromLast = TRUE)]
+  })
+
+  sig <- vapply(per_group, paste0, character(1), collapse = "\r")
+  mats <- list()
+  for (i in which(!duplicated(sig))) {
+    ids <- per_group[[i]]
+    m <- do.call(cbind, draws[ids])
+    colnames(m) <- sub("#[0-9]+$", "", ids)
+    mats[[sig[i]]] <- m
+  }
+  blocks <- unname(lapply(sig, function(s) mats[[s]]))
+  names(blocks) <- names(per_group)
+
+  list(blocks = blocks,
+       summary = if (length(summ)) do.call(rbind, summ) else NULL)
 }

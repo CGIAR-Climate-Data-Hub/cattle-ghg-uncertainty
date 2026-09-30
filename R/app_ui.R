@@ -1585,7 +1585,13 @@ app_ui <- function(request = NULL) {
                     tags$strong(t("info_corr_q3_ans")), "."),
             tags$li(t("info_corr_q4"), tags$strong(t("info_corr_no")),
                     t("info_corr_q4_post"))
-          )),
+          ),
+          # 2026-09: the decision list above is about picking an activity-data
+          # mode. Cross-group sharing is a separate switch with a larger
+          # effect, so it gets its own block instead of a fifth bullet.
+          tags$br(),
+          tags$strong(t("info_corr_shared_label")), tags$br(),
+          t("info_corr_shared_body")),
       bslib::layout_columns(
         col_widths = c(6, 6),
 
@@ -1654,7 +1660,31 @@ app_ui <- function(request = NULL) {
               fileInput("corr_matrix_upload", "Upload correlation matrix (.csv)",
                         accept = ".csv")
             ),
-            plotly::plotlyOutput("corr_heatmap", height = "350px")
+            plotly::plotlyOutput("corr_heatmap", height = "350px"),
+            # Cross-group sharing (2026-09). Placed in the activity-data card
+            # because it is the setting that decides the headline number: when
+            # groups reuse one estimate, sampling them independently makes the
+            # reported MoE fall as 1/sqrt(number of groups).
+            tags$hr(),
+            tags$strong(t("crossgroup_label")),
+            radioButtons(
+              inputId = "crossgroup_mode", label = NULL, selected = "shared",
+              choiceValues = c("shared", "independent"),
+              choiceNames = list(
+                tagList(tags$strong(t("crossgroup_shared")), tags$br(),
+                        tags$span(style = "font-size:0.85rem; color:#5f6b63;",
+                                  t("crossgroup_shared_help"))),
+                tagList(tags$strong(t("crossgroup_independent")), tags$br(),
+                        tags$span(style = "font-size:0.85rem; color:#5f6b63;",
+                                  t("crossgroup_independent_help")))
+              )
+            ),
+            # v1 limitation, stated rather than hidden: a shared coefficient's
+            # column is overwritten after the Iman-Conover reordering, so the
+            # within-group matrix no longer applies to it.
+            tags$div(style = "font-size:0.85rem; color:#5f6b63; margin-bottom:8px;",
+                     t("crossgroup_exclusive")),
+            uiOutput("crossgroup_detected")
           )
         ),
 

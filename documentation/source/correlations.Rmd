@@ -268,6 +268,16 @@ if (!is.null(m)) {
 
 Green cells denote positive correlations, red cells negative, and white cells independence. The preset is intentionally sparse: only the seven pairs with documented published evidence are non-zero. All other parameter pairs are sampled independently unless overridden by a user-supplied matrix.
 
+## Two different correlations, and which one matters more
+
+This page describes two settings that are both called correlation and are easy to confuse.
+
+The **correlation mode** covers relationships *between different parameters within a group*: body weight with mature weight, digestibility with methane conversion, and so on. Its effect on the headline figure is real but modest, typically widening the interval by 3 to 10 per cent on a real inventory.
+
+**Inputs shared between groups** covers something different: the *same parameter reused across groups*. If one IPCC default or one regional study supplies a value used by many groups, that is a single estimate applied repeatedly, and its error moves every group together. Its effect is not modest. On the test in Common pitfalls below, treating shared values independently took the reported margin of error from 25.1 per cent to 1.5 per cent on the same data.
+
+The two are applied separately, and in the current version they are mutually exclusive for any parameter that is shared: where a coefficient is drawn once and handed to several groups, the within-group correlation matrix cannot also reorder it. Where the two would conflict, the cross-group treatment takes precedence, because it is the larger and more consequential effect.
+
 ## Selecting an activity-data correlation mode
 
 The left-hand card on the Simulate tab offers four options:
@@ -370,6 +380,8 @@ The same reasoning applies to the manure-CH~4~ block (B~o~, MCF, ASH) and the ma
 If the "Block-structured EF correlation" mode is selected but all three sliders are left at zero, an amber warning appears under the sliders. In this configuration the simulation behaves identically to the "No EF correlations" mode; the warning indicates that the user should either move at least one slider above zero or switch back to the default mode.
 
 ## Common pitfalls
+
+- **Assuming a smaller margin of error means a better inventory.** It can mean the opposite. If the same coefficient value is reused across many groups and each group samples it independently, the errors cancel against each other and the reported uncertainty shrinks as the inventory is disaggregated more finely. Holding the herd, the parameters and the uncertainty inputs completely fixed and varying only the number of groups gives 25.1% on one group, 12.5% on four, 6.3% on sixteen, 3.1% on sixty-four and 1.5% on 251. The data never changed. This is what the **Inputs shared between groups** setting exists to prevent, and why it defaults to treating a shared value as a single estimate. A reported uncertainty that looks implausibly tight for a Tier 2 inventory (well under 10%) on a finely disaggregated file is the symptom to look for.
 
 - **Expecting the mean to change.** Correlations modify the spread of the emissions distribution but preserve the central estimate to within Monte Carlo sampling noise. A mean shift of more than a few tenths of a percent across correlation modes is typically not a correlation effect but a separate issue (most often related to parameter rebroadcasting).
 
