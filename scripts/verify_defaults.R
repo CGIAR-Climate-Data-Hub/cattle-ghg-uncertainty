@@ -722,13 +722,13 @@ S[["prompt_system_instructions"]] <- local({
   v
 })
 
-# --- S12: mapping_examples.md / questionnaire.md (vocabulary presence) -----
+# --- S12: mapping_examples.md / before_you_start.md (vocabulary presence) --
 # Hand-written illustrative content. Checked for MMS-id vocabulary only:
 # a code offered to the user that no longer exists is the failure mode here
 # (questionnaire.md offered three removed parameters until 2026-09-11).
 S[["prompt_vocab_files"]] <- local({
   v <- .empty
-  for (f in c("translator_prompts/questionnaire.md",
+  for (f in c("translator_prompts/before_you_start.md",
               "translator_prompts/mapping_examples.md")) {
     if (!file.exists(f)) next
     txt <- paste(readLines(file(f, encoding = "UTF-8"), warn = FALSE),

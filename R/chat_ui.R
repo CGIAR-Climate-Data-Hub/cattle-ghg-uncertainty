@@ -32,6 +32,21 @@ translator_chat_ui <- function() {
                style = "color: #2D6A4F; font-weight: 600;
                         text-decoration: underline;",
                t("ai_find_out_more"))),
+      # The two reference files the translator itself works from. They are the
+      # documented fallback when approval is pending, when a ministry policy
+      # rules out an external AI service, or when the monthly cap is reached,
+      # so they have to be reachable rather than merely present on the server.
+      tags$p(style = "margin: -6px 0 14px 0; color: #475569; font-size: 0.86rem;
+                       line-height: 1.5;",
+        t("ai_reference_files_intro"), " ",
+        tags$a(href = "param_catalogue.md", target = "_blank",
+               style = "color: #2D6A4F; text-decoration: underline;",
+               "param_catalogue.md"),
+        " ", t("ai_reference_files_and"), " ",
+        tags$a(href = "template_schema.md", target = "_blank",
+               style = "color: #2D6A4F; text-decoration: underline;",
+               "template_schema.md"),
+        t("ai_reference_files_outro")),
       if (is_fr)
         tags$div(style = "margin: 0 0 14px 0; padding: 8px 12px;
                           background: #FEF3C7; border-left: 3px solid #F59E0B;

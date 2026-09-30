@@ -11,7 +11,7 @@ The system prompt sent to Claude on every translator call is assembled by `R/ope
 | `template_schema.md` | Workbook layout: sheets, columns (from `TEMPLATE_P_COLS` / `TEMPLATE_MM_COLS` / `TEMPLATE_META_FIELDS` in `R/utils_template.R`), units, validation rules, MMS tables. | **Generated.** Never hand-edit. |
 | `mapping_examples.md` | Worked "raw column → template field" examples. | **Hand-written**, with `{{placeholders}}` for defaults. |
 | `worked_example.md` | One complete reference output whose shape the model copies. | **Generated** from `resolve_subcat_default()` and the MMS tables. |
-| `questionnaire.md` | The pre-flight form a user may paste. | **Hand-written.** |
+| `before_you_start.md` | Optional one-page prep sheet: the four things no data file can answer. Replaced `questionnaire.md` on 2026-09-30. | **Hand-written.** |
 | `partials/*.md` | Prose the generated files embed (definitions, notes). | **Hand-written.** |
 | `.manifest.json` | sha256 of the defaults master, the template layout and each generated file at the last build. Audit check F46 and `scripts/deploy.R` compare it against the live objects. | Written by the build script. |
 

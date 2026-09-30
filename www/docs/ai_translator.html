@@ -177,6 +177,63 @@ template ready to upload to the Data Input tab.</p>
 do the emissions calculation itself; that happens after the filled
 template is uploaded.</p>
 </div>
+<div id="before-you-start" class="section level2">
+<h2>Before you start</h2>
+<p>No form has to be filled in beforehand. The translator asks for what
+it needs, one or two questions at a time, and it asks better questions
+once it has seen the file: it can ask about the actual column names and
+sub-category labels in the upload rather than about hypothetical ones.
+Uploading the file first and answering as the questions arrive is the
+intended way to use it.</p>
+<p>Four things are worth deciding in advance, because they are the ones
+the translator cannot read from a data file and will have to ask
+about:</p>
+<ul>
+<li><strong>Which IPCC edition the inventory reports under</strong>, the
+2006 Guidelines or the 2019 Refinement. This is a reporting decision
+rather than a property of the data. It determines which manure
+management systems are available and which default values apply.</li>
+<li><strong>Where the uncertainty estimates come from.</strong> There
+are four common answers: none, in which case the IPCC catalogue ranges
+are used; a single expert judgement percentage per value; measured
+confidence intervals or standard deviations; or a mixture, specified per
+parameter. This determines whether the bounds in the finished template
+are the user’s own or the catalogue’s.</li>
+<li><strong>How manure is split between management systems</strong>, as
+a percentage per sub-category summing to 100. Manure management system
+usage is usually surveyed separately from the herd, so these shares are
+often absent from the file the user uploads and have to be supplied in
+the chat.</li>
+<li><strong>Whether that split is itself uncertain.</strong> If the
+shares are an estimate rather than a measurement, a lower and upper
+percentage can be given for each one, and the tool will sample within
+those ranges and renormalise every iteration so the shares still sum to
+100. Left unspecified, the split is treated as exact. This is easy to
+overlook, because nothing in the file will prompt for it.</li>
+</ul>
+<p>The country name and the inventory year are also required, and are
+quick to state if they are not in the file.</p>
+</div>
+<div id="one-inventory-per-conversation" class="section level2">
+<h2>One inventory per conversation</h2>
+<p>Each finished template describes one country and one inventory year,
+because the Inventory_Metadata sheet carries a single country field. Two
+inventories therefore need two templates, two conversations and two runs
+of the tool.</p>
+<p>Start a new conversation for the second inventory rather than
+continuing the first. A conversation carries the sub-category
+vocabulary, unit conventions and manure system mapping agreed for the
+inventory already in it, and those are exactly the things that can be
+carried across to the next one without anyone noticing: the resulting
+template is still well formed, and the error is only visible by
+comparing it against the source file.</p>
+<p>Two people working on different inventories at the same time should
+also expect the panel to feel slower than it does for one person alone,
+because the app serves everyone from a single process. The translation
+itself is unaffected, but replies queue behind each other. Where several
+inventories are being prepared in one session, it is worth staggering
+the work rather than starting every translation at once.</p>
+</div>
 <div id="the-three-step-workflow" class="section level2">
 <h2>The three-step workflow</h2>
 <p>The translator works in three explicit passes: Explore, Clarify,
@@ -325,6 +382,33 @@ unlocks the chat panel.</li>
 user signed in. No additional magic-link step is required unless the
 user clears site data or switches browsers.</li>
 </ol>
+</div>
+<div id="if-approval-is-not-available-in-time" class="section level3">
+<h3>If approval is not available in time</h3>
+<p>Approval is manual and requires a redeployment, so it is not
+instantaneous. Where the translator cannot be used, whether because
+approval is pending, because a ministry policy prevents uploading data
+to an external AI service, or because the monthly spending cap has been
+reached, the template can still be filled without it.</p>
+<p>The two reference files the translator itself works from are
+published alongside the app and can be used with any AI assistant, or
+read directly by a person:</p>
+<ul>
+<li><strong><code>param_catalogue.md</code></strong> lists every
+parameter the tool expects, with its units, tier, IPCC default,
+suggested uncertainty and distribution.</li>
+<li><strong><code>template_schema.md</code></strong> describes the three
+sheets, their columns and the controlled vocabularies for sub-categories
+and manure management systems.</li>
+</ul>
+<p>Used with another assistant, the practical approach is to provide
+both files first, then describe the raw data and ask for one block of
+comma-separated values per sheet. Those blocks are pasted into the blank
+template, downloadable from the Data Input tab, starting at the first
+data row of each sheet. This route has no quality preview and no
+provenance stamp, so the spot-checks described under Quality control
+below matter more, not less. Filling the template by hand from the two
+files is also perfectly workable for a small inventory.</p>
 </div>
 </div>
 <div id="when-to-use-the-translator-and-when-to-skip-it" class="section level2">

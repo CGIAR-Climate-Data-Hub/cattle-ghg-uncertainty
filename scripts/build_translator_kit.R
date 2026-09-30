@@ -69,7 +69,10 @@ message("✓ wrote template_schema.md")
 
 we <- build_worked_example_md(file.path(out_dir, "partials"))
 writeLines(we, file.path(out_dir, "worked_example.md"), useBytes = TRUE)
-message("✓ wrote worked_example.md (", length(.WE_SUBCATS), " sub-cats x ", NPAR, " params)")
+# The worked example carries only the non-optional parameters: GE and DMI
+# are deliberately absent, because blank means "use the energy balance".
+message("✓ wrote worked_example.md (", length(.WE_SUBCATS), " sub-cats x ",
+        sum(pc$param_tier != "optional"), " non-optional params)")
 
 # The hand-written files carry {{placeholders}} that the app fills at
 # runtime. The DIY-kit copies must be filled here, so a kit user pastes real
@@ -108,11 +111,11 @@ if (!dir.exists(www_dir)) dir.create(www_dir, recursive = TRUE)
 # was historically absent from both www/ and the kit, so DIY-kit users ran a
 # materially different translator from the in-app one. Ship it.
 user_facing <- c("system_instructions.md",
-                 "questionnaire.md", "getting_started.md",
+                 "before_you_start.md",
                  "param_catalogue.md", "template_schema.md",
                  "mapping_examples.md", "worked_example.md")
-hand_written <- c("system_instructions.md", "mapping_examples.md", "questionnaire.md",
-                  "getting_started.md")
+hand_written <- c("system_instructions.md", "mapping_examples.md",
+                  "before_you_start.md")
 for (f in user_facing) {
   src <- file.path(out_dir, f)
   dst <- file.path(www_dir, f)
@@ -123,7 +126,7 @@ for (f in user_facing) {
 message("✓ staged ", length(user_facing), " files into ", www_dir, "/")
 
 # ---------------------------------------------------------------------------
-# 3b. Render the user-facing .Rmd files (getting_started.Rmd, questionnaire.Rmd)
+# 3b. Render any user-facing .Rmd files to PDF + DOCX. Empty since 2026-09-30
 # to PDF + DOCX via rmarkdown::render(). The .Rmd files carry the same polished
 # CGIAR-green LaTeX styling as user_guide.Rmd and methodology.Rmd. Outputs are
 # staged in translator_prompts/ (canonical) and copied to www/ (served by
@@ -157,7 +160,11 @@ if (nzchar(xelatex_bin)) {
 }
 
 if (requireNamespace("rmarkdown", quietly = TRUE)) {
-  to_render <- c("getting_started.Rmd", "questionnaire.Rmd")
+  # getting_started.Rmd and questionnaire.Rmd were removed on 2026-09-30:
+  # they documented the shared claude.ai Project flow retired in 719f45a.
+  # The user-facing guide is documentation/source/ai_translator.Rmd and the
+  # DIY recipe is README.txt below, so nothing here needs a LaTeX render.
+  to_render <- character(0)
   for (rmd in to_render) {
     src <- file.path(out_dir, rmd)
     if (!file.exists(src)) next
@@ -183,27 +190,31 @@ if (requireNamespace("rmarkdown", quietly = TRUE)) {
 }
 
 # ---------------------------------------------------------------------------
-# 3c. Build translator_kit.zip: the bundle users download to set up their
-# OWN Claude Project (DIY-kit flow). Public sharing of Claude Projects is
-# limited on personal accounts, so instead of pointing users at a shared
-# project URL we ship them everything they need to recreate it on their
-# own claude.ai account in ~2 minutes.
+# 3c. Build translator_kit.zip: the bundle for users who cannot use the
+# in-app translator, so that they can recreate it on their own claude.ai
+# account in about two minutes.
+#
+# This is the DIY route, not the shared-Project route. The shared Claude
+# Project was retired in 719f45a and the app's own translator replaced it;
+# getting_started.md and questionnaire.md documented that retired flow and
+# were removed on 2026-09-30. The in-app tool is documented in
+# documentation/source/ai_translator.Rmd, which is the single user-facing
+# guide; this kit is the fallback for pending approval, a ministry policy
+# against external AI services, or a reached spending cap.
 #
 # Zip contents:
 #   README.txt             : one-page quick-start (created here, inline)
-#   getting_started.pdf    : the polished step-by-step with screenshots
 #   system_instructions.md : paste into the Project's "Instructions" field
 #   param_catalogue.md      ┐
 #   template_schema.md      │ upload as Project "Files" (knowledge base)
 #   mapping_examples.md     │
-#   questionnaire.md        ┘
-#   questionnaire.docx     : the fillable form the user pastes per chat
+#   worked_example.md       ┘
+#   before_you_start.md    : optional one-page prep sheet
 # ---------------------------------------------------------------------------
 kit_files <- c("system_instructions.md", "param_catalogue.md",
                "template_schema.md", "mapping_examples.md",
                "worked_example.md",
-               "questionnaire.md", "questionnaire.docx",
-               "getting_started.pdf")
+               "before_you_start.md")
 kit_files_present <- kit_files[file.exists(file.path(out_dir, kit_files))]
 
 # Inline README.txt: gives the user the 5-step recipe at a glance.
@@ -214,36 +225,56 @@ readme_lines <- c(
   "WHAT THIS IS",
   "------------",
   "A free AI helper that turns your raw cattle inventory data (Excel/CSV)",
-  "into the input template expected by the Cattle Uncertainty App. The",
-  "kit lets you set up your OWN Translator on claude.ai in about 2",
+  "into the input template expected by the Cattle Uncertainty App. This",
+  "kit lets you set it up on your own claude.ai account in about two",
   "minutes: no payment, no installation.",
   "",
-  "QUICK-START (5 STEPS)",
+  "DO YOU NEED THIS KIT?",
   "---------------------",
+  "Probably not. The app has the same translator built in, on its",
+  "Resources tab, and it is easier to use: no setup, and it checks its",
+  "own output before you download it. Ask for access there first.",
+  "",
+  "Use this kit if approval is still pending, if your ministry does not",
+  "allow uploading data to an external AI service run by someone else,",
+  "or if the app tells you its monthly cap has been reached.",
+  "",
+  "SETTING IT UP (4 STEPS)",
+  "-----------------------",
   "1. Sign up for a free account at https://claude.ai (Google / email / Apple).",
   "",
-  "2. In the left sidebar, click 'Projects' then 'Create project'.",
-  "   Name it 'GMH Uncertainty Translator' (or anything you like).",
+  "2. In the left sidebar, click Projects, then Create project.",
+  "   Name it GMH Uncertainty Translator, or anything you like.",
   "",
-  "3. Open the project and find the 'Instructions' field (top right).",
-  "   Open `system_instructions.md` from this kit in any text editor,",
+  "3. Open the project and find the Instructions field (top right).",
+  "   Open system_instructions.md from this kit in any text editor,",
   "   select all, copy, and paste the contents into that field. Save.",
   "",
-  "4. Below the Instructions field is a 'Files' panel. Drag-and-drop",
-  "   these four files into it:",
+  "4. Below the Instructions field is a Files panel. Drag these four",
+  "   files into it:",
   "      - param_catalogue.md",
   "      - template_schema.md",
   "      - mapping_examples.md",
-  "      - questionnaire.md",
+  "      - worked_example.md",
   "",
-  "5. Open `questionnaire.docx`, fill it in (country, year, sub-categories,",
-  "   manure systems, etc.: about 2 minutes). Then start a new chat in",
-  "   your Project, paste the filled questionnaire as the first message,",
-  "   and follow the conversation. Claude will ask you to upload your",
-  "   data file(s) next.",
+  "USING IT",
+  "--------",
+  "Start a new chat in your Project, upload your data file, and say what",
+  "it contains. The translator will ask you a few questions, then produce",
+  "the filled template. Upload that to the app\'s Data Input tab.",
   "",
-  "For the full walkthrough with screenshots, open getting_started.pdf",
-  "in this kit.",
+  "You do not need to prepare anything first. If you would rather decide",
+  "a few things in advance, before_you_start.md lists the four questions",
+  "no data file can answer.",
+  "",
+  "Do one inventory per chat. A template covers one country and one year,",
+  "so start a fresh chat for the next one.",
+  "",
+  "AFTER YOU GET THE TEMPLATE",
+  "--------------------------",
+  "This route has no quality preview, so check the output yourself:",
+  "compare population, body weight and milk yield against your source",
+  "file, and read the app\'s QA/QC tab after uploading.",
   "",
   ""
 )

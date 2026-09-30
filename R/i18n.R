@@ -484,6 +484,17 @@ lang_state_take <- function(token) {
   ai_intro_signin_note = list(en = "No setup: sign in once with your email and you're ready.",
                                 fr = "Aucune configuration : connectez-vous une fois avec votre e-mail, c'est prêt."),
   ai_find_out_more = list(en = "Find out more", fr = "En savoir plus"),
+
+  # The reference files the translator works from, linked so they are usable
+  # without it: approval is manual, some ministries cannot upload data to an
+  # external AI service, and the monthly cap can be reached.
+  ai_reference_files_intro = list(
+    en = "Working without the translator, or preparing offline? The same reference files it uses are",
+    fr = "Vous travaillez sans le traducteur, ou vous préparez hors ligne ? Les fichiers de référence qu'il utilise sont"),
+  ai_reference_files_and = list(en = "and", fr = "et"),
+  ai_reference_files_outro = list(
+    en = ". They list every parameter the tool expects and the structure of the three sheets, and can be used with any AI assistant or read directly.",
+    fr = ". Ils listent tous les paramètres attendus par l'outil ainsi que la structure des trois feuilles, et peuvent servir avec n'importe quel assistant IA ou être lus directement."),
   ai_fr_chat_note = list(
     en = "",
     fr = "Note : l'IA répond en anglais et utilise les codes IPCC standards. Vous pouvez lui écrire en français, elle comprend, mais répond en anglais."
