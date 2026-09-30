@@ -236,4 +236,48 @@ for (topic in topics) {
   sz <- file.info(dst)$size
   cat(sprintf("  -> %s (%d bytes)\n", dst, sz))
 }
+
+# ---------------------------------------------------------------------------
+# The AI translator guide also ships as a PDF, so it can be opened, printed and
+# circulated the way user_guide.pdf and methodology.pdf are. Same source file,
+# so the two cannot drift; only the output format differs. The .Rmd's YAML
+# carries the html_document options, so the PDF format is constructed here and
+# the CGIAR styling comes from _head_ai_translator_pdf.tex.
+# ---------------------------------------------------------------------------
+cat("  rendering ai_translator (PDF) ...\n")
+pdf_head <- normalizePath("documentation/source/_head_ai_translator_pdf.tex",
+                           mustWork = TRUE)
+abs_www  <- normalizePath("www", mustWork = TRUE)
+pdf_ok <- tryCatch({
+  rmarkdown::render(
+    "documentation/source/ai_translator.Rmd",
+    output_format = rmarkdown::pdf_document(
+      toc = TRUE, toc_depth = 3, number_sections = TRUE,
+      latex_engine = "pdflatex",
+      includes = rmarkdown::includes(in_header = pdf_head),
+      # These go here, not in render()'s output_options: that argument is
+      # ignored when output_format is an explicit format object rather than a
+      # name resolved from the YAML.
+      pandoc_args = c(
+        # The source uses ## as its top level, which LaTeX would number 0.1,
+        # 0.2. Shift so ## becomes \section. PDF only; HTML is unaffected.
+        "--shift-heading-level-by=-1",
+        # The HTML build takes its title from pandoc_args in the YAML, and
+        # those belong to html_document, so the title block is set here.
+        "--metadata=title:AI Translator Guide",
+        "--metadata=subtitle:Converting raw country livestock data into the input template",
+        "--metadata=author:CIAT / CGIAR Alliance, ClimateActionNetZero")),
+    output_file = "ai_translator_guide.pdf",
+    output_dir  = abs_www,
+    params = list(cache_dir = abs_cache),
+    quiet = TRUE, envir = new.env())
+  TRUE
+}, error = function(e) {
+  cat("  PDF render FAILED:", conditionMessage(e), "\n")
+  FALSE
+})
+if (pdf_ok) {
+  pdst <- file.path("www", "ai_translator_guide.pdf")
+  cat(sprintf("  -> %s (%d bytes)\n", pdst, file.info(pdst)$size))
+}
 cat("Done.\n")

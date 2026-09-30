@@ -111,11 +111,9 @@ if (!dir.exists(www_dir)) dir.create(www_dir, recursive = TRUE)
 # was historically absent from both www/ and the kit, so DIY-kit users ran a
 # materially different translator from the in-app one. Ship it.
 user_facing <- c("system_instructions.md",
-                 "before_you_start.md",
                  "param_catalogue.md", "template_schema.md",
                  "mapping_examples.md", "worked_example.md")
-hand_written <- c("system_instructions.md", "mapping_examples.md",
-                  "before_you_start.md")
+hand_written <- c("system_instructions.md", "mapping_examples.md")
 for (f in user_facing) {
   src <- file.path(out_dir, f)
   dst <- file.path(www_dir, f)
@@ -209,12 +207,10 @@ if (requireNamespace("rmarkdown", quietly = TRUE)) {
 #   template_schema.md      │ upload as Project "Files" (knowledge base)
 #   mapping_examples.md     │
 #   worked_example.md       ┘
-#   before_you_start.md    : optional one-page prep sheet
 # ---------------------------------------------------------------------------
 kit_files <- c("system_instructions.md", "param_catalogue.md",
                "template_schema.md", "mapping_examples.md",
-               "worked_example.md",
-               "before_you_start.md")
+               "worked_example.md")
 kit_files_present <- kit_files[file.exists(file.path(out_dir, kit_files))]
 
 # Inline README.txt: gives the user the 5-step recipe at a glance.
@@ -263,9 +259,8 @@ readme_lines <- c(
   "it contains. The translator will ask you a few questions, then produce",
   "the filled template. Upload that to the app\'s Data Input tab.",
   "",
-  "You do not need to prepare anything first. If you would rather decide",
-  "a few things in advance, before_you_start.md lists the four questions",
-  "no data file can answer.",
+  "You do not need to prepare anything first. The translator asks what it",
+  "needs, and asks better once it has seen your file.",
   "",
   "Do one inventory per chat. A template covers one country and one year,",
   "so start a fresh chat for the next one.",

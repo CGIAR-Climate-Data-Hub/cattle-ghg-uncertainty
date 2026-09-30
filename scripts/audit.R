@@ -2970,11 +2970,10 @@ section_F <- function() {
     "translator_prompts/mapping_examples.md",
     "translator_prompts/worked_example.md",
     "translator_prompts/system_instructions.md",
-    # getting_started.md and questionnaire.md were removed on 2026-09-30
-    # (they documented the claude.ai Project flow retired in 719f45a).
-    # before_you_start.md replaces the questionnaire as an optional prep
-    # sheet and is a prompt surface in the same way.
-    "translator_prompts/before_you_start.md",
+    # getting_started.md and questionnaire.md were removed on 2026-09-30:
+    # they documented the claude.ai Project flow retired in 719f45a. No prep
+    # sheet replaced them, so there is no further user-facing prompt file
+    # here beyond the five above.
     # 2026-09-17: the inline prompt blocks in R (output convention and UI
     # rules) are a prompt surface too; they carried a wrong activity_data
     # rule and a fraction-unit example for months with nothing looking.
@@ -2989,8 +2988,6 @@ section_F <- function() {
          why = "MMS allocation percentages, not an MCF"),
     list(file = "translator_prompts/mapping_examples.md", key = "CP",
          why = "the sentence now names the catalogue as the source and quotes the current 9.6"),
-    list(file = "translator_prompts/before_you_start.md", key = "liquid_slurry",
-         why = "the list of accepted MMS vocabulary terms, not an MCF"),
     list(file = "translator_prompts/system_instructions.md", key = "CP",
          why = "'the 10 parameters the app correlates' is a count, not CP"),
     list(file = "translator_prompts/template_schema.md", key = "CP",

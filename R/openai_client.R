@@ -46,11 +46,11 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
   generated <- c(param_catalogue = "param_catalogue",
                  template_schema = "template_schema",
                  worked_example  = "worked_example")
-  # before_you_start replaced questionnaire on 2026-09-30. It is included so
-  # the model recognises the four answers a user may paste from it, the same
-  # role the questionnaire played.
+  # No prep sheet is shipped. The onboarding questions live in
+  # system_instructions, and the model asks them itself, better placed after
+  # it has seen the user's file. A separate form was removed on 2026-09-30.
   order <- c("system_instructions", "param_catalogue", "template_schema",
-             "mapping_examples", "worked_example", "before_you_start")
+             "mapping_examples", "worked_example")
   parts <- lapply(order, function(nm) {
     body <- if (nm %in% names(generated)) {
       translator_generated_section(nm, partials_dir = file.path(asset_dir, "partials"))

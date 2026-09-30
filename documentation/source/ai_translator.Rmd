@@ -25,16 +25,18 @@ The AI translator converts raw inventory data, in whatever shape it arrives, int
 
 The translator does column mapping and unit conversion. It does not do the emissions calculation itself; that happens after the filled template is uploaded.
 
-## Before you start
+## What the translator will ask, and what it works out for itself
 
-No form has to be filled in beforehand. The translator asks for what it needs, one or two questions at a time, and it asks better questions once it has seen the file: it can ask about the actual column names and sub-category labels in the upload rather than about hypothetical ones. Uploading the file first and answering as the questions arrive is the intended way to use it.
+There is nothing to prepare and no form to fill in. The user uploads the file and answers questions as they arrive; the translator asks for what it needs, one or two questions at a time. It deliberately asks after it has read the file rather than before, so that it can ask about the actual column names and sub-category labels in the upload instead of hypothetical ones.
 
-Four things are worth deciding in advance, because they are the ones the translator cannot read from a data file and will have to ask about:
+Almost everything comes from the file itself: the sub-category names, the head counts, which parameters are present and which are missing, and the units in use. None of that needs stating in advance.
 
-- **Which IPCC edition the inventory reports under**, the 2006 Guidelines or the 2019 Refinement. This is a reporting decision rather than a property of the data. It determines which manure management systems are available and which default values apply.
-- **Where the uncertainty estimates come from.** There are four common answers: none, in which case the IPCC catalogue ranges are used; a single expert judgement percentage per value; measured confidence intervals or standard deviations; or a mixture, specified per parameter. This determines whether the bounds in the finished template are the user's own or the catalogue's.
-- **How manure is split between management systems**, as a percentage per sub-category summing to 100. Manure management system usage is usually surveyed separately from the herd, so these shares are often absent from the file the user uploads and have to be supplied in the chat.
-- **Whether that split is itself uncertain.** If the shares are an estimate rather than a measurement, a lower and upper percentage can be given for each one, and the tool will sample within those ranges and renormalise every iteration so the shares still sum to 100. Left unspecified, the split is treated as exact. This is easy to overlook, because nothing in the file will prompt for it.
+Four things do not appear in a data file, so the translator will ask about them. They are listed here because they are decisions rather than lookups, and two of them are easy to answer badly under time pressure:
+
+- **Which IPCC edition the inventory reports under**, the 2006 Guidelines or the 2019 Refinement. A reporting decision rather than a property of the data. It determines which manure management systems are available and which default values apply.
+- **Where the uncertainty estimates come from**: none, in which case the IPCC catalogue ranges are used; a single expert judgement percentage per value; measured confidence intervals or standard deviations; or a mixture, specified per parameter. This determines whether the bounds in the finished template are the user's own or the catalogue's.
+- **How manure is split between management systems**, as a percentage per sub-category summing to 100. Manure management system usage is usually surveyed separately from the herd, so these shares are often absent from the uploaded file and have to be given in the chat.
+- **Whether that split is itself uncertain.** If the shares are an estimate rather than a measurement, a lower and an upper percentage can be given for each, and the tool samples within those ranges and renormalises every iteration so the shares still sum to 100. Left unspecified, the split is treated as exact. This one is worth raising unprompted, because nothing in the file will suggest it and an allocation that is really an estimate is otherwise reported as though it were known precisely.
 
 The country name and the inventory year are also required, and are quick to state if they are not in the file.
 
@@ -107,17 +109,6 @@ The translator is gated behind a magic-link sign-in flow. Emails ending in `@cgi
 8. Enter the same email address again and click **Send sign-in link**. A fresh magic-link email arrives within 1–2 minutes.
 9. Click the new link. The app verifies the email is now on the approved list, drops a long-lived sign-in cookie in the browser, and unlocks the chat panel.
 10. On subsequent visits from the same browser, the cookie keeps the user signed in. No additional magic-link step is required unless the user clears site data or switches browsers.
-
-### If approval is not available in time
-
-Approval is manual and requires a redeployment, so it is not instantaneous. Where the translator cannot be used, whether because approval is pending, because a ministry policy prevents uploading data to an external AI service, or because the monthly spending cap has been reached, the template can still be filled without it.
-
-The two reference files the translator itself works from are published alongside the app and can be used with any AI assistant, or read directly by a person:
-
-- **`param_catalogue.md`** lists every parameter the tool expects, with its units, tier, IPCC default, suggested uncertainty and distribution.
-- **`template_schema.md`** describes the three sheets, their columns and the controlled vocabularies for sub-categories and manure management systems.
-
-Used with another assistant, the practical approach is to provide both files first, then describe the raw data and ask for one block of comma-separated values per sheet. Those blocks are pasted into the blank template, downloadable from the Data Input tab, starting at the first data row of each sheet. This route has no quality preview and no provenance stamp, so the spot-checks described under Quality control below matter more, not less. Filling the template by hand from the two files is also perfectly workable for a small inventory.
 
 ## When to use the translator and when to skip it
 

@@ -12,7 +12,6 @@ You have five knowledge sections after this one. Treat them as the source of tru
 - `template_schema`: the exact workbook layout (sheets, columns, units, validation rules, controlled vocabularies, MMS list, distribution-choice guide). Generated from the app's own tables.
 - `mapping_examples`: worked examples of "raw column → template field" you can pattern-match against.
 - `worked_example`: one complete reference output whose shape you copy.
-- `before_you_start`: an optional one-page prep sheet. It is not a form to be filled in and most users will not have read it, so never ask for it or refer to it by name. Some users will paste answers from it as their first message.
 
 If any user statement contradicts these sections, the sections win: flag the contradiction and ask the user to confirm.
 

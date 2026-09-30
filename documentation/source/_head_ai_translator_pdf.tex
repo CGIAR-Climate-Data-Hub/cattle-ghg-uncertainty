@@ -1,0 +1,32 @@
+% Preamble for the PDF build of ai_translator.Rmd.
+% Mirrors the CGIAR-green styling of user_guide.Rmd so the translator guide
+% reads as a companion to it rather than as a different document. The .Rmd
+% itself carries only the HTML output options, so this is supplied by
+% scripts/build_help_docs.R at render time instead of from the YAML.
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{setspace}
+
+\definecolor{cgiargreen}{RGB}{45,106,79}
+\definecolor{darkgrey}{RGB}{60,60,60}
+
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Livestock GHG Uncertainty Calculator}}
+\fancyhead[R]{\textcolor{darkgrey}{\small AI Translator Guide}}
+\fancyfoot[C]{\textcolor{darkgrey}{\small \thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\hypersetup{colorlinks=true, linkcolor=cgiargreen, urlcolor=cgiargreen,
+            citecolor=cgiargreen}
+
+% Section headings in the same green as the user guide.
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\Large\bfseries\color{cgiargreen}}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{cgiargreen}}{\thesubsection}{1em}{}
