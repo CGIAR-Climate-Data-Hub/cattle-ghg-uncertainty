@@ -25,7 +25,7 @@ Country X    2022   dairy_cows     500000       275              300            
 | `live_weight_kg` | → `BW` | `live_weight` is in PARAM_ALIASES |
 | `mature_wt_kg` | → `MW` | unit OK |
 | `adg_kg_d` | → `WG` | "average daily gain": adult dairy cow usually 0 |
-| `milk_kg_d` | → `Milk` | confirm "per lactating cow" not "herd total" |
+| `milk_kg_d` | → `Milk` | confirm "per lactating cow" not "herd total". Per lactating cow needs converting: × lactation length ÷ 365, because `Milk` is the annual average per head |
 | `milk_fat_pct` | → `Fat` | |
 | `digest_pct` | → `DE` | `DE_pct` is in PARAM_ALIASES |
 | `ym_pct` | → `Ym` | `Ym_pct` is in PARAM_ALIASES |
