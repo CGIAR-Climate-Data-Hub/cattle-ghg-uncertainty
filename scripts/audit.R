@@ -3630,6 +3630,79 @@ section_F <- function() {
              notes = if (f61_ok) "both sites present"
                      else paste(f61_fail, collapse = "; "))
 
+  # ---------------------------------------------------------------------
+  # F62-F63 -- the absolute-versus-relative spread defect (Andreas, 2026-09-30).
+  #
+  # On the Zambia file the source gave a RELATIVE 50 % margin on each manure
+  # share; the translation wrote a flat 0 to 50 on every row, and a relative
+  # 25 % on MCF was dropped entirely by leaving its bounds blank. Neither was
+  # visible row by row: the flat bounds bracket every mean and the shares
+  # still summed to 100, so the whole quality preview passed the file.
+  #
+  # F62 proves the two consistency checks catch each defect AND stay silent on
+  # a clean sheet, so neither can rot into something that always fires or
+  # never does. F63 proves the two prompt rules that stop the model producing
+  # it are still in the assembled system prompt.
+  # ---------------------------------------------------------------------
+  .mm_fixture <- function(lo, hi, mcf_lo = NA_real_, mcf_hi = NA_real_) {
+    data.frame(
+      cattle_type = "dairy", aggregation_level = "g1", sub_category = "dairy_cows",
+      mms_type = c("pasture", "dry_lot", "solid_storage", "liquid_slurry"),
+      fraction_pct = c(40, 30, 20, 10),
+      lower_fraction = lo, upper_fraction = hi,
+      MCF_pct = c(1, 2, 5, 25), lower_mcf = mcf_lo, upper_mcf = mcf_hi,
+      EF3 = c(0.005, 0.01, 0.005, 0.005),
+      stringsAsFactors = FALSE)
+  }
+  f62_fail <- tryCatch({
+    f <- character(0)
+    fires <- function(df, pat)
+      any(grepl(pat, translator_consistency_checks(NULL, df)$issue))
+
+    # (a) the flat-bound defect must be caught
+    if (!fires(.mm_fixture(rep(0, 4), rep(50, 4)), "same bounds"))
+      f <- c(f, "a flat bound pair repeated across differing shares was NOT flagged")
+    # (b) bounds scaled per row must NOT be flagged
+    bad <- .mm_fixture(c(40, 30, 20, 10) * 0.5, c(40, 30, 20, 10) * 1.5,
+                       c(1, 2, 5, 25) * 0.75, c(1, 2, 5, 25) * 1.25)
+    if (fires(bad, "same bounds"))
+      f <- c(f, "correctly scaled per-row bounds were flagged; the check is too eager")
+    # (c) rows that legitimately share a share AND its bounds must NOT fire
+    same <- .mm_fixture(rep(12.5, 4), rep(37.5, 4))
+    same$fraction_pct <- rep(25, 4)
+    if (fires(same, "same bounds"))
+      f <- c(f, "rows with an identical share were flagged; only differing shares are a finding")
+    # (d) a coefficient with values but no bounds anywhere must be caught
+    if (!fires(.mm_fixture(rep(0, 4), rep(50, 4)), "MCF_pct has a value"))
+      f <- c(f, "MCF with no bounds on any row was NOT flagged")
+    # (e) and must go quiet once the bounds are supplied
+    if (fires(bad, "MCF_pct has a value"))
+      f <- c(f, "MCF with bounds supplied was still flagged")
+    f
+  }, error = function(e) conditionMessage(e))
+  f62_ok <- length(f62_fail) == 0L
+  check_bool("F62", "F",
+             "Flat manure bounds and a coefficient with no bounds are both caught, and neither check fires on a clean sheet",
+             f62_ok,
+             notes = if (f62_ok) "catches both defects; silent on scaled bounds and on equal shares"
+                     else paste(utils::head(f62_fail, 3), collapse = "; "))
+
+  # F63 -- the model-side half. A check that only catches the mistake after
+  # the fact is a net, not a fix; these two rules are what stop it being made.
+  f63_fail <- tryCatch({
+    pr <- assemble_translator_system_prompt("translator_prompts")
+    miss <- c("Relative-uncertainty rule", "Per-MMS uncertainty rule",
+              "Relative spread applied per row",
+              "Per-MMS spreads carried, not dropped")
+    miss[!vapply(miss, function(k) grepl(k, pr, fixed = TRUE), logical(1))]
+  }, error = function(e) conditionMessage(e))
+  f63_ok <- length(f63_fail) == 0L
+  check_bool("F63", "F",
+             "The relative-spread and per-MMS-uncertainty rules are in the assembled system prompt",
+             f63_ok,
+             notes = if (f63_ok) "both rules and both self-checks present"
+                     else paste("missing:", paste(f63_fail, collapse = ", ")))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without
