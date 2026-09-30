@@ -3692,10 +3692,11 @@ section_F <- function() {
   f63_fail <- tryCatch({
     pr <- assemble_translator_system_prompt("translator_prompts")
     miss <- c("Relative-uncertainty rule", "Per-MMS uncertainty rule",
-              "Named-distribution rule",
+              "Named-distribution rule", "Right-row, right-column rule",
               "Relative spread applied per row",
               "Per-MMS spreads carried, not dropped",
-              "Distributions are the file's, not yours")
+              "Distributions are the file's, not yours",
+              "One year column, used everywhere")
     miss[!vapply(miss, function(k) grepl(k, pr, fixed = TRUE), logical(1))]
   }, error = function(e) conditionMessage(e))
   f63_ok <- length(f63_fail) == 0L
