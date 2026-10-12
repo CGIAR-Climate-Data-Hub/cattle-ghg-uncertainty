@@ -483,6 +483,18 @@ lang_state_take <- function(token) {
                           fr = " : cliquez sur « Générer le modèle » et téléchargez le .xlsx au format attendu par l'onglet Données."),
   ai_intro_signin_note = list(en = "No setup: sign in once with your email and you're ready.",
                                 fr = "Aucune configuration : connectez-vous une fois avec votre e-mail, c'est prêt."),
+  # Tutorial video. One recording, linked from each tab at the timestamp
+  # that covers that tab.
+  video_watch_tab = list(en = "Watch this tab explained",
+                           fr = "Voir l'explication de cet onglet"),
+  video_full_title = list(en = "Technical walkthrough (video)",
+                            fr = "Présentation technique (vidéo)"),
+  video_full_body = list(
+    en = "A 23-minute walkthrough of the whole tool: every tab and control, the Excel input template sheet by sheet, and the Country X worked example run from data entry to the IPCC report. Each tab of the app also links to the point in the video that covers it.",
+    fr = "Une présentation de 23 minutes de l'ensemble de l'outil : chaque onglet et chaque commande, le modèle Excel feuille par feuille, et l'exemple Country X traité de la saisie jusqu'au rapport IPCC. Chaque onglet de l'application renvoie aussi au passage de la vidéo qui le concerne."),
+  btn_open_video = list(en = "Watch the walkthrough",
+                          fr = "Voir la présentation"),
+
   btn_open_ai_guide = list(en = "Open AI translator guide (PDF)",
                              fr = "Ouvrir le guide du traducteur IA (PDF)"),
 

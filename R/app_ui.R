@@ -6,6 +6,52 @@
 # matching language string. The language toggle in the navbar (defined
 # below, right-side nav_item) writes the cookie + reloads the page; on
 # reload, this function runs again with the new cookie value.
+# ---------------------------------------------------------------------------
+# Tutorial video (2026-10)
+#
+# One 23-minute recording covers the whole tool. Each tab links to the point
+# in it that covers that tab, so a user who is stuck on one window gets the
+# two minutes about that window rather than the whole thing.
+#
+# The video is hosted, not served by the app: the file is 567 MB against a
+# deploy bundle of about 28 MB, and shinyapps.io would be serving it from the
+# same single process that runs the simulations.
+#
+# Set TUTORIAL_VIDEO_URL in .Renviron to switch the links on. While it is
+# empty every link renders as NULL, so the app behaves exactly as before.
+#
+# Start times are the rendered video's own chapter marks, each checked
+# against the frame at that timestamp. `t=` in seconds is YouTube's
+# convention; a different host may need a different parameter.
+# ---------------------------------------------------------------------------
+.TUTORIAL_VIDEO_URL <- Sys.getenv("TUTORIAL_VIDEO_URL", unset = "")
+.TUTORIAL_VIDEO_CHAPTERS <- list(
+  data_input   = list(start =  165, len = "5 min"),
+  qaqc         = list(start =  501, len = "1 min"),
+  uncertainty  = list(start =  584, len = "2 min"),
+  correlations = list(start =  702, len = "4 min"),
+  simulate     = list(start =  934, len = "4 min"),
+  sensitivity  = list(start = 1158, len = "2 min"),
+  ipcc_report  = list(start = 1268, len = "2 min"))
+
+tutorial_video_link <- function(tab) {
+  if (!nzchar(.TUTORIAL_VIDEO_URL)) return(NULL)
+  ch <- .TUTORIAL_VIDEO_CHAPTERS[[tab]]
+  if (is.null(ch)) return(NULL)
+  sep  <- if (grepl("?", .TUTORIAL_VIDEO_URL, fixed = TRUE)) "&" else "?"
+  href <- paste0(.TUTORIAL_VIDEO_URL, sep, "t=", ch$start)
+  tags$div(
+    style = "margin: 14px 16px -2px 16px;",
+    tags$a(
+      href = href, target = "_blank", rel = "noopener noreferrer",
+      style = paste("color:#2D6A4F; font-size:0.84rem; font-weight:500;",
+                    "text-decoration:none; padding:4px 10px;",
+                    "border:1px solid #2D6A4F; border-radius:14px;",
+                    "background:#FFFFFF; display:inline-block;"),
+      icon("circle-play"), " ", t("video_watch_tab"),
+      tags$span(style = "opacity:0.7;", paste0(" (", ch$len, ")"))))
+}
+
 app_ui <- function(request = NULL) {
   lang <- i18n_lang_from_request(request)
   i18n_set_lang(lang)
@@ -1171,6 +1217,17 @@ app_ui <- function(request = NULL) {
                 class = "btn btn-outline-success",
                 icon("book"), " ", t("btn_open_userguide")
               ),
+              # The walkthrough video, when one is configured. Same button
+              # row as the two documents, because it is the third way of
+              # answering the same question.
+              if (nzchar(.TUTORIAL_VIDEO_URL))
+                tags$a(
+                  href = .TUTORIAL_VIDEO_URL,
+                  target = "_blank",
+                  rel = "noopener noreferrer",
+                  class = "btn btn-outline-success",
+                  icon("circle-play"), " ", t("btn_open_video")
+                ) else NULL,
               # SEO round 2026-09: the project website is the canonical public
               # entry point (see the canonical link in the head block). Linking
               # it from here gives users who arrive straight at the app a route
@@ -1272,6 +1329,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_data_input"),
       icon = icon("upload"),
+      tutorial_video_link("data_input"),
       # Andreas 2026-05 #3: analysis-mode toggle moved here from Home page.
       bslib::card(
         style = "margin: 16px;",
@@ -1450,6 +1508,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_qaqc"),
       icon = icon("check-square"),
+      tutorial_video_link("qaqc"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
           t("info_qaqc"),
@@ -1517,6 +1576,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_uncertainty"),
       icon = icon("sliders-h"),
+      tutorial_video_link("uncertainty"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$p(
             tags$strong(paste0(t("what_to_do_label"), " ")),
@@ -1567,6 +1627,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_correlations"),
       icon = icon("th"),
+      tutorial_video_link("correlations"),
       # 2026-05 UX overhaul: two-block intro (replaces the previous wall of text).
       # Block 1: plain-language "what is this page about?". Block 2: a small
       # decision tree so a first-time user can pick the right option without
@@ -1785,6 +1846,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_simulate"),
       icon = icon("play"),
+      tutorial_video_link("simulate"),
       value = "5. Simulate & Results",
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
@@ -2176,6 +2238,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_sensitivity"),
       icon = icon("bullseye"),
+      tutorial_video_link("sensitivity"),
 
       # ---------- Single-year sensitivity ----------
       conditionalPanel(
@@ -2298,6 +2361,7 @@ app_ui <- function(request = NULL) {
     bslib::nav_panel(
       title = t("tab_ipcc_report"),
       icon = icon("file-alt"),
+      tutorial_video_link("ipcc_report"),
 
       # ---------- Single-year report layout ----------
       conditionalPanel(
