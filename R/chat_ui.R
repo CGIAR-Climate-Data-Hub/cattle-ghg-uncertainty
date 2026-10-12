@@ -182,6 +182,18 @@ translator_chat_server <- function(input, output, session) {
   }, once = TRUE, ignoreInit = FALSE)
 
   # ---- Login form: "send me a magic link" ----------------------------------
+  # Stop. Sets the flag that a running stream polls on every chunk.
+  #
+  # This observer is reached in two ways. Normally, through the event loop
+  # like any other. During a stream, through later::run_now() called by the
+  # keep-alive, which is the only moment the blocked process can read the
+  # socket. It therefore has to be cheap and must not touch reactive values:
+  # a reactive write here would schedule a flush in the middle of a stream.
+  observeEvent(input$translator_stop, {
+    translator_cancel_request()
+    message("translator: stop requested by ", session$userData$email %||% "user")
+  }, ignoreInit = TRUE)
+
   observeEvent(input$translator_submit, {
     email <- tolower(trimws(input$translator_email %||% ""))
     # perl = TRUE is required so `\s` inside the character class is parsed
@@ -330,6 +342,7 @@ translator_chat_server <- function(input, output, session) {
   # template path: no separate button needed. Otherwise it's a normal
   # chat round (clarifying questions, mapping discussion).
   observeEvent(input$translator_send, {
+    translator_cancel_reset()
     req(state$user_email)
     txt <- trimws(input$translator_input %||% "")
     if (!nzchar(txt)) return()
@@ -359,6 +372,7 @@ translator_chat_server <- function(input, output, session) {
   # "Change something and produce again": keep the conversation, drop the
   # template so the chat controls come back (2026-09-18).
   observeEvent(input$translator_revise, {
+    translator_cancel_reset()
     req(state$user_email)
     state$last_template_json <- NULL
     state$last_error <- NULL
@@ -722,19 +736,28 @@ translator_chat_server <- function(input, output, session) {
                    class = "btn-outline-secondary",
                    style = "font-size:0.82rem;",
                    title = t("tip_ai_reset")),
-      # Stop button: escape hatch when the AI is generating a template
-      # and the Shiny event loop is blocked on the OpenAI call. Plain
-      # JS onclick (window.location.reload) bypasses the blocked R
-      # session entirely. The OpenAI call continues in the background
-      # but its result is discarded; the user gets their UI back
-      # immediately. Conversation history is persisted to disk before
-      # the call starts, so the user sees their messages on reload.
+      # Stop button. Two things happen, in this order.
+      #
+      # It sets an input, which the server receives on the next pump of the
+      # event loop from the stream keep-alive. The observer sets the cancel
+      # flag, the stream callback reads it on the next chunk and closes the
+      # connection, so the call stops and stops being billed.
+      #
+      # Then, after a short delay, it reloads the page. The reload is what
+      # this button used to do on its own, and it is kept so the user gets
+      # their UI back even if the signal does not land. The conversation is
+      # persisted before the call starts, so nothing is lost either way.
       tags$button(
         type = "button",
         class = "btn btn-outline-danger",
         style = "font-size:0.82rem;",
-        onclick = sprintf("if (confirm('%s')) { window.location.reload(); }",
-                          gsub("'", "\\\\'", t("ai_stop_confirm"))),
+        onclick = sprintf(
+          paste0("if (confirm('%s')) { ",
+                 "Shiny.setInputValue('translator_stop', Date.now(), {priority:'event'}); ",
+                 "this.disabled = true; this.textContent = '%s'; ",
+                 "setTimeout(function(){ window.location.reload(); }, 1500); }"),
+          gsub("'", "\\\\'", t("ai_stop_confirm")),
+          gsub("'", "\\\\'", t("ai_stopping"))),
         title = t("tip_ai_stop"),
         tagList(icon("ban"), t("btn_ai_stop"))
       )
@@ -742,6 +765,20 @@ translator_chat_server <- function(input, output, session) {
 
     uiOutput("translator_last_error"))
 }
+
+# Cancellation flag for a running translator call.
+#
+# R is single threaded. While a stream is being read, the Shiny event loop is
+# blocked, so a Stop click cannot reach an observer by the usual route. The
+# per-chunk keep-alive pumps the loop (later::run_now), which lets the click
+# arrive and sets this flag; the stream callback reads it on the next chunk
+# and aborts. A plain environment is used rather than a reactiveVal so that
+# setting it inside the pumped loop cannot start a reactive flush mid-stream.
+.TRANSLATOR_CANCEL <- new.env(parent = emptyenv())
+.TRANSLATOR_CANCEL$stop <- FALSE
+translator_cancel_reset   <- function() .TRANSLATOR_CANCEL$stop <- FALSE
+translator_cancel_request <- function() .TRANSLATOR_CANCEL$stop <- TRUE
+translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
 
 # Set a flag the conditionalPanel above can react to. Called from
 # the OpenAI-response parser.
@@ -1565,6 +1602,10 @@ translator_chat_server <- function(input, output, session) {
   on_tick_cb <- function() {
     tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
               error = function(e) NULL)
+    # Give the blocked event loop a chance to receive a Stop click. Without
+    # this the click sits in the socket until the whole call has finished,
+    # which is why Stop used to reload the page and leave the call running.
+    tryCatch(later::run_now(0), error = function(e) NULL)
   }
   info <- function(txt) tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
                                  error = function(e) NULL)
@@ -1599,8 +1640,17 @@ translator_chat_server <- function(input, output, session) {
     new_user_message = discovery_request)
   enum_resp <- .translator_memo_call(discovery_msgs, tools_sig, function()
     anthropic_chat_enumerate_aggregation_levels(
-      discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb))
+      discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+      should_stop = translator_cancelled))
 
+  # A stop is not a failure, and must not trigger the fallback: starting a
+  # monolithic emission here would be the opposite of what was asked for,
+  # and the expensive path at that.
+  if (isTRUE(enum_resp$stopped) || translator_cancelled()) {
+    state$last_error <- enum_resp$error %||%
+      "Stopped at your request. Nothing was produced from this call."
+    return()
+  }
   if (!is.null(enum_resp$error)) {
     # Discovery itself failed: fall back to the monolithic path.
     message("translator: discovery call failed (", enum_resp$error,
@@ -1717,8 +1767,15 @@ translator_chat_server <- function(input, output, session) {
       new_user_message = batch_nudge)
     batch_resp <- .translator_memo_call(batch_msgs, tools_sig, function()
       anthropic_chat_batch_template_force(
-        batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb))
+        batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+        should_stop = translator_cancelled))
 
+    if (isTRUE(batch_resp$stopped) || translator_cancelled()) {
+      state$last_error <- sprintf(
+        "Stopped at your request during batch %d of %d (%s). The %d batch(es) already produced are kept and will not be re-billed; click 'Produce template now' to carry on from there.",
+        i, length(agg_levels), level, length(state$batch_parts))
+      return()
+    }
     if (!is.null(batch_resp$error)) {
       state$last_error <- sprintf(
         "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry, the %d batch(es) that already succeeded are kept and won't be re-billed.",
@@ -1758,7 +1815,8 @@ translator_chat_server <- function(input, output, session) {
         "biological_zero where it applies. Same tool, mode = 'batch', same ",
         "aggregation_level."))))
       retry_resp <- anthropic_chat_batch_template_force(
-        retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb)
+        retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+        should_stop = translator_cancelled)
       if (is.null(retry_resp$error)) {
         .translator_log_usage(state, retry_resp, stage = "retry_defaults_only", expect_warm = TRUE)
         rp <- tryCatch(jsonlite::fromJSON(retry_resp$reply, simplifyVector = TRUE), error = function(e) NULL)

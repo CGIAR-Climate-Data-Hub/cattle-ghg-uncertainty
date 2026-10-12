@@ -415,6 +415,14 @@ anthropic_chat_stream <- function(messages,
                                    # the entire 5-15 min force-template
                                    # emission. Default: no-op.
                                    on_tick = function() {},
+                                   # Cancellation. Called once per received
+                                   # chunk; returning TRUE aborts the stream
+                                   # immediately. R is single threaded, so a
+                                   # Stop click cannot reach an observer while
+                                   # this call is running: the caller pumps the
+                                   # event loop from on_tick and reports the
+                                   # result here. Default: never stops.
+                                   should_stop = function() FALSE,
                                    model = .ANTHROPIC_DEFAULT_MODEL,
                                    max_tokens = 16000,
                                    temperature = 0.2,
@@ -527,7 +535,15 @@ anthropic_chat_stream <- function(messages,
     cache_write1h <- 0L
     sse_buffer <- ""
 
+    stopped_early <- FALSE
     on_data <- function(data) {
+      # Abort the stream. httr2 stops reading as soon as the callback
+      # returns FALSE, which closes the connection and stops the billing.
+      # Wrapped so a faulty predicate can never break a working stream.
+      if (isTRUE(tryCatch(should_stop(), error = function(e) FALSE))) {
+        stopped_early <<- TRUE
+        return(FALSE)
+      }
       chunk_text <- rawToChar(data)
       sse_buffer <<- paste0(sse_buffer, chunk_text)
       while (grepl("\n\n", sse_buffer, fixed = TRUE)) {
@@ -634,7 +650,13 @@ anthropic_chat_stream <- function(messages,
                                 `anthropic-beta` = "extended-cache-ttl-2025-04-11")
 
     resp <- tryCatch(
-      httr2::req_perform_stream(req, on_data, buffer_kb = 16),
+      # buffer_kb 4, not 16. on_data runs once per buffer, and it is where
+      # a Stop is noticed, so the buffer size is the worst-case delay
+      # between clicking Stop and the connection closing. At 16 KB that was
+      # several seconds on a slow stream. The cost of the smaller buffer is
+      # a few more callback invocations, which is immaterial next to the
+      # network wait.
+      httr2::req_perform_stream(req, on_data, buffer_kb = 4),
       error = function(e) e)
 
     if (inherits(resp, "error")) {
@@ -649,6 +671,7 @@ anthropic_chat_stream <- function(messages,
     transient_status <- !is.na(status) && (status == 429 || status >= 500)
     network_error    <- inherits(resp, "error")
 
+    if (isTRUE(stopped_early)) { final_resp <- resp; break }
     if (success_status) { final_resp <- resp; break }
     # Don't retry mid-stream: user already saw some text.
     if (nzchar(accumulated) || nzchar(tool_json_acc)) {
@@ -663,6 +686,13 @@ anthropic_chat_stream <- function(messages,
                      if (is.na(status)) last_err else as.character(status)))
     Sys.sleep(delay)
   }
+
+  # A stream the user aborted comes back as a perfectly ordinary 200 with
+  # whatever had arrived so far. Returning that would hand a half-written
+  # tool payload to fromJSON. Report the stop instead, before any parsing.
+  if (isTRUE(stopped_early))
+    return(list(reply = NULL, stopped = TRUE,
+                error = "Stopped at your request. Nothing was produced from this call."))
 
   resp <- final_resp
   if (inherits(resp, "error")) {
@@ -912,11 +942,13 @@ anthropic_translator_tools <- function() {
 # One emission call: tools always attached, tool_choice auto by default,
 # one forced retry when the model answered in prose instead.
 .anthropic_tool_call <- function(messages, on_chunk, on_tick, model, max_tokens,
-                                 timeout_sec, tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+                                 timeout_sec, tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+                                 should_stop = function() FALSE) {
   call_once <- function(tc) anthropic_chat_stream(
     messages    = messages,
     on_chunk    = on_chunk,
     on_tick     = on_tick,
+    should_stop = should_stop,
     model       = model,
     max_tokens  = max_tokens,
     temperature = 0,
@@ -954,9 +986,10 @@ anthropic_chat_template_force <- function(messages,
                                             # tool_use input_json_delta is
                                             # slower than text streaming.
                                             timeout_sec = 1800,
-                                            tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+                                            tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+                                            should_stop = function() FALSE) {
   .anthropic_tool_call(messages, on_chunk, on_tick, model, max_tokens,
-                       timeout_sec, tool_choice)
+                       timeout_sec, tool_choice, should_stop)
 }
 
 # Stage 1 of the batched emission flow: mode = enumerate. Cheap (~200 output
@@ -967,9 +1000,10 @@ anthropic_chat_enumerate_aggregation_levels <- function(messages,
                                                           model = .ANTHROPIC_DEFAULT_MODEL,
                                                           max_tokens = 4000,
                                                           timeout_sec = 120,
-                                                          tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+                                                          tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+                                            should_stop = function() FALSE) {
   .anthropic_tool_call(messages, on_chunk, on_tick, model, max_tokens,
-                       timeout_sec, tool_choice)
+                       timeout_sec, tool_choice, should_stop)
 }
 
 # Stage 2 of the batched emission flow: mode = batch, one call per
@@ -985,9 +1019,10 @@ anthropic_chat_batch_template_force <- function(messages,
                                                   model = .ANTHROPIC_DEFAULT_MODEL,
                                                   max_tokens = 48000,
                                                   timeout_sec = 900,
-                                                  tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO) {
+                                                  tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+                                            should_stop = function() FALSE) {
   .anthropic_tool_call(messages, on_chunk, on_tick, model, max_tokens,
-                       timeout_sec, tool_choice)
+                       timeout_sec, tool_choice, should_stop)
 }
 
 # --- Build OpenAI-style message list (system + history + new user) ----------

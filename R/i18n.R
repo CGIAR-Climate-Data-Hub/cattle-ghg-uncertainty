@@ -513,12 +513,13 @@ lang_state_take <- function(token) {
                         fr = "Effacer la conversation et recommencer."),
   btn_ai_stop = list(en = " Stop / reload", fr = " Arrêter / recharger"),
   ai_stop_confirm = list(
-    en = "Stop the AI generation and reload the page? Your conversation is saved: you will not lose it.",
-    fr = "Arrêter la génération et recharger la page ? Votre conversation est sauvegardée : vous ne la perdrez pas."
+    en = "Stop the AI now? The current call is cancelled and the page reloads. Your conversation is saved: you will not lose it.",
+    fr = "Arrêter l'IA maintenant ? L'appel en cours est annulé et la page se recharge. Votre conversation est sauvegardée : vous ne la perdrez pas."
   ),
+  ai_stopping = list(en = "Stopping...", fr = "Arrêt en cours..."),
   tip_ai_stop = list(
-    en = "Use this if the AI is generating a template and the page is unresponsive. Reloads the page; the OpenAI call is abandoned. Your conversation history is preserved.",
-    fr = "Utilisez cela si l'IA génère un modèle et que la page ne répond plus. Recharge la page ; l'appel OpenAI est abandonné. Votre historique est préservé."
+    en = "Stops the call that is running. The connection to the AI is closed within a second or two, so nothing further is generated or billed, and the page then reloads to give you a clean screen. Your conversation history is preserved.",
+    fr = "Arrête l'appel en cours. La connexion à l'IA est fermée en une ou deux secondes, donc plus rien n'est généré ni facturé, puis la page se recharge pour repartir sur un écran propre. Votre historique est préservé."
   ),
   btn_ai_download = list(en = "Download template (.xlsx)",
                            fr = "Télécharger le modèle (.xlsx)"),
