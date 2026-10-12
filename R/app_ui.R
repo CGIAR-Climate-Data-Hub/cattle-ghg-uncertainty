@@ -25,6 +25,10 @@
 # convention; a different host may need a different parameter.
 # ---------------------------------------------------------------------------
 .TUTORIAL_VIDEO_URL <- Sys.getenv("TUTORIAL_VIDEO_URL", unset = "")
+# The five-minute overview, shown on the home page. Separate from the
+# 23-minute walkthrough above: this one answers "what is this", that one
+# answers "how do I use it".
+.OVERVIEW_VIDEO_URL <- Sys.getenv("OVERVIEW_VIDEO_URL", unset = "")
 .TUTORIAL_VIDEO_CHAPTERS <- list(
   data_input   = list(start =  165, len = "5 min"),
   qaqc         = list(start =  501, len = "1 min"),
@@ -1029,92 +1033,106 @@ app_ui <- function(request = NULL) {
                     style = "display:none; font-size:0.9rem; color:#444; font-weight:600;")
         ),
 
-        # What this tool does
+        # ---- Status notice ------------------------------------------------
+        # The tool is in review with the countries that will use it. Saying so
+        # here is the difference between a visitor reading an unfamiliar page
+        # as unfinished and reading it as a release candidate.
+        div(
+          style = "display:flex; gap:12px; align-items:flex-start; margin: 20px 0 0 0;
+                   padding: 14px 18px; border:1px solid #F59E0B; border-radius:10px;
+                   background:#FFFBEB;",
+          icon("circle-info", style = "color:#B45309; margin-top:3px;"),
+          div(
+            tags$strong(t("status_title"), style = "color:#92400E;"),
+            tags$div(style = "font-size:0.92rem; color:#78350F; margin-top:3px;",
+                     t("status_body")))),
+
+        # ---- Overview video -----------------------------------------------
+        # Five minutes, and it answers "what is this" better than the page can.
+        if (nzchar(.OVERVIEW_VIDEO_URL))
+          bslib::card(
+            style = "margin-top: 20px;",
+            bslib::card_body(
+              div(style = "display:flex; gap:20px; align-items:center; flex-wrap:wrap;",
+                tags$a(
+                  href = .OVERVIEW_VIDEO_URL, target = "_blank",
+                  rel = "noopener noreferrer",
+                  style = "flex:0 0 auto; text-decoration:none;",
+                  div(style = "width:132px; height:76px; border-radius:10px;
+                               background:#1B4332; color:#FFFFFF; display:flex;
+                               align-items:center; justify-content:center;
+                               font-size:2rem;",
+                      icon("circle-play"))),
+                div(style = "flex:1 1 320px; min-width:260px;",
+                  h4(t("video_overview_title"), style = "margin:0 0 6px 0;"),
+                  tags$p(t("video_overview_body"),
+                         style = "margin:0 0 10px 0; color:#475569;"),
+                  tags$a(href = .OVERVIEW_VIDEO_URL, target = "_blank",
+                         rel = "noopener noreferrer",
+                         class = "btn btn-success btn-sm",
+                         icon("circle-play"), " ", t("btn_watch_overview")))))) else NULL,
+
+        # ---- What the tool is for ------------------------------------------
         bslib::card(
+          style = "margin-top: 20px;",
           bslib::card_header(h4(t("card_what_does_title"), style = "margin: 0;")),
           bslib::card_body(
-            p(t("what_does_intro")),
-            tags$ol(
-              tags$li(t("what_does_li1")),
-              tags$li(t("what_does_li2")),
-              tags$li(t("what_does_li3")),
-              tags$li(t("what_does_li4")),
-              tags$li(t("what_does_li5"))
-            ),
-            p(tags$strong(t("what_does_sources_label")),
-              t("what_does_sources_body"))
-          )
-        ),
+            tags$p(t("what_problem"), style = "margin-bottom: 18px;"),
+            # Four statements of what the tool does. Each names one thing and
+            # describes it; none of them tells the reader what to conclude.
+            div(
+              style = "display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(248px,1fr));",
+              lapply(1:4, function(i) {
+                div(style = "border:1px solid #E0DDD5; border-radius:10px; padding:14px 16px;
+                             background:#FCFCFA;",
+                    tags$div(t(paste0("benefit", i, "_title")),
+                             style = "font-weight:700; color:#2D6A4F; margin-bottom:5px;"),
+                    tags$div(t(paste0("benefit", i, "_body")),
+                             style = "font-size:0.92rem; color:#475569; line-height:1.5;"))
+              })),
+            tags$p(style = "margin: 18px 0 0 0; font-size: 0.92rem;",
+                   tags$strong(t("what_does_sources_label")), " ",
+                   t("what_does_sources_body")))),
 
-        # Workflow overview
+        # ---- Credibility ----------------------------------------------------
+        # Free, open, independently reviewed, and who paid for it. These are
+        # the four things a government compiler checks before investing time,
+        # and the page did not state any of them.
         bslib::card(
-          bslib::card_header(h4(t("workflow_title"), style = "margin: 0;")),
+          style = "margin-top: 20px;",
           bslib::card_body(
-            p(t("workflow_intro")),
-            tags$table(
-              style = "width: 100%; border-collapse: collapse; margin-top: 8px;",
-              tags$thead(
-                tags$tr(style = "background: #D8F3DC; text-align: left;",
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_step")),
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_tab")),
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_what")),
-                  tags$th(style = "padding: 10px; border: 1px solid #E0DDD5;", t("workflow_th_time"))
-                )
-              ),
-              tags$tbody(
-                tags$tr(
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "1"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row1_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row1_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
-                ),
-                tags$tr(style = "background: #FAFAF7;",
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "2"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row2_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row2_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
-                ),
-                tags$tr(
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "3"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row3_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row3_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "10 min")
-                ),
-                tags$tr(style = "background: #FAFAF7;",
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "4"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row4_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row4_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
-                ),
-                tags$tr(
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row5_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row5_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5-7 min")
-                ),
-                tags$tr(style = "background: #FAFAF7;",
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "6"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row6_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row6_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "5 min")
-                ),
-                tags$tr(
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "7"),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5; font-weight: 600; color: #2D6A4F;", t("workflow_row7_tab")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", t("workflow_row7_what")),
-                  tags$td(style = "padding: 8px; border: 1px solid #E0DDD5;", "2 min")
-                )
-              )
-            ),
-            br(),
-            div(class = "info-panel", HTML(t("quick_start_html"))),
-            br(),
-            div(style = "text-align: center;",
+            div(style = "display:grid; gap:12px;
+                         grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+                         font-size:0.92rem; color:#475569;",
+              div(icon("unlock", style="color:#2D6A4F;"), " ", t("trust_open")),
+              div(icon("user-check", style="color:#2D6A4F;"), " ", t("trust_reviewed")),
+              div(icon("building-columns", style="color:#2D6A4F;"), " ", t("trust_built"))))),
+
+        # ---- Three steps -----------------------------------------------------
+        # The seven-tab table with per-tab timings moved to the user guide,
+        # where a reader who has decided to start will look for it.
+        bslib::card(
+          style = "margin-top: 20px;",
+          bslib::card_header(h4(t("steps_title"), style = "margin: 0;")),
+          bslib::card_body(
+            div(
+              style = "display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));",
+              lapply(1:3, function(i) {
+                div(
+                  tags$div(paste0("0", i),
+                           style = "font-size:1.5rem; font-weight:700; color:#95D5B2;
+                                    line-height:1;"),
+                  tags$div(t(paste0("step", i, "_title")),
+                           style = "font-weight:700; margin:4px 0 4px 0;"),
+                  tags$div(t(paste0("step", i, "_body")),
+                           style = "font-size:0.92rem; color:#475569; line-height:1.5;"))
+              })),
+            div(class = "info-panel", style = "margin-top:18px;",
+                HTML(t("quick_start_html"))),
+            div(style = "text-align: center; margin-top: 14px;",
                 actionButton("goto_resources", t("btn_goto_resources"),
-                             class = "btn btn-outline-success",
-                             style = "font-size:0.95rem; padding: 10px 24px;"))
-          )
-        ),
+                             class = "btn btn-outline-success")))),
+
 
         # T0.4: prerequisites & limitations
         bslib::card(

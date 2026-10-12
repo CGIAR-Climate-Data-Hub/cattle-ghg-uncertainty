@@ -495,6 +495,70 @@ lang_state_take <- function(token) {
   btn_open_video = list(en = "Watch the walkthrough",
                           fr = "Voir la présentation"),
 
+  # ---- Home page, rewritten 2026-10-12 --------------------------------
+  # Replaces the five-bullet description of the mechanism and the
+  # seven-row workflow table. Headings name their content; sentences
+  # state facts. No contrasts for emphasis, no fragments.
+  status_title = list(
+    en = "Version 1, in review",
+    fr = "Version 1, en cours de revue"),
+  status_body = list(
+    en = "This version is being reviewed with national inventory teams before its public release. Access is limited to the review group for now.",
+    fr = "Cette version est en cours de revue avec des équipes nationales d'inventaire avant sa publication. L'accès est pour l'instant réservé au groupe de revue."),
+
+  video_overview_title = list(
+    en = "Start with the five-minute overview",
+    fr = "Commencer par la présentation de cinq minutes"),
+  video_overview_body = list(
+    en = "What the tool is for, what it produces, and the five steps of a run. It uses a worked example, so the figures on screen are real output.",
+    fr = "À quoi sert l'outil, ce qu'il produit, et les cinq étapes d'une exécution. La présentation s'appuie sur un exemple complet : les chiffres à l'écran sont de vrais résultats."),
+  btn_watch_overview = list(en = "Watch the overview", fr = "Voir la présentation"),
+
+  what_problem = list(
+    en = "The IPCC asks countries to report how uncertain their emission estimates are. For a Tier 2 cattle inventory this means propagating the uncertainty of around thirty parameters through the full equation chain. In practice the step is often done with generic default ranges, or omitted, because the calculation is laborious and few teams have a suitable tool.",
+    fr = "L'IPCC demande aux pays de rapporter le degré d'incertitude de leurs estimations d'émissions. Pour un inventaire bovin de niveau 2, cela suppose de propager l'incertitude d'une trentaine de paramètres à travers toute la chaîne d'équations. En pratique, cette étape est souvent réalisée avec des plages par défaut, ou omise, car le calcul est laborieux et peu d'équipes disposent d'un outil adapté."),
+
+  benefit1_title = list(en = "Country-specific inputs", fr = "Données propres au pays"),
+  benefit1_body = list(
+    en = "The calculation runs on the parameter values and uncertainty estimates from your own inventory. Where a value is not available, the tool applies the IPCC default and marks the row so you can see which figures are yours.",
+    fr = "Le calcul utilise les valeurs et les estimations d'incertitude de votre propre inventaire. Lorsqu'une valeur manque, l'outil applique la valeur IPCC par défaut et signale la ligne, afin que vous puissiez distinguer vos chiffres."),
+  benefit2_title = list(en = "Results in reporting format", fr = "Résultats au format de rapportage"),
+  benefit2_body = list(
+    en = "Output is produced in the layout of IPCC Table 3.3 and the UNFCCC Common Reporting Tables, so the figures can be carried across into an inventory submission without rework.",
+    fr = "Les résultats sont produits selon la présentation du tableau 3.3 de l'IPCC et des tableaux de rapportage communs de la CCNUCC, et peuvent donc être repris directement dans une soumission d'inventaire."),
+  benefit3_title = list(en = "Ranking of influential inputs", fr = "Classement des paramètres influents"),
+  benefit3_body = list(
+    en = "A sensitivity analysis ranks the parameters by how much each one contributes to the total uncertainty. This indicates where better data would reduce the uncertainty most.",
+    fr = "Une analyse de sensibilité classe les paramètres selon leur contribution à l'incertitude totale. Cela indique où de meilleures données réduiraient le plus l'incertitude."),
+  benefit4_title = list(en = "Runs in a browser", fr = "Fonctionne dans un navigateur"),
+  benefit4_body = list(
+    en = "Data are entered through an Excel template. There is no software to install and no programming involved.",
+    fr = "Les données sont saisies dans un modèle Excel. Aucun logiciel à installer et aucune programmation requise."),
+
+  trust_open = list(
+    en = "Free to use, open source under the MIT licence.",
+    fr = "Gratuit, code ouvert sous licence MIT."),
+  trust_reviewed = list(
+    en = "Reviewed by FAO, the UNFCCC secretariat and the Global Research Alliance on Agricultural Greenhouse Gases.",
+    fr = "Examiné par la FAO, le secrétariat de la CCNUCC et la Global Research Alliance on Agricultural Greenhouse Gases."),
+  trust_built = list(
+    en = "Built by the Alliance of Bioversity International and CIAT under the CGIAR Climate Action Programme, funded by the Global Methane Hub.",
+    fr = "Développé par l'Alliance of Bioversity International and CIAT dans le cadre du CGIAR Climate Action Programme, avec le financement du Global Methane Hub."),
+
+  steps_title = list(en = "How a run works", fr = "Déroulement d'une exécution"),
+  step1_title = list(en = "Prepare the data", fr = "Préparer les données"),
+  step1_body = list(
+    en = "Load one of the worked examples, or your own inventory through the Excel template. The tool checks every parameter and reports what is missing, unusual or invalid.",
+    fr = "Chargez l'un des exemples fournis, ou votre propre inventaire via le modèle Excel. L'outil vérifie chaque paramètre et signale ce qui est manquant, inhabituel ou invalide."),
+  step2_title = list(en = "Describe the uncertainty and run", fr = "Décrire l'incertitude et lancer"),
+  step2_body = list(
+    en = "Give each input a distribution and a range, state any correlations between inputs, and run the Monte Carlo simulation.",
+    fr = "Attribuez à chaque entrée une distribution et une plage, indiquez les corrélations éventuelles entre entrées, puis lancez la simulation de Monte-Carlo."),
+  step3_title = list(en = "Read and report the results", fr = "Lire et rapporter les résultats"),
+  step3_body = list(
+    en = "Read the confidence interval for each emission source and the ranking of influential inputs, then download the results in IPCC Table 3.3 format as Excel, CSV or Word.",
+    fr = "Consultez l'intervalle de confiance de chaque source d'émission et le classement des paramètres influents, puis téléchargez les résultats au format du tableau 3.3 de l'IPCC, en Excel, CSV ou Word."),
+
   btn_open_ai_guide = list(en = "Open AI translator guide (PDF)",
                              fr = "Ouvrir le guide du traducteur IA (PDF)"),
 
