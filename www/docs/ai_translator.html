@@ -333,12 +333,14 @@ values are tagged <code>biological_zero</code> or
 catching translation failures before the simulation runs.</p>
 </div>
 </div>
-<div id="access-for-non-cgiar-email-addresses" class="section level2">
-<h2>Access for non-CGIAR email addresses</h2>
-<p>The translator is gated behind a magic-link sign-in flow. Emails
-ending in <code>@cgiar.org</code> are auto-approved; any other email
-requires one-time manual approval by the administrator. The full
-sequence for a non-CGIAR email is as follows.</p>
+<div id="getting-access" class="section level2">
+<h2>Getting access</h2>
+<p>The translator is gated behind a magic-link sign-in flow. Every
+address requires one-time manual approval by the administrator,
+including CGIAR addresses. Each translation is billed to the project, so
+access is granted by name rather than by domain. Approval is needed
+once; after that the browser stays signed in. The full sequence is as
+follows.</p>
 <div id="initial-request-first-sign-in" class="section level3">
 <h3>Initial request (first sign-in)</h3>
 <ol style="list-style-type: decimal">
@@ -354,8 +356,8 @@ days and may be clicked more than once; after the first successful click
 the browser stays signed in, so the link is only needed once per
 browser.</p></li>
 <li><p>Click the link. The app opens in a browser tab and recognises
-that the email is not on the auto-approved list. A confirmation message
-is displayed:</p>
+that the email is not yet approved. A confirmation message is
+displayed:</p>
 <blockquote>
 <p>Thanks: your request to access the AI translator (<a href="mailto:your.email@example.org" class="email">your.email@example.org</a>) has been forwarded to the
 administrator for approval. You’ll receive an email once approved.</p>

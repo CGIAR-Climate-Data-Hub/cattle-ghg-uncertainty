@@ -145,13 +145,13 @@ If your raw inventory data lives in your own Excel or CSV files with column name
 
 \begin{enumerate}
 \item Open the \textbf{Resources tab}. The "AI Translator" card is the first item below the user manual, with a green left-edge accent and a short intro paragraph explaining what it does.
-\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link (valid 15 minutes) by email. CGIAR addresses (\texttt{@cgiar.org}) are approved automatically; other addresses are reviewed manually by the administrator (typical turnaround: same day). The sign-in is then remembered indefinitely on this browser, once an email has been approved, it stays signed in. To sign out, clear the site data in your browser settings.
+\item \textbf{Sign in with your email.} Enter your email address; you'll receive a one-time sign-in link by email. Every address is reviewed by the administrator before it is approved, including CGIAR addresses, because each translation is billed to the project (typical turnaround: same working day). Approval is needed once. The sign-in is then remembered indefinitely on this browser. To sign out, clear the site data in your browser settings.
 
 \textit{Non-CGIAR email: exact step-by-step:}
 \begin{enumerate}
   \item Enter your email in the AI Translator card and click \textbf{Send sign-in link}.
   \item Within 1--2 minutes, an email arrives in your inbox from \texttt{noreply@cattle-uncertainty.app} with subject \textit{``Sign in to the IPCC Cattle GHG Uncertainty tool''}. Click the link inside (valid for 15 minutes).
-  \item The link opens the app and recognises that your email is not on the auto-approved list. You will see a green confirmation message: \textit{``Thanks, your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.''} At the same moment, the administrator receives a notification email about your request.
+  \item The link opens the app and recognises that your email is not yet approved. You will see a green confirmation message: \textit{``Thanks, your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.''} At the same moment, the administrator receives a notification email about your request.
   \item The administrator reviews the request and adds your email to the approved-users list. Typical turnaround is the same working day.
   \item Once approved, you receive a welcome email from the administrator confirming that you are now on the list. The email contains a direct link back to the app and a reminder of the workflow.
   \item Return to the AI Translator card, enter the same email address again, and click \textbf{Send sign-in link}. A fresh magic-link email arrives within 1--2 minutes.

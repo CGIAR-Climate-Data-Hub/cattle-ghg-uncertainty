@@ -573,8 +573,8 @@ lang_state_take <- function(token) {
   auth_signin_title = list(en = "Sign in to the AI translator",
                             fr = "Se connecter au traducteur IA"),
   auth_signin_body = list(
-    en = "Enter your email address. We will send you a one-time sign-in link. No password required. CGIAR email addresses are approved automatically; other addresses are reviewed manually by the administrator.",
-    fr = "Entrez votre adresse e-mail. Nous vous enverrons un lien de connexion à usage unique. Pas de mot de passe. Les adresses CGIAR sont approuvées automatiquement ; les autres sont examinées par l'administrateur."
+    en = "Enter your email address. We will send you a one-time sign-in link. No password required. Every address is reviewed by the administrator before it is approved, usually the same working day. You only need approval once.",
+    fr = "Entrez votre adresse e-mail. Nous vous enverrons un lien de connexion à usage unique. Pas de mot de passe. Chaque adresse est examinée par l'administrateur avant approbation, en général le jour ouvré même. L'approbation n'est nécessaire qu'une seule fois."
   ),
   btn_auth_send_link = list(en = "Send sign-in link",
                               fr = "Envoyer le lien de connexion"),

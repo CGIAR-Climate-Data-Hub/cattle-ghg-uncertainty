@@ -42,14 +42,17 @@ auth_read_approved_users <- function(path = "config/approved_users.csv") {
 
 # Decide whether a given email is approved.
 #  - listed explicitly in approved_users.csv -> TRUE
-#  - matches the @cgiar.org domain pattern    -> TRUE  (per the plan)
-#  - otherwise                                 -> FALSE
+#  - otherwise                                -> FALSE
+#
+# 2026-10-12: until now any address ending @cgiar.org was approved
+# automatically. That admitted every CGIAR address in the world, and each
+# translator call is billed to the project, so access is now by explicit
+# listing only. The CGIAR addresses that had been relying on the domain rule
+# are listed in config/approved_users.csv, so none of them lost access.
 auth_is_approved <- function(email,
                               whitelist = auth_read_approved_users()) {
   if (is.null(email) || !nzchar(email)) return(FALSE)
-  e <- tolower(trimws(email))
-  if (e %in% whitelist) return(TRUE)
-  grepl("@cgiar\\.org$", e, ignore.case = TRUE)
+  tolower(trimws(email)) %in% whitelist
 }
 
 # ----- Magic-link token store (file-backed) --------------------------------

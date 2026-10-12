@@ -83,16 +83,16 @@ Above the button sits a **quality preview**: the same checks the QA/QC tab will 
 
 The downloaded file follows the official template format exactly. After download, the user should open the file and skim the `data_source` column of the Parameters sheet to confirm that values from the source file are tagged `user_file`, IPCC catalogue values are tagged `ipcc_default`, and explicit zero values are tagged `biological_zero` or `placeholder`. This is the recommended spot-check for catching translation failures before the simulation runs.
 
-## Access for non-CGIAR email addresses
+## Getting access
 
-The translator is gated behind a magic-link sign-in flow. Emails ending in `@cgiar.org` are auto-approved; any other email requires one-time manual approval by the administrator. The full sequence for a non-CGIAR email is as follows.
+The translator is gated behind a magic-link sign-in flow. Every address requires one-time manual approval by the administrator, including CGIAR addresses. Each translation is billed to the project, so access is granted by name rather than by domain. Approval is needed once; after that the browser stays signed in. The full sequence is as follows.
 
 ### Initial request (first sign-in)
 
 1. Open the **Resources tab** of the Cattle Uncertainty App and locate the AI Translator card (the first item, identified by the green left-edge accent).
 2. Enter the email address into the sign-in field and click **Send sign-in link**.
 3. Within 1–2 minutes, an email arrives from `noreply@cattle-uncertainty.app` with subject "Sign in to the IPCC Cattle GHG Uncertainty tool". The link in it stays valid for 30 days and may be clicked more than once; after the first successful click the browser stays signed in, so the link is only needed once per browser.
-4. Click the link. The app opens in a browser tab and recognises that the email is not on the auto-approved list. A confirmation message is displayed:
+4. Click the link. The app opens in a browser tab and recognises that the email is not yet approved. A confirmation message is displayed:
 
     > Thanks: your request to access the AI translator (your.email@example.org) has been forwarded to the administrator for approval. You'll receive an email once approved.
 
