@@ -46,6 +46,20 @@ translator_chat_ui <- function() {
                           border-radius: 4px; font-size: 0.85rem; color: #5D4037;",
                  icon("circle-info"), " ", t("ai_fr_chat_note"))
       else NULL,
+      # Workshop hold. Every translation is billed to the project, and the
+      # review workshop needs the budget intact for its own sessions. The
+      # notice is dated so it removes itself the day after the workshop ends
+      # rather than becoming a stale banner nobody dares delete.
+      if (Sys.Date() <= .TRANSLATOR_HOLD_UNTIL)
+        tags$div(
+          style = "margin: 0 0 16px 0; padding: 12px 16px;
+                   background: #FFF7ED; border: 1px solid #FB923C;
+                   border-left: 4px solid #EA580C; border-radius: 6px;",
+          tags$div(style = "font-weight: 700; color: #9A3412; margin-bottom: 3px;",
+                   icon("triangle-exclamation"), " ", t("ai_hold_title")),
+          tags$div(style = "font-size: 0.9rem; color: #7C2D12; line-height: 1.5;",
+                   t("ai_hold_body")))
+      else NULL,
       uiOutput("translator_panel")
     )
   )
@@ -765,6 +779,10 @@ translator_chat_server <- function(input, output, session) {
 
     uiOutput("translator_last_error"))
 }
+
+# Date the workshop hold notice stops being shown. The review workshop runs
+# 14 to 16 October 2026; the notice clears itself the day after.
+.TRANSLATOR_HOLD_UNTIL <- as.Date("2026-10-16")
 
 # Cancellation flag for a running translator call.
 #

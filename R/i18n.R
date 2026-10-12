@@ -559,6 +559,15 @@ lang_state_take <- function(token) {
     en = "Read the confidence interval for each emission source and the ranking of influential inputs, then download the results in IPCC Table 3.3 format as Excel, CSV or Word.",
     fr = "Consultez l'intervalle de confiance de chaque source d'émission et le classement des paramètres influents, puis téléchargez les résultats au format du tableau 3.3 de l'IPCC, en Excel, CSV ou Word."),
 
+  # Workshop hold notice. Shown until 16 October 2026, then it retires
+  # itself (see .TRANSLATOR_HOLD_UNTIL in R/chat_ui.R).
+  ai_hold_title = list(
+    en = "Please hold until the review workshop, 14 to 16 October",
+    fr = "Merci d'attendre l'atelier de revue, du 14 au 16 octobre"),
+  ai_hold_body = list(
+    en = "Each translation is charged to the project, and the budget is reserved for the review workshop sessions. Please do not run translations before then unless it has been agreed with the project team. The rest of the tool is unaffected and can be used normally.",
+    fr = "Chaque traduction est facturée au projet, et le budget est réservé aux sessions de l'atelier de revue. Merci de ne pas lancer de traduction avant cette date, sauf accord préalable avec l'équipe projet. Le reste de l'outil n'est pas concerné et peut être utilisé normalement."),
+
   btn_open_ai_guide = list(en = "Open AI translator guide (PDF)",
                              fr = "Ouvrir le guide du traducteur IA (PDF)"),
 
