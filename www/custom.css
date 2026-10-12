@@ -208,3 +208,62 @@ h4.card-title { color: var(--primary); font-weight: 600; }
   .fb-fab { padding: 12px; border-radius: 50%; }
   .fb-fab .fb-label { display: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Video posters (home page overview, Resources walkthrough)
+   The thumbnail is the video's own title card. The play badge is what makes
+   a still image read as a video, so it lifts on hover together with the
+   image. Keyboard focus gets the same treatment as hover. Everything is
+   declared here rather than inline, because an inline style outranks a
+   class rule and would freeze the hover state.
+   --------------------------------------------------------------------------- */
+.video-poster {
+  flex: 0 0 auto;
+  display: block;
+  position: relative;
+  width: 280px;
+  max-width: 100%;
+  text-decoration: none;
+}
+.video-poster img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  border: 1px solid #E0DDD5;
+  border-radius: 10px;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+.video-poster:hover img,
+.video-poster:focus-visible img {
+  filter: brightness(1.04);
+  box-shadow: 0 4px 14px rgba(27, 67, 50, 0.22);
+}
+.video-poster-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(27, 67, 50, 0.88);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  padding-left: 4px;          /* optical centring of the play triangle */
+  pointer-events: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.video-poster:hover .video-poster-play,
+.video-poster:focus-visible .video-poster-play {
+  background: rgba(45, 106, 79, 0.96);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+.video-poster:focus-visible {
+  outline: 2px solid #2D6A4F;
+  outline-offset: 3px;
+  border-radius: 12px;
+}

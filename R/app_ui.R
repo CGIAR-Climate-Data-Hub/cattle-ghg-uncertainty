@@ -1054,15 +1054,19 @@ app_ui <- function(request = NULL) {
             style = "margin-top: 20px;",
             bslib::card_body(
               div(style = "display:flex; gap:20px; align-items:center; flex-wrap:wrap;",
+                # The video's own title card, so the reader sees what they
+                # are about to open. A play badge sits over it because a
+                # still image on its own does not read as a video.
                 tags$a(
                   href = .OVERVIEW_VIDEO_URL, target = "_blank",
                   rel = "noopener noreferrer",
-                  style = "flex:0 0 auto; text-decoration:none;",
-                  div(style = "width:132px; height:76px; border-radius:10px;
-                               background:#1B4332; color:#FFFFFF; display:flex;
-                               align-items:center; justify-content:center;
-                               font-size:2rem;",
-                      icon("circle-play"))),
+                  class = "video-poster",
+                  tags$img(
+                    src = "video_overview_thumb.jpg",
+                    alt = t("video_overview_title")),
+                  tags$span(
+                    class = "video-poster-play",
+                    icon("play"))),
                 div(style = "flex:1 1 320px; min-width:260px;",
                   h4(t("video_overview_title"), style = "margin:0 0 6px 0;"),
                   tags$p(t("video_overview_body"),
@@ -1235,17 +1239,6 @@ app_ui <- function(request = NULL) {
                 class = "btn btn-outline-success",
                 icon("book"), " ", t("btn_open_userguide")
               ),
-              # The walkthrough video, when one is configured. Same button
-              # row as the two documents, because it is the third way of
-              # answering the same question.
-              if (nzchar(.TUTORIAL_VIDEO_URL))
-                tags$a(
-                  href = .TUTORIAL_VIDEO_URL,
-                  target = "_blank",
-                  rel = "noopener noreferrer",
-                  class = "btn btn-outline-success",
-                  icon("circle-play"), " ", t("btn_open_video")
-                ) else NULL,
               # SEO round 2026-09: the project website is the canonical public
               # entry point (see the canonical link in the head block). Linking
               # it from here gives users who arrive straight at the app a route
@@ -1261,6 +1254,38 @@ app_ui <- function(request = NULL) {
             )
           )
         ),
+
+        # ---- Technical walkthrough video ------------------------------------
+        # 2026-10-12: the walkthrough used to be a fourth button in the row
+        # above. It is 23 minutes of material and the third route into the
+        # tool, so it is given its own card with the video's title card as
+        # the poster. video_full_title / video_full_body were written for
+        # this card and had no home until now.
+        if (nzchar(.TUTORIAL_VIDEO_URL))
+          bslib::card(
+            style = "margin-top: 20px;",
+            bslib::card_body(
+              div(style = "display:flex; gap:20px; align-items:center; flex-wrap:wrap;",
+                tags$a(
+                  href = .TUTORIAL_VIDEO_URL, target = "_blank",
+                  rel = "noopener noreferrer",
+                  class = "video-poster",
+                  tags$img(
+                    src = "video_walkthrough_thumb.jpg",
+                    alt = t("video_full_title")),
+                  tags$span(
+                    class = "video-poster-play",
+                    icon("play"))),
+                div(style = "flex:1 1 320px; min-width:260px;",
+                  h4(t("video_full_title"), style = "margin:0 0 6px 0;"),
+                  tags$p(t("video_full_body"),
+                         style = "margin:0 0 10px 0; color:#475569;
+                                  font-size:0.92rem;"),
+                  tags$a(href = .TUTORIAL_VIDEO_URL, target = "_blank",
+                         rel = "noopener noreferrer",
+                         class = "btn btn-success btn-sm",
+                         icon("circle-play"), " ", t("btn_open_video")))))) else NULL,
+
         # AI Translator kit: free, self-serve helper to turn the user's own
         # 2026-06: in-app AI translator. Backed by Lolita's OpenAI account
         # with a $10/month spending cap and gated by a magic-link login.
