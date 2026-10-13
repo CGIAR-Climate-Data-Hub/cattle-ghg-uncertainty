@@ -3696,14 +3696,21 @@ section_F <- function() {
               "Relative spread applied per row",
               "Per-MMS spreads carried, not dropped",
               "Distributions are the file's, not yours",
-              "One year column, used everywhere")
+              "One year column, used everywhere",
+              # 2026-10-13. A source with values but no ranges (the commonest
+              # national calculator) was silently given catalogue ranges and
+              # tagged user_file, so the finished file looked country-specific
+              # throughout. These three say the value and its range have
+              # separate provenance and the second has to be declared.
+              "Defaulted-uncertainty rule", "No-uncertainty-anywhere rule",
+              "Defaulted ranges declared", "C2. Missing ranges")
     miss[!vapply(miss, function(k) grepl(k, pr, fixed = TRUE), logical(1))]
   }, error = function(e) conditionMessage(e))
   f63_ok <- length(f63_fail) == 0L
   check_bool("F63", "F",
-             "The relative-spread, per-MMS-uncertainty and named-distribution rules are in the assembled system prompt",
+             "The relative-spread, per-MMS, named-distribution and uncertainty-provenance rules are in the assembled system prompt",
              f63_ok,
-             notes = if (f63_ok) "all three rules and all three self-checks present"
+             notes = if (f63_ok) "all named rules and self-checks present in the assembled prompt"
                      else paste("missing:", paste(f63_fail, collapse = ", ")))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/

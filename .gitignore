@@ -145,6 +145,9 @@ runtime/
 # count_ scripts are ad-hoc hand-debugging tools.
 claude_old/
 ZAM/
+# COL/ is the Colombian national calculator conversion (2026-09, regenerated
+# 2026-10-13). Real-country data, same rule as ZAM/.
+COL/
 AI_model_prices/
 analyze_structure.R
 analyze_zambia.R

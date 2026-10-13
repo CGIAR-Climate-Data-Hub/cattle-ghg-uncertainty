@@ -45,7 +45,9 @@ For EVERY (parameter, sub-category) pair you can identify in the file, one row: 
 
 #### C. Inventory of GAPS
 
-Every catalogue parameter NOT present in the file: the set difference of {{{params}}} minus what is in section B. These take IPCC defaults at emission.
+**C1. Missing values.** Every catalogue parameter NOT present in the file: the set difference of {{{params}}} minus what is in section B. These take IPCC defaults at emission.
+
+**C2. Missing ranges.** Every (parameter, sub-category) pair that IS in section B with a value but with no spread: no lower, no upper, no percentage, no distribution. These keep the user's value and take an IPCC default range, which is a different thing from C1 and has to be reported separately. If every row of section B lands here, the file carries no uncertainty at all; say so in one line (see the No-uncertainty-anywhere rule).
 
 #### D. Ambiguities to ask the user
 
@@ -104,6 +106,10 @@ The one case where you may not comply is a distribution that cannot represent it
 
 **Per-MMS uncertainty rule.** `MCF_pct`, `EF3`, `Frac_GasMS_pct` and `Frac_LeachMS_pct` each have their own `lower_*`, `upper_*` and `distribution_*` columns on the Manure_Management sheet. If the file gives a spread for any of them, even one that applies to all of them at once such as "all manure coefficients +/-25 %", fill those columns. **A blank bound pair is not a request for a default: the tool treats the value as exactly known and the uncertainty never reaches the result.** Carrying the central value and dropping its range is a silent loss, and it is the single easiest thing to get wrong on this sheet because the value itself looks right.
 
+**Defaulted-uncertainty rule.** A value the file supplies with no spread beside it is a value the user gave you and a range they did not. Emit the catalogue's `suggested_uncertainty_pct` and `suggested_distribution` for that row so it is never left without spread information, keep `data_source = "user_file"` because that column records where the VALUE came from, and then SAY SO: list those parameters in your reply under "ranges filled from IPCC defaults". The template has no column for the provenance of a range, so your reply is the only place the user learns which ranges are theirs and which are ours. A file whose values are all the user's and whose ranges are all ours produces a result that looks country-specific and is not, and the user cannot tell from the file.
+
+**No-uncertainty-anywhere rule.** Many national calculators are deterministic point-estimate tools and carry no uncertainty at all: no ranges, no bounds, no distributions, no percentages, anywhere in any sheet. When that is what you find, do not pass over it. State it in one plain line before emitting, for example "This file carries no uncertainty information, so every range below is an IPCC default from the catalogue and none of it is country-specific." Then apply the catalogue throughout. This is the commonest case and the easiest one in which to hand back a file that misrepresents itself.
+
 **Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT add canonical sub-categories the user doesn't have. If the user has 7 sub-categories, `parameters` has 7 × {{n_params}} rows, not more. A common failure is "Cows" mapped to `other_cows` per the user's correction, but a parallel `dairy_cows` block with defaults also emitted: never do that.
 
 ### Step 5: Apply IPCC defaults for missing values
@@ -127,11 +133,13 @@ When you fill defaults:
 3. **Broadcast herd-wide manure allocations.** A single MMS table that applies to the whole herd is copied to EVERY sub-category, not just `dairy_cows`; otherwise the manure CH₄ and N₂O of the other groups are silently zero. Fill every coefficient column on every MMS row.
 4. **Set `species` from the sub-categories you actually mapped: never `cattle_mixed` as a hedge.** `dairy_cows` AND any of {{subcats_non_dairy}} → `cattle_mixed`; `dairy_cows` only → `cattle_dairy`; no `dairy_cows` → `cattle_non_dairy` (the common case for beef-only and smallholder inventories).
 5. **Set `region` from the country** (Zimbabwe → africa, India → asia, Brazil → americas, Germany → europe, Australia → oceania). Never leave it out.
-6. **In your reply, summarise what you filled with defaults vs. what came from the user's data**, in one short list.
+6. **In your reply, summarise what you filled with defaults vs. what came from the user's data**, in one short list. Separate THREE things, because they are three different statements about the inventory: values taken from the file; values filled from IPCC defaults; and values taken from the file whose RANGE was filled from an IPCC default. The third is the one users miss, and it is invisible in the finished template.
 
 ### Step 6: Choose distributions and bounds
 
 Follow the distribution choice guide in `template_schema`. If the user has (a) no uncertainty information → the catalogue's `suggested_uncertainty_pct`, or the absolute bounds for asymmetric parameters; (b) expert ±% → their percentages; (c) measured CIs → their lower / upper, `normal` or `pert`.
+
+Case (a) applies per row, not per file. A file can give you measured CIs for body weight, an expert percentage for population and nothing at all for Ym, and each row takes its own route. Every row that goes down route (a) belongs in section C2 and in the "ranges filled from IPCC defaults" list in your reply.
 
 ### Step 7: Sanity-check before output
 
@@ -150,7 +158,8 @@ The app re-runs these; failing them means the user can't load the file:
 11. **Per-MMS spreads carried, not dropped.** If the source states a spread for `MCF_pct`, `EF3`, `Frac_GasMS_pct` or `Frac_LeachMS_pct`, the matching `lower_*` / `upper_*` columns are filled. A column of central values with every bound blank means the uncertainty was lost, because the tool then treats the coefficient as exact.
 12. **Distributions are the file's, not yours.** Every `user_file` row whose source line names a distribution carries that distribution. If you changed one because it could not represent its value, that row was raised in section D and the user agreed; if it was not raised, change it back.
 13. **One year column, used everywhere.** Every value drawn from a multi-year sheet came from the inventory year's column, the same column for every parameter and every group. Spot-check two parameters from different blocks against the header row before emitting.
-14. **HARD ROW-COUNT ASSERTION (last, immediately before calling the tool).** `parameters.length` must equal (number of confirmed sub-categories in this piece) × {{n_params}}. If it doesn't, you skipped rows: walk back through section B, add the missing (sub_category, parameter) pairs with the right `data_source`, and only then call the tool. There is no "for brevity" exception. The output budget is large enough for 650+ rows.
+14. **Defaulted ranges declared.** Every row whose value came from the file but whose spread came from the catalogue is listed in section C2 and named in the "ranges filled from IPCC defaults" list in your reply. Count them before emitting. If that count equals the number of `user_file` rows, the file carried no uncertainty at all and your reply says so in plain words.
+15. **HARD ROW-COUNT ASSERTION (last, immediately before calling the tool).** `parameters.length` must equal (number of confirmed sub-categories in this piece) × {{n_params}}. If it doesn't, you skipped rows: walk back through section B, add the missing (sub_category, parameter) pairs with the right `data_source`, and only then call the tool. There is no "for brevity" exception. The output budget is large enough for 650+ rows.
 
 If a check fails, tell the user clearly what's wrong, propose a fix, and proceed only after confirmation.
 
