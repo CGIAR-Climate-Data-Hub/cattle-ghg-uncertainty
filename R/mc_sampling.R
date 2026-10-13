@@ -356,7 +356,7 @@ sample_per_mms_param <- function(mms_rows, value_col, lower_col, upper_col,
 # to come back, the previous `sample_dirichlet_simplex` implementation lives
 # in git history at commit 4191b73.
 
-# Structural-defaults preset correlation matrix (expert-elicited, NOT IPCC-published).
+# Structural-defaults preset correlation matrix (literature-based, NOT IPCC-published).
 # Renamed 2026-05 from "IPCC-guidance preset" after the statistical audit: IPCC V1
 # Ch3 / V4 Ch10 publish no numerical correlation values for any livestock parameter.
 # These pairs reflect documented biological / statistical relationships from the
@@ -384,6 +384,21 @@ sample_per_mms_param <- function(mms_rows, value_col, lower_col, upper_col,
 #     trajectory that already lowered this from 0.60 -> 0.30); added two
 #     cross-group biological linkages Andreas flagged as real (Milk-BW and
 #     Milk-DE, both +0.30).
+#   - 2026-10 (evidence run): label changed from "expert-elicited" to
+#     "literature-based"; DE-CP lowered 0.50 -> 0.20 and DE-Ym lowered
+#     -0.50 -> -0.20. Basis: INRAE-CIRAD-AFZ 2018 tables (193 plant feed
+#     materials, energy digestibility vs CP r = -0.07); Feedipedia forages
+#     (a strong r appears only among equation-estimated digestibilities);
+#     IPCC 2019 Table 10.12 implies r ~ 0 under the Country X ranges; Ramin &
+#     Huhtanen 2013 (J Dairy Sci 96:2476-2493) gives a positive DE-Ym link on
+#     forage diets. The other five values are unchanged, but all seven source
+#     strings (the heatmap hover text) were rewritten the same day to give the
+#     biological reason and verified references only: removed Eq 10.3 (the BW/MW equation is Eq 10.6),
+#     "Stallings & Knowlton 2013" (not found), Wilmink 1987 / VandeHaar 1998
+#     (not correlation sources), the "NRC 2001 joint regression" coefficient
+#     (does not exist) and Brody 1945 (not used by IPCC); added the checked
+#     sources (Mehrban et al. 2021; Boujenane 2002; Nistor et al. 2011; Berry &
+#     Evans 2022; Johnson & Johnson 1995; IPCC 2019 Tables 10A.1 and 10A.2).
 PRESET_PAIRS <- list(
   # 2026-06: lowered from 0.85 to 0.50. In practice MW is taken from a breed
   # reference table (essentially constant per breed) while BW comes from the
@@ -392,33 +407,43 @@ PRESET_PAIRS <- list(
   # typical mixed-source case; users with same-source data can override via
   # the manual matrix mode.
   list(a = "BW",   b = "MW",          rho =  0.50,
-       source = "Growth-curve relation (Brody 1945) reused in IPCC Eq 10.3. Set to 0.5 rather than 0.85: 0.85 assumes BW and MW come from the same survey; in practice MW is usually a breed-reference constant while BW is from the national livestock census, so the cross-source correlation is closer to 0.5."),
+       source = "Live weight and mature weight enter the IPCC net-energy-for-growth equation together, and animals of larger breeds are heavier at every age and have a larger mature weight. Refs: IPCC 2006 Guidelines Vol. 4 Ch. 10, Eq 10.6; IPCC 2019 Refinement Vol. 4 Ch. 10, Table 10A.2."),
   # 2026-06: kept at 0.40 but the source comment now flags the sign ambiguity
   # so reviewers don't read it as settled.
   list(a = "BW",   b = "WG",          rho =  0.40,
-       source = "IPCC Eq 10.6 (NEg scales with BW^0.75 x WG^1.097); joint regression estimation correlation, NRC 2001. Note the sign is system-dependent: heavy growing animals gain slower (negative), while well-fed adults are both heavier and gain more (positive). +0.40 reflects the well-fed-adult case typical of dairy/beef finishing systems; growing-young-stock systems may warrant a negative override."),
+       source = "Live weight and daily gain enter the IPCC net-energy-for-growth equation together, and well-fed animals are both heavier and gain faster; the sign can reverse for young stock approaching mature size. Refs: IPCC 2006 Guidelines Vol. 4 Ch. 10, Eq 10.6; Mehrban et al. 2021, Animal Bioscience 34:824-832; IPCC 2019 Refinement Vol. 4 Ch. 10, Table 10A.2."),
   list(a = "Milk", b = "Fat",         rho = -0.30,
-       source = "Milk dilution effect, dairy genetics literature (Wilmink 1987; VandeHaar 1998). Within-herd literature -0.20 to -0.40; 0.30 is the midpoint."),
+       source = "Dilution effect: as milk yield rises, fat yield rises less than proportionally, so the fat percentage falls. Refs: Boujenane 2002, Rev. Elev. Med. Vet. Pays Trop. 55:63; Nistor et al. 2011, Sci. Pap. Anim. Sci. Biotechnol. 44:316; IPCC 2019 Refinement Vol. 4 Ch. 10, Table 10A.1."),
   # 2026-06 ADDED (Andreas review): Milk-BW. High-producing cows are larger;
   # Holstein vs Jersey illustrate the linkage (~650 kg vs ~450 kg, ~30 vs ~20
   # kg milk/day). This is one of the "real biological linkages cutting across
   # the old population/intake groups" Andreas highlighted.
   list(a = "Milk", b = "BW",          rho =  0.30,
-       source = "High-producing dairy breeds are physically larger (Holstein ~650 kg ~30 kg milk/d vs Jersey ~450 kg ~20 kg milk/d). NRC Dairy 2001; Stallings & Knowlton 2013. Included as a real cross-group biological linkage."),
+       source = "Larger dairy breeds and more intensive systems have both heavier cows and higher milk yields; within one breed the link is weak. Refs: IPCC 2019 Refinement Vol. 4 Ch. 10, Table 10A.1; Berry & Evans 2022, JDS Communications 3:32-37; Berry et al. 2003, J. Dairy Sci. 86:2193-2204."),
   # 2026-06 ADDED (Andreas review): Milk-DE. Higher feed digestibility lifts
   # nutrient availability and so milk yield, especially in concentrate-fed
   # dairy systems. Andreas' second flagged linkage.
   list(a = "Milk", b = "DE",          rho =  0.30,
-       source = "Higher digestibility → more nutrient availability → higher milk yield, especially in concentrate-fed dairy. NRC Dairy 2001 Ch.2. Included as a real cross-group biological linkage."),
-  list(a = "DE",   b = "CP",          rho =  0.50,
-       source = "Forage-quality co-variation across feed types (NRC 2001; INRA; Feedipedia). High-quality forages have both high DE and high CP; cross-feedstuff correlations 0.4-0.7."),
-  # 2026-05 audit re-review: strengthened from -0.40 to -0.50. IPCC 2019
-  # Refinement Eq 10.21 makes Ym an explicit decreasing function of DE
-  # (with NDF, EE). Observational meta-analyses (Niu et al. 2018 Global
-  # Change Biology; Hristov et al. 2013) show a stronger negative cross-
-  # diet correlation than -0.40, closer to the equation slope.
-  list(a = "DE",   b = "Ym",          rho = -0.50,
-       source = "IPCC 2019 Refinement Eq 10.21 (Ym decreases with DE) + meta-analysis (Niu et al. 2018 GCB; Hristov et al. 2013). Set to -0.50 rather than -0.40 to align with the observed cross-diet slope.")
+       source = "More digestible feed gives more net energy per kg of feed and supports higher milk yield. Refs: NRC 2001, Nutrient Requirements of Dairy Cattle, Ch. 2 (Energy); IPCC 2019 Refinement Vol. 4 Ch. 10, Table 10A.1."),
+  # 2026-10: lowered from 0.50 to 0.20. The "0.4-0.7 cross-feedstuff" claim
+  # could not be found in NRC 2001, INRA or Feedipedia. Across feeds the
+  # measured link is weak (INRAE-CIRAD-AFZ 2018 tables, 193 plant feed
+  # materials: r = -0.07; Feedipedia forages: r = 0.1-0.25 once equation-
+  # estimated digestibilities are excluded). Within one forage along maturity
+  # it is real (dehydrated alfalfa grades: energy digestibility 57 -> 64 % as
+  # CP goes 15 -> 26 %), which is what 0.20 keeps.
+  list(a = "DE",   b = "CP",          rho =  0.20,
+       source = "Within one forage, digestibility and crude protein fall together as the plant matures; across different feeds the link is weak because protein and digestibility depend on different things (plant family, plant part, processing). Refs: INRAE-CIRAD-AFZ feed tables 2018 (feedtables.com); Feedipedia (INRAE-CIRAD-AFZ-FAO)."),
+  # 2026-05 audit re-review: strengthened from -0.40 to -0.50, citing Eq 10.21
+  # (which is the EF equation; the Ym-DE relation is Table 10.12).
+  # 2026-10: lowered to -0.20 and documented as system-dependent. Under the
+  # Country X ranges (DE 51 % +-15 %, Ym 6.5 % +-20 %) the Table 10.12 steps
+  # imply r ~ 0 (DE rarely crosses 62 %) and a straight line through the
+  # table -0.32; the measured-data equation of Ramin & Huhtanen 2013 (J Dairy
+  # Sci 96:2476-2493; 298 diets) gives a positive link on forage diets (+0.45
+  # implied). Niu et al. 2018 does not use digestibility as a predictor.
+  list(a = "DE",   b = "Ym",          rho = -0.20,
+       source = "IPCC Table 10.12 assigns a lower methane conversion factor to more digestible diets, mainly because high digestibility goes with high feeding level and grain-rich rations, which shift rumen fermentation and speed up passage; within forage-based diets, methane per unit of energy changes little with digestibility or rises slightly. Refs: IPCC 2019 Refinement Vol. 4 Ch. 10, Table 10.12; Ramin & Huhtanen 2013, J. Dairy Sci. 96:2476-2493; Johnson & Johnson 1995, J. Anim. Sci. 73:2483-2492.")
   # 2026-06: Milk-pct_pregnant was dropped. Sign is ambiguous: per-cow genetic
   # studies show high milk yield <-> reduced fertility (negative); per-herd
   # management gives the opposite (positive: well-run dairies have both high

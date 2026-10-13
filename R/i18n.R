@@ -913,8 +913,8 @@ lang_state_take <- function(token) {
     en = "No time series, but you want to capture well-known biological linkages (BW ↔ MW, Milk ↔ Fat, DE ↔ Ym, …)? → ",
     fr = "Pas de séries temporelles, mais vous voulez capturer des liens biologiques bien connus (BW ↔ MW, Milk ↔ Fat, DE ↔ Ym, …) ? → "
   ),
-  info_corr_q2_ans = list(en = "Structural defaults (expert-elicited)",
-                            fr = "Valeurs structurelles par défaut (jugement d'expert)"),
+  info_corr_q2_ans = list(en = "Structural defaults (literature-based)",
+                            fr = "Valeurs structurelles par défaut (fondées sur la littérature)"),
   info_corr_q3 = list(en = "You have your own correlation matrix from a study or expert elicitation? → ",
                         fr = "Vous avez votre propre matrice de corrélation à partir d'une étude ou d'un jugement d'expert ? → "),
   info_corr_q3_ans = list(en = "Advanced: manual entry",
@@ -937,8 +937,8 @@ lang_state_take <- function(token) {
     en = " sheet in your upload, the tool can learn the relationships from your own data. If not, pick a preset or skip.",
     fr = " dans votre téléversement, l'outil peut apprendre les relations à partir de vos propres données. Sinon, choisissez un préréglage ou ignorez."
   ),
-  info_struct_defaults_label = list(en = "Structural defaults (expert-elicited):",
-                                       fr = "Valeurs structurelles par défaut (jugement d'expert) :"),
+  info_struct_defaults_label = list(en = "Structural defaults (literature-based):",
+                                       fr = "Valeurs structurelles par défaut (fondées sur la littérature) :"),
   info_struct_defaults_body = list(
     en = "applies a sparse correlation matrix with seven well-documented structural pairs (BW ↔ MW, BW ↔ WG, Milk ↔ Fat, Milk ↔ BW, Milk ↔ DE, DE ↔ CP, DE ↔ Ym).",
     fr = "applique une matrice de corrélation creuse avec sept paires structurelles bien documentées (BW ↔ MW, BW ↔ WG, Milk ↔ Fat, Milk ↔ BW, Milk ↔ DE, DE ↔ CP, DE ↔ Ym)."
@@ -1628,8 +1628,8 @@ lang_state_take <- function(token) {
 
   corr_mode_none = list(en = "No correlations (default)",
                           fr = "Pas de corrélations (par défaut)"),
-  corr_mode_preset = list(en = "Structural defaults (expert-elicited)",
-                            fr = "Valeurs structurelles par défaut (jugement d'expert)"),
+  corr_mode_preset = list(en = "Structural defaults (literature-based)",
+                            fr = "Valeurs structurelles par défaut (fondées sur la littérature)"),
   corr_mode_ts = list(en = "From template (auto, time-series)",
                        fr = "Depuis le modèle (auto, séries temporelles)"),
   corr_mode_manual = list(en = "Advanced: manual matrix entry",

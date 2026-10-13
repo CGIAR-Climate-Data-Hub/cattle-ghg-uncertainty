@@ -1104,8 +1104,9 @@ app_server <- function(input, output, session) {
   # T4.1 / Round 7 R1.15: structural-defaults preset, sparse matrix with documented
   # structural pairs only. Renamed 2026-05 from "IPCC-guidance preset" after the
   # statistical audit: the IPCC publishes no numerical correlation values; this
-  # preset is expert-elicited from biological / statistical relationships in the
-  # IPCC equations and the livestock literature. After Round 7 the preset operates
+  # preset is literature-based: values set from biological / statistical
+  # relationships in the IPCC equations and the livestock literature (2026-10
+  # evidence run: DE-CP 0.20, DE-Ym -0.20; label "literature-based"). After Round 7 the preset operates
   # on the **unified** set of all parameter names (AD + coefficients) so within-
   # coefficient pairs like BW <-> MW (now both coefficients post-R1.6) flow
   # correctly. The previous cross-block N <-> BW pair was dropped in the 2026-05
@@ -1125,7 +1126,7 @@ app_server <- function(input, output, session) {
       }
       rv$corr_matrix <- preset
       showNotification(
-        sprintf("Loaded structural-defaults preset (%d parameters). Includes Milk↔BW and Milk↔DE (+0.30 each), BW↔MW at 0.50, and DE↔Ym at -0.50; Milk↔pct_pregnant and Cfi↔Ca are intentionally excluded.",
+        sprintf("Loaded structural-defaults preset (%d parameters). Includes Milk↔BW and Milk↔DE (+0.30 each), BW↔MW at 0.50, DE↔CP at +0.20 and DE↔Ym at -0.20; Milk↔pct_pregnant and Cfi↔Ca are intentionally excluded.",
                 nrow(preset)),
         type = "message", duration = 6)
     } else if (input$corr_mode == "timeseries") {
