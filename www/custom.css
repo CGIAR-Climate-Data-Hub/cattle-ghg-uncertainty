@@ -161,14 +161,15 @@ body { background: var(--bg); color: var(--text); }
 
 .validation-ok { color: #2D6A4F; font-weight: 600; }
 .validation-error { color: var(--danger); font-weight: 600; }
-/* Loaded, but something needs acting on before running. Amber, not red:
-   the upload succeeded. */
+/* The file loaded, but it will not run as it stands. Red: the user has to
+   act on this before going further, and amber was not loud enough for
+   something that otherwise surfaces as a dead session twenty minutes on. */
 .validation-warn {
-  color: #92400E;
+  color: var(--danger);
   font-weight: 600;
-  background: #FFFBEB;
-  border: 1px solid #F59E0B;
-  border-left: 4px solid #D97706;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-left: 4px solid var(--danger);
   border-radius: 6px;
   padding: 10px 14px;
   display: block;

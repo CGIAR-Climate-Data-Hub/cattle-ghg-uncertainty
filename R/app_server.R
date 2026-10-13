@@ -329,10 +329,11 @@ app_server <- function(input, output, session) {
                              paste0("WARNING: ", size_warn, "\n"))
 
       showNotification(msg, type = "message", duration = 6)
-      # Sticky: the user has to dismiss it, because the cost of missing it is
-      # a failed run twenty minutes later.
+      # Sticky and red. The cost of missing it is a failed run twenty minutes
+      # later, so "error" is used for the colour even though the upload
+      # itself succeeded.
       if (!is.null(size_warn))
-        showNotification(size_warn, type = "warning", duration = NULL)
+        showNotification(size_warn, type = "error", duration = NULL)
 
       if (length(parsed$warnings) > 0) {
         showNotification(paste("Upload warnings:",
