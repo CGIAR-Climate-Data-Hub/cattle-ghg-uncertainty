@@ -559,7 +559,7 @@ Two things to expect. First, the reported margin of error will usually be \textb
 
 \begin{itemize}
   \item Do you have $\ge$ 5 years of national time-series data in your upload? $\rightarrow$ \textbf{From template (auto, time-series)}.
-  \item No time series, but you want to capture well-known biological linkages (BW $\leftrightarrow$ MW, Milk $\leftrightarrow$ Fat, DE $\leftrightarrow$ Ym, …)? $\rightarrow$ \textbf{Structural defaults (expert-elicited)}. This is the recommended pick for single-year inventories without historical data.
+  \item No time series, but you want to capture well-known biological linkages (BW $\leftrightarrow$ MW, Milk $\leftrightarrow$ Fat, DE $\leftrightarrow$ Ym, …)? $\rightarrow$ \textbf{Structural defaults (literature-based)}. This is the recommended pick for single-year inventories without historical data.
   \item You have your own correlation matrix from a study or expert elicitation? $\rightarrow$ \textbf{Advanced: manual entry}.
   \item None of the above? $\rightarrow$ leave \textbf{No correlations} (the default; conservative and defensible).
 \end{itemize}
@@ -572,7 +572,7 @@ The central emission estimate is essentially unchanged regardless of which mode 
 
 \begin{itemize}
   \item \textbf{No correlations} $\rightarrow$ the baseline. All parameters drawn independently.
-  \item \textbf{Structural defaults} $\rightarrow$ widens the 95\% uncertainty interval by roughly \textbf{3 to 10\%}. Most of this comes from the DE $\leftrightarrow$ Ym pair (the only cross-block link in the preset, also the strongest at $\rho = -0.5$). The effect is intentionally modest because the preset only links 7 pairs out of $\sim$78 possible across the IPCC equation chain.
+  \item \textbf{Structural defaults} $\rightarrow$ changes the 95\% uncertainty interval by \textbf{about one percentage point or less} on the built-in examples (Country X 25.3\% $\rightarrow$ 25.2\%; Country Y 36.5\% $\rightarrow$ 37.5\%). The effect is modest because the preset links only 7 pairs out of $\sim$78 possible, with values between 0.20 and 0.50 in absolute terms. Strong correlations on wide inputs, entered through the manual matrix, move the interval much more.
   \item \textbf{From template (auto, time-series)} $\rightarrow$ varies with the data. A rich, varied historical series (multiple parameters genuinely co-moving year-on-year) can produce effects similar to or larger than the structural defaults. A sparse or mostly static series will produce a much smaller effect because the matrix collapses to near-identity once constant columns are dropped.
   \item \textbf{Advanced: manual entry} $\rightarrow$ entirely depends on what you upload. Strong correlations on parameters with wide uncertainty bounds can move the interval by 20\% or more (in either direction).
   \item \textbf{Block-structured EF correlation} (right-hand card) at $\rho = 0.3$ on one block $\rightarrow$ a further few-percent widening on top of any activity-data correlation. At $\rho = 0.5$ (the slider maximum), roughly double that.
@@ -612,28 +612,30 @@ If you prefer to specify correlations manually:
 
 \textit{Missing parameters are assumed to have zero correlation.} If your uploaded matrix omits a parameter that the simulation uses (for example, you upload a small matrix covering only the parameters you want correlated), every pair involving the omitted parameter is treated as independent: the simulation runs and uses the correlations you did provide, but it does not invent values for the missing ones. Equivalent rule for header typos: a misspelled row/column name is treated the same as a missing parameter, so the correlation simply does not take effect. This is intentional graceful degradation, not an error, so the easiest way to verify your matrix is being used as you expect is to use the downloadable templates above (which ship with all canonical names already in place).
 
-## Structural defaults (expert-elicited)
+## Structural defaults (literature-based)
 
-A built-in preset of structural defaults is available. It applies the following well-documented pairs, drawn from the IPCC equations and the livestock literature. \textit{These values are expert-elicited; the IPCC publishes no numerical correlation coefficients for these pairs.} Hover any non-zero cell in the heatmap for the per-pair source citation.
+A built-in preset of structural defaults is available. It applies the seven pairs below, drawn from the IPCC equations and the livestock literature. \textit{The values are literature-based: the direction of each link comes from the IPCC equations and published studies, and the size was set by the project team from the evidence listed; the IPCC publishes no numerical correlation coefficients for these pairs.} Hover any non-zero cell in the heatmap for the per-pair source.
 
 \begin{center}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{llrp{7cm}}
+{\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{llrp{8.6cm}}
 \toprule
-\textbf{Parameter A} & \textbf{Parameter B} & \textbf{$\rho$} & \textbf{Source} \\
+\textbf{Parameter A} & \textbf{Parameter B} & \textbf{$\rho$} & \textbf{Biological reason and references} \\
 \midrule
-BW   & MW   & $+0.50$ & Growth-curve relation (Brody 1945); IPCC Eq 10.3. Set to $0.5$ rather than $0.85$ to reflect that BW comes from measured data while MW is usually a breed reference: different sources, so the cross-source correlation is closer to $0.5$ than $0.85$. \\
-BW   & WG   & $+0.40$ & IPCC Eq 10.6 joint estimation (NRC 2001 energy-balance studies, published range $0.30$--$0.50$). Sign is system-dependent; $+0.40$ reflects well-fed adult dairy/beef systems. \\
-Milk & Fat  & $-0.30$ & Milk dilution effect, dairy genetics literature (Wilmink 1987; VandeHaar 1998); within-herd literature $-0.20$ to $-0.40$. \\
-Milk & BW   & $+0.30$ & High-producing dairy breeds are physically larger (Holstein $\sim$650 kg \& $\sim$30 kg milk/day vs Jersey $\sim$450 kg \& $\sim$20 kg). NRC Dairy 2001; Stallings \& Knowlton 2013. \\
-Milk & DE   & $+0.30$ & Higher feed digestibility $\Rightarrow$ more nutrient availability $\Rightarrow$ higher milk yield, especially in concentrate-fed dairy. NRC Dairy 2001 Ch.2. \\
-DE   & CP   & $+0.50$ & Forage-quality co-variation across feed types (NRC 2001; INRA; Feedipedia). \\
-DE   & Ym   & $-0.50$ & IPCC 2019 Refinement Eq 10.21 (Ym decreases with DE) + meta-analysis (Niu et al. 2018 GCB; Hristov et al. 2013). The only cross-block (activity-data $\leftrightarrow$ coefficient) pair, and the dominant mover on the headline. \\
+BW   & MW   & $+0.50$ & Live weight and mature weight enter the IPCC net-energy-for-growth equation together, and animals of larger breeds are heavier at every age and have a larger mature weight. Set below the same-survey value because MW is usually a breed-reference constant while BW comes from the census. IPCC 2006 Eq 10.6; IPCC 2019 Table 10A.2. \\
+BW   & WG   & $+0.40$ & Live weight and daily gain enter the same equation, and well-fed animals are both heavier and gain faster; the sign can reverse for young stock approaching mature size. IPCC 2006 Eq 10.6; Mehrban et al. 2021 (Animal Bioscience 34:824--832); IPCC 2019 Table 10A.2. \\
+Milk & Fat  & $-0.30$ & Dilution effect: as milk yield rises, fat yield rises less than proportionally, so the fat percentage falls. Boujenane 2002 (Rev. Elev. Med. Vet. Pays Trop. 55:63); Nistor et al. 2011 (Sci. Pap. Anim. Sci. Biotechnol. 44:316); IPCC 2019 Table 10A.1. \\
+Milk & BW   & $+0.30$ & Larger dairy breeds and more intensive systems have both heavier cows and higher milk yields; within one breed the link is weak. IPCC 2019 Table 10A.1; Berry and Evans 2022 (JDS Communications 3:32--37); Berry et al. 2003 (J. Dairy Sci. 86:2193--2204). \\
+Milk & DE   & $+0.30$ & More digestible feed gives more net energy per kg of feed and supports higher milk yield. NRC 2001 Ch. 2 (Energy); IPCC 2019 Table 10A.1. \\
+DE   & CP   & $+0.20$ & Within one forage, digestibility and crude protein fall together as the plant matures; across different feeds the link is weak because protein and digestibility depend on different things (plant family, plant part, processing). INRAE-CIRAD-AFZ feed tables 2018 (feedtables.com); Feedipedia. \\
+DE   & Ym   & $-0.20$ & IPCC Table 10.12 assigns a lower Ym to more digestible diets, mainly because high digestibility goes with high feeding level and grain-rich rations; within forage-based diets, methane per unit of energy changes little with digestibility or rises slightly. IPCC 2019 Table 10.12; Ramin and Huhtanen 2013 (J. Dairy Sci. 96:2476--2493); Johnson and Johnson 1995 (J. Anim. Sci. 73:2483--2492). \\
 \bottomrule
 \end{tabular}
+}
 \end{center}
 
-All other pairs are set to zero.
+All other pairs are set to zero. Four of the values can reasonably be changed through the manual matrix when you know your situation: BW $\leftrightarrow$ MW $0.8$--$0.9$ when both weights come from the same survey; Milk $\leftrightarrow$ BW $0.10$--$0.20$ for a single-breed herd; DE $\leftrightarrow$ CP $0.3$--$0.5$ when your feed-quality uncertainty is mainly about forage maturity; DE $\leftrightarrow$ Ym $-0.3$ to $-0.5$ for high-grain dairy or feedlot systems.
 
 ## Coefficient (emission factor) correlations
 

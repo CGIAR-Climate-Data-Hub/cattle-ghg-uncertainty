@@ -109,11 +109,11 @@ The right-hand cloud tilts downward, but the lopsided shape of each marginal axi
 
 ## Implications for the IPCC equations
 
-Several pairs of IPCC Tier 2 input parameters are biologically correlated. The most pronounced is between digestible energy (`DE`) and the methane conversion factor `Ym`: when feed quality rises (higher `DE`), less of the ingested energy is lost as methane (lower `Ym`); when feed quality falls, `Ym` rises. The two parameters enter the enteric-CH~4~ equation as a product, so the joint behaviour of `DE × Ym` directly shapes the emissions distribution.
+Several pairs of IPCC Tier 2 input parameters are biologically correlated. A familiar example is the link between digestible energy (`DE`) and the methane conversion factor `Ym`: the IPCC 2019 Refinement (Table 10.12) assigns a lower `Ym` to more digestible diets. The two parameters enter the enteric-CH~4~ equation as a product, so the joint behaviour of `DE × Ym` directly shapes the emissions distribution.
 
 When `DE` and `Ym` are sampled independently, a non-trivial share of Monte Carlo iterations falls on combinations that are not biologically plausible: for example, very high `DE` paired with very high `Ym`. The product is then artificially inflated in those iterations, widening the right tail of the resulting CH~4~ distribution.
 
-Imposing ρ = −0.5 between `DE` and `Ym` excludes the implausible combinations and changes the shape of the product distribution as follows:
+For illustration, imposing a strong negative correlation (ρ = −0.5) between `DE` and `Ym` excludes the implausible combinations and changes the shape of the product distribution as follows (the preset itself uses −0.20 for this pair, see the seven pairs below):
 
 ```{r fig-de-ym-product, fig.width = 8, fig.height = 3.6, fig.alt = "Two histograms showing the DE x Ym product under independence and under negative correlation"}
 set.seed(31)
@@ -171,7 +171,7 @@ knitr::kable(
 )
 ```
 
-The mean total CO~2~eq is constant across the four modes to within Monte Carlo sampling noise. The 95% margin of error shifts by approximately two percentage points when the structural-defaults preset is applied. Most of this shift is attributable to the `DE ↔ Ym` pair, which has the largest magnitude (ρ = −0.50) among the seven preset correlations; the remaining six pairs contribute smaller, partially-cancelling effects.
+The mean total CO~2~eq is constant across the four modes to within Monte Carlo sampling noise. The 95% margin of error changes by about one percentage point or less when the structural-defaults preset is applied: the seven pairs are moderate (0.20 to 0.50 in absolute value), pull in different directions, and partially cancel.
 
 The same comparison can be reproduced directly on a user-supplied inventory: enabling the "Compare with/without correlations" option on the Simulate tab produces a side-by-side bar chart of the 95% margin of error with the selected correlation mode (green bars) and with all correlations disabled (grey bars).
 
@@ -194,7 +194,7 @@ knitr::kable(
 )
 ```
 
-The `DE ↔ Ym` correlation operates the same way in Country Y as in Country X. The absolute margins of error are wider here across all four modes because each individual parameter has wider uncertainty bounds in a less-surveyed pastoral system. The relative effect of switching correlations on: a few percentage points of additional MoE, is comparable to Country X: the underlying biological mechanism is identical, and only the per-parameter uncertainty differs.
+The preset operates the same way in Country Y as in Country X. The absolute margins of error are wider here across all four modes because each individual parameter has wider uncertainty bounds in a less-surveyed pastoral system. The relative effect of switching correlations on: a few percentage points of additional MoE, is comparable to Country X: the underlying biological mechanism is identical, and only the per-parameter uncertainty differs.
 
 The headline shift in both countries is shown side by side below:
 
@@ -226,21 +226,21 @@ legend("topleft", fill = c("#94A3B8", "#2D6A4F"),
 
 ## The seven pairs in the structural-defaults preset
 
-The "Structural defaults" mode applies seven parameter-pair correlations drawn from published livestock-science literature. Each pair, its assigned ρ value, and its source are listed below:
+The "Structural defaults" mode applies seven parameter-pair correlations. The values are literature-based: the direction of each link comes from the IPCC equations and published studies, and the size was set by the project team from the evidence listed; the IPCC publishes no numerical correlation coefficients for these pairs. Each pair, its ρ value, the biological reason and the references are listed below (the same text appears when you hover a cell of the heatmap in the app):
 
-- **BW ↔ MW** (ρ = +0.50). Cattle with above-average adult body weight typically also exceeded the average at younger ages, following standard allometric growth curves (Brody 1945). Used in IPCC Vol.4 Ch.10 Eq 10.3. The value 0.50 reflects the typical case in which BW and MW come from different sources (BW from a livestock census, MW from a breed reference); when both come from the same animal-condition survey, a higher value can be set via the manual matrix.
+- **BW ↔ MW** (ρ = +0.50). Live weight and mature weight enter the IPCC net-energy-for-growth equation together, and animals of larger breeds are heavier at every age and have a larger mature weight. Set below the same-survey value because MW is usually a breed-reference constant while BW comes from the census; when both come from the same survey, 0.8 to 0.9 can be set via the manual matrix. IPCC 2006 Eq 10.6; IPCC 2019 Table 10A.2.
 
-- **BW ↔ WG** (ρ = +0.40). In well-fed adult cattle (dairy or beef finishing systems), heavier animals tend to gain weight more rapidly. NRC (2001) joint regression of body weight and average daily gain. The sign of this correlation is system-dependent: in growing-young-stock systems with feed limitation, BW and WG can be negatively correlated.
+- **BW ↔ WG** (ρ = +0.40). Live weight and daily gain enter the same equation, and well-fed animals are both heavier and gain faster; the sign can reverse for young stock approaching mature size. IPCC 2006 Eq 10.6; Mehrban et al. 2021 (Animal Bioscience 34:824–832, phenotypic correlation 0.49 to 0.63 in 15,279 cattle); IPCC 2019 Table 10A.2.
 
-- **Milk ↔ Fat** (ρ = −0.30). The dilution effect: higher daily milk yield is associated with lower fat content per litre. Reported across the dairy genetics literature (Wilmink 1987; VandeHaar 1998), with within-herd values typically between −0.20 and −0.40.
+- **Milk ↔ Fat** (ρ = −0.30). Dilution effect: as milk yield rises, fat yield rises less than proportionally, so the fat percentage falls. Boujenane 2002 (−0.28 in 20,140 Holstein-Friesian lactations); Nistor et al. 2011 (−0.26 in 120 cows); IPCC 2019 Table 10A.1 (−0.30 across nine regions).
 
-- **Milk ↔ BW** (ρ = +0.30). High-producing dairy breeds are physically larger (e.g. Holstein ~650 kg, ~30 kg/day vs Jersey ~450 kg, ~20 kg/day). NRC Dairy (2001).
+- **Milk ↔ BW** (ρ = +0.30). Larger dairy breeds and more intensive systems have both heavier cows and higher milk yields; within one breed the link is weak. IPCC 2019 Table 10A.1 (0.84 across regions); Berry and Evans 2022 (JDS Communications 3:32–37, the heaviest quarter of 16,980 cows yields only 3 to 4% more); Berry et al. 2003 (J. Dairy Sci. 86:2193–2204). A single-breed herd may use 0.10 to 0.20.
 
-- **Milk ↔ DE** (ρ = +0.30). Higher feed digestibility increases nutrient availability, which lifts milk yield. The effect is strongest in concentrate-fed dairy systems. NRC Dairy (2001) Ch. 2.
+- **Milk ↔ DE** (ρ = +0.30). More digestible feed gives more net energy per kg of feed and supports higher milk yield. NRC 2001 Ch. 2 (Energy); IPCC 2019 Table 10A.1 (0.65 across regions); no within-system coefficient is published.
 
-- **DE ↔ CP** (ρ = +0.50). Feed-quality co-variation: high-quality forages tend to have both high digestibility and high crude protein. Cross-feedstuff correlations of 0.4–0.7 are documented in NRC, INRA, and Feedipedia.
+- **DE ↔ CP** (ρ = +0.20). Within one forage, digestibility and crude protein fall together as the plant matures; across different feeds the link is weak, because protein and digestibility depend on different things (plant family, plant part, processing). INRAE-CIRAD-AFZ feed tables 2018 (feedtables.com: r = −0.07 over 193 plant feed materials); Feedipedia (0.1 to 0.2 over 82 forages with measured digestibility). Use 0.3 to 0.5 when the uncertainty is mainly about forage maturity.
 
-- **DE ↔ Y~m~** (ρ = −0.50). The largest-magnitude correlation in the preset and the dominant contributor to the headline MoE shift in dairy systems. IPCC 2019 Refinement Eq 10.21 expresses Y~m~ as an explicit decreasing function of `DE`; observational meta-analyses (Niu et al. 2018; Hristov et al. 2013) report cross-diet slopes consistent with ρ ≈ −0.50.
+- **DE ↔ Y~m~** (ρ = −0.20). IPCC Table 10.12 assigns a lower Y~m~ to more digestible diets, mainly because high digestibility goes with high feeding level and grain-rich rations, which shift rumen fermentation and speed up passage; within forage-based diets, methane per unit of energy changes little with digestibility or rises slightly. IPCC 2019 Table 10.12; Ramin and Huhtanen 2013 (J. Dairy Sci. 96:2476–2493); Johnson and Johnson 1995 (J. Anim. Sci. 73:2483–2492). The value suits forage-based systems; use −0.3 to −0.5 for high-grain dairy or feedlot systems.
 
 The structure of the preset matrix is visualised below:
 
@@ -284,7 +284,7 @@ The left-hand card on the Simulate tab offers four options:
 
 **No correlations.** The strict IPCC Approach-2 default, applicable when activity-data sources are independent or when a conservative baseline is required.
 
-**Structural defaults (expert-elicited).** Applies the seven biological pairs documented above. Suitable for single-year inventories without a multi-year time series of feed quality or herd structure.
+**Structural defaults (literature-based).** Applies the seven biological pairs documented above. Suitable for single-year inventories without a multi-year time series of feed quality or herd structure.
 
 **From template (auto, time-series).** Computes a Spearman rank-correlation matrix from the user's `Parameter_TimeSeries` sheet, with first-difference detrending applied internally to remove shared long-run growth. Requires at least five years of populated data; the radio button is disabled in the UI when this condition is not met.
 

@@ -578,13 +578,13 @@ Correlations between activity data parameters (e.g.\ body weight and mature weig
 \begin{itemize}
   \item \textbf{No correlations} (independence): the default. All parameters are drawn independently. This is the conservative IPCC Approach 2 starting point and is appropriate when the inventory compiler has no defensible information about parameter co-movement.
   \item \textbf{From template (auto, time-series)}: the matrix is computed automatically from the \texttt{Parameter\_TimeSeries} sheet of the upload using a \textbf{Spearman rank correlation} after detrending (first differences by default; linear and raw alternatives available). Spearman is preferred over Pearson because (i) it is robust to skewed marginals (Ym, Bo, milk yield), (ii) it matches the rank-correlation target the sampler reproduces (per IPCC Vol.1 Ch.3 §3.2.3.2), and (iii) it is the preferred option when the user wants the \emph{rank} dependence preserved rather than a linear product-moment relationship that can be distorted by outliers. Requires $\ge$ 5 annual rows and $\ge$ 2 non-constant numeric columns to produce a usable matrix; otherwise the option is greyed out (see ``UI gating'' below).
-  \item \textbf{Structural-defaults preset}: a small set of expert-elicited pairs drawn from the IPCC equation structure and the published livestock literature (see Section~``Structural-Defaults Preset'' below). Independent of the upload's time-series, so this is the option that works for single-year inventories without historical data.
+  \item \textbf{Structural-defaults preset}: a small set of literature-based pairs drawn from the IPCC equation structure and the published livestock literature (see Section~``Structural-Defaults Preset'' below). Independent of the upload's time-series, so this is the option that works for single-year inventories without historical data.
   \item \textbf{Manual entry}: the user uploads a square symmetric CSV. The diagonal must be 1; entries are interpreted as Spearman rank correlations on $[-1, +1]$; the matrix is projected onto the nearest positive-definite correlation matrix if needed, with a warning if any entry shifts by more than $0.01$.
 \end{itemize}
 
 \textit{UI gating.} Modes whose prerequisites are missing are greyed out automatically and cannot be selected: ``From template'' is disabled when the upload has no usable \texttt{Parameter\_TimeSeries} sheet, ``Manual entry'' is disabled until the user uploads a CSV matrix, and ``Structural defaults'' is disabled until a template (built-in example or custom upload) is loaded. The Run button additionally blocks the simulation with an explicit error if a no-op mode somehow slips through. These gates prevent the silent fall-back to ``no correlations'' that would otherwise occur when a mode is selected without the data it needs.
 
-\textit{Expected magnitude of effect on the headline.} Picking the structural-defaults preset on a typical single-year inventory widens the 95\% uncertainty interval by approximately $3$--$10$\%, depending mainly on how wide the user's Ym range is (the cross-block DE $\leftrightarrow$ Ym $= -0.50$ pair is the dominant mover). The central estimate is essentially unchanged because correlations preserve marginal means. The ``From template (auto)'' mode produces effects in the same general range when the time-series is rich enough to deliver multiple correlated pairs; a sparse or near-static time-series will produce a much smaller effect (the matrix collapses to near-identity after detrending).
+\textit{Expected magnitude of effect on the headline.} Picking the structural-defaults preset on a typical single-year inventory changes the 95\% uncertainty interval by about one percentage point or less (built-in examples at 3,000 iterations: Country X 25.3\% without correlations and 25.2\% with the preset; Country Y 36.5\% and 37.5\%). An earlier version of the preset, with DE $\leftrightarrow$ Ym at $-0.50$, widened the interval by 3--10\%; the October 2026 revision lowered that pair to $-0.20$ (see the Structural-Defaults Preset section below). The central estimate is essentially unchanged because correlations preserve marginal means. The ``From template (auto)'' mode produces effects in the same general range when the time-series is rich enough to deliver multiple correlated pairs; a sparse or near-static time-series will produce a much smaller effect (the matrix collapses to near-identity after detrending).
 
 ## Emission Factor Correlations
 
@@ -597,30 +597,31 @@ Emission factors that share systematic bias because they come from the same meas
 
 The same correlated-sampling procedure used for activity data (Section ``Correlated Sampling'' above) is applied to the coefficient block: no special-case sampler. Setting a within-block slider to $\rho = 0.3$ typically widens the 95\% uncertainty interval by a further few percent on top of any activity-data correlation effect; setting it to $\rho = 0.5$ (the slider maximum) approximately doubles that.
 
-## Structural-Defaults Preset (Expert-Elicited)
+## Structural-Defaults Preset (Literature-Based)
 
-The tool provides a **structural-defaults preset** correlation matrix as a middle ground between full independence and user-specified correlations. This preset assigns non-zero correlations to a small set of structurally linked pairs drawn from the IPCC equation structure and the published livestock literature. \textit{These values are expert-elicited; the IPCC publishes no numerical correlation coefficients for any livestock parameter pair.} All other pairs are set to zero. Hover any non-zero cell in the heatmap for the per-pair source citation. This is appropriate when no empirical correlation data are available but the inventory compiler wants to avoid the unrealistic assumption of full independence.
+The tool provides a **structural-defaults preset** correlation matrix as a middle ground between full independence and user-specified correlations. It assigns a non-zero rank correlation to seven pairs of parameters that are linked through the IPCC equations or through well-documented biology; all other pairs are zero. \textit{The values are literature-based: the direction of each link comes from the IPCC equations and from published studies, and the size of each value was set by the project team from the evidence listed below. The IPCC publishes no numerical correlation coefficients for any livestock parameter pair.} Hover any non-zero cell in the heatmap for the per-pair source. The preset is appropriate when no empirical correlation data are available but the inventory compiler wants to avoid the unrealistic assumption of full independence.
 
 The current preset contains seven pairs:
 
-\begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{p{2.6cm} p{1.1cm} p{9.5cm}}
+\begingroup\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{p{1.9cm} p{0.9cm} p{5.6cm} p{5.6cm}}
 \toprule
-\textbf{Pair} & \textbf{$\rho$} & \textbf{Source / rationale} \\
+\textbf{Pair} & \textbf{$\rho$} & \textbf{Biological reason} & \textbf{References and status} \\
 \midrule
-BW $\leftrightarrow$ MW       & $+0.50$ & Growth-curve relation (Brody 1945) reused in IPCC Eq 10.3. The high same-survey value $0.85$ only holds when BW and MW are measured together; in most national inventories MW is taken from a breed reference table while BW comes from the livestock census, so the cross-source correlation is closer to $0.5$. \\
-BW $\leftrightarrow$ WG       & $+0.40$ & IPCC Eq 10.6: $NE_g \propto BW^{0.75} \cdot WG^{1.097}$; joint regression-estimation correlation in NRC (2001) energy-balance studies, published range $0.30$--$0.50$. Sign is system-dependent (heavy growing animals gain slower $\Rightarrow$ negative; well-fed adults are both heavier and gain more $\Rightarrow$ positive). The $+0.40$ default reflects the well-fed-adult case typical of dairy/beef finishing systems. \\
-Milk $\leftrightarrow$ Fat    & $-0.30$ & Milk dilution effect, dairy genetics literature (Wilmink 1987; VandeHaar 1998). Within-herd literature gives $-0.20$ to $-0.40$; $-0.30$ is the midpoint. \\
-Milk $\leftrightarrow$ BW     & $+0.30$ & High-producing dairy breeds are physically larger: Holstein $\sim$650 kg, $\sim$30 kg milk/day vs Jersey $\sim$450 kg, $\sim$20 kg milk/day. NRC Dairy (2001); Stallings \& Knowlton (2013). Captures a real cross-group biological linkage. \\
-Milk $\leftrightarrow$ DE     & $+0.30$ & Higher feed digestibility $\Rightarrow$ more nutrient availability $\Rightarrow$ higher milk yield, especially in concentrate-fed dairy systems. NRC Dairy (2001) Ch.2. \\
-DE $\leftrightarrow$ CP       & $+0.50$ & Forage-quality co-variation across feed types (NRC 2001; INRA; Feedipedia). High-quality forages have both high DE and high CP; cross-feedstuff correlations range $0.4$--$0.7$. \\
-DE $\leftrightarrow$ Ym       & $-0.50$ & The IPCC 2019 Refinement treats Ym as a decreasing function of diet digestibility (the updated Ym guidance in Table 10.12 and the Ym-prediction approach in Annex 10B.2 give lower Ym for higher-quality, more-digestible diets). Meta-analyses (Niu et al. 2018 \emph{Global Change Biology}; Hristov et al. 2013) show a cross-diet negative correlation of this order. The single cross-block (activity-data $\leftrightarrow$ coefficient) pair in the preset and the one most likely to move headline emissions. \\
+\endhead
+BW $\leftrightarrow$ MW & $+0.50$ & Live weight and mature weight enter the net energy for growth together (Eq 10.6, through $BW/(C \cdot MW)$), and animals of larger breeds are heavier at every age and have a larger mature weight. Set below the same-survey value (about $0.85$) because MW is usually a breed-reference constant while BW comes from the census. & IPCC (2006) Eq 10.6; IPCC (2019) Table 10A.2 (r = 0.69 across 17 growing-cattle rows paired with the regional mature-cow weight). No published coefficient; project judgement. \\
+BW $\leftrightarrow$ WG & $+0.40$ & Both enter Eq 10.6 ($NE_g = 22.02 \cdot (BW/(C \cdot MW))^{0.75} \cdot WG^{1.097}$); well-fed animals are both heavier and gain faster. The sign reverses for young stock approaching mature size. & Mehrban et al. (2021): phenotypic correlation of daily gain with body weight $0.49$--$0.63$ in 15,279 Hanwoo cattle; IPCC (2019) Table 10A.2 growing categories $0.2$--$0.5$. Literature-based. \\
+Milk $\leftrightarrow$ Fat & $-0.30$ & Dilution effect: as milk yield rises, fat yield rises less than proportionally, so the fat percentage falls. & Boujenane (2002): $-0.28$ phenotypic in 20,140 Holstein-Friesian lactations; Nistor et al. (2011): $-0.26$ in 120 cows; IPCC (2019) Table 10A.1: $-0.30$ across nine regions. Literature-based. \\
+Milk $\leftrightarrow$ BW & $+0.30$ & Larger dairy breeds and more intensive systems have both heavier cows and higher milk yields; within one breed the link is weak. & IPCC (2019) Table 10A.1: $0.84$ across regions; Berry and Evans (2022): the heaviest quarter of 16,980 Holstein-Friesian cows yields only 3--4\% more; Berry et al. (2003): genetic correlation close to zero. Project judgement between the across-breed and within-breed cases; a single-breed herd may use $0.10$--$0.20$. \\
+Milk $\leftrightarrow$ DE & $+0.30$ & More digestible feed gives more net energy per kg of feed and supports higher milk yield. & NRC (2001) Ch. 2; IPCC (2019) Table 10A.1: $0.65$ across regions; no within-system coefficient is published. Project judgement, conservative. \\
+DE $\leftrightarrow$ CP & $+0.20$ & Within one forage, digestibility and crude protein fall together as the plant matures. Across different feeds the link is weak, because protein and digestibility depend on different things (plant family, plant part, processing). & INRAE-CIRAD-AFZ (2018): $r = -0.07$ over 193 plant feed materials, and energy digestibility 57--64\% across the dehydrated-alfalfa protein grades; Feedipedia: $0.1$--$0.2$ over 82 forages with measured digestibility. Project judgement near the measured across-feed value; use $0.3$--$0.5$ when the uncertainty is mainly about forage maturity. \\
+DE $\leftrightarrow$ Ym & $-0.20$ & IPCC Table 10.12 assigns a lower Ym to more digestible diets, mainly because high digestibility goes with high feeding level and grain-rich rations, which shift rumen fermentation and speed up passage; within forage-based diets, methane per unit of energy changes little with digestibility or rises slightly. & IPCC (2019) Table 10.12 (implies $r \approx 0$ under the Country X ranges, $-0.32$ read as a straight line); Ramin and Huhtanen (2013): positive link on forage diets (298 diets); Johnson and Johnson (1995). System-dependent: $-0.20$ for forage-based systems; $-0.3$ to $-0.5$ for high-grain dairy or feedlot systems via the manual matrix. \\
 \bottomrule
-\end{tabular}
-\end{center}
+\end{longtable}
+\endgroup
 
-\textit{Derivation notes.} A previously included N $\leftrightarrow$ BW $= 0.30$ pair was removed (no defensible cross-country source); DE $\leftrightarrow$ Ym was set to $-0.50$ (cross-diet meta-analyses cited in Section ``Activity Data Correlations''); Cfi $\leftrightarrow$ Ca was set to $0.30$ rather than the previously assumed $0.60$, recognising that Cfi and Ca are independent inputs in IPCC Eq 10.3 / 10.4 rather than jointly estimated; BW $\leftrightarrow$ MW was set to $0.50$ rather than $0.85$ to reflect the typical mixed-source data provenance (BW from the national census, MW from a breed reference); the two cross-group dairy pairs (Milk $\leftrightarrow$ BW and Milk $\leftrightarrow$ DE) were added to capture biological linkages between herd-population and feed-quality parameters; and a Milk $\leftrightarrow$ pct\_pregnant pair was not included because the sign is ambiguous between per-cow genetic and per-herd management interpretations. The resulting matrix is positive-definite without nearest-PD repair.
+\textit{Revision history.} May 2026 audit: a previously included N $\leftrightarrow$ BW $= 0.30$ pair was removed (N is sampled as a scalar broadcast, so the pair was inert), and Cfi $\leftrightarrow$ Ca was lowered from $0.60$ to $0.30$. June 2026 livestock-science review: BW $\leftrightarrow$ MW lowered from $0.85$ to $0.50$ (mixed-source provenance); Milk $\leftrightarrow$ BW and Milk $\leftrightarrow$ DE added as cross-group biological linkages; Milk $\leftrightarrow$ pct\_pregnant dropped (the sign is ambiguous between per-cow genetic and per-herd management interpretations) and Cfi $\leftrightarrow$ Ca dropped (independent inputs in Eq 10.3 / 10.4, not jointly estimated). October 2026 evidence run: the label changed from "expert-elicited" to "literature-based"; DE $\leftrightarrow$ CP lowered from $+0.50$ to $+0.20$, because the previously cited "cross-feedstuff correlations of 0.4--0.7" appear in none of the named sources and measured feed tables show no across-feed link; DE $\leftrightarrow$ Ym lowered from $-0.50$ to $-0.20$, because the previously cited Eq 10.21 is the emission-factor equation rather than a Ym--DE relation, Table 10.12 implies a near-zero correlation under typical input ranges, Niu et al. (2018) does not use digestibility as a predictor, and measured forage-diet data give a positive link; citations that could not be verified (Brody 1945; Wilmink 1987; VandeHaar 1998; Stallings and Knowlton 2013; the "NRC 2001 joint regression") were removed from all seven sources. The resulting matrix is positive-definite without nearest-PD repair (smallest eigenvalue $0.26$).
 
 ## Cross-Block Correlations
 
@@ -808,6 +809,22 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 # References
 
 \hangindent=1.5em
+\noindent Berry, D.P., and Evans, R.D. (2022). The response to genetic merit for milk production in dairy cows differs by cow body weight. *JDS Communications*, 3(1), 32--37. https://doi.org/10.3168/jdsc.2021-0115
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Berry, D.P., Buckley, F., Dillon, P., Evans, R.D., Rath, M., and Veerkamp, R.F. (2003). Genetic relationships among body condition score, body weight, milk yield, and fertility in dairy cows. *Journal of Dairy Science*, 86(6), 2193--2204.
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Boujenane, I. (2002). Estimation des param\`etres g\'en\'etiques et ph\'enotypiques de la production laiti\`ere des vaches de race Frisonnes Holstein au Maroc. *Revue d'\'elevage et de m\'edecine v\'et\'erinaire des pays tropicaux*, 55(1), 63--67. https://doi.org/10.19182/remvt.9848
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Feedipedia (INRAE, CIRAD, AFZ and FAO). Animal feed resources information system: nutritional tables of forage products. https://www.feedipedia.org (forage datasheets consulted October 2026).
+
+\vspace{6pt}
+\hangindent=1.5em
 \noindent Frey, H.C., and Rhodes, D.S. (1998). Characterizing, Simulating, and Analyzing Variability and Uncertainty: An Illustration of Methods Using an Air Toxics Emissions Example. *Human and Ecological Risk Assessment*, 4(4), 762--797.
 
 \vspace{6pt}
@@ -832,11 +849,23 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 
 \vspace{6pt}
 \hangindent=1.5em
+\noindent INRAE, CIRAD, and AFZ (2018). Tables of composition and nutritional values of feed materials (feedtables.com): energy digestibility in ruminants and crude protein. https://www.feedtables.com (consulted October 2026).
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Johnson, K.A., and Johnson, D.E. (1995). Methane emissions from cattle. *Journal of Animal Science*, 73(8), 2483--2492.
+
+\vspace{6pt}
+\hangindent=1.5em
 \noindent Jones, D.B. (1931). Factors for Converting Percentages of Nitrogen in Foods and Feeds into Percentages of Proteins. *USDA Circular* No. 183. United States Department of Agriculture, Washington, D.C.
 
 \vspace{6pt}
 \hangindent=1.5em
 \noindent Karimi-Zindashty, Y., MacDonald, J.D., Nitschelm, J., Del Grosso, S.J., and Desjardins, R.L. (2012). Sources of uncertainty in the Canadian national livestock greenhouse gas inventory. *Journal of Agricultural Science*, 150(6), 677--690.
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Mehrban, H., Naserkheil, M., Lee, D., and Ib\'a\~nez-Escriche, N. (2021). Genetic parameters and correlations of related feed efficiency, growth, and carcass traits in Hanwoo beef cattle. *Animal Bioscience*, 34(5), 824--832. https://doi.org/10.5713/ajas.20.0135
 
 \vspace{6pt}
 \hangindent=1.5em
@@ -848,7 +877,19 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 
 \vspace{6pt}
 \hangindent=1.5em
+\noindent National Research Council (2001). *Nutrient Requirements of Dairy Cattle*, 7th revised edition. National Academies Press, Washington, D.C. (Chapter 2, Energy.)
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Nistor, E., Bampidis, V., Matiuti, M., Pentea, M., Pet, L., and Ciolac, V. (2011). Estimates of phenotypic parameters for milk production traits in Romanian Black Spotted breed dairy cows. *Scientific Papers Animal Science and Biotechnologies*, 44(1), 316.
+
+\vspace{6pt}
+\hangindent=1.5em
 \noindent Penman, J., Kruger, D., Galbally, I., Hiraishi, T., Nyenzi, B., Emmanuel, S., Buendia, L., Hoppaus, R., Martinsen, T., Meijer, J., Miwa, K., and Tanabe, K. (2000). *Good Practice Guidance and Uncertainty Management in National Greenhouse Gas Inventories*. IPCC/OECD/IEA/IGES, Hayama, Japan.
+
+\vspace{6pt}
+\hangindent=1.5em
+\noindent Ramin, M., and Huhtanen, P. (2013). Development of equations for predicting methane emissions from ruminants. *Journal of Dairy Science*, 96(4), 2476--2493. https://doi.org/10.3168/jds.2012-6095
 
 \vspace{6pt}
 \hangindent=1.5em

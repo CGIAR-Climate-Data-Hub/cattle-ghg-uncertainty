@@ -17,7 +17,7 @@ For each cattle sub-category (defined by cattle type, production system and anim
 
 - Each parameter carries a probability distribution (normal, positive-normal, lognormal, beta, triangular, PERT, uniform, constant); entered bounds are interpreted as the 95% interval. Lognormal central values are treated as medians per IPCC good-practice guidance.
 - Sampling is by rank-correlation-preserving restricted pairing (Iman-Conover) per IPCC Vol. 1 Ch. 3 section 3.2.3.2, preserving each marginal distribution exactly while hitting a target Spearman correlation matrix.
-- Correlation options: none (default), an expert-elicited structural-defaults preset of seven documented parameter pairs (e.g. digestible energy with Ym), a matrix estimated from an uploaded historical time series (Spearman, detrended, projected to the nearest positive-definite matrix), or a user matrix.
+- Correlation options: none (default), a literature-based structural-defaults preset of seven documented parameter pairs (e.g. body weight with mature weight), a matrix estimated from an uploaded historical time series (Spearman, detrended, projected to the nearest positive-definite matrix), or a user matrix.
 - Headline metric: the 95% margin of error, MoE% = (Q97.5 - Q2.5) / (2 x mean) x 100, the IPCC Table 3.3 "% uncertainty" convention, with asymmetric upper/lower half-widths also computed.
 - Decomposition: three simulation runs (all parameters varying; emission factors fixed; activity data fixed) give combined, AD-only and EF-only uncertainty per source.
 - Sensitivity: SRC (standardised linear regression) and PRCC (partial rank correlation) rankings of inputs against total CO2eq.
