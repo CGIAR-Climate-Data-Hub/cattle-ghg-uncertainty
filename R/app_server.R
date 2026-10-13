@@ -310,10 +310,29 @@ app_server <- function(input, output, session) {
         parsed$metadata$region else NULL
       .apply_completeness(region = region_upload)
 
-      rv$upload_status <- list(type = "success", message = msg)
-      rv$sim_log <- paste0(rv$sim_log, "Custom data uploaded: ", msg, "\n")
+      # 2026-10-13: an inventory with more groups than this deployment can
+      # simulate used to load without comment and then kill the session at
+      # Simulate, after the user had set up distributions and correlations.
+      # Warn here, where the fix (aggregate the data) is still cheap, and say
+      # what the fix is. Never block: a local R session has no such limit.
+      n_groups <- inventory_group_count(parsed$param_specs)
+      size_warn <- if (n_groups > .MAX_SIMULATED_GROUPS)
+        paste(sprintf(t("upload_too_many_groups"),
+                      .fmt_count(n_groups), .MAX_SIMULATED_GROUPS),
+              t("upload_too_many_groups_fix")) else NULL
+
+      rv$upload_status <- list(
+        type    = if (is.null(size_warn)) "success" else "warning",
+        message = if (is.null(size_warn)) msg else paste(msg, size_warn))
+      rv$sim_log <- paste0(rv$sim_log, "Custom data uploaded: ", msg, "\n",
+                           if (is.null(size_warn)) "" else
+                             paste0("WARNING: ", size_warn, "\n"))
 
       showNotification(msg, type = "message", duration = 6)
+      # Sticky: the user has to dismiss it, because the cost of missing it is
+      # a failed run twenty minutes later.
+      if (!is.null(size_warn))
+        showNotification(size_warn, type = "warning", duration = NULL)
 
       if (length(parsed$warnings) > 0) {
         showNotification(paste("Upload warnings:",
@@ -558,8 +577,16 @@ app_server <- function(input, output, session) {
     blocks <- list()
     # Show upload status banner if present (T1.1: makes upload errors visible)
     if (!is.null(rv$upload_status)) {
-      cls <- if (rv$upload_status$type == "success") "validation-ok" else "validation-error"
-      ic  <- if (rv$upload_status$type == "success") "check-circle" else "exclamation-triangle"
+      # "warning" means the file loaded but something about it needs acting
+      # on, which is neither green nor red.
+      cls <- switch(rv$upload_status$type,
+                    success = "validation-ok",
+                    warning = "validation-warn",
+                    "validation-error")
+      ic  <- switch(rv$upload_status$type,
+                    success = "check-circle",
+                    warning = "triangle-exclamation",
+                    "exclamation-triangle")
       blocks <- c(blocks, list(
         tags$div(class = cls, icon(ic), rv$upload_status$message)
       ))

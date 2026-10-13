@@ -567,6 +567,16 @@ lang_state_take <- function(token) {
   # itself (see .TRANSLATOR_HOLD_UNTIL in R/chat_ui.R).
   # Scale warning on upload (2026-10-13). Shown before the first billed
   # call when a file implies more groups than the server can simulate.
+  # Template upload: more groups than this deployment can simulate.
+  # The message has to carry the fix, because the user meets it at the one
+  # moment when aggregating is still cheap.
+  upload_too_many_groups = list(
+    en = "This file describes %s groups, and this server can simulate about %d. A run is likely to stop partway through with a memory error.",
+    fr = "Ce fichier décrit %s groupes, et ce serveur peut en simuler environ %d. Une simulation risque de s'interrompre en cours d'exécution faute de mémoire."),
+  upload_too_many_groups_fix = list(
+    en = "Combine your data to a coarser level before running: add the populations together and take population-weighted averages of the other parameters. Do not split the file and run the parts separately, because the confidence intervals of the parts cannot be added back together correctly. See the user guide, \"How many groups the tool can run\".",
+    fr = "Regroupez vos données à un niveau plus agrégé avant de lancer la simulation : additionnez les effectifs et calculez des moyennes pondérées par les effectifs pour les autres paramètres. Ne divisez pas le fichier pour en simuler les parties séparément : les intervalles de confiance des parties ne peuvent pas être recombinés correctement. Voir le guide d'utilisation, section \"Nombre de groupes que l'outil peut traiter\"."),
+
   ai_scale_title = list(
     en = "This file may be too large to simulate",
     fr = "Ce fichier est peut-être trop volumineux pour être simulé"),

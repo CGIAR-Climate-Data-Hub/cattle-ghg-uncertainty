@@ -316,7 +316,7 @@ translator_chat_server <- function(input, output, session) {
         sprintf(t("ai_scale_tokens"), format(round(sc$tokens), big.mark = ",")),
         if (length(sc$heavy))
           sprintf(t("ai_scale_heavy"), paste(sc$heavy, collapse = ", ")) else NULL,
-        sprintf(t("ai_scale_groups"), .TRANSLATOR_MAX_SYSTEMS))
+        sprintf(t("ai_scale_groups"), .MAX_SIMULATED_GROUPS))
       tags$div(
         style = "margin: 6px 0 10px 0; padding: 12px 16px; background:#FFF7ED;
                  border:1px solid #FB923C; border-left:4px solid #EA580C;
@@ -1089,14 +1089,15 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
 # warning that fires on correct files is worse than none, because users learn
 # to click past it.
 #
-# .TRANSLATOR_MAX_SYSTEMS is stated to the model in that rule. Audit F64 fails
+# .MAX_SIMULATED_GROUPS is stated to the model in that rule. Audit F64 fails
 # if the two drift apart.
 #
 # This WARNS and never blocks. A user may be heading for a local run, or may
 # intend to aggregate in the conversation. Refusing their data is not the
 # tool's call.
 # ---------------------------------------------------------------------------
-.TRANSLATOR_MAX_SYSTEMS <- 400L            # measured hosted-tier ceiling
+# The group ceiling is .MAX_SIMULATED_GROUPS in R/utils_validation.R, shared
+# with the template upload check so the two cannot state different numbers.
 .TRANSLATOR_MAX_PAYLOAD_TOKENS <- 120000L  # above this no context window holds it
 
 .translator_scale_check <- function(parsed) {
@@ -1139,7 +1140,7 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
       "geographic level as the FIRST question in section D, naming the ",
       "coarser level the file already contains.
 "),
-      .TRANSLATOR_MAX_SYSTEMS),
+      .MAX_SIMULATED_GROUPS),
     "
 ---
 

@@ -1,5 +1,45 @@
 # Input Validation Functions
 
+# ---------------------------------------------------------------------------
+# How many groups this deployment can simulate (2026-10-13)
+#
+# A group is one (cattle_type, aggregation_level, sub_category) triple, which
+# is what the sampler allocates per-iteration matrices for. Peak memory was
+# measured on the Colombian fixture at about 1.8 MB per group against a single
+# shinyapps.io worker with roughly 1 GB:
+#
+#   140 groups  420 MB  |  350  787 MB  |  560  1.14 GB  |  812  1.61 GB
+#
+# 400 is the point past which a run is more likely to die than finish, once
+# Shiny's own overhead is allowed for. It is a property of the deployment, not
+# of the method: a local R session with more memory has no such limit.
+#
+# One constant, used by the template upload check below, by the translator
+# upload warning in R/chat_ui.R, and quoted to the model in the Runnable-size
+# rule of the system prompt. Audit F64 fails if those drift apart.
+# ---------------------------------------------------------------------------
+.MAX_SIMULATED_GROUPS <- 400L
+
+# Distinct groups described by a Parameters sheet. Used before a run to warn,
+# never to block: a user may be running locally, where the limit is their own
+# machine.
+inventory_group_count <- function(param_specs) {
+  if (is.null(param_specs) || !NROW(param_specs)) return(0L)
+  key <- paste(param_specs$cattle_type %||% "",
+               param_specs$aggregation_level %||% "",
+               param_specs$sub_category %||% "",
+               sep = "\u001f")
+  length(unique(key))
+}
+
+# Thousands separator for the current language. French writes 10 089, not
+# 10,089, and the group warning is one of the few places the app prints a
+# number large enough for it to show.
+.fmt_count <- function(n) {
+  fr <- identical(get0(".LANG_CURRENT", envir = .GlobalEnv, ifnotfound = "en"), "fr")
+  format(n, big.mark = if (fr) " " else ",", trim = TRUE)
+}
+
 validate_param_specs <- function(param_specs) {
   errors <- character()
   warnings <- character()

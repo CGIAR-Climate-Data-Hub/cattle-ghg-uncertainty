@@ -161,6 +161,18 @@ body { background: var(--bg); color: var(--text); }
 
 .validation-ok { color: #2D6A4F; font-weight: 600; }
 .validation-error { color: var(--danger); font-weight: 600; }
+/* Loaded, but something needs acting on before running. Amber, not red:
+   the upload succeeded. */
+.validation-warn {
+  color: #92400E;
+  font-weight: 600;
+  background: #FFFBEB;
+  border: 1px solid #F59E0B;
+  border-left: 4px solid #D97706;
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: block;
+}
 
 .sidebar { background: var(--bg-card); border-right: 1px solid var(--border); }
 

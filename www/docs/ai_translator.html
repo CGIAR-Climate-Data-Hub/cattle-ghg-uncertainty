@@ -240,6 +240,61 @@ itself is unaffected, but replies queue behind each other. Where several
 inventories are being prepared in one session, it is worth staggering
 the work rather than starting every translation at once.</p>
 </div>
+<div id="large-files-and-fine-geography" class="section level2">
+<h2>Large files and fine geography</h2>
+<p>Two separate limits apply, and they catch different files. One is
+about the size of the file you upload, the other about how many groups
+the inventory describes. A file can pass one and fail the other.</p>
+<div id="the-upload-limit" class="section level3">
+<h3>The upload limit</h3>
+<p>The panel accepts , , and , up to . A larger file is refused by the
+browser before it reaches the tool, with a message saying so.</p>
+<p>National calculator workbooks are often well over this, and usually
+for reasons that have nothing to do with the inventory: feed composition
+tables, municipality lookups, macros and embedded charts. The fix is to
+copy the sheets that actually hold the cattle data into a new workbook
+and upload that. It is normal for a 20 MB national calculator to become
+a 200 KB file with two sheets in it.</p>
+</div>
+<div id="the-conversation-limit" class="section level3">
+<h3>The conversation limit</h3>
+<p>Even inside 8 MB, a file can hold more data than the conversation can
+carry. The panel shows an estimated token count for each sheet before
+anything is sent, and warns if the total is too large. Untick the sheets
+the translator does not need: reference tables, vocabulary lists,
+calculation sheets whose results already appear elsewhere.</p>
+<p>Nothing is charged until you press send, so a warning at this stage
+costs nothing to act on.</p>
+</div>
+<div id="the-group-limit" class="section level3">
+<h3>The group limit</h3>
+<p>The tool simulates about , where a group is one combination of , and
+. An inventory with 1,121 municipalities and 9 animal sub-categories is
+roughly 10,000 groups, which no amount of translating will make
+runnable.</p>
+<p> Translating at municipality level and aggregating afterwards wastes
+the translation, because the aggregation has to happen in the source
+data and the file then has to be translated again.</p>
+<p>The translator is told about this limit and should raise the question
+itself, as the first item in its list of ambiguities, when your file
+carries more than one geographic level. If it does not raise it, raise
+it yourself: tell it which level to use, in the same message where you
+answer its other questions.</p>
+</div>
+<div id="where-the-aggregation-happens" class="section level3">
+<h3>Where the aggregation happens</h3>
+<p>In your own data, before you upload. Most national calculators
+already contain the coarser level: a department total row alongside the
+municipality rows. If yours does, point the translator at those rows and
+ignore the rest.</p>
+<p>If it does not, aggregate before uploading: add the populations
+together, and take population-weighted averages of every other
+parameter. The user guide describes this under “How many groups the tool
+can run”, along with the reason that splitting a large inventory into
+several runs and combining the results afterwards gives the wrong
+confidence interval.</p>
+</div>
+</div>
 <div id="the-three-step-workflow" class="section level2">
 <h2>The three-step workflow</h2>
 <p>The translator works in three explicit passes: Explore, Clarify,

@@ -3719,13 +3719,13 @@ section_F <- function() {
                      else paste("missing:", paste(f63_fail, collapse = ", ")))
 
   # F64 -- the size ceiling exists in two places that cannot see each other:
-  # .TRANSLATOR_MAX_SYSTEMS in R/chat_ui.R, which the upload warning uses, and
+  # .MAX_SIMULATED_GROUPS in R/chat_ui.R, which the upload warning uses, and
   # the Runnable-size rule in the system prompt, which the model reads. If one
   # is retuned and the other is not, the app and the model give the user
   # different numbers for the same limit, and neither looks wrong on its own.
   f64_fail <- tryCatch({
     pr <- assemble_translator_system_prompt("translator_prompts")
-    n  <- .TRANSLATOR_MAX_SYSTEMS
+    n  <- .MAX_SIMULATED_GROUPS
     f <- character(0)
     if (!grepl(sprintf("roughly %d groups", n), pr, fixed = TRUE))
       f <- c(f, sprintf("the prompt does not state the ceiling as 'roughly %d groups'", n))
@@ -3740,7 +3740,7 @@ section_F <- function() {
              "The simulated-size ceiling agrees between R/chat_ui.R and the system prompt",
              f64_ok,
              notes = if (f64_ok)
-               sprintf("both state %d groups", .TRANSLATOR_MAX_SYSTEMS)
+               sprintf("both state %d groups", .MAX_SIMULATED_GROUPS)
              else paste(f64_fail, collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
