@@ -140,6 +140,12 @@ The translator is gated behind a magic-link sign-in flow. Every address requires
 9. Click the new link. The app verifies the email is now on the approved list, drops a long-lived sign-in cookie in the browser, and unlocks the chat panel.
 10. On subsequent visits from the same browser, the cookie keeps the user signed in. No additional magic-link step is required unless the user clears site data or switches browsers.
 
+### Staying signed in
+
+The app remembers you in the browser you signed in with. A different browser or machine, or clearing your site data, means asking for a new sign-in link. A private or incognito window forgets everything when you close it, so it needs a new link every time. Use a normal window, especially if sign-in emails are slow to reach you.
+
+Your conversation is safe either way. It is saved against your email address, not in the browser, so it comes back when you sign in again.
+
 ## When to use the translator and when to skip it
 
 The AI translator is intended for the common case in which raw inventory data does not match the tool's template. It is most useful when:
