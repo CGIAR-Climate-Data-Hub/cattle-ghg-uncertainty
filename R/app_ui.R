@@ -29,6 +29,12 @@
 # 23-minute walkthrough above: this one answers "what is this", that one
 # answers "how do I use it".
 .OVERVIEW_VIDEO_URL <- Sys.getenv("OVERVIEW_VIDEO_URL", unset = "")
+# "Monte Carlo in motion", a 7-minute explainer of the method itself rather
+# than of the app. It is linked from the Simulate tab only, because that is
+# where a user meets the iteration count and the confidence interval and
+# may want to know what is happening behind them.
+.MONTE_CARLO_VIDEO_URL <- Sys.getenv("MONTE_CARLO_VIDEO_URL", unset = "")
+.MONTE_CARLO_VIDEO_LEN <- "7 min"
 .TUTORIAL_VIDEO_CHAPTERS <- list(
   data_input   = list(start =  165, len = "5 min"),
   qaqc         = list(start =  501, len = "1 min"),
@@ -38,22 +44,33 @@
   sensitivity  = list(start = 1158, len = "2 min"),
   ipcc_report  = list(start = 1268, len = "2 min"))
 
+.video_pill <- function(href, label, len) {
+  tags$a(
+    href = href, target = "_blank", rel = "noopener noreferrer",
+    class = "video-pill",
+    icon("circle-play"), " ", label,
+    tags$span(style = "opacity:0.7;", paste0(" (", len, ")")))
+}
+
 tutorial_video_link <- function(tab) {
-  if (!nzchar(.TUTORIAL_VIDEO_URL)) return(NULL)
+  pills <- list()
   ch <- .TUTORIAL_VIDEO_CHAPTERS[[tab]]
-  if (is.null(ch)) return(NULL)
-  sep  <- if (grepl("?", .TUTORIAL_VIDEO_URL, fixed = TRUE)) "&" else "?"
-  href <- paste0(.TUTORIAL_VIDEO_URL, sep, "t=", ch$start)
+  if (nzchar(.TUTORIAL_VIDEO_URL) && !is.null(ch)) {
+    sep  <- if (grepl("?", .TUTORIAL_VIDEO_URL, fixed = TRUE)) "&" else "?"
+    pills <- c(pills, list(.video_pill(paste0(.TUTORIAL_VIDEO_URL, sep, "t=", ch$start),
+                                       t("video_watch_tab"), ch$len)))
+  }
+  # The method explainer, offered beside the tab walkthrough on the Simulate
+  # tab. The two answer different questions: one shows which button to press,
+  # the other shows what Monte Carlo does.
+  if (identical(tab, "simulate") && nzchar(.MONTE_CARLO_VIDEO_URL))
+    pills <- c(pills, list(.video_pill(.MONTE_CARLO_VIDEO_URL,
+                                       t("video_learn_mc"),
+                                       .MONTE_CARLO_VIDEO_LEN)))
+  if (!length(pills)) return(NULL)
   tags$div(
-    style = "margin: 14px 16px -2px 16px;",
-    tags$a(
-      href = href, target = "_blank", rel = "noopener noreferrer",
-      style = paste("color:#2D6A4F; font-size:0.84rem; font-weight:500;",
-                    "text-decoration:none; padding:4px 10px;",
-                    "border:1px solid #2D6A4F; border-radius:14px;",
-                    "background:#FFFFFF; display:inline-block;"),
-      icon("circle-play"), " ", t("video_watch_tab"),
-      tags$span(style = "opacity:0.7;", paste0(" (", ch$len, ")"))))
+    style = "margin: 14px 16px -2px 16px; display:flex; gap:8px; flex-wrap:wrap;",
+    pills)
 }
 
 app_ui <- function(request = NULL) {

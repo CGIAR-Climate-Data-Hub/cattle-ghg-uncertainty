@@ -492,6 +492,10 @@ lang_state_take <- function(token) {
   video_full_body = list(
     en = "A 23-minute walkthrough of the whole tool: every tab and control, the Excel input template sheet by sheet, and the Country X worked example run from data entry to the IPCC report. Each tab of the app also links to the point in the video that covers it.",
     fr = "Une présentation de 23 minutes de l'ensemble de l'outil : chaque onglet et chaque commande, le modèle Excel feuille par feuille, et l'exemple Country X traité de la saisie jusqu'au rapport IPCC. Chaque onglet de l'application renvoie aussi au passage de la vidéo qui le concerne."),
+  # "Monte Carlo in motion", linked from the Simulate tab. It explains the
+  # method, not the app, so the label says so.
+  video_learn_mc = list(en = "Learn how Monte Carlo works",
+                          fr = "Comprendre la méthode de Monte-Carlo"),
   btn_open_video = list(en = "Watch the walkthrough",
                           fr = "Voir la présentation"),
 
