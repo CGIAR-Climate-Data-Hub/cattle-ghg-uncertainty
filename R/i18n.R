@@ -587,8 +587,8 @@ lang_state_take <- function(token) {
     en = "Most of it is in: %s. Untick any sheet that is a reference or lookup table rather than inventory data.",
     fr = "L'essentiel provient de : %s. Décochez toute feuille qui est une table de référence ou de correspondance plutôt que des données d'inventaire."),
   ai_scale_groups = list(
-    en = "A file this size often also describes a finer geography than the tool can simulate, which is about %d groups (one group is an aggregation level times an animal sub-category). If yours is finer, aggregate it first: the file would upload normally and then run out of memory at the simulation step.",
-    fr = "Un fichier de cette taille décrit souvent une géographie plus fine que ce que l'outil peut simuler, soit environ %d groupes (un groupe est un niveau d'agrégation multiplié par une sous-catégorie animale). Si la vôtre est plus fine, agrégez-la d'abord : le fichier se chargerait normalement, puis saturerait la mémoire au moment de la simulation."),
+    en = "A file this size often also describes a finer geography than the tool can simulate, which is about %d groups (one group is an aggregation level times an animal sub-category). Translating at the finer level wastes the translation, because the aggregation has to happen in your data and the file then has to be translated again.",
+    fr = "Un fichier de cette taille décrit souvent une géographie plus fine que ce que l'outil peut simuler, soit environ %d groupes (un groupe est un niveau d'agrégation multiplié par une sous-catégorie animale). Traduire au niveau le plus fin gâche la traduction, car l'agrégation doit avoir lieu dans vos données et le fichier doit alors être traduit de nouveau."),
   ai_scale_footer = list(
     en = "You can send it anyway. This is a warning, not a block: it is here so the cost is known before the call, not after.",
     fr = "Vous pouvez l'envoyer malgré tout. Il s'agit d'un avertissement et non d'un blocage : il est affiché pour que le coût soit connu avant l'appel, et non après."),

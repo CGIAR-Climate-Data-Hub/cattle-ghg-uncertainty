@@ -312,16 +312,21 @@ translator_chat_server <- function(input, output, session) {
     # first billed call. See .translator_scale_check.
     sc <- .translator_scale_check(pu$parsed)
     scale_panel <- if (isTRUE(sc$warn)) {
+      # The aggregation guidance is the SAME string the Data Input tab uses
+      # (upload_too_many_groups_fix). The two warnings are about the same
+      # decision, met at different moments, and a user who reads one and then
+      # the other must not be told two different things.
       lines <- c(
-        sprintf(t("ai_scale_tokens"), format(round(sc$tokens), big.mark = ",")),
+        sprintf(t("ai_scale_tokens"), .fmt_count(round(sc$tokens))),
         if (length(sc$heavy))
           sprintf(t("ai_scale_heavy"), paste(sc$heavy, collapse = ", ")) else NULL,
-        sprintf(t("ai_scale_groups"), .MAX_SIMULATED_GROUPS))
+        sprintf(t("ai_scale_groups"), .MAX_SIMULATED_GROUPS),
+        t("upload_too_many_groups_fix"))
       tags$div(
-        style = "margin: 6px 0 10px 0; padding: 12px 16px; background:#FFF7ED;
-                 border:1px solid #FB923C; border-left:4px solid #EA580C;
-                 border-radius:6px; font-size:0.88rem; color:#7C2D12;",
-        tags$div(style = "font-weight:700; color:#9A3412; margin-bottom:4px;",
+        style = "margin: 6px 0 10px 0; padding: 12px 16px; background:#FEF2F2;
+                 border:1px solid #FCA5A5; border-left:4px solid #C1121F;
+                 border-radius:6px; font-size:0.88rem; color:#7F1D1D;",
+        tags$div(style = "font-weight:700; color:#C1121F; margin-bottom:4px;",
                  icon("triangle-exclamation"), " ", t("ai_scale_title")),
         tags$ul(style = "margin:0 0 6px 0; padding-left:18px;",
                 lapply(lines, tags$li)),
