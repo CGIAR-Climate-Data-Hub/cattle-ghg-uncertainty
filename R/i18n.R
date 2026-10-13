@@ -586,9 +586,13 @@ lang_state_take <- function(token) {
   ai_scale_heavy = list(
     en = "Most of it is in: %s. Untick any sheet that is a reference or lookup table rather than inventory data.",
     fr = "L'essentiel provient de : %s. Décochez toute feuille qui est une table de référence ou de correspondance plutôt que des données d'inventaire."),
+  # Conditional by design. A file can be too large in tokens for reasons that
+  # have nothing to do with geography: many years, many sheets, one very wide
+  # table. Stating the group advice as a fact would misdirect those users, so
+  # it opens with "If".
   ai_scale_groups = list(
-    en = "A file this size often also describes a finer geography than the tool can simulate, which is about %d groups (one group is an aggregation level times an animal sub-category). Translating at the finer level wastes the translation, because the aggregation has to happen in your data and the file then has to be translated again.",
-    fr = "Un fichier de cette taille décrit souvent une géographie plus fine que ce que l'outil peut simuler, soit environ %d groupes (un groupe est un niveau d'agrégation multiplié par une sous-catégorie animale). Traduire au niveau le plus fin gâche la traduction, car l'agrégation doit avoir lieu dans vos données et le fichier doit alors être traduit de nouveau."),
+    en = "If your inventory describes more than about %d groups (one group is an aggregation level times an animal sub-category) it will also be too large to simulate, so decide the level before translating rather than after: aggregating afterwards means translating the file a second time.",
+    fr = "Si votre inventaire décrit plus d'environ %d groupes (un groupe est un niveau d'agrégation multiplié par une sous-catégorie animale), il sera également trop volumineux pour être simulé. Décidez donc du niveau avant la traduction plutôt qu'après : agréger ensuite oblige à traduire le fichier une seconde fois."),
   ai_scale_footer = list(
     en = "You can send it anyway. This is a warning, not a block: it is here so the cost is known before the call, not after.",
     fr = "Vous pouvez l'envoyer malgré tout. Il s'agit d'un avertissement et non d'un blocage : il est affiché pour que le coût soit connu avant l'appel, et non après."),

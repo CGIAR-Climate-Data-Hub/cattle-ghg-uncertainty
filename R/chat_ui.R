@@ -316,12 +316,20 @@ translator_chat_server <- function(input, output, session) {
       # (upload_too_many_groups_fix). The two warnings are about the same
       # decision, met at different moments, and a user who reads one and then
       # the other must not be told two different things.
+      # Two different problems, and only the first is certain.
+      #   1. Too many tokens. Measured, always true when this panel shows.
+      #   2. Too many groups to simulate. A guess: a big file is OFTEN
+      #      fine-grained, but it can equally be many years, many sheets or
+      #      one wide table. So it is phrased as a condition and carries the
+      #      aggregation guidance with it, rather than standing as a fact.
+      # The untick advice is dropped for a single-sheet file, where there is
+      # nothing to untick.
       lines <- c(
         sprintf(t("ai_scale_tokens"), .fmt_count(round(sc$tokens))),
-        if (length(sc$heavy))
+        if (length(sc$heavy) && length(sheets) > 1L)
           sprintf(t("ai_scale_heavy"), paste(sc$heavy, collapse = ", ")) else NULL,
-        sprintf(t("ai_scale_groups"), .MAX_SIMULATED_GROUPS),
-        t("upload_too_many_groups_fix"))
+        paste(sprintf(t("ai_scale_groups"), .MAX_SIMULATED_GROUPS),
+              t("upload_too_many_groups_fix")))
       tags$div(
         style = "margin: 6px 0 10px 0; padding: 12px 16px; background:#FEF2F2;
                  border:1px solid #FCA5A5; border-left:4px solid #C1121F;
