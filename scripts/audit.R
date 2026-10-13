@@ -3703,7 +3703,12 @@ section_F <- function() {
               # throughout. These three say the value and its range have
               # separate provenance and the second has to be declared.
               "Defaulted-uncertainty rule", "No-uncertainty-anywhere rule",
-              "Defaulted ranges declared", "C2. Missing ranges")
+              "Defaulted ranges declared", "C2. Missing ranges",
+              # 2026-10-13. Nothing told the model the app has a size
+              # ceiling, so a municipality-level file would map in full and
+              # OOM at Simulate. The server-side check is in chat_ui.R
+              # (.translator_scale_check); this is the model-side half.
+              "Runnable-size rule", "Geographic level, when the file holds")
     miss[!vapply(miss, function(k) grepl(k, pr, fixed = TRUE), logical(1))]
   }, error = function(e) conditionMessage(e))
   f63_ok <- length(f63_fail) == 0L
@@ -3712,6 +3717,31 @@ section_F <- function() {
              f63_ok,
              notes = if (f63_ok) "all named rules and self-checks present in the assembled prompt"
                      else paste("missing:", paste(f63_fail, collapse = ", ")))
+
+  # F64 -- the size ceiling exists in two places that cannot see each other:
+  # .TRANSLATOR_MAX_SYSTEMS in R/chat_ui.R, which the upload warning uses, and
+  # the Runnable-size rule in the system prompt, which the model reads. If one
+  # is retuned and the other is not, the app and the model give the user
+  # different numbers for the same limit, and neither looks wrong on its own.
+  f64_fail <- tryCatch({
+    pr <- assemble_translator_system_prompt("translator_prompts")
+    n  <- .TRANSLATOR_MAX_SYSTEMS
+    f <- character(0)
+    if (!grepl(sprintf("roughly %d groups", n), pr, fixed = TRUE))
+      f <- c(f, sprintf("the prompt does not state the ceiling as 'roughly %d groups'", n))
+    # And the warning the server sends must quote the same number.
+    note <- .translator_scale_note(list(warn = TRUE, tokens = 1e6, heavy = "x"))
+    if (!grepl(sprintf("about %d groups", n), note, fixed = TRUE))
+      f <- c(f, sprintf("the server scale note does not quote %d", n))
+    f
+  }, error = function(e) conditionMessage(e))
+  f64_ok <- length(f64_fail) == 0L
+  check_bool("F64", "F",
+             "The simulated-size ceiling agrees between R/chat_ui.R and the system prompt",
+             f64_ok,
+             notes = if (f64_ok)
+               sprintf("both state %d groups", .TRANSLATOR_MAX_SYSTEMS)
+             else paste(f64_fail, collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

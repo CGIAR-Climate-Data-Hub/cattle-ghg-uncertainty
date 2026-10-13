@@ -354,6 +354,27 @@ app_ui <- function(request = NULL) {
          // header (session$request$HTTP_COOKIE), HMAC-verifies it, and
          // restores the signed-in state without a fresh magic link.
          // Server-side ttl matches (auth_session_cookie_issue default).
+         // 2026-10-13: oversized-upload message. Shiny enforces
+         // shiny.maxRequestSize in the browser and refuses the file before
+         // the server is told anything, so the only place a useful sentence
+         // can be put is here. Without it the Colombian 22 MB workbook gave
+         // a bare red progress bar and no way to know what to do next.
+         document.addEventListener('change', function(ev) {
+           var inp = ev.target;
+           if (!inp || inp.id !== 'translator_file' || !inp.files) return;
+           var box = document.getElementById('translator_upload_error');
+           if (!box) return;
+           var limitMb = parseInt(box.getAttribute('data-limit'), 10) || 8;
+           var f = inp.files[0];
+           if (f && f.size > limitMb * 1024 * 1024) {
+             var mb = (f.size / 1024 / 1024).toFixed(1);
+             box.textContent = (box.getAttribute('data-msg') || '')
+               .replace('%s', mb).replace('%d', limitMb);
+             box.style.display = 'block';
+           } else {
+             box.style.display = 'none';
+           }
+         }, true);
          Shiny.addCustomMessageHandler('setTranslatorSession', function(value) {
            if (!value) return;
            var maxAge = 100 * 365 * 24 * 60 * 60;  // ~100 years in seconds

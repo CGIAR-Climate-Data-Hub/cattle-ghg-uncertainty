@@ -565,6 +565,27 @@ lang_state_take <- function(token) {
 
   # Workshop hold notice. Shown until 16 October 2026, then it retires
   # itself (see .TRANSLATOR_HOLD_UNTIL in R/chat_ui.R).
+  # Scale warning on upload (2026-10-13). Shown before the first billed
+  # call when a file implies more groups than the server can simulate.
+  ai_scale_title = list(
+    en = "This file may be too large to simulate",
+    fr = "Ce fichier est peut-être trop volumineux pour être simulé"),
+  ai_scale_tokens = list(
+    en = "The data about to be sent is roughly %s tokens, which is more than the conversation can carry.",
+    fr = "Les données sur le point d'être envoyées représentent environ %s jetons, ce qui dépasse ce que la conversation peut contenir."),
+  ai_scale_heavy = list(
+    en = "Most of it is in: %s. Untick any sheet that is a reference or lookup table rather than inventory data.",
+    fr = "L'essentiel provient de : %s. Décochez toute feuille qui est une table de référence ou de correspondance plutôt que des données d'inventaire."),
+  ai_scale_groups = list(
+    en = "A file this size often also describes a finer geography than the tool can simulate, which is about %d groups (one group is an aggregation level times an animal sub-category). If yours is finer, aggregate it first: the file would upload normally and then run out of memory at the simulation step.",
+    fr = "Un fichier de cette taille décrit souvent une géographie plus fine que ce que l'outil peut simuler, soit environ %d groupes (un groupe est un niveau d'agrégation multiplié par une sous-catégorie animale). Si la vôtre est plus fine, agrégez-la d'abord : le fichier se chargerait normalement, puis saturerait la mémoire au moment de la simulation."),
+  ai_scale_footer = list(
+    en = "You can send it anyway. This is a warning, not a block: it is here so the cost is known before the call, not after.",
+    fr = "Vous pouvez l'envoyer malgré tout. Il s'agit d'un avertissement et non d'un blocage : il est affiché pour que le coût soit connu avant l'appel, et non après."),
+  ai_upload_too_big = list(
+    en = "That file is %s MB. The upload limit is %d MB, so it was not sent. Save the sheets the inventory needs as a separate .xlsx and upload that: a national calculator usually carries large feed or lookup tables the tool does not read.",
+    fr = "Ce fichier fait %s Mo. La limite de téléversement est de %d Mo, il n'a donc pas été envoyé. Enregistrez les feuilles nécessaires à l'inventaire dans un fichier .xlsx séparé et téléversez celui-ci : un calculateur national contient souvent de grandes tables d'aliments ou de correspondance que l'outil ne lit pas."),
+
   ai_hold_title = list(
     en = "Please hold until the review workshop, 14 to 16 October",
     fr = "Merci d'attendre l'atelier de revue, du 14 au 16 octobre"),

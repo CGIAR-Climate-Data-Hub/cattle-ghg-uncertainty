@@ -308,9 +308,29 @@ translator_chat_server <- function(input, output, session) {
     }, character(1))
     choices <- setNames(as.character(seq_along(sheets)), labels)
     total <- sum(vapply(sheets, function(s) s$est_tokens, numeric(1)))
+    # Scale warning, shown here because this is the last screen before the
+    # first billed call. See .translator_scale_check.
+    sc <- .translator_scale_check(pu$parsed)
+    scale_panel <- if (isTRUE(sc$warn)) {
+      lines <- c(
+        sprintf(t("ai_scale_tokens"), format(round(sc$tokens), big.mark = ",")),
+        if (length(sc$heavy))
+          sprintf(t("ai_scale_heavy"), paste(sc$heavy, collapse = ", ")) else NULL,
+        sprintf(t("ai_scale_groups"), .TRANSLATOR_MAX_SYSTEMS))
+      tags$div(
+        style = "margin: 6px 0 10px 0; padding: 12px 16px; background:#FFF7ED;
+                 border:1px solid #FB923C; border-left:4px solid #EA580C;
+                 border-radius:6px; font-size:0.88rem; color:#7C2D12;",
+        tags$div(style = "font-weight:700; color:#9A3412; margin-bottom:4px;",
+                 icon("triangle-exclamation"), " ", t("ai_scale_title")),
+        tags$ul(style = "margin:0 0 6px 0; padding-left:18px;",
+                lapply(lines, tags$li)),
+        tags$div(style = "font-style:italic;", t("ai_scale_footer")))
+    } else NULL
     tags$div(
       style = "margin: 6px 0 12px 0; padding: 10px 14px; background:#F1F8F4;
                border:1px solid #C8E6C9; border-radius:8px; font-size:0.88rem;",
+      scale_panel,
       tags$div(style = "font-weight:600; margin-bottom:6px;",
                sprintf("%s: %d sheet%s read (~%s tokens in total). Untick reference or lookup sheets the AI does not need, then send.",
                        pu$name, length(sheets), if (length(sheets) == 1L) "" else "s",
@@ -639,8 +659,24 @@ translator_chat_server <- function(input, output, session) {
                 tags$span(style = "color:#52525B; font-weight:400;",
                           t("ai_upload_hint"))
               ),
-              accept = c(".xlsx", ".xls", ".csv"),
+              # .xlsm added 2026-10-13: national calculators are commonly
+              # macro workbooks, and readxl reads them exactly as .xlsx.
+              # Without it the file picker would not even offer the
+              # Colombian workbook, with no explanation to the user.
+              accept = c(".xlsx", ".xlsm", ".xls", ".csv"),
               width = "100%"),
+    # Filled and shown by the oversized-upload listener in app_ui.R. The
+    # limit is read from the same option the server enforces, so the two
+    # cannot drift apart.
+    tags$div(id = "translator_upload_error",
+             `data-msg` = t("ai_upload_too_big"),
+             `data-limit` = as.character(
+               max(1L, as.integer(getOption("shiny.maxRequestSize",
+                                            8 * 1024^2) %/% (1024^2)))),
+             style = "display:none; margin:-6px 0 12px 0; padding:12px 16px;
+                      background:#FEF2F2; border:1px solid #FCA5A5;
+                      border-left:4px solid #DC2626; border-radius:6px;
+                      font-size:0.88rem; color:#7F1D1D;"),
     # 2026-09-17: sheet picker shown between parse and send (plan F8).
     uiOutput("translator_sheet_picker"),
 
@@ -1028,6 +1064,88 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
           format(Sys.Date(), "%Y-%m-%d"))
 }
 
+# ---------------------------------------------------------------------------
+# Scale check (2026-10-13)
+#
+# The Colombian national calculator carries 1,121 municipalities x 9 animal
+# categories. Nothing in the app or the prompt knew that is roughly 10,000
+# groups against a server that manages 300 to 400, so the file would have been
+# mapped in full, uploaded, and then exhausted memory at Simulate, after the
+# translator spend and twenty minutes of the user's time.
+#
+# WHAT THIS CHECKS, AND WHAT IT DELIBERATELY DOES NOT.
+#
+# It checks the payload: the number of tokens actually about to be sent. That
+# is exact, never a guess, and it is what makes an oversized file expensive
+# before it is useless. Colombia measures about 3.4 million tokens, which no
+# context window holds and which is billed on the way to failing.
+#
+# It does NOT try to find the geography column. Three attempts at that read
+# a dry-matter-intake column as a list of places, and read the Zimbabwe
+# template's vocabulary sheet as an inventory. Telling a municipality column
+# from a measurement is a semantic judgement, the model has the column names
+# and the data in front of it, and the Runnable-size rule in
+# system_instructions.md puts the ceiling and the question in its hands. A
+# warning that fires on correct files is worse than none, because users learn
+# to click past it.
+#
+# .TRANSLATOR_MAX_SYSTEMS is stated to the model in that rule. Audit F64 fails
+# if the two drift apart.
+#
+# This WARNS and never blocks. A user may be heading for a local run, or may
+# intend to aggregate in the conversation. Refusing their data is not the
+# tool's call.
+# ---------------------------------------------------------------------------
+.TRANSLATOR_MAX_SYSTEMS <- 400L            # measured hosted-tier ceiling
+.TRANSLATOR_MAX_PAYLOAD_TOKENS <- 120000L  # above this no context window holds it
+
+.translator_scale_check <- function(parsed) {
+  empty <- list(warn = FALSE, tokens = 0, heavy = character(0))
+  if (is.null(parsed) || !length(parsed$sheets)) return(empty)
+  # est_tokens is set when the upload is read and is the same figure the
+  # sheet picker shows. Recomputing it here would let the two disagree.
+  tok <- vapply(parsed$sheets, function(s) as.numeric(s$est_tokens %||% 0), numeric(1))
+  heavy <- vapply(seq_along(parsed$sheets), function(i) {
+    s <- parsed$sheets[[i]]
+    if (tok[i] > .TRANSLATOR_MAX_PAYLOAD_TOKENS / 4)
+      (if (is.null(s$name) || is.na(s$name)) "(file)" else s$name) else NA_character_
+  }, character(1))
+  list(warn   = sum(tok) > .TRANSLATOR_MAX_PAYLOAD_TOKENS,
+       tokens = sum(tok),
+       heavy  = heavy[!is.na(heavy)])
+}
+
+# The same facts, phrased for the model, appended to the Explore message.
+.translator_scale_note <- function(sc) {
+  if (is.null(sc) || !isTRUE(sc$warn)) return("")
+  paste0(
+    "## Scale warning from the server (not from the file)
+
+",
+    sprintf(paste0(
+      "- This file's data block is roughly %s tokens, which is more than the ",
+      "conversation can carry. Name the sheets that are reference or lookup ",
+      "tables rather than inventory data in section D, so the user can untick ",
+      "them and send again%s.
+"),
+      format(round(sc$tokens), big.mark = ","),
+      if (length(sc$heavy))
+        paste0(" (the largest are: ", paste(sc$heavy, collapse = ", "), ")") else ""),
+    sprintf(paste0(
+      "- A file this size usually carries a finer geography than the app can ",
+      "simulate, which is about %d groups. Apply the Runnable-size rule: ",
+      "work out from the file how many (aggregation level, sub-category) ",
+      "groups it implies, and if that exceeds the ceiling, raise the ",
+      "geographic level as the FIRST question in section D, naming the ",
+      "coarser level the file already contains.
+"),
+      .TRANSLATOR_MAX_SYSTEMS),
+    "
+---
+
+")
+}
+
 # Build the Explore user message from a parsed upload (the sheets the user
 # ticked). Returns list(content = what the model sees, display = what the
 # user sees in their own bubble).
@@ -1114,11 +1232,14 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
     "```json\n",
     "{\n  \"file\": \"", file_name, "\",\n  \"sheets\": ", sheets_json, "\n}\n",
     "```\n\n---\n\n")
+  # Scale note first, so the geographic level is the first thing the model
+  # weighs rather than something it meets after mapping 10,000 groups.
+  scale_block <- .translator_scale_note(.translator_scale_check(parsed))
   content <- sprintf(
-    "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s",
+    "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s%s",
     file_name, parsed$n_total_sheets,
     if (parsed$n_total_sheets == 1L) "" else "s",
-    exploration_block, detect_block, file_block)
+    scale_block, exploration_block, detect_block, file_block)
   display <- if (parsed$n_total_sheets == 1L)
     sprintf("Uploaded %s (%d rows × %d columns sent). Step 1 of 3: the AI will now explore your file and report what it found.",
             file_name, nrow(parsed$sheets[[1]]$preview), ncol(parsed$sheets[[1]]$preview))
