@@ -14,7 +14,50 @@
 #
 # Returns a data.frame(where, issue) with zero rows when nothing was found.
 
-translator_consistency_checks <- function(param_specs, manure = NULL) {
+# ---------------------------------------------------------------------------
+# Source reconciliation (2026-10-14)
+#
+# Everything above compares the template against itself. On the Colombian
+# municipal file that was not enough twice in one evening:
+#
+#   Run 1 emitted 2,067,473 head where the file said 1,873,832, because one
+#   group appeared under two aggregation levels. It passed 2,434 checks.
+#   Run 2 replaced the Ym of seven groups with the IPCC default of 7.0 where
+#   the file gives 5.85 to 6.00, and said so in data_source, unread.
+#
+# A translator's job is fidelity to a source, so the source has to be one of
+# the things it is checked against. `source` carries a fingerprint of the
+# uploaded workbook: every number in it, and the parameter families the
+# server-side scan found. Both are already computed elsewhere.
+#
+# When `source` is NULL these checks are skipped and the behaviour is exactly
+# as before.
+# ---------------------------------------------------------------------------
+
+# Numbers the translator may legitimately derive rather than copy: a unit
+# conversion of a single cell. Sums and weighted averages are NOT here; those
+# must be tagged user_chat, which exempts them from the verbatim check.
+.TRANSLATOR_VALUE_TRANSFORMS <- c(1, 100, 1/100, 18.45, 1/18.45, 365, 1/1000)
+
+translator_source_fingerprint <- function(parsed) {
+  if (is.null(parsed) || !length(parsed$sheets)) return(NULL)
+  nums <- numeric(0)
+  for (sh in parsed$sheets) {
+    d <- sh$preview
+    if (is.null(d) || !NROW(d)) next
+    for (col in d) {
+      v <- suppressWarnings(as.numeric(as.character(col)))
+      nums <- c(nums, v[is.finite(v)])
+    }
+  }
+  fam <- tryCatch(.translator_scan_param_labels(parsed$sheets),
+                  error = function(e) character(0))
+  list(numbers  = unique(round(nums, 6)),
+       families = sub(" .*$", "", fam))      # "Ym (methane ...)" -> "Ym"
+}
+
+translator_consistency_checks <- function(param_specs, manure = NULL,
+                                          source = NULL) {
   out <- list()
   add <- function(where, issue) {
     out[[length(out) + 1L]] <<- data.frame(where = where, issue = issue,
@@ -194,6 +237,79 @@ translator_consistency_checks <- function(param_specs, manure = NULL) {
                            "treat it as exactly known and its uncertainty will not reach the result. If the source ",
                            "gives a range for it, add %s and %s."),
                     col, n_val, lo_col, hi_col))
+    }
+  }
+
+  # ---- source reconciliation ------------------------------------------
+  if (!is.null(source) && is.data.frame(ps) && nrow(ps) > 0 &&
+      "data_source" %in% names(ps)) {
+    dsrc <- tolower(as.character(ps$data_source))
+    dsrc[is.na(dsrc)] <- ""
+    val  <- suppressWarnings(as.numeric(ps$mean))
+    lvl2 <- if ("aggregation_level" %in% names(ps)) as.character(ps$aggregation_level)
+            else rep("", nrow(ps))
+    lvl2[is.na(lvl2)] <- ""
+
+    # C3. A row tagged user_file claims the number appears in the file as
+    # written. Anything else is either a transcription error or invented.
+    # Derived values are tagged user_chat and are exempt by design.
+    if (length(source$numbers)) {
+      verbatim <- dsrc == "user_file" & is.finite(val) & val != 0
+      if (any(verbatim)) {
+        cand <- unique(as.vector(outer(source$numbers,
+                                       .TRANSLATOR_VALUE_TRANSFORMS, "*")))
+        seen <- vapply(val[verbatim], function(v)
+          any(abs(cand - v) <= 5e-4 * max(1, abs(v))), logical(1))
+        if (any(!seen)) {
+          miss <- which(verbatim)[!seen]
+          shown <- utils::head(unique(sprintf("%s%s%s = %s",
+            lvl2[miss], ifelse(nzchar(lvl2[miss]), " / ", ""),
+            ps$parameter[miss], fmt(val[miss]))), 6)
+          add("source reconciliation", sprintf(paste0(
+            "%d value(s) are marked as taken from your file but no matching ",
+            "number is in it: %s. Either the value was altered, or it was ",
+            "computed and should be marked user_chat rather than user_file."),
+            length(miss), paste(shown, collapse = "; ")))
+        }
+      }
+    }
+
+    # C1. A population read from the file belongs to one group. The same
+    # number under two groups is the signature of a double count, which is
+    # how one run came to report ten per cent more animals than the file.
+    isN <- ps$parameter %in% c("N", "cattle_pop") & dsrc == "user_file" &
+           is.finite(val) & val > 0
+    if (sum(isN) > 1) {
+      key <- paste(lvl2[isN], ps$sub_category[isN])
+      dup <- val[isN][duplicated(round(val[isN], 4))]
+      if (length(dup)) {
+        for (d in unique(dup)) {
+          w <- key[round(val[isN], 4) == round(d, 4)]
+          add("source reconciliation", sprintf(paste0(
+            "The population %s appears on %d groups (%s). A head count read ",
+            "from the file belongs to one group, so this is usually the same ",
+            "animals counted twice."), fmt(d), length(w),
+            paste(utils::head(w, 4), collapse = ", ")))
+        }
+      }
+    }
+
+    # C4. The template says a parameter was gap-filled, while the scan found
+    # that parameter in the uploaded file. One of the two is wrong, and the
+    # user should be the one to decide which.
+    if (length(source$families)) {
+      filled <- grepl("ipcc|default|auto", dsrc) & ps$parameter %in% source$families
+      if (any(filled)) {
+        by_p <- split(which(filled), ps$parameter[filled])
+        for (pn in names(by_p)) {
+          i <- by_p[[pn]]
+          add("source reconciliation", sprintf(paste0(
+            "%s was filled from the IPCC default on %d row(s) (%s), but %s is ",
+            "present in your file. Check whether the file's value should have ",
+            "been used."), pn, length(i),
+            paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn))
+        }
+      }
     }
   }
 

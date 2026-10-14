@@ -315,6 +315,12 @@ translator_chat_server <- function(input, output, session) {
     )
     if (is.null(parsed)) { state$pending_upload <- NULL; return() }
     state$last_error <- NULL
+    # Keep a fingerprint of the uploaded workbook: every number in it and the
+    # parameter families the scan found. pending_upload is cleared once the
+    # file is sent, and the emitted template is checked against the source
+    # long after that (see translator_consistency_checks).
+    state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
+                                error = function(e) NULL)
     state$pending_upload <- list(parsed = parsed, name = fi$name,
                                  hash = parsed$file_hash)
   })
@@ -760,8 +766,15 @@ translator_chat_server <- function(input, output, session) {
     # See the long comment on output$translator_messages.
     tags$div(
       `data-translator-scroller` = "true",
-      style = "display:flex; flex-direction:column; max-height:480px;
-               overflow-y:auto; padding:8px;",
+      # 2026-10-14: a FIXED height, not max-height. With max-height the box
+      # grew as the conversation did, so every reply reflowed the page and
+      # moved the card under the reader. At a fixed height the card never
+      # changes size, the page never moves, and only this box scrolls.
+      # overflow-anchor is off because the browser's own scroll anchoring
+      # fights the pin-to-bottom below when Shiny replaces the message list.
+      style = "display:flex; flex-direction:column;
+               height:60vh; min-height:320px;
+               overflow-y:auto; overflow-anchor:none; padding:8px;",
       uiOutput("translator_messages",
                 style = "display:flex; flex-direction:column;"),
       tags$div(id = "translator_stream_target",
@@ -991,7 +1004,7 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
 # workbook to a temp file, parses it back and runs the app's QA/QC plus the
 # relational checks. Returns list(qa, summary, issues, n_params, n_manure,
 # error).
-.translator_precheck <- function(json_text) {
+.translator_precheck <- function(json_text, source = NULL) {
   fail <- function(msg) list(qa = NULL, summary = NULL, issues = NULL, error = msg)
   parsed <- tryCatch(jsonlite::fromJSON(json_text, simplifyVector = TRUE),
                      error = function(e) NULL)
@@ -1001,11 +1014,11 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
   werr <- tryCatch({ .translator_write_official_template(parsed, tmp); NULL },
                    error = function(e) conditionMessage(e))
   if (!is.null(werr)) return(fail(paste("the workbook could not be written:", werr)))
-  .translator_precheck_file(tmp)
+  .translator_precheck_file(tmp, source = source)
 }
 
 # Same checks on a workbook that already exists (about 4 s for 800 rows).
-.translator_precheck_file <- function(path) {
+.translator_precheck_file <- function(path, source = NULL) {
   fail <- function(msg) list(qa = NULL, summary = NULL, issues = NULL, error = msg)
   if (is.null(path) || !file.exists(path)) return(fail("the workbook was not found"))
   pu <- tryCatch(suppressMessages(parse_uploaded_template(path)), error = function(e) NULL)
@@ -1015,7 +1028,8 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
   if (!length(region) || is.na(region[1]) || !nzchar(region[1])) region <- "global"
   qa <- tryCatch(run_qaqc(pu$param_specs, region = region[1], manure_data = pu$manure),
                  error = function(e) NULL)
-  issues <- tryCatch(translator_consistency_checks(pu$param_specs, pu$manure),
+  issues <- tryCatch(translator_consistency_checks(pu$param_specs, pu$manure,
+                                                   source = source),
                      error = function(e) NULL)
   list(qa = qa, summary = if (!is.null(qa)) qaqc_summary(qa) else NULL,
        issues = issues, n_params = nrow(pu$param_specs),
@@ -1087,7 +1101,7 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
     state$template_file     <- path
     state$template_file_key <- key
   }
-  state$precheck     <- if (ok) .translator_precheck_file(path)
+  state$precheck     <- if (ok) .translator_precheck_file(path, source = state$source_fp)
                         else list(qa = NULL, summary = NULL, issues = NULL,
                                   error = "the workbook could not be written")
   state$precheck_key <- key

@@ -354,6 +354,34 @@ app_ui <- function(request = NULL) {
          // header (session$request$HTTP_COOKIE), HMAC-verifies it, and
          // restores the signed-in state without a fresh magic link.
          // Server-side ttl matches (auth_session_cookie_issue default).
+         // 2026-10-14: keep the newest message in view without moving the
+         // page. Shiny replaces the whole message list on every update, which
+         // resets the box's scroll position and, before the box had a fixed
+         // height, reflowed the page underneath the reader. The box is now a
+         // fixed height; this keeps it pinned to the bottom after each
+         // replacement, and only when the reader was already at the bottom,
+         // so scrolling back to re-read something is not undone.
+         (function () {
+           var PIN_SLACK = 80;          // px from the bottom still counts as at-the-bottom
+           function pin(box, force) {
+             if (!box) return;
+             var atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) <= PIN_SLACK;
+             if (force || atBottom) box.scrollTop = box.scrollHeight;
+           }
+           function watch() {
+             var box = document.querySelector('[data-translator-scroller]');
+             if (!box || box._translatorPinned) return;
+             box._translatorPinned = true;
+             pin(box, true);
+             new MutationObserver(function () { pin(box, false); })
+               .observe(box, { childList: true, subtree: true, characterData: true });
+           }
+           document.addEventListener('shiny:value', function (e) {
+             if (e.name === 'translator_panel' || e.name === 'translator_messages')
+               setTimeout(watch, 0);
+           });
+           setTimeout(watch, 500);
+         })();
          // 2026-10-13: oversized-upload message. Shiny enforces
          // shiny.maxRequestSize in the browser and refuses the file before
          // the server is told anything, so the only place a useful sentence

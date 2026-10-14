@@ -3708,7 +3708,13 @@ section_F <- function() {
               # ceiling, so a municipality-level file would map in full and
               # OOM at Simulate. The server-side check is in chat_ui.R
               # (.translator_scale_check); this is the model-side half.
-              "Runnable-size rule", "Geographic level, when the file holds")
+              "Runnable-size rule", "Geographic level, when the file holds",
+              # 2026-10-14. Two runs on the Colombian municipal file: one
+              # double-counted a group and reported 10% too many animals, the
+              # other replaced seven coefficients with IPCC defaults. Both
+              # passed every internal check. These are the model-side half;
+              # the server-side half is in R/translator_checks.R.
+              "Copied-or-computed rule", "One head count, one group")
     miss[!vapply(miss, function(k) grepl(k, pr, fixed = TRUE), logical(1))]
   }, error = function(e) conditionMessage(e))
   f63_ok <- length(f63_fail) == 0L
