@@ -588,14 +588,30 @@ Correlations between activity data parameters (e.g.\ body weight and mature weig
 
 ## Emission Factor Correlations
 
-Emission factors that share systematic bias because they come from the same measurement literature (e.g.\ all rumen-fermentation coefficients from one regional database, or all NH$_3$ volatilisation parameters from one experimental programme) can be assigned correlations in the Tab~4 \emph{Coefficient Correlations} card. Two modes are available:
+Coefficients are sampled independently of one another. This is the standard
+IPCC Approach 2 assumption and, since October 2026, the tool's unconditional
+behaviour.
 
-\begin{itemize}
-  \item \textbf{No EF correlations} (default): coefficients are sampled independently. The standard IPCC Approach 2 assumption and the right default when each emission factor comes from its own study.
-  \item \textbf{Block-structured EF correlation}: coefficients are grouped into three blocks (energy-equation, manure-CH$_4$, manure-N), each with its own within-block $\rho$ slider in $[0, 0.5]$. Cross-block correlation is always zero because the three measurement literatures are independent. All three sliders default to $0$, so this mode does nothing until the user actively moves at least one slider; an inline warning surfaces if the user selects ``block-structured'' but leaves all sliders at zero.
-\end{itemize}
+Earlier versions offered a block-structured mode in which coefficients were
+grouped into three blocks (energy-equation, manure-CH$_4$, manure-N), each
+carrying its own within-block $\rho$ in $[0, 0.5]$, with cross-block
+correlation fixed at zero. The mode was withdrawn on two grounds. First, no
+inventory dataset supplies a within-literature correlation coefficient, so
+the control required an input the compiler could not evidence. Second,
+measurement showed most of it to be inert: on a 32-group inventory at
+3,000 iterations, moving all three sliders from $0$ to $0.5$ moved the
+95\% margin of error from 9.09\% to 11.00\%, of which the energy block
+contributed $-0.05$ points and the manure-CH$_4$ block $+0.05$ points, both
+within sampling noise. The manure-N block accounted for the entire 1.9-point
+span, which follows from its parameter widths: EF3\_PRP at $\pm 221\%$,
+Frac\_LEACH\_PRP at $\pm 150\%$, EF5 at $\pm 89\%$ and Frac\_GASM\_PRP at
+$\pm 73\%$, against $\leq 30\%$ for every coefficient in the other two blocks.
 
-The same correlated-sampling procedure used for activity data (Section ``Correlated Sampling'' above) is applied to the coefficient block: no special-case sampler. Setting a within-block slider to $\rho = 0.3$ typically widens the 95\% uncertainty interval by a further few percent on top of any activity-data correlation effect; setting it to $\rho = 0.5$ (the slider maximum) approximately doubles that.
+Correlation between coefficients remains expressible where it is evidenced.
+The unified correlation matrix spans both activity data and coefficients, so
+the structural-defaults preset (which includes the DE--Y$_m$ pair) and a
+user-supplied manual matrix both act on coefficients. What was removed is the
+block abstraction and its sliders, not the capability.
 
 ## Structural-Defaults Preset (Literature-Based)
 

@@ -290,94 +290,62 @@ The left-hand card on the Simulate tab offers four options:
 
 **Manual (CSV upload).** Uses a user-supplied square correlation matrix, intended for cases where a published matrix from a similar inventory or an expert-elicitation result is available. A template is provided in the panel.
 
-## Emission-factor correlations (right-hand card)
+## Coefficient correlations
 
-The Simulate tab includes two correlation cards. The left-hand card, described above, controls correlations between **activity-data** parameters (herd size, body weight, milk yield, feed quality: quantities measured from the population). The right-hand card controls correlations between **emission-factor coefficients** (Y~m~, B~o~, MCF, EF3, EF4, EF5, fixed quantities sourced from published studies rather than from a per-population survey).
+Coefficients are drawn independently of one another. This is the IPCC
+Approach 2 default, and since October 2026 it is what the tool does in every
+run, with no setting attached.
 
-The two cards are separated because the underlying mechanisms differ. Activity-data correlations arise from biological co-variation across animals and feed. Emission-factor correlations arise from shared methodological bias in the published values: for example, when several coefficients are calibrated against a common regional dataset.
+A control used to sit on this tab. It grouped the coefficients into three
+blocks by the measurement literature they come from, and offered a
+within-block correlation for each. It was removed for two reasons.
 
-### The three coefficient blocks
+The first is that it asked for a number no inventory dataset supplies. A
+compiler can read a body weight or a herd count off a survey. Nothing in a
+survey says whether the correlation between Cfi and Y~m~ is 0.2 or 0.4, and
+the four descriptive bands printed under each slider did not change that.
 
-The right-hand card groups the IPCC coefficients into three blocks based on the scientific literature they originate from. A within-block correlation ρ can be applied to represent shared bias within a block; correlation across blocks is fixed at zero on the assumption that the three literatures are independent.
+The second is that most of the control could not affect the answer. Measured
+on a 32-group Colombian municipal inventory at 3,000 iterations, holding the
+herd, the parameters and the uncertainty inputs fixed and moving only the
+sliders:
 
-| Block | Coefficients | Common literature source |
-|---|---|---|
-| **Energy** | Cfi, Ca, C, Cp, Y~m~ | Rumen-fermentation and animal-energetics studies (IPCC Vol.4 Ch.10 §10.2). |
-| **Manure-CH~4~** | B~o~, MCF, ASH | Biogas-potential and lagoon studies. |
-| **Manure-N** | EF3, EF4, EF5, Frac_GasMS, Frac_LeachMS, UE | Soil-emissions and N-volatilisation studies. |
+| Slider positions | 95% margin of error |
+|---|---|
+| all three at 0 (default) | 9.09% |
+| all three at 0.15 | 9.80% |
+| all three at 0.30 | 10.35% |
+| all three at 0.50 (maximum) | 11.00% |
+| energy block alone at 0.50 | 9.04% |
+| manure-CH~4~ block alone at 0.50 | 9.14% |
+| manure-N block alone at 0.50 | 10.97% |
 
-### Behaviour of the within-block ρ slider
+The whole control spans 1.9 percentage points. Two of its three blocks
+account for none of it: the energy block moves the figure by -0.05 points and
+the manure-CH~4~ block by +0.05, both inside Monte Carlo noise at this
+iteration count. The entire effect comes from the manure-N block, and the
+reason is the width of the parameters in it. EF3_PRP carries an IPCC default
+range of plus or minus 221%, Frac_LEACH_PRP 150%, EF5 89% and Frac_GASM_PRP
+73%, against 30% or less for every coefficient in the other two blocks.
+Correlating wide inputs moves a result; correlating narrow ones cannot, at
+any value of rho.
 
-When "Block-structured EF correlation" is selected and the energy-block slider is set to ρ = 0.3, the sampler treats the five energy coefficients as sharing a common bias term of moderate strength. An iteration in which Y~m~ samples above its central value will also draw Cfi slightly above its central value (and similarly for the other energy coefficients), with the magnitude of the offset proportional to ρ.
+For comparison, the **Inputs shared between groups** setting on the same tab
+is worth 3.2% against 11.6% on the Colombian departmental inventory. That is
+the setting which decides whether a reported interval is defensible.
 
-The figure below shows the joint sample cloud of Y~m~ and Cfi under three slider settings:
+### Expressing a coefficient correlation you can evidence
 
-```{r fig-ef-scatter, fig.width = 9, fig.height = 3.2, fig.alt = "Three scatter plots showing Ym vs Cfi under EF block correlation of 0, 0.3, and 0.5"}
-set.seed(89)
-n <- 1200
-ym_marg  <- function(n) mc2d::rpert(n, min = 5.5, mode = 6.5, max = 7.5, shape = 4)
-cfi_marg <- function(n) rnorm(n, mean = 0.386, sd = 0.024)
-par(mfrow = c(1, 3), mar = c(3.5, 3.5, 2.5, 0.6), mgp = c(2.3, 0.7, 0))
-for (rho in c(0, 0.3, 0.5)) {
-  ic <- .ic_pair(n, rho = rho, marg1 = ym_marg, marg2 = cfi_marg)
-  ttl <- if (rho == 0) "ρ = 0   (independent)" else sprintf("ρ = +%.1f", rho)
-  plot(ic, pch = 16, col = adjustcolor("#2D6A4F", 0.4), cex = 0.5,
-       xlab = "Ym (% gross energy)", ylab = "Cfi (MJ/kg^0.75/day)",
-       main = ttl, cex.main = 0.95, cex.lab = 0.9, cex.axis = 0.85,
-       xlim = c(5.3, 7.7), ylim = c(0.32, 0.45))
-}
-```
+Independence is applied automatically and matches the IPCC default, so for
+most inventories there is nothing to do. Where several groups carry the same
+coefficient value, which is the case that genuinely matters, the treatment is
+**Inputs shared between groups**, which is on by default.
 
-At ρ = 0, the sample cloud is approximately circular, indicating independent sampling of Y~m~ and Cfi. At ρ = 0.3 a mild upward tilt is visible, and at ρ = 0.5 the tilt is pronounced. The same procedure is applied uniformly to all coefficients in the block.
-
-### Effect on the headline emissions estimate
-
-The figure below shows the 95% margin of error of total CO~2~eq for Country X under a range of correlation configurations:
-
-```{r fig-ef-stacking, fig.width = 8, fig.height = 4.0, fig.alt = "Bar chart showing Country X 95% MoE under combinations of AD correlation and EF correlation modes"}
-get_moe <- function(key) {
-  s <- runs[[key]]$summary
-  s[s$variable == "total_co2e", "moe_pct"]
-}
-df <- data.frame(
-  config = c(
-    "Nothing on",
-    "EF only, ρ=0.3",
-    "EF only, ρ=0.5",
-    "AD preset only",
-    "AD preset + EF ρ=0.3"
-  ),
-  moe = c(
-    get_moe("country_x_none"),
-    get_moe("country_x_ef_energy_03"),
-    get_moe("country_x_ef_energy_05"),
-    get_moe("country_x_preset"),
-    get_moe("country_x_preset_plus_ef_03")
-  ),
-  ad  = c("none", "none", "none", "preset", "preset"),
-  ef  = c("0", "0.3", "0.5", "0", "0.3")
-)
-par(mar = c(5.5, 4, 1.5, 0.6), mgp = c(2.6, 0.7, 0))
-cols <- c("#94A3B8", "#94A3B8", "#94A3B8", "#2D6A4F", "#2D6A4F")
-bp <- barplot(df$moe, names.arg = df$config, col = cols, border = "white",
-              ylab = "95% MoE on total CO₂eq (%)",
-              ylim = c(0, max(df$moe) * 1.18),
-              las = 2, cex.names = 0.78, cex.axis = 0.85, cex.lab = 0.9)
-text(bp, df$moe + max(df$moe) * 0.04, sprintf("%.1f%%", df$moe),
-     cex = 0.82, font = 2)
-```
-
-Applying the energy-block EF correlation alone (ρ = 0.3) increases the margin of error by approximately two percentage points relative to the no-correlation baseline; ρ = 0.5 produces a larger increase. When the EF correlation is combined with the structural-defaults AD preset, the two effects add partially: the AD preset has already shifted the MoE, and the additional EF contribution is smaller in magnitude.
-
-### Guidance on when to enable EF correlations
-
-The block-structured EF correlation is appropriate only when there is reason to believe that several emission-factor coefficients share a common methodological bias. The IPCC defaults are aggregated across many independent studies, so no single bias dominates; when the user's emission factors are taken from IPCC defaults, the EF correlation should remain off. Similarly, if the emission factors are sourced from country-specific measurements performed at different laboratories or in different years, the corresponding errors can be treated as independent.
-
-EF correlation at ρ = 0.3 is reasonable when several coefficients within a block originate from a single methodological source: for example, when all energy-equation coefficients (Cfi, Ca, Y~m~, and others) are drawn from a single national feeding trial or a single regional rumen database. The slider interpretation displayed under each slider categorises ρ in four bands: 0 (independent), up to 0.15 (weak shared bias), 0.16 to 0.35 (moderate shared bias), and above 0.35 (strong shared bias requiring documented justification).
-
-The same reasoning applies to the manure-CH~4~ block (B~o~, MCF, ASH) and the manure-N block (EF3, EF4, EF5, Frac_GasMS, Frac_LeachMS, UE): engage a non-zero ρ only when the constituent coefficients are known to share a common source.
-
-If the "Block-structured EF correlation" mode is selected but all three sliders are left at zero, an amber warning appears under the sliders. In this configuration the simulation behaves identically to the "No EF correlations" mode; the warning indicates that the user should either move at least one slider above zero or switch back to the default mode.
+A compiler who does have evidence that specific coefficients share a bias can
+still express it through **Advanced: manual matrix entry** on the
+activity-data card. That matrix spans the coefficients as well as the
+activity data, so a documented pair can be entered directly by name. The
+structural-defaults preset already uses this route for DE and Y~m~.
 
 ## Common pitfalls
 
@@ -386,8 +354,6 @@ If the "Block-structured EF correlation" mode is selected but all three sliders 
 - **Expecting the mean to change.** Correlations modify the spread of the emissions distribution but preserve the central estimate to within Monte Carlo sampling noise. A mean shift of more than a few tenths of a percent across correlation modes is typically not a correlation effect but a separate issue (most often related to parameter rebroadcasting).
 
 - **Selecting "From template (auto)" with an empty `Parameter_TimeSeries` sheet.** In earlier versions this configuration silently reverted to no correlations. The radio button is now disabled when the sheet contains no data, and the Run button blocks with an explicit error if stale state slips through. Identical heights for the green and grey bars in the comparison chart are a symptom of this configuration.
-
-- **Selecting "Block-structured EF correlation" with all three sliders at zero.** This produces a no-op identical to the default mode. An amber warning appears under the sliders; the user should move at least one slider above zero or switch back to "No EF correlations".
 
 - **Modifying row or column headers in the manual matrix.** Names that do not match the canonical entries in `PARAM_CATALOGUE` are dropped silently during import. The example template provided in the panel contains the canonical names and should be used as the starting point.
 

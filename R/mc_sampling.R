@@ -26,11 +26,11 @@
   fixed
 }
 
-# Used for the legacy "uniform EF correlation" option where a single rho
-# represents shared systematic bias across all emission factors. Retained for
-# back-compat; the default UI control switched to make_block_corr() in the
-# 2026-05 audit follow-up because a single rho across 13 heterogeneous
-# coefficients (energy, manure-CH4, manure-N) is statistically extreme.
+# Legacy helper for a single rho shared across all emission factors. No UI
+# control has produced one since the 2026-05 audit follow-up, and since
+# 2026-10-15 the app draws coefficients independently in every run, so
+# nothing calls this. Kept because it is a self-contained matrix builder and
+# the trend tab's year-correlation work may want it.
 make_uniform_corr <- function(n, rho) {
   if (n <= 1) return(diag(max(n, 1L)))
   m <- matrix(rho, n, n)
@@ -38,50 +38,10 @@ make_uniform_corr <- function(n, rho) {
   .repair_corr(m, "uniform-rho correlation matrix")
 }
 
-# 2026-05 audit follow-up: block-structured EF correlation.
-# Groups the IPCC coefficients into three blocks that share a measurement /
-# methodological provenance, and lets each block carry its own within-block
-# correlation. Cross-block entries are zero (the three literatures -
-# energy-equation rumen studies, BMP / lagoon studies, NH3/N2O volatilisation
-# studies: are independent).
-.EF_BLOCKS <- list(
-  # Energy-equation coefficients (IPCC Eq 10.3 / 10.4 / 10.16 / 10.21 family)
-  energy   = c("Cfi", "Ca", "C", "C_growth", "Cp", "Ym", "Ym_pct"),
-  # Manure-CH4 coefficients (BMP / lagoon literature)
-  manureCH = c("Bo", "MCF", "ASH", "ash"),
-  # Manure-N coefficients (NH3 / N2O volatilisation literature).
-  # Andreas 2026-05-27: EF3_S / Frac_GASMS / Frac_LEACH_H dropped from the
-  # Parameters sheet (now per-MMS in Manure_Management); legacy aliases
-  # ("EF3", "Frac_GASM", "Frac_LEACH") retained so old uploads still map.
-  manureN  = c("EF3_PRP", "EF3",
-               "Frac_GASM_PRP", "Frac_GASM",
-               "EF4", "EF5",
-               "Frac_LEACH_PRP", "Frac_LEACH",
-               "UE")
-)
-
-# Build an n x n block-diagonal correlation matrix. `param_names` are the
-# column ordering you want in the output (typically ef_params$parameter);
-# `rho_by_block` is a named list like list(energy = 0.3, manureCH = 0.2, manureN = 0).
-# Blocks with rho == 0 (or absent) contribute identity rows/cols; blocks with
-# only one matching parameter in `param_names` likewise contribute identity.
-make_block_corr <- function(param_names, rho_by_block) {
-  n <- length(param_names)
-  if (n == 0) return(matrix(0, 0, 0))
-  m <- diag(n)
-  rownames(m) <- colnames(m) <- param_names
-  for (blk in names(.EF_BLOCKS)) {
-    rho <- rho_by_block[[blk]]
-    if (is.null(rho) || !is.finite(rho) || rho == 0) next
-    idx <- which(param_names %in% .EF_BLOCKS[[blk]])
-    if (length(idx) >= 2) {
-      sub <- matrix(rho, length(idx), length(idx))
-      diag(sub) <- 1
-      m[idx, idx] <- sub
-    }
-  }
-  .repair_corr(m, "block-structured EF correlation matrix")
-}
+# 2026-10-15: .EF_BLOCKS and make_block_corr() removed with the UI control
+# they served. Coefficients are drawn independently. The ef_corr_matrix
+# argument threaded through this file stays live: the activity-data
+# correlation modes supply a coefficient-block matrix through it.
 
 # Correlated sampling for one block of parameters.
 # Procedure per IPCC Vol.1 Ch.3 §3.2.3.2: draw each column independently from

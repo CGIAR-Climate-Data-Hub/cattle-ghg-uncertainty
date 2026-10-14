@@ -197,6 +197,13 @@ lang_state_take <- function(token) {
     en = "%d coefficients are used identically across groups in this inventory (%s). They will be drawn once and applied to every group that shares them.",
     fr = "%d coefficients sont utilisés à l'identique entre groupes dans cet inventaire (%s). Ils seront tirés une fois puis appliqués à chaque groupe qui les partage."),
 
+  card_coef_indep_h = list(
+    en = "Coefficient correlations",
+    fr = "Corrélations des coefficients"),
+  info_coef_indep = list(
+    en = "Per-head coefficients, which is the emission factors together with Ym, Bo, digestibility and the rest, are drawn independently of one another in every run. This is the IPCC Approach 2 default. A setting used to sit here offering correlation within a measurement literature. It was removed in October 2026 because it asked for a correlation value that no inventory dataset supplies, and because across its entire range it moved the reported 95% interval by under 2 points on a 32-group test inventory. Where several groups carry the same coefficient value, that is handled by the setting above, and it is by far the larger effect.",
+    fr = "Les coefficients par tête, c'est-à-dire les facteurs d'émission ainsi que Ym, Bo, la digestibilité et les autres, sont tirés indépendamment les uns des autres à chaque execution. C'est le réglage par défaut de l'approche 2 du GIEC. Un réglage proposait ici une corrélation à l'intérieur d'une même littérature de mesure. Il a été retiré en octobre 2026 parce qu'il demandait une valeur de corrélation qu'aucun jeu de données d'inventaire ne fournit, et parce que sur toute son étendue il ne déplaçait l'intervalle à 95 % rapporté que de moins de 2 points sur un inventaire test de 32 groupes. Lorsque plusieurs groupes portent la même valeur de coefficient, cela est traité par le réglage ci-dessus, dont l'effet est de loin le plus important."),
+
   # ---- Measured-intake route (GE / DMI), 2026-09 -----------------------
   # Route labels. These appear in the results table and in every export, so
   # a reader can tell how each group reached gross energy without opening
@@ -977,12 +984,6 @@ lang_state_take <- function(token) {
     en = "any parameter whose row/column is absent from the uploaded matrix (or whose name doesn't match the canonical list) is treated as independent of every other parameter: the simulation runs but no correlation is applied for that parameter.",
     fr = "tout paramètre dont la ligne/colonne est absente de la matrice téléversée (ou dont le nom ne correspond pas à la liste canonique) est traité comme indépendant : la simulation tourne mais aucune corrélation n'est appliquée à ce paramètre."
   ),
-  card_ef_corr_h = list(en = "Coefficient Correlations (per-head EF inputs)",
-                          fr = "Corrélations des coefficients (entrées du FE par tête)"),
-  info_ef_corr = list(
-    en = "Emission factors can share systematic bias if they come from the same measurement literature. The IPCC default is to treat them as independent. Pick block-structured if you suspect one literature is biased: for example, all your energy-equation coefficients come from the same regional database.",
-    fr = "Les facteurs d'émission peuvent partager un biais systématique s'ils proviennent de la même littérature de mesure. La valeur IPCC par défaut les traite comme indépendants. Choisissez « par blocs » si vous suspectez qu'une littérature est biaisée : par exemple, si tous vos coefficients d'équation énergétique viennent de la même base régionale."
-  ),
 
   # =====================================================================
   # SIMULATE TAB
@@ -1657,10 +1658,6 @@ lang_state_take <- function(token) {
     fr = " : nécessite une matrice téléversée"
   ),
 
-  corr_ef_mode_none = list(en = "No EF correlations (default)",
-                             fr = "Pas de corrélations FE (par défaut)"),
-  corr_ef_mode_block = list(en = "Block-structured EF correlation",
-                              fr = "Corrélation FE structurée par blocs"),
 
   corr_ts_status_ok = list(
     en = "Time-series sheet loaded: correlations computed from your data.",
@@ -1675,10 +1672,6 @@ lang_state_take <- function(token) {
     fr = "Feuille Parameter_TimeSeries trouvée mais vide. Remplissez-la avec des données pluriannuelles ou choisissez un autre mode de corrélation."
   ),
 
-  corr_ef_zero_warning = list(
-    en = "All three within-block ρ sliders are at 0: block-structured EF correlation has no effect. Move at least one slider above 0 to add a correlation.",
-    fr = "Les trois curseurs ρ inter-blocs sont à 0 : la corrélation FE structurée par blocs n'a aucun effet. Déplacez au moins un curseur au-dessus de 0 pour ajouter une corrélation."
-  ),
 
   cmp_run_label = list(en = "Compare with/without correlations",
                          fr = "Comparer avec/sans corrélations"),
@@ -1759,14 +1752,6 @@ lang_state_take <- function(token) {
                                   fr = "Aucune matrice de corrélation chargée"),
   corr_heatmap_title_ad = list(en = "Activity Data Correlation Matrix",
                                   fr = "Matrice de corrélation des données d'activité"),
-  corr_heatmap_title_ef = list(en = "EF Correlation Matrix",
-                                  fr = "Matrice de corrélation des FE"),
-  corr_ef_no_corr = list(en = "No EF correlations applied (IPCC default)",
-                          fr = "Aucune corrélation FE appliquée (IPCC par défaut)"),
-  tip_ef_corr_mode = list(
-    en = "Should emission factors share systematic bias? The IPCC default is independence. Pick block-structured if you suspect one literature is biased (e.g. all your Ym-equation coefficients come from the same regional database).",
-    fr = "Les facteurs d'émission partagent-ils un biais systématique ? La valeur IPCC par défaut est l'indépendance. Choisissez « par blocs » si vous suspectez qu'une littérature est biaisée (par ex. tous vos coefficients d'équation Ym proviennent de la même base régionale)."
-  ),
 
   # =====================================================================
   # RESULTS VIEW (Simulate tab: post-run)

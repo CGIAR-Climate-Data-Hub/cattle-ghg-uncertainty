@@ -188,9 +188,13 @@ translator_chat_server <- function(input, output, session) {
       # now arrived at Home with no sign anything had happened. The panel
       # sits on the Resources tab, below the documents, so the tab switch
       # alone is not enough and the card is scrolled to as well.
+      # Sent as one client-side instruction rather than nav_select() plus a
+      # scroll. This observer runs on the first flush, before bslib's tab
+      # binding is reliably listening, so nav_select() was being dropped and
+      # the user landed on Home. The handler retries until the nav link
+      # exists, so it no longer depends on which side initialises first.
       tryCatch({
-        bslib::nav_select(id = "nav", selected = "Resources", session = session)
-        session$sendCustomMessage("scrollTo", "ai-translator-card")
+        session$sendCustomMessage("openTranslator", "")
       }, error = function(e) {
         message("auth: couldn't open the translator tab: ", conditionMessage(e))
       })

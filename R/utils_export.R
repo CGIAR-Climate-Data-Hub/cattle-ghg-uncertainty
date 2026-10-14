@@ -124,7 +124,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
 
   run_settings_df <- if (!is.null(settings)) {
     data.frame(
-      Setting = c("Iterations", "AD correlations", "EF correlations",
+      Setting = c("Iterations", "AD correlations",
                   "Comparison run (no corr.)", "GWP basis", "Seed",
                   "Analysis mode", "Emission sources",
                   # Measured-intake route (2026-09). Says which groups used
@@ -135,7 +135,6 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
       Value   = c(
         as.character(settings$n_iter %||% NA),
         as.character(settings$corr_mode %||% "none"),
-        as.character(settings$ef_corr_mode %||% "none"),
         if (isTRUE(settings$run_comparison)) "yes" else "no",
         as.character(settings$gwp_version %||% NA),
         as.character(settings$seed %||% NA),

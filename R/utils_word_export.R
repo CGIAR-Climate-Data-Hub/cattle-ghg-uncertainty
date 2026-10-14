@@ -767,7 +767,6 @@ build_trend_summary_docx <- function(path,
   rows <- list(
     c("Iterations",            .fmt_int(s$n_iter)),
     c("AD correlations",       .as_str(s$corr_mode,    "none")),
-    c("EF correlations",       .as_str(s$ef_corr_mode, "none")),
     c("Comparison run (no corr.)", if (isTRUE(s$run_comparison)) "yes" else "no"),
     c("GWP basis",             .as_str(s$gwp_version,  "AR5")),
     c("Seed",                  .as_str(s$seed,         "(random)")),

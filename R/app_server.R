@@ -16,7 +16,6 @@ app_server <- function(input, output, session) {
     manure_data = NULL,
     population = NULL,
     corr_matrix = NULL,
-    ef_corr_matrix = NULL,
     mc_results = NULL,
     uncertainty = NULL,
     decomposition = NULL,
@@ -1212,8 +1211,11 @@ app_server <- function(input, output, session) {
   # run would otherwise be identical to the main run and waste compute time.
   output$run_comparison_ui <- renderUI({
     no_ad_corr <- is.null(input$corr_mode) || input$corr_mode == "none"
-    no_ef_corr <- is.null(input$ef_corr_mode) || input$ef_corr_mode == "none"
-    if (no_ad_corr && no_ef_corr) {
+    # 2026-10-15: was the EF block mode. With coefficients always independent,
+    # the remaining thing a comparison run can show is cross-group sharing.
+    no_cg_corr <- is.null(input$crossgroup_mode) ||
+                  input$crossgroup_mode == "independent"
+    if (no_ad_corr && no_cg_corr) {
       tagList(
         tags$div(
           style = "opacity:0.55; pointer-events:none;",
@@ -1406,82 +1408,16 @@ app_server <- function(input, output, session) {
     }
   })
 
-  # EF correlation matrix: built from UI inputs whenever they change.
-  # 2026-05 audit follow-up: only two modes survive, "none" (IPCC default)
-  # and "block" (within-literature correlations, cross-block zero). The
-  # legacy "uniform" single-ρ option was removed because applying one ρ to
-  # 13 coefficients drawn from three unrelated measurement literatures
-  # (rumen fermentation / BMP-lagoon / NH₃ volatilisation) is statistically
-  # indefensible. make_uniform_corr() in mc_sampling.R is kept as an
-  # exported helper in case it is needed programmatically, but the UI no
-  # longer offers it.
-  ef_corr_reactive <- reactive({
-    req(rv$param_specs)
-    if (!isTRUE(input$ef_corr_mode == "block")) return(NULL)
-    ef_params <- rv$param_specs[rv$param_specs$param_type == "coefficient", ]
-    if (nrow(ef_params) < 2) return(NULL)
-    rho_by_block <- list(
-      energy   = input$ef_rho_energy   %||% 0,
-      manureCH = input$ef_rho_manureCH %||% 0,
-      manureN  = input$ef_rho_manureN  %||% 0
-    )
-    if (all(unlist(rho_by_block) == 0)) return(NULL)  # nothing to apply
-    make_block_corr(ef_params$parameter, rho_by_block)
-  })
-
-  observe({
-    rv$ef_corr_matrix <- ef_corr_reactive()
-  })
-
-  # 2026-05 UX overhaul: live "Currently:" captions under each block-rho slider.
-  # Translates the numeric rho into a plain-language band so non-statisticians
-  # can read the slider state without consulting docs.
-  .rho_band <- function(rho) {
-    if (is.null(rho) || !is.finite(rho)) return("")
-    if (rho == 0)         return("Currently: 0.00, independent within the block (no shared bias assumed).")
-    if (rho <= 0.15)      return(sprintf("Currently: %.2f, weak shared bias.", rho))
-    if (rho <= 0.35)      return(sprintf("Currently: %.2f, moderate shared bias (typical when one literature dominates).", rho))
-                          sprintf("Currently: %.2f, strong shared bias (requires documented justification).", rho)
-  }
-  output$ef_rho_energy_interp   <- renderText(.rho_band(input$ef_rho_energy))
-  output$ef_rho_manureCH_interp <- renderText(.rho_band(input$ef_rho_manureCH))
-  output$ef_rho_manureN_interp  <- renderText(.rho_band(input$ef_rho_manureN))
-
-  # 2026-06: warn when block-mode is selected but all three sliders are at 0.
-  # Without this the user gets a silent no-op identical to the AD-side empty-TS
-  # case Andreas hit.
-  output$ef_rho_all_zero_warning <- renderUI({
-    rhos <- c(input$ef_rho_energy   %||% 0,
-              input$ef_rho_manureCH %||% 0,
-              input$ef_rho_manureN  %||% 0)
-    if (all(rhos == 0)) {
-      tags$div(
-        style = "font-size:0.82rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px; margin-top:8px;",
-        icon("exclamation-triangle"),
-        " ", t("corr_ef_zero_warning")
-      )
-    }
-  })
-
-  output$ef_corr_heatmap <- plotly::renderPlotly({
-    mat <- ef_corr_reactive()
-    if (is.null(mat)) {
-      plotly::plot_ly() %>%
-        plotly::layout(title = t("corr_ef_no_corr"),
-                       xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
-    } else {
-      title_str <- sprintf("%s: energy=%.2f, manureCH=%.2f, manureN=%.2f",
-                           t("corr_heatmap_title_ef"),
-                           input$ef_rho_energy   %||% 0,
-                           input$ef_rho_manureCH %||% 0,
-                           input$ef_rho_manureN  %||% 0)
-      plotly::plot_ly(z = mat, type = "heatmap",
-                      x = colnames(mat), y = rownames(mat),
-                      colorscale = list(c(0, "#FFFFFF"), c(1, "#2D6A4F")),
-                      zmin = 0, zmax = 1) %>%
-        plotly::layout(title = title_str)
-    }
-  })
+  # 2026-10-15: block-structured EF correlation removed. Measured on the
+  # 32-group Colombia file, moving all three within-block rho sliders from 0
+  # to their maximum moved the reported 95% interval by 1.9 points, 9.1% to
+  # 11.0%, and two of the three blocks accounted for none of it: energy
+  # -0.05 pt, manure CH4 +0.05 pt, manure N +1.88 pt. The control asked for a
+  # number nothing in a compiler's data could supply, and two thirds of it
+  # could not change the answer whichever value was chosen. Coefficients are
+  # now always drawn independently, the IPCC Approach 2 default.
+  # The ef_corr_matrix slot survives because the activity-data correlation
+  # modes still populate it through ts_coef_corr below.
 
   # --- SIMULATION ---
 
@@ -1658,15 +1594,12 @@ app_server <- function(input, output, session) {
     rv$sim_log <- paste0(rv$sim_log, "\n--- Starting simulation ---\n")
     rv$sim_log <- paste0(rv$sim_log, "Iterations: ", n_iter_val, "\n")
     rv$sim_log <- paste0(rv$sim_log, "GWP: ", input$gwp_version, "\n")
-    if (!is.null(rv$ef_corr_matrix)) {
-      rv$sim_log <- paste0(rv$sim_log,
-        sprintf("EF correlation: block-structured (energy=%.2f, manureCH=%.2f, manureN=%.2f)\n",
-                input$ef_rho_energy   %||% 0,
-                input$ef_rho_manureCH %||% 0,
-                input$ef_rho_manureN  %||% 0))
-    } else {
-      rv$sim_log <- paste0(rv$sim_log, "EF correlation: none (independent)\n")
-    }
+    rv$sim_log <- paste0(rv$sim_log, "Activity-data correlation: ",
+                         input$corr_mode %||% "none", "\n")
+    rv$sim_log <- paste0(rv$sim_log, "Shared inputs across groups: ",
+                         input$crossgroup_mode %||% "shared", "\n")
+    rv$sim_log <- paste0(rv$sim_log,
+                         "Coefficient correlation: independent (IPCC default)\n")
 
     withProgress(
       message = sprintf("Monte Carlo simulation (%s iterations)", n_iter_fmt),
@@ -1962,13 +1895,10 @@ app_server <- function(input, output, session) {
             # AD block has only cattle_pop: within-block correlation is meaningless.
             corr <- NULL
 
-            # If time-series matrix is available, prefer it over uniform-rho.
-            ef_corr <- if (!is.null(ts_coef_corr)) {
-              ts_coef_corr
-            } else if (!is.null(rv$ef_corr_matrix)) {
-              ef_n <- sum(sys_specs$param_type == "coefficient")
-              if (nrow(rv$ef_corr_matrix) == ef_n) rv$ef_corr_matrix else NULL
-            } else NULL
+            # The activity-data correlation modes are the only remaining
+            # source of a coefficient-block matrix; block-structured EF
+            # correlation was removed on 2026-10-15.
+            ef_corr <- ts_coef_corr
 
             # Andreas 2026-05 follow-up: Dirichlet MMS-allocation sampling
             # removed (not in IPCC guidance; MMS% is now deterministic).
@@ -3561,7 +3491,6 @@ app_server <- function(input, output, session) {
         settings = list(
           n_iter           = as.integer(input$n_iter),
           corr_mode        = input$corr_mode,
-          ef_corr_mode     = input$ef_corr_mode,
           run_comparison   = input$run_comparison,
           gwp_version      = input$gwp_version,
           seed             = input$seed,
@@ -3696,7 +3625,6 @@ app_server <- function(input, output, session) {
       settings <- list(
         n_iter            = as.integer(input$n_iter),
         corr_mode         = input$corr_mode,
-        ef_corr_mode      = input$ef_corr_mode,
         run_comparison    = isTRUE(input$run_comparison),
         gwp_version       = input$gwp_version,
         seed              = input$seed,

@@ -575,7 +575,6 @@ The central emission estimate is essentially unchanged regardless of which mode 
   \item \textbf{Structural defaults} $\rightarrow$ changes the 95\% uncertainty interval by \textbf{about one percentage point or less} on the built-in examples (Country X 25.3\% $\rightarrow$ 25.2\%; Country Y 36.5\% $\rightarrow$ 37.5\%). The effect is modest because the preset links only 7 pairs out of $\sim$78 possible, with values between 0.20 and 0.50 in absolute terms. Strong correlations on wide inputs, entered through the manual matrix, move the interval much more.
   \item \textbf{From template (auto, time-series)} $\rightarrow$ varies with the data. A rich, varied historical series (multiple parameters genuinely co-moving year-on-year) can produce effects similar to or larger than the structural defaults. A sparse or mostly static series will produce a much smaller effect because the matrix collapses to near-identity once constant columns are dropped.
   \item \textbf{Advanced: manual entry} $\rightarrow$ entirely depends on what you upload. Strong correlations on parameters with wide uncertainty bounds can move the interval by 20\% or more (in either direction).
-  \item \textbf{Block-structured EF correlation} (right-hand card) at $\rho = 0.3$ on one block $\rightarrow$ a further few-percent widening on top of any activity-data correlation. At $\rho = 0.5$ (the slider maximum), roughly double that.
 \end{itemize}
 
 If you select correlations and the result barely changes, that is usually expected, not a bug: the IPCC equation chain multiplies around 13 parameters together, which dilutes the effect of any single correlated pair. See the Methodology document for the underlying mathematics.
@@ -639,18 +638,23 @@ All other pairs are set to zero. Four of the values can reasonably be changed th
 
 ## Coefficient (emission factor) correlations
 
-The right-hand card on Tab~4 controls correlations \emph{between} the per-head IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, …). Two modes are available:
+The per-head IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, and the
+rest) are drawn independently of one another in every run. This is the
+IPCC Approach 2 default and there is no setting to choose.
 
-\begin{itemize}
-  \item \textbf{No EF correlations} (default): coefficients are sampled independently. This is the IPCC Approach~2 default and is appropriate when each emission factor comes from its own study.
-  \item \textbf{Block-structured EF correlation} (recommended when you do want non-zero EF correlations): the IPCC coefficients are grouped into three blocks, each with its own within-block $\rho$ slider in $[0, 0.5]$:
-  \begin{itemize}
-    \item \textit{Energy-equation coefficients} (Cfi, Ca, C, Cp, Ym): rumen-fermentation studies (IPCC Eq~10.3 / 10.16 / 10.21 family).
-    \item \textit{Manure-CH$_4$ coefficients} (Bo, MCF, ASH): BMP assays and lagoon-temperature studies.
-    \item \textit{Manure-N coefficients} (EF3, EF4, EF5, Frac\_GASMS, Frac\_LEACH, UE): NH$_3$ / N$_2$O volatilisation studies.
-  \end{itemize}
-  Cross-block correlation is zero: these three literatures are independent. $\rho = 0.3$ is a moderate assumption capturing shared measurement bias within a block.
-\end{itemize}
+Until October 2026 Tab 4 carried a second card offering block-structured
+correlation between these coefficients, with three within-block $\rho$
+sliders. It was removed for two reasons. It asked for a correlation value
+that no inventory dataset supplies, and across its entire range it moved the
+reported 95\% interval by under two percentage points on a 32-group test
+inventory, with two of its three blocks contributing nothing measurable. The
+\emph{Find out more: correlations} page sets out the measurements.
+
+If you do have evidence that particular coefficients share a bias, you can
+still enter it. The \textbf{Advanced: manual matrix entry} option on the
+activity-data card accepts a correlation matrix spanning coefficients as
+well as activity data, and the structural-defaults preset already applies one
+such pair (DE $\leftrightarrow$ Ym).
 
 \newpage
 
@@ -845,7 +849,7 @@ To illustrate the workflow, the following example uses the Country X built-in da
 
 **Step 3: Uncertainty**: Go to Tab 3. Note that activity data (N, BW, Milk, WG, Fat) use Normal distributions and coefficients (Ym, DE, Bo, etc.) use PERT or lognormal distributions.
 
-**Step 4: Correlations**: Go to Tab 4. Select "From template (auto, time-series)", the example dataset includes a 5-year time series from which a Spearman rank correlation matrix is computed automatically (first-difference detrending is applied internally to strip shared long-run growth). The matrix is sampled using Iman--Conover restricted pairing. Leave the right-hand card at "No EF correlations" for the default run.
+**Step 4: Correlations**: Go to Tab 4. Select "From template (auto, time-series)", the example dataset includes a 5-year time series from which a Spearman rank correlation matrix is computed automatically (first-difference detrending is applied internally to strip shared long-run growth). The matrix is sampled using Iman--Conover restricted pairing.
 
 **Step 5: Simulate**: Go to Tab 5. Set iterations to 10,000, GWP to AR6, seed to 42. Click "Run Monte Carlo Simulation".
 

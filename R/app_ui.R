@@ -202,6 +202,29 @@ app_ui <- function(request = NULL) {
                                    window.location.pathname);
            }
          });
+         // 2026-10-14: a sign-in link has to land on the translator.
+         // nav_select() alone was not enough. That observer fires on the
+         // first flush, when bslib's tab binding may not yet be listening,
+         // so the message was dropped and the user stayed on Home with no
+         // sign anything had happened. Driving the tab from the client
+         // removes the ordering question: retry until the nav link is in
+         // the DOM, click it, then bring the card into view. The attribute
+         // value is unquoted on purpose, so this stays inside the R string.
+         Shiny.addCustomMessageHandler('openTranslator', function(_unused) {
+           var attempt = function(tries) {
+             var link = document.querySelector('a[data-value=Resources]');
+             if (link) {
+               link.click();
+               setTimeout(function() {
+                 var el = document.getElementById('ai-translator-card');
+                 if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+               }, 250);
+             } else if (tries > 0) {
+               setTimeout(function() { attempt(tries - 1); }, 100);
+             }
+           };
+           attempt(25);
+         });
          // 2026-06: in-app AI translator, Server-Sent-Events streaming.
          // server -> client message protocol:
          //   translatorStreamStart : create a fresh assistant bubble,
@@ -1862,94 +1885,19 @@ app_ui <- function(request = NULL) {
           )
         ),
 
-        # --- Emission factor correlations ---
+        # --- Coefficient correlations: removed 2026-10-15 ---
+        # The card here offered a mode selector and three within-block rho
+        # sliders. It was taken out because it asked the user for a number
+        # their data cannot supply, and because two of its three blocks
+        # could not move the answer: measured on the 32-group Colombia file,
+        # energy -0.05 pt and manure CH4 +0.05 pt, both inside Monte Carlo
+        # noise, against manure N +1.88 pt. The whole control spanned 9.1%
+        # to 11.0%. A note is left in its place so that a user who looks for
+        # the setting learns the absence is deliberate.
         bslib::card(
-          bslib::card_header(t("card_ef_corr_h")),
+          bslib::card_header(t("card_coef_indep_h")),
           bslib::card_body(
-            div(class = "info-panel",
-                t("info_ef_corr")),
-            radioButtons("ef_corr_mode",
-                         label = tagList(
-                           paste0(t("corr_mode_label"), " "),
-                           bslib::tooltip(
-                             span(icon("circle-question"),
-                                  style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                             t("tip_ef_corr_mode"),
-                             placement = "right"
-                           )
-                         ),
-                         choices = setNames(c("none", "block"),
-                                              c(t("corr_ef_mode_none"),
-                                                t("corr_ef_mode_block")))),
-            div(class = "small text-muted",
-                style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
-                tags$ul(style = "padding-left:18px; margin:0;",
-                  tags$li(tags$strong("No EF correlations (default)"),
-                          ": emission factors are treated as independent. Standard IPCC Approach 2 assumption; ",
-                          "appropriate when each EF comes from its own study."),
-                  tags$li(tags$strong("Block-structured EF correlation"),
-                          ": pick this when coefficients within the same measurement literature share bias ",
-                          "(e.g. all rumen-fermentation coefficients from one regional database) but the three literatures ",
-                          "are independent of one another.")
-                )),
-            conditionalPanel(
-              condition = "input.ef_corr_mode == 'block'",
-              # 2026-05 UX overhaul: directional tooltips per slider so a
-              # non-statistician understands what moving the slider does.
-              # Each slider has a live "Currently:" caption below it
-              # (driven by output$ef_rho_*_interp in app_server.R).
-              sliderInput("ef_rho_energy",
-                          label = tagList(
-                            "Within-block ρ: Energy-equation coefficients (Cfi, Ca, C, Cp, Ym) ",
-                            bslib::tooltip(
-                              span(icon("circle-question"),
-                                   style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                              "Move the slider toward 0.5 if you believe your energy-equation coefficients (Cfi, Ca, Ym, …) share a common bias: e.g. all derived from the same regional rumen-fermentation database. Move toward 0 if you treat them as independent. ρ = 0.3 means: if Ym is sampled at its 80th percentile in one iteration, the others are nudged up to about their 60th percentile on average.",
-                              placement = "right"
-                            )
-                          ),
-                          min = 0.0, max = 0.5, value = 0.0, step = 0.05),
-              div(style = "font-size:0.78rem; color:#2D6A4F; margin-top:-6px; margin-bottom:10px;",
-                  textOutput("ef_rho_energy_interp", inline = TRUE)),
-
-              sliderInput("ef_rho_manureCH",
-                          label = tagList(
-                            "Within-block ρ: Manure-CH₄ coefficients (Bo, MCF, ASH) ",
-                            bslib::tooltip(
-                              span(icon("circle-question"),
-                                   style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                              "Move toward 0.5 if Bo, MCF, ASH likely share systematic bias: e.g. all from one country's BMP / lagoon-temperature database. Move toward 0 if independent. ρ = 0.3 means: a high Bo iteration tends to come with a slightly high MCF.",
-                              placement = "right"
-                            )
-                          ),
-                          min = 0.0, max = 0.5, value = 0.0, step = 0.05),
-              div(style = "font-size:0.78rem; color:#2D6A4F; margin-top:-6px; margin-bottom:10px;",
-                  textOutput("ef_rho_manureCH_interp", inline = TRUE)),
-
-              sliderInput("ef_rho_manureN",
-                          label = tagList(
-                            "Within-block ρ: Manure-N coefficients (EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, UE) ",
-                            bslib::tooltip(
-                              span(icon("circle-question"),
-                                   style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                              "Move toward 0.5 if EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP all come from the same NH₃ / N₂O volatilisation programme. Move toward 0 if independent. ρ = 0.3 means moderate shared bias.",
-                              placement = "right"
-                            )
-                          ),
-                          min = 0.0, max = 0.5, value = 0.0, step = 0.05),
-              div(style = "font-size:0.78rem; color:#2D6A4F; margin-top:-6px; margin-bottom:10px;",
-                  textOutput("ef_rho_manureN_interp", inline = TRUE)),
-
-              div(style = "font-size:0.82rem; color:#555; margin-top:4px;",
-                  "These sliders only matter when you want to capture systematic measurement bias ",
-                  tags$em("within"), " one literature. Cross-block correlation is always zero: ",
-                  "the three coefficient groups come from independent measurement programmes."),
-              # 2026-06: warn when all three sliders are at 0, selecting
-              # block-structured then leaving the sliders at zero is a silent
-              # no-op exactly like the AD-side empty-TS issue.
-              uiOutput("ef_rho_all_zero_warning")
-            ),
-            plotly::plotlyOutput("ef_corr_heatmap", height = "350px")
+            div(class = "info-panel", t("info_coef_indep"))
           )
         )
       )

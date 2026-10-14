@@ -1819,19 +1819,22 @@ section_F <- function() {
     # Renamed sections after the 2026-06-09 tone rewrite. The page no
     # longer has a "Quick answer" TLDR block (replaced with a neutral
     # opening paragraph) and the pitfalls section is now "Common pitfalls"
-    # (was "Common mistakes"). Country X / Y worked examples and the
-    # emission-factor (EF) section are required signals of structural
+    # (was "Common mistakes"). On 2026-10-15 "Emission-factor correlations
+    # (right-hand card)" became "Coefficient correlations", when the block
+    # correlation control was removed and the section was rewritten to say
+    # coefficients are drawn independently. Country X / Y worked examples
+    # and the coefficient section are required signals of structural
     # completeness.
     size_ok       <- file.info(help_html)$size >= 50000
     has_x         <- grepl("Country X", txt, fixed = TRUE)
     has_y         <- grepl("Country Y", txt, fixed = TRUE)
     has_pitfalls  <- grepl("Common pitfalls", txt, fixed = TRUE)
-    has_ef        <- grepl("Emission-factor correlations", txt, fixed = TRUE)
+    has_coef      <- grepl("Coefficient correlations", txt, fixed = TRUE)
     check_bool("F23", "F",
-               "Correlations help page rendered with both worked examples + EF section + pitfalls",
-               size_ok && has_x && has_y && has_pitfalls && has_ef,
-               notes = sprintf("size_ok=%s X=%s Y=%s pitfalls=%s EF=%s",
-                               size_ok, has_x, has_y, has_pitfalls, has_ef))
+               "Correlations help page rendered with both worked examples + coefficient section + pitfalls",
+               size_ok && has_x && has_y && has_pitfalls && has_coef,
+               notes = sprintf("size_ok=%s X=%s Y=%s pitfalls=%s coef=%s",
+                               size_ok, has_x, has_y, has_pitfalls, has_coef))
   } else {
     record("F23", "F", "Correlations help page",
            "rendered HTML", "missing", "SKIP",
@@ -3916,7 +3919,7 @@ section_G <- function() {
     build_run_summary_docx(
       path = dpath,
       settings = list(n_iter = 500L, gwp_version = "AR5",
-                       corr_mode = "none", ef_corr_mode = "none",
+                       corr_mode = "none",
                        analysis_mode = "single",
                        emission_sources = character(0)),
       param_specs = sim$by_system[[1]]$samples,
