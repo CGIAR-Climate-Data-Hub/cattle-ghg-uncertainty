@@ -183,6 +183,17 @@ translator_chat_server <- function(input, output, session) {
       }, error = function(e) {
         message("auth: couldn't issue session cookie: ", conditionMessage(e))
       })
+      # 2026-10-14: land on the translator, not the home page. Someone who
+      # has just clicked a sign-in link came for the translator, and until
+      # now arrived at Home with no sign anything had happened. The panel
+      # sits on the Resources tab, below the documents, so the tab switch
+      # alone is not enough and the card is scrolled to as well.
+      tryCatch({
+        bslib::nav_select(id = "nav", selected = "Resources", session = session)
+        session$sendCustomMessage("scrollTo", "ai-translator-card")
+      }, error = function(e) {
+        message("auth: couldn't open the translator tab: ", conditionMessage(e))
+      })
     } else {
       state$user_email <- NULL
       state$login_status <- paste0(
@@ -218,6 +229,22 @@ translator_chat_server <- function(input, output, session) {
     # external addresses.
     if (!grepl("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email, perl = TRUE)) {
       state$login_status <- "Please enter a valid email address."
+      return()
+    }
+    # 2026-10-14: check approval BEFORE issuing a link. Until now every
+    # address got a working sign-in email, including addresses with no
+    # access, who then clicked it and were refused. That told them twice
+    # that they were in ("Sent! Check your email", then a link that opens
+    # the app) before telling them they were not, and it fired an admin
+    # notification on every click rather than once on the request.
+    if (!auth_is_approved(email)) {
+      state$login_status <- paste0(
+        "Thanks. ", email, " is not on the access list yet, so no sign-in ",
+        "link has been sent. Your request has been forwarded to the ",
+        "administrator, and you will receive an email once it is approved.")
+      tryCatch(auth_notify_admin_of_request(email),
+               error = function(e)
+                 message("auth: couldn't notify admin: ", conditionMessage(e)))
       return()
     }
     tok <- auth_token_issue(email)

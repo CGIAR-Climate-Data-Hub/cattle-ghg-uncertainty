@@ -1236,6 +1236,10 @@ app_ui <- function(request = NULL) {
     # ==================== USEFUL RESOURCES TAB (T0.2) ====================
     bslib::nav_panel(
       title = t("tab_resources"),
+      # Explicit value: without it the panel's value is the TRANSLATED title,
+      # so nav_select("Resources") worked in English and silently did nothing
+      # in French. The magic-link redirect and goto_resources both target this.
+      value = "Resources",
       icon = icon("book-open"),
       div(style = "max-width: 960px; margin: 0 auto; padding: 24px;",
         # FR-only inline note about English-only docs (shown only when the

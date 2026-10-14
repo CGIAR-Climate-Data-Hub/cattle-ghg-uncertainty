@@ -83,6 +83,8 @@ app_server <- function(input, output, session) {
   # methodology/user-guide download buttons are in view immediately. The JS
   # handler in app_ui.R wraps scrollIntoView in setTimeout(150ms) to give the
   # newly-activated tab a tick to render before we try to scroll to it.
+  # "Resources" is the panel's explicit value (R/app_ui.R), not its title,
+  # so this works in French as well.
   observeEvent(input$goto_resources, {
     bslib::nav_select(id = "nav", selected = "Resources", session = session)
     session$sendCustomMessage("scrollTo", "downloads-card")
