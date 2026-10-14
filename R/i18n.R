@@ -197,12 +197,6 @@ lang_state_take <- function(token) {
     en = "%d coefficients are used identically across groups in this inventory (%s). They will be drawn once and applied to every group that shares them.",
     fr = "%d coefficients sont utilisés à l'identique entre groupes dans cet inventaire (%s). Ils seront tirés une fois puis appliqués à chaque groupe qui les partage."),
 
-  card_coef_indep_h = list(
-    en = "Coefficient correlations",
-    fr = "Corrélations des coefficients"),
-  info_coef_indep = list(
-    en = "Per-head coefficients, which is the emission factors together with Ym, Bo, digestibility and the rest, are drawn independently of one another in every run. This is the IPCC Approach 2 default. A setting used to sit here offering correlation within a measurement literature. It was removed in October 2026 because it asked for a correlation value that no inventory dataset supplies, and because across its entire range it moved the reported 95% interval by under 2 points on a 32-group test inventory. Where several groups carry the same coefficient value, that is handled by the setting above, and it is by far the larger effect.",
-    fr = "Les coefficients par tête, c'est-à-dire les facteurs d'émission ainsi que Ym, Bo, la digestibilité et les autres, sont tirés indépendamment les uns des autres à chaque execution. C'est le réglage par défaut de l'approche 2 du GIEC. Un réglage proposait ici une corrélation à l'intérieur d'une même littérature de mesure. Il a été retiré en octobre 2026 parce qu'il demandait une valeur de corrélation qu'aucun jeu de données d'inventaire ne fournit, et parce que sur toute son étendue il ne déplaçait l'intervalle à 95 % rapporté que de moins de 2 points sur un inventaire test de 32 groupes. Lorsque plusieurs groupes portent la même valeur de coefficient, cela est traité par le réglage ci-dessus, dont l'effet est de loin le plus important."),
 
   # ---- Measured-intake route (GE / DMI), 2026-09 -----------------------
   # Route labels. These appear in the results table and in every export, so

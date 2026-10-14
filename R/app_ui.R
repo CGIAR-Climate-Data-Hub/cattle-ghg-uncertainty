@@ -1790,7 +1790,10 @@ app_ui <- function(request = NULL) {
           tags$strong(t("info_corr_shared_label")), tags$br(),
           t("info_corr_shared_body")),
       bslib::layout_columns(
-        col_widths = c(6, 6),
+        # One card since the coefficient-correlation card was removed on
+        # 2026-10-15. Full width rather than a half-width card beside an
+        # empty half.
+        col_widths = 12,
 
         # --- Activity data correlations ---
         bslib::card(
@@ -1883,23 +1886,13 @@ app_ui <- function(request = NULL) {
                      t("crossgroup_exclusive")),
             uiOutput("crossgroup_detected")
           )
-        ),
-
-        # --- Coefficient correlations: removed 2026-10-15 ---
-        # The card here offered a mode selector and three within-block rho
-        # sliders. It was taken out because it asked the user for a number
-        # their data cannot supply, and because two of its three blocks
-        # could not move the answer: measured on the 32-group Colombia file,
-        # energy -0.05 pt and manure CH4 +0.05 pt, both inside Monte Carlo
-        # noise, against manure N +1.88 pt. The whole control spanned 9.1%
-        # to 11.0%. A note is left in its place so that a user who looks for
-        # the setting learns the absence is deliberate.
-        bslib::card(
-          bslib::card_header(t("card_coef_indep_h")),
-          bslib::card_body(
-            div(class = "info-panel", t("info_coef_indep"))
-          )
         )
+        # Coefficient correlations: the card that stood here was removed on
+        # 2026-10-15, and the note that replaced it was removed the same
+        # day. Coefficients are drawn independently in every run, which is
+        # the IPCC Approach 2 default and needs no control. The reasoning,
+        # with the measurements behind it, is in the methodology document
+        # only, deliberately: the tab states settings, not history.
       )
     ),
 

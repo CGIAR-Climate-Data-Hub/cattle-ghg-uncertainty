@@ -636,26 +636,6 @@ DE   & Ym   & $-0.20$ & IPCC Table 10.12 assigns a lower Ym to more digestible d
 
 All other pairs are set to zero. Four of the values can reasonably be changed through the manual matrix when you know your situation: BW $\leftrightarrow$ MW $0.8$--$0.9$ when both weights come from the same survey; Milk $\leftrightarrow$ BW $0.10$--$0.20$ for a single-breed herd; DE $\leftrightarrow$ CP $0.3$--$0.5$ when your feed-quality uncertainty is mainly about forage maturity; DE $\leftrightarrow$ Ym $-0.3$ to $-0.5$ for high-grain dairy or feedlot systems.
 
-## Coefficient (emission factor) correlations
-
-The per-head IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, and the
-rest) are drawn independently of one another in every run. This is the
-IPCC Approach 2 default and there is no setting to choose.
-
-Until October 2026 Tab 4 carried a second card offering block-structured
-correlation between these coefficients, with three within-block $\rho$
-sliders. It was removed for two reasons. It asked for a correlation value
-that no inventory dataset supplies, and across its entire range it moved the
-reported 95\% interval by under two percentage points on a 32-group test
-inventory, with two of its three blocks contributing nothing measurable. The
-\emph{Find out more: correlations} page sets out the measurements.
-
-If you do have evidence that particular coefficients share a bias, you can
-still enter it. The \textbf{Advanced: manual matrix entry} option on the
-activity-data card accepts a correlation matrix spanning coefficients as
-well as activity data, and the structural-defaults preset already applies one
-such pair (DE $\leftrightarrow$ Ym).
-
 \newpage
 
 # Running the simulation (Tab 5: Simulate)

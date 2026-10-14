@@ -51,7 +51,7 @@ runs <- readRDS(file.path(params$cache_dir, "correlations_runs.rds"))
 }
 ```
 
-This page describes how correlations between input parameters affect Monte Carlo simulation results in the tool, what the two correlation cards on the Simulate tab control, and how to interpret each option using two worked examples.
+This page describes how correlations between input parameters affect Monte Carlo simulation results in the tool, what the correlation settings on the Simulate tab control, and how to interpret each option using two worked examples.
 
 The principle: when two input parameters tend to move together in nature, the Monte Carlo sampler should reproduce that joint behaviour. Sampling them independently when they are correlated produces parameter combinations that do not occur in real systems, which biases the spread (though not the central estimate) of the simulated emissions distribution.
 
@@ -289,63 +289,6 @@ The left-hand card on the Simulate tab offers four options:
 **From template (auto, time-series).** Computes a Spearman rank-correlation matrix from the user's `Parameter_TimeSeries` sheet, with first-difference detrending applied internally to remove shared long-run growth. Requires at least five years of populated data; the radio button is disabled in the UI when this condition is not met.
 
 **Manual (CSV upload).** Uses a user-supplied square correlation matrix, intended for cases where a published matrix from a similar inventory or an expert-elicitation result is available. A template is provided in the panel.
-
-## Coefficient correlations
-
-Coefficients are drawn independently of one another. This is the IPCC
-Approach 2 default, and since October 2026 it is what the tool does in every
-run, with no setting attached.
-
-A control used to sit on this tab. It grouped the coefficients into three
-blocks by the measurement literature they come from, and offered a
-within-block correlation for each. It was removed for two reasons.
-
-The first is that it asked for a number no inventory dataset supplies. A
-compiler can read a body weight or a herd count off a survey. Nothing in a
-survey says whether the correlation between Cfi and Y~m~ is 0.2 or 0.4, and
-the four descriptive bands printed under each slider did not change that.
-
-The second is that most of the control could not affect the answer. Measured
-on a 32-group Colombian municipal inventory at 3,000 iterations, holding the
-herd, the parameters and the uncertainty inputs fixed and moving only the
-sliders:
-
-| Slider positions | 95% margin of error |
-|---|---|
-| all three at 0 (default) | 9.09% |
-| all three at 0.15 | 9.80% |
-| all three at 0.30 | 10.35% |
-| all three at 0.50 (maximum) | 11.00% |
-| energy block alone at 0.50 | 9.04% |
-| manure-CH~4~ block alone at 0.50 | 9.14% |
-| manure-N block alone at 0.50 | 10.97% |
-
-The whole control spans 1.9 percentage points. Two of its three blocks
-account for none of it: the energy block moves the figure by -0.05 points and
-the manure-CH~4~ block by +0.05, both inside Monte Carlo noise at this
-iteration count. The entire effect comes from the manure-N block, and the
-reason is the width of the parameters in it. EF3_PRP carries an IPCC default
-range of plus or minus 221%, Frac_LEACH_PRP 150%, EF5 89% and Frac_GASM_PRP
-73%, against 30% or less for every coefficient in the other two blocks.
-Correlating wide inputs moves a result; correlating narrow ones cannot, at
-any value of rho.
-
-For comparison, the **Inputs shared between groups** setting on the same tab
-is worth 3.2% against 11.6% on the Colombian departmental inventory. That is
-the setting which decides whether a reported interval is defensible.
-
-### Expressing a coefficient correlation you can evidence
-
-Independence is applied automatically and matches the IPCC default, so for
-most inventories there is nothing to do. Where several groups carry the same
-coefficient value, which is the case that genuinely matters, the treatment is
-**Inputs shared between groups**, which is on by default.
-
-A compiler who does have evidence that specific coefficients share a bias can
-still express it through **Advanced: manual matrix entry** on the
-activity-data card. That matrix spans the coefficients as well as the
-activity data, so a documented pair can be entered directly by name. The
-structural-defaults preset already uses this route for DE and Y~m~.
 
 ## Common pitfalls
 

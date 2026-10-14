@@ -1819,22 +1819,20 @@ section_F <- function() {
     # Renamed sections after the 2026-06-09 tone rewrite. The page no
     # longer has a "Quick answer" TLDR block (replaced with a neutral
     # opening paragraph) and the pitfalls section is now "Common pitfalls"
-    # (was "Common mistakes"). On 2026-10-15 "Emission-factor correlations
-    # (right-hand card)" became "Coefficient correlations", when the block
-    # correlation control was removed and the section was rewritten to say
-    # coefficients are drawn independently. Country X / Y worked examples
-    # and the coefficient section are required signals of structural
-    # completeness.
+    # (was "Common mistakes"). The emission-factor section was removed
+    # entirely on 2026-10-15 along with the control it described; that
+    # reasoning now lives in the methodology document alone, so this page
+    # is no longer checked for it. Country X / Y worked examples and the
+    # pitfalls section remain the signals of structural completeness.
     size_ok       <- file.info(help_html)$size >= 50000
     has_x         <- grepl("Country X", txt, fixed = TRUE)
     has_y         <- grepl("Country Y", txt, fixed = TRUE)
     has_pitfalls  <- grepl("Common pitfalls", txt, fixed = TRUE)
-    has_coef      <- grepl("Coefficient correlations", txt, fixed = TRUE)
     check_bool("F23", "F",
-               "Correlations help page rendered with both worked examples + coefficient section + pitfalls",
-               size_ok && has_x && has_y && has_pitfalls && has_coef,
-               notes = sprintf("size_ok=%s X=%s Y=%s pitfalls=%s coef=%s",
-                               size_ok, has_x, has_y, has_pitfalls, has_coef))
+               "Correlations help page rendered with both worked examples + pitfalls",
+               size_ok && has_x && has_y && has_pitfalls,
+               notes = sprintf("size_ok=%s X=%s Y=%s pitfalls=%s",
+                               size_ok, has_x, has_y, has_pitfalls))
   } else {
     record("F23", "F", "Correlations help page",
            "rendered HTML", "missing", "SKIP",
