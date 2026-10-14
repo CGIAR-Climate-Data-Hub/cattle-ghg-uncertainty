@@ -518,20 +518,43 @@ discussion would otherwise carry the old numbers into the workbook.</li>
 </div>
 <div id="privacy-and-operational-cost" class="section level2">
 <h2>Privacy and operational cost</h2>
+<div id="where-your-data-goes" class="section level3">
+<h3>Where your data goes</h3>
+<p>When a file is uploaded, its contents are sent to the AI service over
+an encrypted connection. That is how the translation is done, and it is
+the main thing to be aware of before uploading anything.</p>
+<p>A copy of the conversation, including the uploaded data and the
+user’s email address, is then written to a file on the app server. It is
+kept so that a user can close the tab and resume where they left off. It
+is removed in two cases: when the user clicks <strong>Reset
+conversation</strong>, or when the server restarts after a period
+without use. There is no scheduled deletion beyond that, so
+<strong>Reset conversation is the reliable way to remove
+it</strong>.</p>
+<p>Separately, a usage log records the date, the user’s email address,
+the model and the token count of each call. It holds no file contents
+and exists so the administrator can monitor spending.</p>
+<p>The AI service applies its own terms to the data it receives. Those
+terms are the service provider’s and should be consulted directly rather
+than summarised here.</p>
+</div>
+<div id="cost" class="section level3">
+<h3>Cost</h3>
 <p>The translator is hosted by the GMH project on a dedicated AI service
-account. The user is not billed for usage. The chat does not retain
-input data after the session ends; only the user’s email address and
-per-call token counts are logged so the administrator can monitor
-monthly consumption. A monthly global spending cap is in place; if the
-cap is reached, an explicit “monthly cap reached, contact administrator”
-message is shown and translation requests pause until the next
-cycle.</p>
+account, and the user is not billed for usage. A monthly global spending
+cap is in place; if the cap is reached, an explicit “monthly cap
+reached, contact administrator” message is shown and translation
+requests pause until the next cycle.</p>
+</div>
+<div id="whether-to-use-it-at-all" class="section level3">
+<h3>Whether to use it at all</h3>
 <p>The IPCC inventory data the translator handles is generally
 non-sensitive (it is destined for UNFCCC reporting, which is a
 public-record process). For ministries with internal policies
 restricting upload of pre-publication data to external AI services, the
 translator should not be used; the template can instead be filled
 manually using the IPCC defaults provided in the user guide.</p>
+</div>
 <div id="related-material" class="section level3 related">
 <h3>Related material</h3>
 <ul>

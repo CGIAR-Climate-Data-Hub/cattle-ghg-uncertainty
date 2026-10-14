@@ -169,7 +169,21 @@ The translator performs column mapping and unit conversion. It does not validate
 
 ## Privacy and operational cost
 
-The translator is hosted by the GMH project on a dedicated AI service account. The user is not billed for usage. The chat does not retain input data after the session ends; only the user's email address and per-call token counts are logged so the administrator can monitor monthly consumption. A monthly global spending cap is in place; if the cap is reached, an explicit "monthly cap reached, contact administrator" message is shown and translation requests pause until the next cycle.
+### Where your data goes
+
+When a file is uploaded, its contents are sent to the AI service over an encrypted connection. That is how the translation is done, and it is the main thing to be aware of before uploading anything.
+
+A copy of the conversation, including the uploaded data and the user's email address, is then written to a file on the app server. It is kept so that a user can close the tab and resume where they left off. It is removed in two cases: when the user clicks **Reset conversation**, or when the server restarts after a period without use. There is no scheduled deletion beyond that, so **Reset conversation is the reliable way to remove it**.
+
+Separately, a usage log records the date, the user's email address, the model and the token count of each call. It holds no file contents and exists so the administrator can monitor spending.
+
+The AI service applies its own terms to the data it receives. Those terms are the service provider's and should be consulted directly rather than summarised here.
+
+### Cost
+
+The translator is hosted by the GMH project on a dedicated AI service account, and the user is not billed for usage. A monthly global spending cap is in place; if the cap is reached, an explicit "monthly cap reached, contact administrator" message is shown and translation requests pause until the next cycle.
+
+### Whether to use it at all
 
 The IPCC inventory data the translator handles is generally non-sensitive (it is destined for UNFCCC reporting, which is a public-record process). For ministries with internal policies restricting upload of pre-publication data to external AI services, the translator should not be used; the template can instead be filled manually using the IPCC defaults provided in the user guide.
 
