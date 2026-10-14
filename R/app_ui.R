@@ -1256,17 +1256,13 @@ app_ui <- function(request = NULL) {
           tags$strong(t("info_definitions_software")),
           t("info_definitions_tail"))
       ,
-      # The basis panel sits ABOVE the parameter table deliberately. The
-      # numbers in that table are only interpretable once a user knows which
-      # region, productivity class, climate and manure-system variant they
-      # were drawn from, and those choices used to appear nowhere in the app.
-      bslib::card(
-        bslib::card_header(t("basis_panel_title")),
-        bslib::card_body(
-          tags$p(t("basis_panel_intro")),
-          DT::DTOutput("basis_table")
-        )
-      ),
+      # 2026-10-15: the declared-basis table is withheld from the app
+      # and its outputs for now, on request. Nothing that builds it was
+      # removed: basis_tool_wide(), basis_dimension_label() and
+      # basis_plain_table() are intact, the translator prompt still
+      # carries the table, and the full record stays in
+      # defaults/DEFAULTS_MASTER.md. Restoring the display means putting
+      # these call sites back.
       bslib::card(
         bslib::card_header(t("card_param_definitions")),
         bslib::card_body(DT::DTOutput("definitions_table"))

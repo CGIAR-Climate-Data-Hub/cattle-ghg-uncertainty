@@ -283,18 +283,12 @@ build_run_summary_docx <- function(path,
     doc <- .add_flextable_safe(doc, .styled_flextable(flextable::flextable(qa_caveats)))
   }
 
-  # ---- What the default values assume (2026-09-21) ------------------------
-  basis_tbl <- tryCatch(basis_plain_table(param_specs), error = function(e) NULL)
-  if (!is.null(basis_tbl) && nrow(basis_tbl) > 0) {
-    doc <- .add_h2(doc, "2c. What the default values assume")
-    doc <- .add_p(doc, paste0(
-      "Every IPCC default in this tool is one cell of a much larger table. Reaching it means choosing a region, ",
-      "a productivity class, a climate and, for manure, one variant of each system. The choices are listed below ",
-      "in plain language. The column \"Relied on in this run\" says whether any of the affected parameters was ",
-      "filled from the defaults in this run or whether every value came from your file. Where a choice does not ",
-      "describe the herd you report, replace the parameters it affects with your own values and run again."))
-    doc <- .add_flextable_safe(doc, .styled_flextable(.basis_flextable(basis_tbl)))
-  }
+  # 2026-10-15: the declared-basis table is withheld from the app and
+  # its outputs for now, on request. Nothing that builds it was removed:
+  # basis_tool_wide(), basis_dimension_label() and basis_plain_table()
+  # are intact, the translator prompt still carries the table, and the
+  # full record stays in defaults/DEFAULTS_MASTER.md. Restoring the
+  # display means putting these call sites back.
 
   # ---- IPCC Table 3.3 results (LANDSCAPE) --------------------------------
   if (!is.null(ipcc_table) && is.data.frame(ipcc_table) && nrow(ipcc_table) > 0) {

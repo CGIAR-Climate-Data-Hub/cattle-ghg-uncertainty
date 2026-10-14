@@ -165,16 +165,15 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     qa_caveats
   else placeholder("No QA/QC checks were ignored or repaired for this run.")
 
-  # 2026-09-21: the tool-wide assumptions behind every default, with a
-  # per-run column saying whether they were relied on. Same table as
-  # section 2c of the Word report, plus the IPCC source column.
-  basis_df <- tryCatch(basis_plain_table(param_specs), error = function(e) NULL)
-  if (is.null(basis_df) || !nrow(basis_df))
-    basis_df <- placeholder("Assumption table unavailable.")
+  # 2026-10-15: the declared-basis table is withheld from the app and
+  # its outputs for now, on request. Nothing that builds it was removed:
+  # basis_tool_wide(), basis_dimension_label() and basis_plain_table()
+  # are intact, the translator prompt still carries the table, and the
+  # full record stays in defaults/DEFAULTS_MASTER.md. Restoring the
+  # display means putting these call sites back.
 
   sheets <- list(
     Run_Settings        = run_settings_df,
-    Assumptions         = basis_df,
     QA_Caveats          = caveats_df,
     Summary             = summary_df,
     Uncertainty_Metrics = uncertainty_df,

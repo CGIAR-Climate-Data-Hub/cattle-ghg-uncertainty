@@ -1297,24 +1297,13 @@ generate_template_openxlsx <- function(filepath, include_example,
            used_in=rep("Inventory_Metadata.species", length(V_SPECIES)),
            stringsAsFactors=FALSE)),
 
-    # The declared basis comes FIRST on the Vocab sheet. Every default below
-    # it is one cell of a much larger IPCC table, and a user who cannot see
-    # which region, productivity class and climate were chosen cannot judge
-    # whether a default applies to their herd or know what to override.
-    list(title="WHAT THE DEFAULTS ASSUME: read this before accepting any pre-filled value",
-         cols=c("choice","this tool uses","IPCC also publishes","affects",
-                "IPCC source","why, and what to do otherwise"),
-         # Tool-wide rows only: basis_tool_wide(). Lactation state and the
-         # guidelines edition are resolved, not assumed, so they are not
-         # presented to a compiler as assumptions.
-         data=local({ b <- basis_tool_wide(); data.frame(
-           choice=basis_dimension_label(b$dimension),
-           chosen=b$chosen,
-           alternatives=b$alternatives,
-           governs=gsub(" ", ", ", b$governs, fixed=TRUE),
-           source=b$ipcc_source,
-           why=b$why,
-           stringsAsFactors=FALSE) })),
+    # 2026-10-15: the declared-basis table is withheld from the app and
+    # its outputs for now, on request. Nothing that builds it was
+    # removed: basis_tool_wide(), basis_dimension_label() and
+    # basis_plain_table() are intact, the translator prompt still
+    # carries the table, and the full record stays in
+    # defaults/DEFAULTS_MASTER.md. Restoring the display means putting
+    # these call sites back.
 
     list(title="IPCC variant each manure system models  [every coefficient on a row comes from THIS variant]",
          cols=c("mms_type","IPCC variant modelled"),
