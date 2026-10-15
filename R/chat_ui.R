@@ -904,11 +904,18 @@ translator_chat_server <- function(input, output, session) {
 #
 # TRUE uses anthropic_chat_stream_async(), which returns immediately and
 # delivers the reply through a later() callback, so one worker serves many
-# people. Proven against the live API (process stayed responsive during a
-# call; two concurrent calls completed; Stop cancelled one without
-# touching the other) but NOT yet exercised through a browser session.
-# Flip it after a browser test, not before.
-.TRANSLATOR_ASYNC <- FALSE
+# people.
+#
+# Proven: the process stays responsive during a live call (71 heartbeats
+# against 1 synchronous); two concurrent live calls both complete; Stop
+# cancels one without touching the other; the SSE parse survives a
+# multi-byte character split across chunks; and a reactive write from the
+# later() callback, wrapped in withReactiveDomain(), reaches Shiny and
+# triggers a redraw.
+#
+# Still unproven, and the reason to test before deploying: two real
+# browser sessions streaming at the same time over real websockets.
+.TRANSLATOR_ASYNC <- TRUE
 
 .TRANSLATOR_CANCEL <- new.env(parent = emptyenv())
 
