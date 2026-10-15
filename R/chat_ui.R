@@ -1022,6 +1022,41 @@ translator_cancel_clear <- function(tok) {
 .translator_memo_path <- function(key) {
   file.path(.history_dir(), paste0("translator_memo_", substr(key, 1, 32), ".json"))
 }
+# Asynchronous twin of .translator_memo_call(). A memo hit still arrives
+# through the callback, so the chain has one completion path rather than
+# an instant branch and a slow branch.
+.translator_memo_call_async <- function(msgs, tools_sig, start, on_result) {
+  key <- tryCatch(.tp_sha256(c(jsonlite::toJSON(msgs, auto_unbox = TRUE), tools_sig)),
+                  error = function(e) NULL)
+  if (!is.null(key)) {
+    pth <- .translator_memo_path(key)
+    if (file.exists(pth)) {
+      hit <- tryCatch(jsonlite::read_json(pth, simplifyVector = FALSE), error = function(e) NULL)
+      if (!is.null(hit) && !is.null(hit$reply) && nzchar(hit$reply)) {
+        message("translator: response memo hit for ", substr(key, 1, 12))
+        return(on_result(list(
+          reply = hit$reply,
+          usage = list(prompt_tokens = 0L, completion_tokens = 0L,
+                       cached_tokens = 0L, cache_write_tokens = 0L,
+                       cache_write_1h_tokens = 0L, total_tokens = 0L),
+          model = hit$model %||% "memo", cost_usd = 0, error = NULL,
+          latency_sec = 0, memo_hit = TRUE)))
+      }
+    }
+  }
+  start(function(resp) {
+    if (!is.null(key) && is.null(resp$error) && !is.null(resp$reply) &&
+        nzchar(resp$reply) && .translator_template_json_parses(resp$reply)) {
+      tryCatch(jsonlite::write_json(
+        list(reply = resp$reply, model = resp$model %||% ""),
+        .translator_memo_path(key), auto_unbox = TRUE),
+        error = function(e) NULL)
+    }
+    on_result(resp)
+  })
+  invisible(NULL)
+}
+
 .translator_memo_call <- function(msgs, tools_sig, fn) {
   key <- tryCatch(.tp_sha256(c(jsonlite::toJSON(msgs, auto_unbox = TRUE), tools_sig)),
                   error = function(e) NULL)
@@ -1879,61 +1914,13 @@ translator_cancel_clear <- function(tok) {
 # WebSocket heartbeat tolerance and breaks the session. Splitting into
 # 5 per-aggregation-level calls of ~6K tokens each (~60-90s each)
 # keeps every individual call well inside any timeout.
-.translator_force_template <- function(state, session) {
-  state$pending <- TRUE
-  state$last_error <- NULL
-  tok <- .translator_begin_request(session)
-  on.exit({
-    translator_cancel_clear(tok)
-    state$pending <- FALSE
-    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
-              error = function(e) NULL)
-  })
-
-  if (budget_would_exceed()) {
-    state$last_error <- paste0(
-      "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly: ",
-      "please try again later or contact the administrator.")
-    return()
-  }
-
-  system_prompt <- tryCatch(assemble_translator_system_prompt(),
-                             error = function(e) NULL)
-  if (is.null(system_prompt)) {
-    state$last_error <- "Couldn't load the translator instructions."
-    return()
-  }
-  tools_sig <- tryCatch(jsonlite::toJSON(anthropic_translator_tools(), auto_unbox = TRUE),
-                        error = function(e) "tools")
-
-  # Stream-aware progress callback shared across discovery + batch calls.
-  total_chars <- 0L
-  on_chunk_cb <- function(text) {
-    total_chars <<- total_chars + nchar(text)
-    tryCatch(session$sendCustomMessage("translatorProgressTick",
-                                         list(chars = total_chars)),
-              error = function(e) NULL)
-  }
-  # Keep-alive for tool_use streams (input_json_delta events): the text
-  # path never fires during emission, so this keeps the typing bubble alive.
-  on_tick_cb <- function() {
-    tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
-              error = function(e) NULL)
-    # Give the blocked event loop a chance to receive a Stop click. Without
-    # this the click sits in the socket until the whole call has finished,
-    # which is why Stop used to reload the page and leave the call running.
-    tryCatch(later::run_now(0), error = function(e) NULL)
-  }
-  info <- function(txt) tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
-                                 error = function(e) NULL)
-
-  # ---- Stage 1: discovery call ------------------------------------------
-  # Cheap (~200 output tokens). mode = enumerate. Memoised on the exact
-  # conversation (plan F6): a second click on Produce with nothing changed
-  # costs nothing.
-  info("Analysing your inventory structure...")
-  discovery_request <- paste(
+# The per-batch instruction. Lifted out of the loop so the asynchronous
+# chain builds exactly the same prompt; a difference here would silently
+# change what the model is asked for.
+# The discovery instruction. Extracted alongside .translator_batch_nudge()
+# so the asynchronous chain asks for exactly the same thing.
+.translator_discovery_request <- function() {
+    paste(
     "STEP 3 OF 3: EMISSION SETUP. Before producing the filled template,",
     "the in-app handler needs you to enumerate two things from this",
     "conversation:",
@@ -1953,98 +1940,10 @@ translator_cancel_clear <- function(tok) {
     "Do NOT emit any parameters, manure_management, or time-series rows",
     "here: those come in per-aggregation-level follow-up calls.",
     sep = "\n")
-  discovery_msgs <- anthropic_build_messages(
-    system_prompt, history = state$messages,
-    new_user_message = discovery_request)
-  enum_resp <- .translator_memo_call(discovery_msgs, tools_sig, function()
-    anthropic_chat_enumerate_aggregation_levels(
-      discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-      should_stop = function() translator_cancelled(tok)))
+}
 
-  # A stop is not a failure, and must not trigger the fallback: starting a
-  # monolithic emission here would be the opposite of what was asked for,
-  # and the expensive path at that.
-  if (isTRUE(enum_resp$stopped) || translator_cancelled(tok)) {
-    state$last_error <- enum_resp$error %||%
-      "Stopped at your request. Nothing was produced from this call."
-    return()
-  }
-  if (!is.null(enum_resp$error)) {
-    # Discovery itself failed: fall back to the monolithic path.
-    message("translator: discovery call failed (", enum_resp$error,
-            "), falling back to monolithic emission")
-    .translator_force_template_single(state, session)
-    return()
-  }
-  if (!isTRUE(enum_resp$memo_hit))
-    .translator_log_usage(state, enum_resp, stage = "enumerate", expect_warm = TRUE)
-
-  enum_parsed <- tryCatch(
-    jsonlite::fromJSON(enum_resp$reply, simplifyVector = TRUE),
-    error = function(e) NULL)
-  bad <- .translator_validate_piece(enum_parsed, "enumerate")
-  if (!is.null(bad)) {
-    message("translator: discovery reply incomplete (", bad, "); using single-call path")
-    .translator_force_template_single(state, session)
-    return()
-  }
-  # Distinct, non-blank labels (plan C7): a duplicate would have re-used
-  # the cached part and doubled every row; a blank would have keyed the
-  # cache on "".
-  agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
-  agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
-  inventory_metadata <- enum_parsed$inventory_metadata
-
-  # Decision: fall back to the monolithic path when batching wouldn't
-  # buy us anything (small inventories, or empty enumeration).
-  if (length(agg_levels) <= 2L) {
-    message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
-                     length(agg_levels)))
-    .translator_force_template_single(state, session)
-    return()
-  }
-
-  # ---- Stage 2: per-aggregation-level batch emission ---------------------
-  # state$batch_parts holds parts that a PREVIOUS merge validated (plan
-  # A3); the memo (plan F6) covers the "same call, same answer" case. Both
-  # survive a Stop, because the parts are persisted with the conversation
-  # (plan F5) and the memo is on disk.
-  cached_levels <- intersect(agg_levels, names(state$batch_parts))
-  fresh_levels  <- setdiff(agg_levels, cached_levels)
-  if (length(cached_levels) > 0)
-    message(sprintf("translator: reusing %d validated batch(es): %s",
-                     length(cached_levels), paste(cached_levels, collapse = ", ")))
-  message(sprintf("translator: dispatching %d force-template call(s): %s",
-                   length(fresh_levels), paste(fresh_levels, collapse = ", ")))
-
-  # Did the user upload a file with values? Drives the per-batch
-  # defaults-only check (plan C1).
-  file_was_uploaded <- any(vapply(state$messages, function(m)
-    identical(m$source, "server_upload") ||
-      grepl("Parameter labels DETECTED IN THIS FILE", m$content %||% "", fixed = TRUE),
-    logical(1)))
-  count_user_rows <- function(pj) {
-    if (is.null(pj) || !is.data.frame(pj$parameters)) return(0L)
-    ds <- pj$parameters$data_source
-    if (is.null(ds)) return(0L)
-    sum(grepl("^user[_ ]?(file|chat)$", ds, ignore.case = TRUE), na.rm = TRUE)
-  }
-
-  parts <- list()
-  for (i in seq_along(agg_levels)) {
-    level <- agg_levels[i]
-
-    if (!is.null(state$batch_parts[[level]])) {
-      info(sprintf("Reusing %d of %d: %s (validated on a previous attempt)...",
-                   i, length(agg_levels), level))
-      parts[[i]] <- state$batch_parts[[level]]
-      next
-    }
-
-    info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
-    total_chars <- 0L
-
-    batch_nudge <- sprintf(paste(
+.translator_batch_nudge <- function(i, n_levels, level) {
+      sprintf(paste(
       "STEP 3 OF 3: BATCH %d OF %d (aggregation_level = '%s').",
       "",
       "Emit ONLY the parameters, manure_management, and",
@@ -2079,74 +1978,14 @@ translator_cancel_clear <- function(tok) {
       "the file provides them, %d parameters per sub-category, biological",
       "zeros with distribution='constant'.",
       sep = "\n"),
-      i, length(agg_levels), level, level, level, level, nrow(PARAM_CATALOGUE))
-    batch_msgs <- anthropic_build_messages(
-      system_prompt, history = state$messages,
-      new_user_message = batch_nudge)
-    batch_resp <- .translator_memo_call(batch_msgs, tools_sig, function()
-      anthropic_chat_batch_template_force(
-        batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = function() translator_cancelled(tok)))
+          i, n_levels, level, level, level, level, nrow(PARAM_CATALOGUE))
+}
 
-    if (isTRUE(batch_resp$stopped) || translator_cancelled(tok)) {
-      state$last_error <- sprintf(
-        "Stopped at your request during batch %d of %d (%s). The %d batch(es) already produced are kept and will not be re-billed; click 'Produce template now' to carry on from there.",
-        i, length(agg_levels), level, length(state$batch_parts))
-      return()
-    }
-    if (!is.null(batch_resp$error)) {
-      state$last_error <- sprintf(
-        "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry, the %d batch(es) that already succeeded are kept and won't be re-billed.",
-        i, length(agg_levels), level, batch_resp$error, length(state$batch_parts))
-      return()
-    }
-    if (!isTRUE(batch_resp$memo_hit))
-      .translator_log_usage(state, batch_resp, stage = "batch", expect_warm = TRUE)
-
-    batch_parsed <- tryCatch(
-      jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
-      error = function(e) NULL)
-    bad <- .translator_validate_piece(batch_parsed, "batch")
-    if (!is.null(bad)) {
-      state$last_error <- sprintf(
-        "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
-        i, level, bad, length(state$batch_parts))
-      return()
-    }
-
-    # Per-batch defaults-only check (plan C1): a file was uploaded, this
-    # level's rows carry no user_file / user_chat provenance at all, so the
-    # model has fallen back to the catalogue for a whole production system.
-    # One retry with the rejection message; only the nudge changes, so the
-    # prefix is a cache read.
-    if (file_was_uploaded && count_user_rows(batch_parsed) == 0L &&
-        is.data.frame(batch_parsed$parameters) && nrow(batch_parsed$parameters) > 0) {
-      message("translator: batch '", level, "' has ZERO user_file rows; retrying once")
-      info(sprintf("Batch %s came back with catalogue defaults only; asking the AI to use the file values...", level))
-      retry_msgs <- c(batch_msgs, list(list(role = "user", content = paste0(
-        "REJECTED: every parameters row you emitted for '", level, "' is tagged ",
-        "data_source = 'ipcc_default' or lacks the tag, yet the uploaded file ",
-        "carries values for this production system. Re-emit the batch for '",
-        level, "' now: for every parameter present in the file use the file's ",
-        "value with data_source = 'user_file' (and its bounds if given), use ",
-        "catalogue defaults ONLY for parameters the file does not supply, and ",
-        "biological_zero where it applies. Same tool, mode = 'batch', same ",
-        "aggregation_level."))))
-      retry_resp <- anthropic_chat_batch_template_force(
-        retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = function() translator_cancelled(tok))
-      if (is.null(retry_resp$error)) {
-        .translator_log_usage(state, retry_resp, stage = "retry_defaults_only", expect_warm = TRUE)
-        rp <- tryCatch(jsonlite::fromJSON(retry_resp$reply, simplifyVector = TRUE), error = function(e) NULL)
-        if (is.null(.translator_validate_piece(rp, "batch")) && count_user_rows(rp) > 0L)
-          batch_parsed <- rp
-      }
-    }
-
-    batch_parsed$.requested_aggregation_level <- level
-    parts[[i]] <- batch_parsed
-  }
-
+# Stage 3 of the emission: merge the per-level pieces, validate, store and
+# tell the user. Lifted out of .translator_force_template() so the
+# synchronous loop and the asynchronous chain end the same way.
+.translator_emit_finish <- function(state, session, inventory_metadata,
+                                    parts, agg_levels, info) {
   # ---- Stage 3: merge + validate + store --------------------------------
   info("Assembling final template...")
   merged <- .translator_merge_batches(inventory_metadata, parts, agg_levels)
@@ -2240,6 +2079,227 @@ translator_cancel_clear <- function(tok) {
   # re-emitted from the new transcript; the cache is keyed by level only
   # as a resume aid, and cleared when the conversation changes shape).
   .translator_persist(state)
+  invisible(NULL)
+}
+
+.translator_force_template <- function(state, session) {
+  if (isTRUE(.TRANSLATOR_ASYNC))
+    return(.translator_force_template_async(state, session))
+  state$pending <- TRUE
+  state$last_error <- NULL
+  tok <- .translator_begin_request(session)
+  on.exit({
+    translator_cancel_clear(tok)
+    state$pending <- FALSE
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+              error = function(e) NULL)
+  })
+
+  if (budget_would_exceed()) {
+    state$last_error <- paste0(
+      "The AI translator is temporarily unavailable. ",
+      "We've been notified and will restore service shortly: ",
+      "please try again later or contact the administrator.")
+    return()
+  }
+
+  system_prompt <- tryCatch(assemble_translator_system_prompt(),
+                             error = function(e) NULL)
+  if (is.null(system_prompt)) {
+    state$last_error <- "Couldn't load the translator instructions."
+    return()
+  }
+  tools_sig <- tryCatch(jsonlite::toJSON(anthropic_translator_tools(), auto_unbox = TRUE),
+                        error = function(e) "tools")
+
+  # Stream-aware progress callback shared across discovery + batch calls.
+  total_chars <- 0L
+  on_chunk_cb <- function(text) {
+    total_chars <<- total_chars + nchar(text)
+    tryCatch(session$sendCustomMessage("translatorProgressTick",
+                                         list(chars = total_chars)),
+              error = function(e) NULL)
+  }
+  # Keep-alive for tool_use streams (input_json_delta events): the text
+  # path never fires during emission, so this keeps the typing bubble alive.
+  on_tick_cb <- function() {
+    tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
+              error = function(e) NULL)
+    # Give the blocked event loop a chance to receive a Stop click. Without
+    # this the click sits in the socket until the whole call has finished,
+    # which is why Stop used to reload the page and leave the call running.
+    tryCatch(later::run_now(0), error = function(e) NULL)
+  }
+  info <- function(txt) tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
+                                 error = function(e) NULL)
+
+  # ---- Stage 1: discovery call ------------------------------------------
+  # Cheap (~200 output tokens). mode = enumerate. Memoised on the exact
+  # conversation (plan F6): a second click on Produce with nothing changed
+  # costs nothing.
+  info("Analysing your inventory structure...")
+  discovery_request <- .translator_discovery_request()
+  discovery_msgs <- anthropic_build_messages(
+    system_prompt, history = state$messages,
+    new_user_message = discovery_request)
+  enum_resp <- .translator_memo_call(discovery_msgs, tools_sig, function()
+    anthropic_chat_enumerate_aggregation_levels(
+      discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+      should_stop = function() translator_cancelled(tok)))
+
+  # A stop is not a failure, and must not trigger the fallback: starting a
+  # monolithic emission here would be the opposite of what was asked for,
+  # and the expensive path at that.
+  if (isTRUE(enum_resp$stopped) || translator_cancelled(tok)) {
+    state$last_error <- enum_resp$error %||%
+      "Stopped at your request. Nothing was produced from this call."
+    return()
+  }
+  if (!is.null(enum_resp$error)) {
+    # Discovery itself failed: fall back to the monolithic path.
+    message("translator: discovery call failed (", enum_resp$error,
+            "), falling back to monolithic emission")
+    .translator_force_template_single(state, session)
+    return()
+  }
+  if (!isTRUE(enum_resp$memo_hit))
+    .translator_log_usage(state, enum_resp, stage = "enumerate", expect_warm = TRUE)
+
+  enum_parsed <- tryCatch(
+    jsonlite::fromJSON(enum_resp$reply, simplifyVector = TRUE),
+    error = function(e) NULL)
+  bad <- .translator_validate_piece(enum_parsed, "enumerate")
+  if (!is.null(bad)) {
+    message("translator: discovery reply incomplete (", bad, "); using single-call path")
+    .translator_force_template_single(state, session)
+    return()
+  }
+  # Distinct, non-blank labels (plan C7): a duplicate would have re-used
+  # the cached part and doubled every row; a blank would have keyed the
+  # cache on "".
+  agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
+  agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
+  inventory_metadata <- enum_parsed$inventory_metadata
+
+  # Decision: fall back to the monolithic path when batching wouldn't
+  # buy us anything (small inventories, or empty enumeration).
+  if (length(agg_levels) <= 2L) {
+    message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
+                     length(agg_levels)))
+    .translator_force_template_single(state, session)
+    return()
+  }
+
+  # ---- Stage 2: per-aggregation-level batch emission ---------------------
+  # state$batch_parts holds parts that a PREVIOUS merge validated (plan
+  # A3); the memo (plan F6) covers the "same call, same answer" case. Both
+  # survive a Stop, because the parts are persisted with the conversation
+  # (plan F5) and the memo is on disk.
+  cached_levels <- intersect(agg_levels, names(state$batch_parts))
+  fresh_levels  <- setdiff(agg_levels, cached_levels)
+  if (length(cached_levels) > 0)
+    message(sprintf("translator: reusing %d validated batch(es): %s",
+                     length(cached_levels), paste(cached_levels, collapse = ", ")))
+  message(sprintf("translator: dispatching %d force-template call(s): %s",
+                   length(fresh_levels), paste(fresh_levels, collapse = ", ")))
+
+  # Did the user upload a file with values? Drives the per-batch
+  # defaults-only check (plan C1).
+  file_was_uploaded <- any(vapply(state$messages, function(m)
+    identical(m$source, "server_upload") ||
+      grepl("Parameter labels DETECTED IN THIS FILE", m$content %||% "", fixed = TRUE),
+    logical(1)))
+  count_user_rows <- function(pj) {
+    if (is.null(pj) || !is.data.frame(pj$parameters)) return(0L)
+    ds <- pj$parameters$data_source
+    if (is.null(ds)) return(0L)
+    sum(grepl("^user[_ ]?(file|chat)$", ds, ignore.case = TRUE), na.rm = TRUE)
+  }
+
+  parts <- list()
+  for (i in seq_along(agg_levels)) {
+    level <- agg_levels[i]
+
+    if (!is.null(state$batch_parts[[level]])) {
+      info(sprintf("Reusing %d of %d: %s (validated on a previous attempt)...",
+                   i, length(agg_levels), level))
+      parts[[i]] <- state$batch_parts[[level]]
+      next
+    }
+
+    info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
+    total_chars <- 0L
+
+    batch_nudge <- .translator_batch_nudge(i, length(agg_levels), level)
+    batch_msgs <- anthropic_build_messages(
+      system_prompt, history = state$messages,
+      new_user_message = batch_nudge)
+    batch_resp <- .translator_memo_call(batch_msgs, tools_sig, function()
+      anthropic_chat_batch_template_force(
+        batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+        should_stop = function() translator_cancelled(tok)))
+
+    if (isTRUE(batch_resp$stopped) || translator_cancelled(tok)) {
+      state$last_error <- sprintf(
+        "Stopped at your request during batch %d of %d (%s). The %d batch(es) already produced are kept and will not be re-billed; click 'Produce template now' to carry on from there.",
+        i, length(agg_levels), level, length(state$batch_parts))
+      return()
+    }
+    if (!is.null(batch_resp$error)) {
+      state$last_error <- sprintf(
+        "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry, the %d batch(es) that already succeeded are kept and won't be re-billed.",
+        i, length(agg_levels), level, batch_resp$error, length(state$batch_parts))
+      return()
+    }
+    if (!isTRUE(batch_resp$memo_hit))
+      .translator_log_usage(state, batch_resp, stage = "batch", expect_warm = TRUE)
+
+    batch_parsed <- tryCatch(
+      jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
+      error = function(e) NULL)
+    bad <- .translator_validate_piece(batch_parsed, "batch")
+    if (!is.null(bad)) {
+      state$last_error <- sprintf(
+        "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
+        i, level, bad, length(state$batch_parts))
+      return()
+    }
+
+    # Per-batch defaults-only check (plan C1): a file was uploaded, this
+    # level's rows carry no user_file / user_chat provenance at all, so the
+    # model has fallen back to the catalogue for a whole production system.
+    # One retry with the rejection message; only the nudge changes, so the
+    # prefix is a cache read.
+    if (file_was_uploaded && count_user_rows(batch_parsed) == 0L &&
+        is.data.frame(batch_parsed$parameters) && nrow(batch_parsed$parameters) > 0) {
+      message("translator: batch '", level, "' has ZERO user_file rows; retrying once")
+      info(sprintf("Batch %s came back with catalogue defaults only; asking the AI to use the file values...", level))
+      retry_msgs <- c(batch_msgs, list(list(role = "user", content = paste0(
+        "REJECTED: every parameters row you emitted for '", level, "' is tagged ",
+        "data_source = 'ipcc_default' or lacks the tag, yet the uploaded file ",
+        "carries values for this production system. Re-emit the batch for '",
+        level, "' now: for every parameter present in the file use the file's ",
+        "value with data_source = 'user_file' (and its bounds if given), use ",
+        "catalogue defaults ONLY for parameters the file does not supply, and ",
+        "biological_zero where it applies. Same tool, mode = 'batch', same ",
+        "aggregation_level."))))
+      retry_resp <- anthropic_chat_batch_template_force(
+        retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+        should_stop = function() translator_cancelled(tok))
+      if (is.null(retry_resp$error)) {
+        .translator_log_usage(state, retry_resp, stage = "retry_defaults_only", expect_warm = TRUE)
+        rp <- tryCatch(jsonlite::fromJSON(retry_resp$reply, simplifyVector = TRUE), error = function(e) NULL)
+        if (is.null(.translator_validate_piece(rp, "batch")) && count_user_rows(rp) > 0L)
+          batch_parsed <- rp
+      }
+    }
+
+    batch_parsed$.requested_aggregation_level <- level
+    parts[[i]] <- batch_parsed
+  }
+
+  .translator_emit_finish(state, session, inventory_metadata, parts,
+                          agg_levels, info)
 }
 
 # Legacy single-call force-template path. Used by .translator_force_template()
@@ -2247,6 +2307,225 @@ translator_cancel_clear <- function(tok) {
 # The three retry loops (parse / coverage / defaults-only) and the sub-
 # category strip post-processing are correct on small inventories: kept
 # unchanged here.
+# Asynchronous emission: the same three stages as
+# .translator_force_template(), expressed as a chain so the R worker is
+# free between calls instead of held for the whole 5 to 15 minutes.
+#
+# The stages are unchanged in substance. Discovery enumerates the
+# aggregation levels; one batch call per level follows, in order, because
+# each one is cached against the conversation prefix and firing them in
+# parallel would multiply the cache writes; then the merge.
+#
+# Order matters and is preserved: run_level(i) only starts after level
+# i-1 has been accepted. What changed is that waiting for a level no
+# longer blocks anybody else.
+.translator_force_template_async <- function(state, session) {
+  state$pending <- TRUE
+  state$last_error <- NULL
+  tok <- .translator_begin_request(session)
+
+  done <- function() {
+    translator_cancel_clear(tok)
+    state$pending <- FALSE
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+              error = function(e) NULL)
+    invisible(NULL)
+  }
+  fail <- function(msg) { state$last_error <- msg; done() }
+  # Every continuation runs from a later() callback, so each one has to
+  # re-enter the session's reactive domain before touching `state`.
+  inseq <- function(expr) shiny::withReactiveDomain(session, expr)
+
+  if (budget_would_exceed())
+    return(fail(paste0("The AI translator is temporarily unavailable. ",
+                       "We've been notified and will restore service shortly: ",
+                       "please try again later or contact the administrator.")))
+
+  system_prompt <- tryCatch(assemble_translator_system_prompt(), error = function(e) NULL)
+  if (is.null(system_prompt))
+    return(fail("Couldn't load the translator instructions."))
+  tools_sig <- tryCatch(jsonlite::toJSON(anthropic_translator_tools(), auto_unbox = TRUE),
+                        error = function(e) "tools")
+
+  total_chars <- 0L
+  on_chunk_cb <- function(text) {
+    total_chars <<- total_chars + nchar(text)
+    tryCatch(session$sendCustomMessage("translatorProgressTick",
+                                        list(chars = total_chars)),
+              error = function(e) NULL)
+  }
+  # No later::run_now() here any more. The synchronous path needed it to
+  # let a Stop click through a blocked loop; nothing is blocked now, so
+  # this is only the typing-bubble keep-alive it was meant to be.
+  on_tick_cb <- function()
+    tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
+              error = function(e) NULL)
+  info <- function(txt)
+    tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
+              error = function(e) NULL)
+  stopper <- function() translator_cancelled(tok)
+
+  file_was_uploaded <- any(vapply(state$messages, function(m)
+    identical(m$source, "server_upload") ||
+      grepl("Parameter labels DETECTED IN THIS FILE", m$content %||% "", fixed = TRUE),
+    logical(1)))
+  count_user_rows <- function(pj) {
+    if (is.null(pj) || !is.data.frame(pj$parameters)) return(0L)
+    ds <- pj$parameters$data_source
+    if (is.null(ds)) return(0L)
+    sum(grepl("^user[_ ]?(file|chat)$", ds, ignore.case = TRUE), na.rm = TRUE)
+  }
+
+  # ---- Stage 3 entry -----------------------------------------------------
+  finish <- function(inventory_metadata, parts, agg_levels) {
+    tryCatch(.translator_emit_finish(state, session, inventory_metadata,
+                                     parts, agg_levels, info),
+              error = function(e)
+                state$last_error <- paste0("Assembling the template failed (",
+                                           conditionMessage(e), ")."))
+    done()
+  }
+
+  # ---- Stage 2: one level at a time -------------------------------------
+  run_levels <- function(agg_levels, inventory_metadata) {
+    parts <- vector("list", length(agg_levels))
+    step <- function(i) {
+      if (i > length(agg_levels)) return(finish(inventory_metadata, parts, agg_levels))
+      level <- agg_levels[i]
+
+      if (!is.null(state$batch_parts[[level]])) {
+        info(sprintf("Reusing %d of %d: %s (validated on a previous attempt)...",
+                     i, length(agg_levels), level))
+        parts[[i]] <<- state$batch_parts[[level]]
+        return(step(i + 1L))
+      }
+
+      info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
+      total_chars <<- 0L
+      batch_msgs <- anthropic_build_messages(
+        system_prompt, history = state$messages,
+        new_user_message = .translator_batch_nudge(i, length(agg_levels), level))
+
+      accept <- function(batch_parsed) {
+        batch_parsed$.requested_aggregation_level <- level
+        parts[[i]] <<- batch_parsed
+        step(i + 1L)
+      }
+
+      .translator_memo_call_async(batch_msgs, tools_sig,
+        start = function(cb) anthropic_chat_batch_template_force_async(
+          batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+          should_stop = stopper, on_result = cb),
+        on_result = function(batch_resp) inseq({
+          if (isTRUE(batch_resp$stopped) || translator_cancelled(tok))
+            return(fail(sprintf(
+              "Stopped at your request during batch %d of %d (%s). The %d batch(es) already produced are kept and will not be re-billed; click 'Produce template now' to carry on from there.",
+              i, length(agg_levels), level, length(state$batch_parts))))
+          if (!is.null(batch_resp$error))
+            return(fail(sprintf(
+              "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry, the %d batch(es) that already succeeded are kept and won't be re-billed.",
+              i, length(agg_levels), level, batch_resp$error, length(state$batch_parts))))
+          if (!isTRUE(batch_resp$memo_hit))
+            .translator_log_usage(state, batch_resp, stage = "batch", expect_warm = TRUE)
+
+          batch_parsed <- tryCatch(jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
+                                   error = function(e) NULL)
+          bad <- .translator_validate_piece(batch_parsed, "batch")
+          if (!is.null(bad))
+            return(fail(sprintf(
+              "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
+              i, level, bad, length(state$batch_parts))))
+
+          # Defaults-only retry (plan C1): one more call, so one more
+          # continuation rather than an inline second request.
+          if (file_was_uploaded && count_user_rows(batch_parsed) == 0L &&
+              is.data.frame(batch_parsed$parameters) && nrow(batch_parsed$parameters) > 0) {
+            message("translator: batch '", level, "' has ZERO user_file rows; retrying once")
+            info(sprintf("Batch %s came back with catalogue defaults only; asking the AI to use the file values...", level))
+            retry_msgs <- c(batch_msgs, list(list(role = "user", content = paste0(
+              "REJECTED: every parameters row you emitted for '", level, "' is tagged ",
+              "data_source = 'ipcc_default' or lacks the tag, yet the uploaded file ",
+              "carries values for this production system. Re-emit the batch for '",
+              level, "' now: for every parameter present in the file use the file's ",
+              "value with data_source = 'user_file' (and its bounds if given), use ",
+              "catalogue defaults ONLY for parameters the file does not supply, and ",
+              "biological_zero where it applies. Same tool, mode = 'batch', same ",
+              "aggregation_level."))))
+            return(anthropic_chat_batch_template_force_async(
+              retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+              should_stop = stopper,
+              on_result = function(retry_resp) inseq({
+                if (is.null(retry_resp$error)) {
+                  .translator_log_usage(state, retry_resp, stage = "retry_defaults_only",
+                                        expect_warm = TRUE)
+                  rp <- tryCatch(jsonlite::fromJSON(retry_resp$reply, simplifyVector = TRUE),
+                                 error = function(e) NULL)
+                  if (is.null(.translator_validate_piece(rp, "batch")) &&
+                      count_user_rows(rp) > 0L)
+                    batch_parsed <- rp
+                }
+                accept(batch_parsed)
+              })))
+          }
+          accept(batch_parsed)
+        }))
+    }
+    step(1L)
+  }
+
+  # ---- Stage 1: discovery ------------------------------------------------
+  info("Analysing your inventory structure...")
+  discovery_request <- .translator_discovery_request()
+  discovery_msgs <- anthropic_build_messages(
+    system_prompt, history = state$messages,
+    new_user_message = discovery_request)
+
+  .translator_memo_call_async(discovery_msgs, tools_sig,
+    start = function(cb) anthropic_chat_enumerate_aggregation_levels_async(
+      discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
+      should_stop = stopper, on_result = cb),
+    on_result = function(enum_resp) inseq({
+      if (isTRUE(enum_resp$stopped) || translator_cancelled(tok))
+        return(fail(enum_resp$error %||%
+          "Stopped at your request. Nothing was produced from this call."))
+      if (!is.null(enum_resp$error)) {
+        message("translator: discovery call failed (", enum_resp$error,
+                "), falling back to monolithic emission")
+        done()
+        return(.translator_force_template_single(state, session))
+      }
+      if (!isTRUE(enum_resp$memo_hit))
+        .translator_log_usage(state, enum_resp, stage = "enumerate", expect_warm = TRUE)
+
+      enum_parsed <- tryCatch(jsonlite::fromJSON(enum_resp$reply, simplifyVector = TRUE),
+                              error = function(e) NULL)
+      bad <- .translator_validate_piece(enum_parsed, "enumerate")
+      if (!is.null(bad)) {
+        message("translator: discovery reply incomplete (", bad, "); using single-call path")
+        done()
+        return(.translator_force_template_single(state, session))
+      }
+      agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
+      agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
+      if (length(agg_levels) <= 2L) {
+        message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
+                        length(agg_levels)))
+        done()
+        return(.translator_force_template_single(state, session))
+      }
+      cached_levels <- intersect(agg_levels, names(state$batch_parts))
+      fresh_levels  <- setdiff(agg_levels, cached_levels)
+      if (length(cached_levels) > 0)
+        message(sprintf("translator: reusing %d validated batch(es): %s",
+                        length(cached_levels), paste(cached_levels, collapse = ", ")))
+      message(sprintf("translator: dispatching %d force-template call(s): %s",
+                      length(fresh_levels), paste(fresh_levels, collapse = ", ")))
+      run_levels(agg_levels, enum_parsed$inventory_metadata)
+    }))
+
+  invisible(NULL)
+}
+
 .translator_force_template_single <- function(state, session) {
   state$pending <- TRUE
   state$last_error <- NULL

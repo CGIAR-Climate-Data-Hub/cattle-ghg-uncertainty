@@ -1339,6 +1339,59 @@ anthropic_translator_tools <- function() {
   resp
 }
 
+# Asynchronous twin of .anthropic_tool_call(). The "model answered in
+# text instead of calling the tool" retry becomes a second continuation
+# rather than a second line.
+.anthropic_tool_call_async <- function(messages, on_chunk, on_tick, model,
+                                       max_tokens, timeout_sec,
+                                       tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+                                       should_stop = function() FALSE,
+                                       on_result = function(res) {}) {
+  call_once <- function(tc, cb) anthropic_chat_stream_async(
+    messages    = messages,
+    on_chunk    = on_chunk,
+    on_tick     = on_tick,
+    should_stop = should_stop,
+    model       = model,
+    max_tokens  = max_tokens,
+    temperature = 0,
+    timeout_sec = timeout_sec,
+    tools       = anthropic_translator_tools(),
+    tool_choice = tc,
+    on_result   = cb)
+
+  call_once(tool_choice, function(resp) {
+    if (identical(tool_choice, .ANTHROPIC_TOOL_CHOICE_AUTO) &&
+        is.null(resp$error) && !isTRUE(resp$tool_used)) {
+      message("translator: model replied in text instead of calling ",
+              .ANTHROPIC_TOOL_NAME, "; repeating the call with tool_choice forced")
+      call_once(.ANTHROPIC_TOOL_CHOICE_FORCE, function(resp2)
+        on_result(.anthropic_merge_usage(resp2, resp)))
+    } else {
+      on_result(resp)
+    }
+  })
+  invisible(NULL)
+}
+
+anthropic_chat_enumerate_aggregation_levels_async <- function(
+    messages, on_chunk = function(text) {}, on_tick = function() {},
+    model = .ANTHROPIC_DEFAULT_MODEL, max_tokens = 4000, timeout_sec = 120,
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+    should_stop = function() FALSE, on_result = function(res) {}) {
+  .anthropic_tool_call_async(messages, on_chunk, on_tick, model, max_tokens,
+                             timeout_sec, tool_choice, should_stop, on_result)
+}
+
+anthropic_chat_batch_template_force_async <- function(
+    messages, on_chunk = function(text) {}, on_tick = function() {},
+    model = .ANTHROPIC_DEFAULT_MODEL, max_tokens = 48000, timeout_sec = 900,
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+    should_stop = function() FALSE, on_result = function(res) {}) {
+  .anthropic_tool_call_async(messages, on_chunk, on_tick, model, max_tokens,
+                             timeout_sec, tool_choice, should_stop, on_result)
+}
+
 # --- Force-template variant (tool_use) -----------------------------------------
 #
 # mode = full. The model is forced to call the tool once with the whole
