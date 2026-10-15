@@ -124,6 +124,10 @@ For any **core** parameter (see the tier column in `param_catalogue`) the user h
 
 **On what the QA tab will flag**: the app's deviation-from-IPCC-default check applies **only to BW** (which has a continental table lookup in IPCC Vol.4 Ch.10 Annex 10A.1 / 10A.2). Other auto-filled parameters are marked **Missing (auto-filled)** but get no deviation warning. Say "the QA tab will flag this as auto-filled", not "compared against an IPCC continental default".
 
+**Before you fill any of those four from a default, look for them in the file under a non-English name.** A Spanish workbook writes `FE` for *factor de emision*, so a column headed `FE N2O`, `FE CH4` or `Factor de emision` is an emission factor the file already supplies, not a gap. French uses `FE` the same way, for *facteur d'emission*. Other headers that carry a value rather than mark a gap: `MCF` with a suffix such as `MCFvalle`, `Ceniza` (ash), `SV` or `VS` (volatile solids), `B0` (methane potential), `Lixiviacion` (leaching), `Volatilizacion`. Reading one of these as missing and substituting an IPCC default replaces a country's own measurement with a global figure, silently, which is the worst outcome this tool can produce. Where a column might be one of these, ask in CLARIFICATION rather than assume.
+
+Numbers are sometimes stored as text with a decimal comma: `10,78` is ten point seven eight, not one thousand and seventy-eight, and `300,00` is three hundred. Convert them, and count a row that contains one as a data row. Never skip a row because one of its cells would not parse as a number.
+
 For per-MMS `MCF_pct`, `EF3`, `Frac_GasMS_pct`, `Frac_LeachMS_pct`, use the tables in `template_schema`. Mind the units on that sheet: MCF and the two fractions are PERCENT, EF3 is a fraction.
 
 If the user expresses uncertainty about the **MMS allocation itself** ("about 70 % on pasture, could be 60 to 80"), fill `lower_fraction` / `upper_fraction` / `distribution_fraction` (default `pert`) on those rows. Leave them null when the user is confident.

@@ -39,21 +39,93 @@
 # must be tagged user_chat, which exempts them from the verbatim check.
 .TRANSLATOR_VALUE_TRANSFORMS <- c(1, 100, 1/100, 18.45, 1/18.45, 365, 1/1000)
 
+# Every numeric reading of a column, including cells that store the number
+# as TEXT. A Spanish or French workbook writes 10,78 for ten point seven
+# eight, and as.numeric() returns NA for it, so the value is invisible to
+# every check below. The Colombian municipal file has two such cells
+# (DMI "10,78" and BW "300,00"): they produced a false "no matching number
+# is in your file" report on DMI for two municipalities, and they are why
+# the translator read 15 rows from a sheet that has 16.
+#
+# Both continental conventions are read, and the pattern decides which:
+#   "10,78" or "1.234,56"  -> comma is the decimal mark
+#   "1,234,567"            -> comma groups thousands
+# A bare "1,234" is ambiguous, so both readings are kept. This set is only
+# ever used for "is this number present in the source", where an extra
+# candidate costs sensitivity, never a false alarm.
+# [0-9] rather than a shorthand class throughout: R's default TRE
+# engine reads a shorthand inside a bracket as literal characters.
+.translator_cell_numbers <- function(col) {
+  if (is.numeric(col)) return(col[is.finite(col)])
+  x <- trimws(as.character(col))
+  x <- x[!is.na(x) & nzchar(x)]
+  if (!length(x)) return(numeric(0))
+  out <- suppressWarnings(as.numeric(x))
+  out <- out[is.finite(out)]
+  dec <- grepl("^[-+]?[0-9]+,[0-9]+$", x) |
+         grepl("^[-+]?[0-9]{1,3}([.][0-9]{3})+,[0-9]+$", x)
+  if (any(dec)) {
+    v <- suppressWarnings(as.numeric(gsub(",", ".", gsub("[.]", "", x[dec]))))
+    out <- c(out, v[is.finite(v)])
+  }
+  thou <- grepl("^[-+]?[0-9]{1,3}(,[0-9]{3})+$", x)
+  if (any(thou)) {
+    v <- suppressWarnings(as.numeric(gsub(",", "", x[thou])))
+    out <- c(out, v[is.finite(v)])
+  }
+  out
+}
+
+# The values the source itself gives for each manure coefficient, read from
+# the column whose HEADER names it. Matching on the header rather than on
+# any cell keeps this precise: the question is "what does their EF3 column
+# say", not "does this number appear anywhere in the workbook".
+#
+# Needed because testing a manure value against the whole number pool is
+# far too weak. EF3 = 0.02 passed that test by matching 2/100, where 2 is
+# some unrelated count, while the file's own EF3 column says 0.009.
+.MANURE_FAMILY_HEADERS <- list(
+  MCF          = c("^mcf", "methane conversion", "factor de conversi"),
+  EF3          = c("^ef3", "^fe[ _]*n2o", "^factor de emisi.*n2o", "direct n2o"),
+  Bo           = c("^bo$", "^b0$", "methane producing", "potencial.*metano"),
+  Frac_GasMS   = c("frac_?gas", "volatilis", "volatiliz"),
+  Frac_LeachMS = c("frac_?leach", "lixivia", "leaching")
+)
+
+.translator_family_column_values <- function(sheets) {
+  out <- list()
+  for (sh in sheets) {
+    d <- sh$preview
+    if (is.null(d) || !NROW(d) || is.null(names(d))) next
+    hdr <- tolower(trimws(names(d)))
+    for (fam in names(.MANURE_FAMILY_HEADERS)) {
+      for (pat in .MANURE_FAMILY_HEADERS[[fam]]) {
+        k <- which(grepl(pat, hdr, perl = TRUE))
+        if (!length(k)) next
+        v <- unlist(lapply(k, function(j) .translator_cell_numbers(d[[j]])))
+        v <- v[is.finite(v) & v != 0]
+        if (length(v)) out[[fam]] <- unique(c(out[[fam]], round(v, 6)))
+        break
+      }
+    }
+  }
+  out
+}
+
 translator_source_fingerprint <- function(parsed) {
   if (is.null(parsed) || !length(parsed$sheets)) return(NULL)
   nums <- numeric(0)
   for (sh in parsed$sheets) {
     d <- sh$preview
     if (is.null(d) || !NROW(d)) next
-    for (col in d) {
-      v <- suppressWarnings(as.numeric(as.character(col)))
-      nums <- c(nums, v[is.finite(v)])
-    }
+    for (col in d) nums <- c(nums, .translator_cell_numbers(col))
   }
   fam <- tryCatch(.translator_scan_param_labels(parsed$sheets),
                   error = function(e) character(0))
   list(numbers  = unique(round(nums, 6)),
-       families = sub(" .*$", "", fam))      # "Ym (methane ...)" -> "Ym"
+       families = sub(" .*$", "", fam),      # "Ym (methane ...)" -> "Ym"
+       family_values = tryCatch(.translator_family_column_values(parsed$sheets),
+                                error = function(e) list()))
 }
 
 translator_consistency_checks <- function(param_specs, manure = NULL,
@@ -309,6 +381,41 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
             "been used."), pn, length(i),
             paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn))
         }
+      }
+    }
+  }
+
+  # C5. The same question as C4, asked of the Manure_Management sheet.
+  # C4 only sees param_specs, so a coefficient that lives on the manure
+  # sheet escaped it entirely: the Colombian file gives a direct N2O
+  # emission factor as "FE N2O" = 0.009 and a Bo of 0.19, and the template
+  # was written with the IPCC 0.02 and 0.13, with nothing to notice.
+  #
+  # The comparison is against the source's OWN column for that coefficient,
+  # not the workbook's number pool: 0.02 passes a pool test by matching an
+  # unrelated 2 divided by 100. Percent against fraction is tolerated,
+  # since the sheets differ on that and it is not an error.
+  if (!is.null(source) && !is.null(manure) && is.data.frame(manure) &&
+      nrow(manure) > 0 && length(source$family_values %||% list())) {
+    fv <- source$family_values
+    col_fam <- c(MCF_pct = "MCF", EF3 = "EF3", Bo = "Bo",
+                 Frac_GasMS_pct = "Frac_GasMS", Frac_LeachMS_pct = "Frac_LeachMS")
+    for (cn in names(col_fam)) {
+      fam <- col_fam[[cn]]
+      if (!cn %in% names(manure) || is.null(fv[[fam]]) || !length(fv[[fam]])) next
+      v <- suppressWarnings(as.numeric(manure[[cn]]))
+      v <- unique(v[is.finite(v) & v != 0])
+      if (!length(v)) next
+      ref <- unique(c(fv[[fam]], fv[[fam]] * 100, fv[[fam]] / 100))
+      seen <- vapply(v, function(z)
+        any(abs(ref - z) <= 1e-3 * max(1, abs(z))), logical(1))
+      if (!all(seen)) {
+        add("source reconciliation", sprintf(paste0(
+          "Manure_Management: %s is set to %s, but your file's own %s column ",
+          "gives %s. An IPCC default appears to have replaced a value your ",
+          "file supplies. Check which should be used."),
+          cn, paste(fmt(v[!seen]), collapse = ", "), fam,
+          paste(fmt(utils::head(sort(fv[[fam]]), 4)), collapse = ", ")))
       }
     }
   }
