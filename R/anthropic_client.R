@@ -403,6 +403,423 @@ anthropic_chat <- function(messages,
 #   event: content_block_stop
 #   event: message_delta          { usage: { output_tokens } }
 #   event: message_stop
+# ============================================================================
+# anthropic_chat_stream_async()   (knowledge/20-async-translator.md, step 3b)
+# ============================================================================
+# Same inputs and the same result shape as anthropic_chat_stream(), except
+# that it returns immediately and hands the result to on_result() later.
+#
+# The whole point: the R process is free while Anthropic is generating. On
+# a single worker two users can now stream at once, and a third can use the
+# calculator without waiting.
+#
+# Differences from the synchronous call, stated rather than hidden:
+#   * No retry loop yet. The synchronous path retries 429 and 5xx up to
+#     max_retries before any text has arrived. Async retry means re-issuing
+#     from the completion callback; it is listed as follow-up work in the
+#     plan and is not implemented here.
+#   * Cancellation is by $cancel() on the returned handle, which the caller
+#     normally drives from should_stop().
+anthropic_chat_stream_async <- function(messages,
+                                        on_chunk  = function(text) {},
+                                        on_tick   = function() {},
+                                        should_stop = function() FALSE,
+                                        on_result = function(res) {},
+                                        model = .ANTHROPIC_DEFAULT_MODEL,
+                                        max_tokens = 16000,
+                                        temperature = 0.2,
+                                        timeout_sec = 900,
+                                        tools = NULL,
+                                        tool_choice = NULL,
+                                        cache_ttl = "auto") {
+  api_key <- .anthropic_api_key_for(model)
+  if (!nzchar(api_key)) {
+    on_result(list(reply = NULL,
+      error = "AI translator is not configured (server is missing the ANTHROPIC_API_KEY). Please contact the administrator."))
+    return(invisible(NULL))
+  }
+
+  built     <- .anthropic_build_body(messages, model, max_tokens, temperature,
+                                     tools, tool_choice, cache_ttl)
+  cache_ttl <- built$cache_ttl
+  body_json <- jsonlite::toJSON(built$body, auto_unbox = TRUE, null = "null")
+
+  headers <- c(`x-api-key`         = api_key,
+               `anthropic-version` = .ANTHROPIC_VERSION,
+               `Content-Type`      = "application/json",
+               `Accept`            = "text/event-stream")
+  if (!is.null(cache_ttl))
+    headers <- c(headers, `anthropic-beta` = "extended-cache-ttl-2025-04-11")
+
+  consumer <- .anthropic_sse_consumer(on_chunk = on_chunk, on_tick = on_tick,
+                                      cache_ttl = cache_ttl)
+  st <- new.env(parent = emptyenv())
+  st$stopped  <- FALSE
+  st$reported <- FALSE
+  st$handle   <- NULL
+
+  report <- function(res) {
+    if (st$reported) return(invisible(NULL))
+    st$reported <- TRUE
+    tryCatch(on_result(res), error = function(e)
+      message("translator async: on_result failed: ", conditionMessage(e)))
+    invisible(NULL)
+  }
+  stopped_result <- function()
+    list(reply = NULL, stopped = TRUE,
+         error = "Stopped at your request. Nothing was produced from this call.")
+
+  st$handle <- .anthropic_stream_async(
+    url = .ANTHROPIC_ENDPOINT, headers = headers, body_json = body_json,
+    timeout_sec = timeout_sec,
+    on_data = function(raw) {
+      # Checked per chunk, exactly as the synchronous on_data does, but the
+      # abort is a cancel on the handle rather than returning FALSE.
+      if (isTRUE(tryCatch(should_stop(), error = function(e) FALSE))) {
+        if (!st$stopped) {
+          st$stopped <- TRUE
+          tryCatch(st$handle$cancel(), error = function(e) NULL)
+          report(stopped_result())
+        }
+        return(invisible(NULL))
+      }
+      consumer$feed(raw)
+    },
+    on_done = function(res) {
+      if (st$stopped) return(report(stopped_result()))
+      status <- res$status_code %||% NA_integer_
+      if (!is.na(status) && status >= 300) {
+        body_msg <- tryCatch({
+          b <- jsonlite::fromJSON(rawToChar(res$content), simplifyVector = FALSE)
+          b$error$message %||% ""
+        }, error = function(e) "")
+        acc <- consumer$state$accumulated
+        return(report(list(reply = if (nzchar(acc)) acc else NULL,
+                           error = .anthropic_status_msg(status, body_msg))))
+      }
+      report(consumer$result(model))
+    },
+    on_error = function(msg) {
+      if (st$stopped) return(report(stopped_result()))
+      acc <- consumer$state$accumulated
+      report(list(reply = if (nzchar(acc)) acc else NULL,
+                  error = paste0("Streaming failed (", msg,
+                                 "). Try again in a minute.")))
+    })
+
+  invisible(st$handle)
+}
+
+# ============================================================================
+# REQUEST BODY  (knowledge/20-async-translator.md, step 3b)
+# ============================================================================
+# Lifted verbatim out of anthropic_chat_stream() so the asynchronous
+# transport builds a byte-identical request rather than a second copy of
+# this logic that drifts. Pure: no network, no side effects, which is what
+# makes the equivalence testable.
+#
+# Returns the body AND the resolved cache_ttl, because "auto" is decided
+# here and the caller needs the answer for the beta header and for the
+# cache-write accounting in the SSE consumer.
+.anthropic_build_body <- function(messages, model, max_tokens, temperature,
+                                  tools = NULL, tool_choice = NULL,
+                                  cache_ttl = "auto") {
+  split <- .anthropic_split_system(messages)
+  # Resolve "auto": measure the WHOLE request (system + every message, the
+  # last one included) and take the 1-hour cache above the threshold.
+  # 2026-09-18: it used to measure only the stable prefix. On the Zambia
+  # run the Explore call (prefix = system alone, below the threshold) took
+  # 5 minutes, the next call (prefix now including the upload) took 1 hour,
+  # and changing the TTL on the system block invalidated the cache: $1.04
+  # rewritten. Sizing on the full request makes the choice stable from the
+  # first call, because a request only grows. Anthropic requires 1-hour
+  # breakpoints to precede 5-minute ones; the helpers below mark the system
+  # block and message n-1 with the chosen TTL and message n with the
+  # 5-minute default, which satisfies that ordering.
+  if (identical(cache_ttl, "auto")) {
+    n_msg <- length(split$messages)
+    prefix_chars <- nchar(split$system, type = "bytes") +
+      sum(vapply(split$messages[seq_len(n_msg)], function(m) {
+        cc <- m$content
+        if (is.character(cc)) nchar(cc, type = "bytes") else
+          sum(vapply(cc, function(b) nchar(b$text %||% "", type = "bytes"), integer(1)))
+      }, integer(1)))
+    cache_ttl <- if (ceiling(prefix_chars / 3.6) > .ANTHROPIC_1H_PREFIX_TOKENS) "1h" else NULL
+  }
+  # When tools are present, this is a batched / discovery / force-template
+  # call: the LAST message varies per batch (different aggregation_level
+  # nudge) while the SECOND-TO-LAST message is the stable, batch-invariant
+  # conversation history. Use the two-breakpoint cache helper so the long
+  # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
+  # cost on batches 2-5. Production cost driver per 2026-06-12 logs.
+  # Since 2026-09-17 every translator call carries the tool block (plan F1)
+  # and since 2026-09-18 the same tool_choice (auto), so this is the branch
+  # chat turns take as well.
+  cache_msgs <- if (is.null(tools))
+    .anthropic_cache_last_message(split$messages, ttl = cache_ttl)
+  else
+    .anthropic_cache_stable_and_last(split$messages, ttl = cache_ttl)
+  body <- list(
+    model       = model,
+    max_tokens  = max_tokens,
+    messages    = cache_msgs,
+    stream      = TRUE
+  )
+  if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
+    body$temperature <- temperature
+  sys_payload <- .anthropic_system_payload(split$system, ttl = cache_ttl)
+  if (!is.null(sys_payload)) body$system <- sys_payload
+  if (!is.null(tools)) body$tools <- tools
+  if (!is.null(tool_choice)) body$tool_choice <- tool_choice
+  list(body = body, cache_ttl = cache_ttl)
+}
+
+# ============================================================================
+# SSE CONSUMER  (knowledge/20-async-translator.md, step 3a)
+# ============================================================================
+# The Anthropic event parsing, lifted out of anthropic_chat_stream()'s
+# on_data closure so that a second transport can run the same logic rather
+# than a copy of it.
+#
+# It also fixes a real bug visible in the 15 October logs:
+#
+#   Warning in grepl("\n\n", sse_buffer) : input string 1 is invalid in
+#   this locale
+#
+# The old code did rawToChar() on each arriving chunk and pasted the result
+# onto a character buffer. A chunk boundary can fall in the middle of a
+# multi-byte UTF-8 character, and rawToChar() on that half produces an
+# invalid string, which then poisons every regex touching the buffer. It
+# surfaced on the Colombian file because Spanish is full of accented
+# characters; an ASCII-only inventory would never show it.
+#
+# The buffer is therefore kept as RAW. Events are split on the byte pair
+# 0x0a 0x0a, and only a complete event is converted to text and marked
+# UTF-8, so a split character is simply still in the buffer when the next
+# chunk arrives.
+.anthropic_sse_consumer <- function(on_chunk  = function(text) {},
+                                    on_tick   = function() {},
+                                    cache_ttl = NULL) {
+  st <- new.env(parent = emptyenv())
+
+  reset <- function() {
+    st$accumulated   <- ""
+    st$tool_json_acc <- ""
+    st$tool_block    <- NULL
+    st$usage_in      <- 0L
+    st$usage_out     <- 0L
+    st$cache_read    <- 0L
+    st$cache_write   <- 0L
+    st$cache_write1h <- 0L
+    st$buf           <- raw(0)
+    invisible(NULL)
+  }
+  reset()
+
+  # Index of the first 0x0a 0x0a pair, or NA. Byte work only: no string
+  # conversion, so a half-written character cannot break it.
+  .next_event_end <- function(b) {
+    n <- length(b)
+    if (n < 2L) return(NA_integer_)
+    hit <- which(b[-n] == as.raw(10L) & b[-1L] == as.raw(10L))
+    if (!length(hit)) NA_integer_ else hit[1L]
+  }
+
+  feed <- function(data) {
+    st$buf <- c(st$buf, if (is.raw(data)) data else charToRaw(as.character(data)))
+    repeat {
+      idx <- .next_event_end(st$buf)
+      if (is.na(idx)) break
+      event_raw <- if (idx > 1L) st$buf[seq_len(idx - 1L)] else raw(0)
+      st$buf <- if (length(st$buf) > idx + 1L)
+                  st$buf[(idx + 2L):length(st$buf)] else raw(0)
+      if (!length(event_raw)) next
+      event <- rawToChar(event_raw)
+      Encoding(event) <- "UTF-8"
+
+      event_type <- NULL
+      payload    <- NULL
+      for (line in strsplit(event, "\n", fixed = TRUE)[[1]]) {
+        if (startsWith(line, "event: ")) {
+          event_type <- substring(line, 8)
+        } else if (startsWith(line, "data: ")) {
+          payload <- substring(line, 7)
+        }
+      }
+      if (is.null(payload) || payload == "[DONE]") next
+
+      parsed <- tryCatch(jsonlite::fromJSON(payload, simplifyVector = FALSE),
+                         error = function(e) NULL)
+      if (is.null(parsed)) next
+
+      # message_start carries initial usage incl. cache_read/cache_write.
+      if (identical(event_type, "message_start") ||
+          identical(parsed$type, "message_start")) {
+        u <- parsed$message$usage %||% list()
+        st$usage_in   <- u$input_tokens            %||% st$usage_in
+        st$usage_out  <- u$output_tokens           %||% st$usage_out
+        st$cache_read <- u$cache_read_input_tokens %||% st$cache_read
+        cc <- u$cache_creation
+        if (is.list(cc) && (!is.null(cc$ephemeral_5m_input_tokens) ||
+                            !is.null(cc$ephemeral_1h_input_tokens))) {
+          st$cache_write   <- cc$ephemeral_5m_input_tokens %||% 0L
+          st$cache_write1h <- cc$ephemeral_1h_input_tokens %||% 0L
+        } else {
+          tot <- u$cache_creation_input_tokens %||% 0L
+          if (identical(cache_ttl, "1h")) st$cache_write1h <- tot else st$cache_write <- tot
+        }
+      }
+      if (identical(parsed$type, "content_block_start")) {
+        cb <- parsed$content_block %||% list()
+        if (identical(cb$type, "tool_use")) {
+          st$tool_block <- list(id    = cb$id    %||% "",
+                                name  = cb$name  %||% "",
+                                input = cb$input %||% list())
+          st$tool_json_acc <- ""
+        }
+      }
+      if (identical(parsed$type, "content_block_delta")) {
+        d <- parsed$delta %||% list()
+        if (identical(d$type, "text_delta") && !is.null(d$text)) {
+          st$accumulated <- paste0(st$accumulated, d$text)
+          tryCatch(on_chunk(d$text), error = function(e)
+            message("translator stream on_chunk error: ", conditionMessage(e)))
+        } else if (identical(d$type, "input_json_delta") &&
+                   !is.null(d$partial_json)) {
+          st$tool_json_acc <- paste0(st$tool_json_acc, d$partial_json)
+          tryCatch(on_tick(), error = function(e)
+            message("translator stream on_tick error: ", conditionMessage(e)))
+        }
+      }
+      if (identical(parsed$type, "message_delta")) {
+        u <- parsed$usage %||% list()
+        if (!is.null(u$output_tokens)) st$usage_out <- u$output_tokens
+      }
+    }
+    invisible(NULL)
+  }
+
+  # The same shape anthropic_chat_stream() returns, so callers of either
+  # transport can be written once.
+  result <- function(model) {
+    final_reply <- if (!is.null(st$tool_block) && nzchar(st$tool_json_acc))
+      st$tool_json_acc else st$accumulated
+    list(
+      reply     = final_reply,
+      tool_used = !is.null(st$tool_block) && nzchar(st$tool_json_acc),
+      usage     = list(prompt_tokens         = st$usage_in,
+                       completion_tokens     = st$usage_out,
+                       cached_tokens         = st$cache_read,
+                       cache_write_tokens    = st$cache_write,
+                       cache_write_1h_tokens = st$cache_write1h,
+                       total_tokens          = st$usage_in + st$usage_out +
+                                               st$cache_read + st$cache_write +
+                                               st$cache_write1h),
+      model     = model
+    )
+  }
+
+  list(state = st, reset = reset, feed = feed, result = result)
+}
+
+# ============================================================================
+# NON-BLOCKING TRANSPORT  (knowledge/20-async-translator.md, step 2)
+# ============================================================================
+# httr2::req_perform_stream() is synchronous: it holds the R process for the
+# whole call. Measured on 15 October 2026, one exploration held the single
+# worker for 153.9 seconds, during which nobody else could render anything.
+# Almost none of that is computation; it is waiting for Anthropic to emit
+# tokens.
+#
+# .anthropic_stream_async() hands the request to curl's multi interface and
+# returns immediately. A self-rescheduling later() callback advances every
+# in-flight transfer a slice at a time, and between slices R returns to
+# Shiny's event loop, so other sessions are served normally.
+#
+# Why not promises/future: a future runs in a separate R process and cannot
+# touch `session`, but the data callback has to push each chunk into the
+# user's chat bubble as it arrives. Here every callback runs on the main
+# thread, so the streaming UI needs no change at all.
+#
+# Why curl rather than a new package: curl is already installed as httr2's
+# own transport, so this adds no dependency to resolve on shinyapps.io.
+#
+# Cancellation is by calling $cancel() on the returned handle, not by
+# returning FALSE from the data callback the way httr2 allows.
+.anthropic_stream_async <- function(url, headers, body_json,
+                                    timeout_sec = 900,
+                                    on_data  = function(raw) NULL,
+                                    on_done  = function(res) NULL,
+                                    on_error = function(msg) NULL,
+                                    low_speed_time  = 45L,
+                                    low_speed_limit = 1L,
+                                    poll_sec = 0.05) {
+  h <- curl::new_handle(url = url)
+  if (length(headers)) curl::handle_setheaders(h, .list = as.list(headers))
+  curl::handle_setopt(
+    h,
+    post            = TRUE,
+    postfields      = charToRaw(body_json),
+    timeout         = as.integer(timeout_sec),
+    # Same stall detector as the synchronous path: a connection making no
+    # progress for 45s is dropped rather than held to the wall-clock limit.
+    low_speed_time  = as.integer(low_speed_time),
+    low_speed_limit = as.integer(low_speed_limit)
+  )
+
+  pool <- curl::new_pool()
+  state <- new.env(parent = emptyenv())
+  state$finished  <- FALSE
+  state$cancelled <- FALSE
+
+  settle <- function(fn, arg) {
+    if (state$finished) return(invisible(NULL))
+    state$finished <- TRUE
+    tryCatch(fn(arg), error = function(e)
+      message("translator async: completion handler failed: ",
+              conditionMessage(e)))
+    invisible(NULL)
+  }
+
+  curl::multi_add(
+    h,
+    done = function(res) settle(on_done, res),
+    fail = function(err) {
+      # A cancel surfaces here too; the caller already knows about that one.
+      if (isTRUE(state$cancelled)) { state$finished <- TRUE; return(invisible(NULL)) }
+      settle(on_error, as.character(err))
+    },
+    # Two arguments, not one: curl calls this as data(raw, final_flag).
+    # Declaring only the raw vector fails with "unused argument".
+    # Wrapped: a throwing data callback must not take the whole poll loop
+    # down with it, or every other in-flight transfer stalls as well.
+    data = function(raw, ...) tryCatch(on_data(raw), error = function(e)
+      message("translator async: data handler failed: ", conditionMessage(e))),
+    pool = pool
+  )
+
+  poll <- function() {
+    if (state$finished) return(invisible(NULL))
+    st <- tryCatch(curl::multi_run(timeout = 0, pool = pool),
+                   error = function(e) { settle(on_error, conditionMessage(e)); NULL })
+    if (is.null(st) || state$finished) return(invisible(NULL))
+    if (st$pending > 0) later::later(poll, poll_sec)
+    invisible(NULL)
+  }
+  later::later(poll, 0)
+
+  list(
+    cancel = function() {
+      if (state$finished) return(invisible(FALSE))
+      state$cancelled <- TRUE
+      tryCatch(curl::multi_cancel(h), error = function(e) NULL)
+      state$finished <- TRUE
+      invisible(TRUE)
+    },
+    is_done = function() isTRUE(state$finished)
+  )
+}
+
 anthropic_chat_stream <- function(messages,
                                    on_chunk = function(text) {},
                                    # Optional keep-alive callback fired on
@@ -465,53 +882,10 @@ anthropic_chat_stream <- function(messages,
                 error = "AI translator is not configured (server is missing the ANTHROPIC_API_KEY). Please contact the administrator."))
   }
 
-  split <- .anthropic_split_system(messages)
-  # Resolve "auto": measure the WHOLE request (system + every message, the
-  # last one included) and take the 1-hour cache above the threshold.
-  # 2026-09-18: it used to measure only the stable prefix. On the Zambia
-  # run the Explore call (prefix = system alone, below the threshold) took
-  # 5 minutes, the next call (prefix now including the upload) took 1 hour,
-  # and changing the TTL on the system block invalidated the cache: $1.04
-  # rewritten. Sizing on the full request makes the choice stable from the
-  # first call, because a request only grows. Anthropic requires 1-hour
-  # breakpoints to precede 5-minute ones; the helpers below mark the system
-  # block and message n-1 with the chosen TTL and message n with the
-  # 5-minute default, which satisfies that ordering.
-  if (identical(cache_ttl, "auto")) {
-    n_msg <- length(split$messages)
-    prefix_chars <- nchar(split$system, type = "bytes") +
-      sum(vapply(split$messages[seq_len(n_msg)], function(m) {
-        cc <- m$content
-        if (is.character(cc)) nchar(cc, type = "bytes") else
-          sum(vapply(cc, function(b) nchar(b$text %||% "", type = "bytes"), integer(1)))
-      }, integer(1)))
-    cache_ttl <- if (ceiling(prefix_chars / 3.6) > .ANTHROPIC_1H_PREFIX_TOKENS) "1h" else NULL
-  }
-  # When tools are present, this is a batched / discovery / force-template
-  # call: the LAST message varies per batch (different aggregation_level
-  # nudge) while the SECOND-TO-LAST message is the stable, batch-invariant
-  # conversation history. Use the two-breakpoint cache helper so the long
-  # ~170K conversation prefix is cached once on batch 1 and re-read at 10%
-  # cost on batches 2-5. Production cost driver per 2026-06-12 logs.
-  # Since 2026-09-17 every translator call carries the tool block (plan F1)
-  # and since 2026-09-18 the same tool_choice (auto), so this is the branch
-  # chat turns take as well.
-  cache_msgs <- if (is.null(tools))
-    .anthropic_cache_last_message(split$messages, ttl = cache_ttl)
-  else
-    .anthropic_cache_stable_and_last(split$messages, ttl = cache_ttl)
-  body <- list(
-    model       = model,
-    max_tokens  = max_tokens,
-    messages    = cache_msgs,
-    stream      = TRUE
-  )
-  if (!(model %in% .ANTHROPIC_NO_TEMPERATURE_MODELS))
-    body$temperature <- temperature
-  sys_payload <- .anthropic_system_payload(split$system, ttl = cache_ttl)
-  if (!is.null(sys_payload)) body$system <- sys_payload
-  if (!is.null(tools)) body$tools <- tools
-  if (!is.null(tool_choice)) body$tool_choice <- tool_choice
+  built      <- .anthropic_build_body(messages, model, max_tokens, temperature,
+                                      tools, tool_choice, cache_ttl)
+  body       <- built$body
+  cache_ttl  <- built$cache_ttl
 
   attempt    <- 0
   last_err   <- NULL

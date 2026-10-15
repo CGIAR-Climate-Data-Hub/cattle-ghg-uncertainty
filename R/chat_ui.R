@@ -219,7 +219,7 @@ translator_chat_server <- function(input, output, session) {
   # socket. It therefore has to be cheap and must not touch reactive values:
   # a reactive write here would schedule a flush in the middle of a stream.
   observeEvent(input$translator_stop, {
-    translator_cancel_request()
+    translator_cancel_request(session$userData$translator_tok)
     message("translator: stop requested by ", session$userData$email %||% "user")
   }, ignoreInit = TRUE)
 
@@ -426,7 +426,6 @@ translator_chat_server <- function(input, output, session) {
   # template path: no separate button needed. Otherwise it's a normal
   # chat round (clarifying questions, mapping discussion).
   observeEvent(input$translator_send, {
-    translator_cancel_reset()
     req(state$user_email)
     txt <- trimws(input$translator_input %||% "")
     if (!nzchar(txt)) return()
@@ -456,7 +455,6 @@ translator_chat_server <- function(input, output, session) {
   # "Change something and produce again": keep the conversation, drop the
   # template so the chat controls come back (2026-09-18).
   observeEvent(input$translator_revise, {
-    translator_cancel_reset()
     req(state$user_email)
     state$last_template_json <- NULL
     state$last_error <- NULL
@@ -885,11 +883,66 @@ translator_chat_server <- function(input, output, session) {
 # arrive and sets this flag; the stream callback reads it on the next chunk
 # and aborts. A plain environment is used rather than a reactiveVal so that
 # setting it inside the pumped loop cannot start a reactive flush mid-stream.
+# Per-request cancellation: one flag per in-flight call, keyed by a token,
+# rather than one flag for the whole R process.
+#
+# The old store was a single .TRANSLATOR_CANCEL$stop. That is safe only
+# while a worker can host exactly one translation at a time. Two users
+# sharing a worker could already cancel each other silently, and the async
+# work in knowledge/20-async-translator.md makes overlapping calls normal
+# rather than accidental, so this has to be fixed before any of it.
+#
+# It also closes a second hole. The old flag was reset by the Send and
+# Revise observers only, never by "Send to the AI (Step 1 of 3)", so a Stop
+# left it TRUE and the next exploration aborted on its first chunk with no
+# explanation. A token minted per call cannot carry state forward.
+# Which transport the translator uses.
+#
+# FALSE keeps anthropic_chat_stream(), which holds the R worker for the
+# whole call: on 15 October 2026 one exploration held it for 153.9 seconds
+# and nobody else in the room could render anything.
+#
+# TRUE uses anthropic_chat_stream_async(), which returns immediately and
+# delivers the reply through a later() callback, so one worker serves many
+# people. Proven against the live API (process stayed responsive during a
+# call; two concurrent calls completed; Stop cancelled one without
+# touching the other) but NOT yet exercised through a browser session.
+# Flip it after a browser test, not before.
+.TRANSLATOR_ASYNC <- FALSE
+
 .TRANSLATOR_CANCEL <- new.env(parent = emptyenv())
-.TRANSLATOR_CANCEL$stop <- FALSE
-translator_cancel_reset   <- function() .TRANSLATOR_CANCEL$stop <- FALSE
-translator_cancel_request <- function() .TRANSLATOR_CANCEL$stop <- TRUE
-translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
+
+translator_cancel_new <- function() {
+  tok <- paste0("rq_", as.integer(Sys.time()), "_",
+                paste(sample(c(letters, 0:9), 10L, replace = TRUE), collapse = ""))
+  assign(tok, FALSE, envir = .TRANSLATOR_CANCEL)
+  tok
+}
+translator_cancel_request <- function(tok) {
+  if (!is.null(tok) && nzchar(tok)) assign(tok, TRUE, envir = .TRANSLATOR_CANCEL)
+  invisible(NULL)
+}
+translator_cancelled <- function(tok) {
+  if (is.null(tok) || !nzchar(tok)) return(FALSE)
+  isTRUE(tryCatch(get(tok, envir = .TRANSLATOR_CANCEL, inherits = FALSE),
+                  error = function(e) FALSE))
+}
+translator_cancel_clear <- function(tok) {
+  if (!is.null(tok) && nzchar(tok) &&
+      exists(tok, envir = .TRANSLATOR_CANCEL, inherits = FALSE))
+    rm(list = tok, envir = .TRANSLATOR_CANCEL)
+  invisible(NULL)
+}
+
+# The token for whichever call this session currently has in flight. Kept
+# on session$userData, a plain environment, rather than in the module's
+# reactiveValues: the Stop observer reads it, and a reactive read there
+# would schedule a flush in the middle of a stream.
+.translator_begin_request <- function(session) {
+  tok <- translator_cancel_new()
+  session$userData$translator_tok <- tok
+  tok
+}
 
 # Set a flag the conditionalPanel above can react to. Called from
 # the OpenAI-response parser.
@@ -1546,64 +1599,11 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
 # into the browser, then append it to the chat history. All this state
 # lives on `state`. Requires `session` so the streaming chunks can be
 # pushed to the active browser tab via sendCustomMessage.
-.translator_send <- function(state, session, stage = "clarify") {
-  state$pending <- TRUE
-  state$last_error <- NULL
-  on.exit({
-    state$pending <- FALSE
-    # Always tell the browser to drop the active streaming bubble: the
-    # server-side renderUI will replace it (or leave a blank when there's
-    # an error). Safe to call even if the bubble was never created.
-    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
-              error = function(e) NULL)
-  })
-
-  # Cap check.
-  if (budget_would_exceed()) {
-    # With MONTHLY_BUDGET_CAP_USD set to a sentinel "no cap" value
-    # (0/none/unlimited/unset), this branch never fires. Kept as a
-    # safety net for the case where an administrator explicitly sets
-    # a numeric cap and wants the in-app gate.
-    state$last_error <- paste0(
-      "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly: ",
-      "please try again later or contact the administrator.")
-    return()
-  }
-
-  system_prompt <- tryCatch(
-    assemble_translator_system_prompt(),
-    error = function(e) {
-      state$last_error <- paste0("Couldn't load the translator instructions: ",
-                                  conditionMessage(e))
-      NULL
-    })
-  if (is.null(system_prompt)) return()
-
-  msgs <- anthropic_build_messages(system_prompt, history = state$messages)
-
-  # Create an empty bubble client-side, then stream tokens into it. The
-  # final assistant message gets written into state$messages at the end so
-  # the renderUI for the message history catches up.
-  session$sendCustomMessage("translatorStreamStart", "")
-
-  # The tool block rides along on every chat turn (plan F1): the
-  # prompt-cache prefix is tools -> system -> messages, so a chat turn
-  # without the tool and an emission call with it can never share a cache
-  # entry. Since 2026-09-18 the tool_choice is `auto` here as well, the
-  # same as the emission calls, because a change of tool_choice between
-  # calls invalidates the cached message prefix. Rule 9 tells the model not
-  # to call the tool from a chat reply; if it does anyway, the block below
-  # promotes a complete piece and explains a partial one.
-  resp <- anthropic_chat_stream(
-    msgs,
-    on_chunk = function(text) {
-      session$sendCustomMessage("translatorStreamChunk", text)
-    },
-    tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO
-  )
-
+# Everything that happens once a reply has arrived, whichever transport
+# brought it. Split out of .translator_send() so the synchronous and
+# asynchronous paths cannot drift: under async this runs from a later()
+# callback rather than inline, which is the only difference.
+.translator_handle_result <- function(state, session, resp, stage) {
   if (!is.null(resp$error)) {
     state$last_error <- resp$error
     # If we got at least some text before the error, still save it.
@@ -1697,6 +1697,117 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
 
   # Persist so a refresh / reload resumes where we left off.
   .translator_persist(state)
+  invisible(NULL)
+}
+
+.translator_send <- function(state, session, stage = "clarify") {
+  state$pending <- TRUE
+  state$last_error <- NULL
+  # One cancellation token per call, minted here rather than in the
+  # observers so every entry point gets a fresh flag.
+  tok <- .translator_begin_request(session)
+  # Set once the call has been handed to the asynchronous transport, which
+  # cleans up itself when the result arrives. Every early return below
+  # still unwinds through on.exit as before.
+  handed_off <- FALSE
+  on.exit({
+    if (!handed_off) {
+      translator_cancel_clear(tok)
+      state$pending <- FALSE
+    # Always tell the browser to drop the active streaming bubble: the
+    # server-side renderUI will replace it (or leave a blank when there's
+    # an error). Safe to call even if the bubble was never created.
+      tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+                error = function(e) NULL)
+    }
+  })
+
+  # Cap check.
+  if (budget_would_exceed()) {
+    # With MONTHLY_BUDGET_CAP_USD set to a sentinel "no cap" value
+    # (0/none/unlimited/unset), this branch never fires. Kept as a
+    # safety net for the case where an administrator explicitly sets
+    # a numeric cap and wants the in-app gate.
+    state$last_error <- paste0(
+      "The AI translator is temporarily unavailable. ",
+      "We've been notified and will restore service shortly: ",
+      "please try again later or contact the administrator.")
+    return()
+  }
+
+  system_prompt <- tryCatch(
+    assemble_translator_system_prompt(),
+    error = function(e) {
+      state$last_error <- paste0("Couldn't load the translator instructions: ",
+                                  conditionMessage(e))
+      NULL
+    })
+  if (is.null(system_prompt)) return()
+
+  msgs <- anthropic_build_messages(system_prompt, history = state$messages)
+
+  # Create an empty bubble client-side, then stream tokens into it. The
+  # final assistant message gets written into state$messages at the end so
+  # the renderUI for the message history catches up.
+  session$sendCustomMessage("translatorStreamStart", "")
+
+  # The tool block rides along on every chat turn (plan F1): the
+  # prompt-cache prefix is tools -> system -> messages, so a chat turn
+  # without the tool and an emission call with it can never share a cache
+  # entry. Since 2026-09-18 the tool_choice is `auto` here as well, the
+  # same as the emission calls, because a change of tool_choice between
+  # calls invalidates the cached message prefix. Rule 9 tells the model not
+  # to call the tool from a chat reply; if it does anyway, the block below
+  # promotes a complete piece and explains a partial one.
+  on_chunk_cb <- function(text) {
+    tryCatch(session$sendCustomMessage("translatorStreamChunk", text),
+              error = function(e) NULL)
+  }
+  # 2026-10-15: this path passed no should_stop at all, so Stop did nothing
+  # during an exploration or a chat reply. It only ever worked on the
+  # emission calls below.
+  stopper <- function() translator_cancelled(tok)
+
+  if (isTRUE(.TRANSLATOR_ASYNC)) {
+    # Hand off and return. The worker is free from here until Anthropic
+    # answers, which is the whole point: a 154-second call no longer locks
+    # every other user out of the app.
+    handed_off <- TRUE
+    anthropic_chat_stream_async(
+      msgs,
+      on_chunk    = on_chunk_cb,
+      should_stop = stopper,
+      tools       = anthropic_translator_tools(),
+      tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+      on_result   = function(resp) {
+        # withReactiveDomain: this runs from a later() callback, outside
+        # any reactive context, so without it the writes to `state` below
+        # belong to no session and Shiny never schedules a flush.
+        shiny::withReactiveDomain(session, {
+          tryCatch(.translator_handle_result(state, session, resp, stage),
+                    error = function(e) {
+                      state$last_error <- paste0(
+                        "The reply arrived but could not be processed (",
+                        conditionMessage(e), ").")
+                    })
+          translator_cancel_clear(tok)
+          state$pending <- FALSE
+          tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
+                    error = function(e) NULL)
+        })
+      })
+    return(invisible(NULL))
+  }
+
+  resp <- anthropic_chat_stream(
+    msgs,
+    on_chunk    = on_chunk_cb,
+    should_stop = stopper,
+    tools       = anthropic_translator_tools(),
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO
+  )
+
+  .translator_handle_result(state, session, resp, stage)
 }
 
 # One place to log a call's usage (plan F11). `stage` names the pipeline
@@ -1764,7 +1875,9 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
 .translator_force_template <- function(state, session) {
   state$pending <- TRUE
   state$last_error <- NULL
+  tok <- .translator_begin_request(session)
   on.exit({
+    translator_cancel_clear(tok)
     state$pending <- FALSE
     tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
               error = function(e) NULL)
@@ -1839,12 +1952,12 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
   enum_resp <- .translator_memo_call(discovery_msgs, tools_sig, function()
     anthropic_chat_enumerate_aggregation_levels(
       discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-      should_stop = translator_cancelled))
+      should_stop = function() translator_cancelled(tok)))
 
   # A stop is not a failure, and must not trigger the fallback: starting a
   # monolithic emission here would be the opposite of what was asked for,
   # and the expensive path at that.
-  if (isTRUE(enum_resp$stopped) || translator_cancelled()) {
+  if (isTRUE(enum_resp$stopped) || translator_cancelled(tok)) {
     state$last_error <- enum_resp$error %||%
       "Stopped at your request. Nothing was produced from this call."
     return()
@@ -1966,9 +2079,9 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
     batch_resp <- .translator_memo_call(batch_msgs, tools_sig, function()
       anthropic_chat_batch_template_force(
         batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = translator_cancelled))
+        should_stop = function() translator_cancelled(tok)))
 
-    if (isTRUE(batch_resp$stopped) || translator_cancelled()) {
+    if (isTRUE(batch_resp$stopped) || translator_cancelled(tok)) {
       state$last_error <- sprintf(
         "Stopped at your request during batch %d of %d (%s). The %d batch(es) already produced are kept and will not be re-billed; click 'Produce template now' to carry on from there.",
         i, length(agg_levels), level, length(state$batch_parts))
@@ -2014,7 +2127,7 @@ translator_cancelled      <- function() isTRUE(.TRANSLATOR_CANCEL$stop)
         "aggregation_level."))))
       retry_resp <- anthropic_chat_batch_template_force(
         retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = translator_cancelled)
+        should_stop = function() translator_cancelled(tok))
       if (is.null(retry_resp$error)) {
         .translator_log_usage(state, retry_resp, stage = "retry_defaults_only", expect_warm = TRUE)
         rp <- tryCatch(jsonlite::fromJSON(retry_resp$reply, simplifyVector = TRUE), error = function(e) NULL)
