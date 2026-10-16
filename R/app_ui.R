@@ -2041,6 +2041,13 @@ app_ui <- function(request = NULL) {
             ),
             conditionalPanel(
               condition = "input.analysis_mode == 'trend'",
+              # 2026-10-16: trend used to take the single-year slider's
+              # 10,000 iterations for every year. A 95% interval is stable
+              # at 2,000, and 35 years at 10,000 did not fit in memory.
+              numericInput("n_iter_trend", t("trend_n_iter_label"),
+                           value = 2000, min = 500, max = 10000, step = 500),
+              div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
+                  t("trend_n_iter_help")),
               actionButton("run_trend", t("btn_run_trend"),
                            class = "run-btn w-100", icon = icon("play")),
               hr(),

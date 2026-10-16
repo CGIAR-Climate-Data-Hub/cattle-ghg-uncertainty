@@ -1046,6 +1046,12 @@ lang_state_take <- function(token) {
     fr = "Lance deux simulations complètes supplémentaires (~3× le temps de calcul sur un grand inventaire). Décochez pour un calcul plus rapide si vous n'avez besoin que du résultat principal et de la sensibilité."),
   btn_run_sim = list(en = "Run Monte Carlo Simulation",
                        fr = "Lancer la simulation Monte Carlo"),
+  trend_n_iter_label = list(
+    en = "Iterations per year (trend)",
+    fr = "Itérations par année (tendance)"),
+  trend_n_iter_help = list(
+    en = "Each year is a full simulation. 2,000 gives a stable 95% interval; raise it for the final run.",
+    fr = "Chaque année est une simulation complète. 2 000 donne un intervalle à 95 % stable ; augmentez pour l'exécution finale."),
   btn_run_trend = list(en = "Run Trend Analysis",
                          fr = "Lancer l'analyse de tendance"),
 

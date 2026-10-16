@@ -1619,17 +1619,8 @@ app_server <- function(input, output, session) {
           specs  <- rv$param_specs
           manure <- rv$manure_data
 
-          make_group_key <- function(df) {
-            if (all(c("cattle_type", "aggregation_level") %in% names(df))) {
-              sub <- if ("sub_category" %in% names(df)) df$sub_category else rep("", nrow(df))
-              paste(df$cattle_type, df$aggregation_level, sub, sep = "||")
-            } else if (all(c("system", "subsystem") %in% names(df))) {
-              paste(df$system, df$subsystem, sep = "||")
-            } else {
-              rep("group1", nrow(df))
-            }
-          }
-
+          # make_group_key() now lives in R/systems_builder.R, shared with
+          # trend mode.
           group_key  <- make_group_key(specs)
           sys_groups <- unique(group_key)
 
@@ -1692,231 +1683,19 @@ app_server <- function(input, output, session) {
             }
           }
 
-          systems_data <- list()
-
-          # Used when a group has no usable Manure_Management row. Shared with
-          # trend_tab.R, scripts/audit.R and scripts/example_verify.R, which
-          # all used to keep their own retyped copy of these numbers.
-          .mms_fb <- default_mms_fallback()
-          default_mms_fracs <- .mms_fb$fractions
-          default_mcf_vals  <- .mms_fb$mcf
-          default_ef3_vals  <- .mms_fb$ef3
-
-          # Cross-group coefficient sharing (2026-09). Drawn ONCE, before the
-          # group loop, so that groups holding the same estimate for a
-          # coefficient move together instead of averaging each other out.
-          # Without this the reported MoE falls as 1/sqrt(number of groups),
-          # i.e. the headline figure depends on how finely the inventory was
-          # disaggregated rather than on the data. See the block comment above
-          # build_shared_coefficient_draws() in R/mc_sampling.R.
-          #
-          # The per-system seed set inside the loop is unaffected: it governs
-          # only the columns each system still draws for itself.
-          shared_draws <- if (identical(input$crossgroup_mode %||% "shared", "shared")) {
-            build_shared_coefficient_draws(specs, as.integer(input$n_iter),
-                                           seed = input$seed, group_keys = group_key)
-          } else list(blocks = list(), summary = NULL)
-          rv$shared_summary <- shared_draws$summary
-
-          for (sg in sys_groups) {
-            sys_specs <- specs[group_key == sg, ]
-
-            # Round 7 R1.13: also extract per-MMS Frac_GasMS / Frac_LeachMS
-            # from the manure sheet if the columns are present. NA -> fall back
-            # to mms_frac_defaults_2019() inside calc_indirect_n2o_mm().
-            frac_gas_vals   <- NULL
-            frac_leach_vals <- NULL
-            # Andreas 2026-05 follow-up (C4 / C6): per-MMS uncertainty matrices
-            # populated below if the manure sheet has lower/upper/dist cols.
-            # Andreas 28/5/26 #4: fraction_samples is the new per-MMS sampled
-            # allocation matrix (n_iter × n_mms, rows renormalised to sum to 1).
-            mcf_samples <- ef3_samples <- fg_samples <- fl_samples <-
-              fraction_samples <- NULL
-
-            if (!is.null(manure) && nrow(manure) > 0 &&
-                all(c("mms_type", "fraction_pct", "MCF_pct", "EF3") %in% names(manure))) {
-              manure_key <- make_group_key(manure)
-              # Use the auto-matched MM key from resolve_sub_category_matches
-              # (falls through to the literal sg when no remap was needed).
-              sg_lookup  <- if (sg %in% names(sg_to_mm)) sg_to_mm[[sg]] else sg
-              mms_rows   <- manure[manure_key == sg_lookup, ]
-              if (nrow(mms_rows) > 0) {
-                # Defensive coercion in case Excel stored these as text
-                fp_num   <- suppressWarnings(as.numeric(mms_rows$fraction_pct))
-                mcf_num  <- suppressWarnings(as.numeric(mms_rows$MCF_pct))
-                ef3_num  <- suppressWarnings(as.numeric(mms_rows$EF3))
-                mms_fracs <- setNames(fp_num / 100,  mms_rows$mms_type)
-                mcf_vals  <- setNames(mcf_num / 100, mms_rows$mms_type)
-                ef3_vals  <- setNames(ef3_num,       mms_rows$mms_type)
-                # Drop any rows that didn't coerce (NA fraction → useless)
-                mms_fracs <- mms_fracs[!is.na(mms_fracs)]
-                mcf_vals  <- mcf_vals[names(mms_fracs)]
-                ef3_vals  <- ef3_vals[names(mms_fracs)]
-                # Replace any leftover NAs in MCF/EF3 with THAT SYSTEM's own
-                # default rather than crashing. This used to substitute 0.015
-                # and 0.005 for every system alike, which are pasture's
-                # temperate MCF and the superseded solid-storage EF3: a blank
-                # MCF on an uncovered lagoon became 1.5% where Table 10.17
-                # gives 77%.
-                mcf_vals <- fill_mms_blanks(mcf_vals, "mcf")
-                ef3_vals <- fill_mms_blanks(ef3_vals, "ef3")
-
-                # Round 7 R1.13: per-MMS Frac_GasMS / Frac_LeachMS columns.
-                if ("Frac_GasMS_pct" %in% names(mms_rows)) {
-                  fg_num <- suppressWarnings(as.numeric(mms_rows$Frac_GasMS_pct)) / 100
-                  frac_gas_vals <- setNames(fg_num, mms_rows$mms_type)
-                  frac_gas_vals <- frac_gas_vals[names(mms_fracs)]
-                }
-                if ("Frac_LeachMS_pct" %in% names(mms_rows)) {
-                  fl_num <- suppressWarnings(as.numeric(mms_rows$Frac_LeachMS_pct)) / 100
-                  frac_leach_vals <- setNames(fl_num, mms_rows$mms_type)
-                  frac_leach_vals <- frac_leach_vals[names(mms_fracs)]
-                }
-
-                # Andreas 2026-05 follow-up (C4 / C6): sample per-MMS MCF /
-                # EF3 / Frac_GasMS / Frac_LeachMS uncertainty from the
-                # lower / upper / distribution columns on the manure sheet.
-                # Was previously dropped: only central values were used as
-                # deterministic per-iteration constants, so MCF never showed
-                # up in the MM-CH4 tornado despite huge bounds in real data.
-                mc_n_iter <- n_iter_val
-                # Pre-scale percentage cols to fractions so the sampler works
-                # in the same units the downstream calc expects.
-                mr_mcf_scaled <- mms_rows
-                for (col in c("MCF_pct", "lower_mcf", "upper_mcf")) {
-                  if (col %in% names(mr_mcf_scaled))
-                    mr_mcf_scaled[[col]] <- suppressWarnings(
-                      as.numeric(mr_mcf_scaled[[col]])) / 100
-                }
-                mr_fg_scaled <- mms_rows
-                for (col in c("Frac_GasMS_pct", "lower_frac_gas", "upper_frac_gas")) {
-                  if (col %in% names(mr_fg_scaled))
-                    mr_fg_scaled[[col]] <- suppressWarnings(
-                      as.numeric(mr_fg_scaled[[col]])) / 100
-                }
-                mr_fl_scaled <- mms_rows
-                for (col in c("Frac_LeachMS_pct", "lower_frac_leach", "upper_frac_leach")) {
-                  if (col %in% names(mr_fl_scaled))
-                    mr_fl_scaled[[col]] <- suppressWarnings(
-                      as.numeric(mr_fl_scaled[[col]])) / 100
-                }
-                mcf_samples <- sample_per_mms_param(
-                  mr_mcf_scaled, "MCF_pct", "lower_mcf", "upper_mcf",
-                  "distribution_mcf", mc_n_iter, default_dist = "pert")
-                ef3_samples <- sample_per_mms_param(
-                  mms_rows, "EF3", "lower_ef3", "upper_ef3",
-                  "distribution_ef3", mc_n_iter, default_dist = "pert")
-                fg_samples <- sample_per_mms_param(
-                  mr_fg_scaled, "Frac_GasMS_pct", "lower_frac_gas",
-                  "upper_frac_gas", "distribution_frac_gas",
-                  mc_n_iter, default_dist = "pert")
-                fl_samples <- sample_per_mms_param(
-                  mr_fl_scaled, "Frac_LeachMS_pct", "lower_frac_leach",
-                  "upper_frac_leach", "distribution_frac_leach",
-                  mc_n_iter, default_dist = "pert")
-
-                # Andreas 28/5/26 #4: sample fraction_pct per-MMS so MMS
-                # allocation can show up in the tornado / rank-correlation.
-                # If lower_fraction / upper_fraction are absent or equal to
-                # the central value, the sampler degenerates to a constant
-                # row (matching the prior deterministic behaviour). Each
-                # iteration row is then divided by 100 and renormalised so
-                # it sums to 1: keeps the values on the simplex (Option A
-                # from the design Q: independent sample + renormalise).
-                if (any(c("lower_fraction", "upper_fraction",
-                           "distribution_fraction") %in% names(mms_rows))) {
-                  fraction_samples <- sample_per_mms_param(
-                    mms_rows, "fraction_pct", "lower_fraction",
-                    "upper_fraction", "distribution_fraction",
-                    mc_n_iter, default_dist = "pert")
-                  if (!is.null(fraction_samples)) {
-                    # `pmax(0, x)` strips the matrix dim attribute; clamp
-                    # in place to keep `fraction_samples` a matrix.
-                    fraction_samples[fraction_samples < 0] <- 0
-                    fraction_samples <- fraction_samples / 100
-                    rs <- rowSums(fraction_samples)
-                    rs[rs <= 0] <- 1  # safeguard against degenerate rows
-                    fraction_samples <- fraction_samples / rs
-                  }
-                }
-
-                # Reorder columns to match mms_fracs ordering.
-                ord_names <- names(mms_fracs)
-                if (!is.null(mcf_samples)) mcf_samples <- mcf_samples[, ord_names, drop = FALSE]
-                if (!is.null(ef3_samples)) ef3_samples <- ef3_samples[, ord_names, drop = FALSE]
-                if (!is.null(fg_samples))  fg_samples  <- fg_samples[, ord_names, drop = FALSE]
-                if (!is.null(fl_samples))  fl_samples  <- fl_samples[, ord_names, drop = FALSE]
-                if (!is.null(fraction_samples))
-                  fraction_samples <- fraction_samples[, ord_names, drop = FALSE]
-                # Final guard: if all MMS rows were unparsable, use defaults
-                if (length(mms_fracs) == 0) {
-                  mms_fracs <- default_mms_fracs
-                  mcf_vals  <- default_mcf_vals
-                  ef3_vals  <- default_ef3_vals
-                }
-              } else {
-                mms_fracs <- default_mms_fracs
-                mcf_vals  <- default_mcf_vals
-                ef3_vals  <- default_ef3_vals
-              }
-            } else {
-              mms_fracs <- default_mms_fracs
-              mcf_vals  <- default_mcf_vals
-              ef3_vals  <- default_ef3_vals
-            }
-
-            # R1.1 / Round 7 T4.3: build a UNIFIED correlation matrix over both
-            # AD and coefficient parameters. The preset matrix and the time-series
-            # matrix can both span both blocks (post-Round-7), so we expand the
-            # user's matrix to the full (AD + coefficient) parameter list. This
-            # supersedes the prior two-pass `corr_matrix` / `ef_corr_matrix` split,
-            # though both inputs are still passed downstream for back-compat.
-            ad_names   <- sys_specs$parameter[sys_specs$param_type == "activity_data"]
-            coef_names <- sys_specs$parameter[sys_specs$param_type == "coefficient"]
-            all_names  <- c(ad_names, coef_names)
-
-            corr_mtx_active <- effective_corr_matrix()
-
-            # isTRUE() wrap protects against input$corr_mode being NA mid-render
-            # (the radioButtons("corr_mode", ...) is built inside a renderUI, so
-            # input$corr_mode can transiently be NA right after Country X / Y
-            # load when corr_mtx_active is already populated from the example's
-            # synthetic time-series). Without isTRUE, `NA != "none"` returns NA,
-            # `NA && TRUE` returns NA, and `if (NA)` throws "missing value where
-            # TRUE/FALSE needed": the exact error users reported on Country X.
-            unified_corr <- if (isTRUE(input$corr_mode != "none") && !is.null(corr_mtx_active)) {
-              expand_corr_matrix(corr_mtx_active, all_names)
-            } else NULL
-
-            ts_coef_corr <- if (isTRUE(input$corr_mode != "none") && !is.null(corr_mtx_active)) {
-              expand_corr_matrix(corr_mtx_active, coef_names)
-            } else NULL
-
-            # AD block has only cattle_pop: within-block correlation is meaningless.
-            corr <- NULL
-
-            # The activity-data correlation modes are the only remaining
-            # source of a coefficient-block matrix; block-structured EF
-            # correlation was removed on 2026-10-15.
-            ef_corr <- ts_coef_corr
-
-            # Andreas 2026-05 follow-up: Dirichlet MMS-allocation sampling
-            # removed (not in IPCC guidance; MMS% is now deterministic).
-            # Per-MMS uncertainty matrices (C4 / C6 fix) attached below.
-            systems_data[[sg]] <- list(
-              param_specs = sys_specs, corr_matrix = corr, ef_corr_matrix = ef_corr,
-              unified_corr_matrix = unified_corr,
-              mms_fractions = mms_fracs, mcf_values = mcf_vals, ef3_values = ef3_vals,
-              frac_gas_values = frac_gas_vals, frac_leach_values = frac_leach_vals,
-              mcf_samples = mcf_samples, ef3_samples = ef3_samples,
-              frac_gas_samples = fg_samples, frac_leach_samples = fl_samples,
-              # Andreas 28/5/26 #4: per-iteration MMS allocation samples
-              mms_fraction_samples = fraction_samples,
-              # Shared coefficient draws for this group (NULL when the group
-              # shares nothing, or when the user chose independent groups).
-              pre_sampled_coefficients = shared_draws$blocks[[sg]]
-            )
-          }
+          # 2026-10-16: the per-group build (manure values and per-MMS
+          # sampling, correlation expansion, shared coefficient draws) moved
+          # verbatim to build_systems_data() in R/systems_builder.R so that
+          # trend mode runs each year through exactly this code. Until then
+          # trend ran the whole sheet as one system. knowledge/22-trend-capacity.md
+          built <- build_systems_data(
+            specs, manure = manure, n_iter = n_iter_val, seed = input$seed,
+            crossgroup  = if (identical(input$crossgroup_mode %||% "shared", "shared"))
+                            "shared" else "independent",
+            corr_matrix = if (isTRUE(input$corr_mode != "none")) effective_corr_matrix() else NULL,
+            sg_to_mm    = sg_to_mm)
+          systems_data      <- built$systems
+          rv$shared_summary <- built$shared$summary
 
           # ---- Stage 2: Monte Carlo sampling ----
           n_sys <- length(sys_groups)
@@ -3634,16 +3413,19 @@ app_server <- function(input, output, session) {
   rv_trend <- reactiveValues(results = NULL, samples_by_year = NULL,
                               co2e_by_year = NULL, slope = NULL,
                               delta_total = NULL, year_corr = NULL,
-                              years = NULL, message = NULL)
+                              years = NULL, message = NULL, res = NULL)
 
   observeEvent(input$run_trend, {
     req(rv$param_specs)
     if (.qa_gate_blocked()) return()
-    n_iter <- as.integer(input$n_iter %||% 10000)
+    # 2026-10-16: trend has its own iteration control. It used to take the
+    # single-year slider's 10,000, and 35 years of that was 2.09 GB of
+    # retained samples on a 2 GB instance. A 95% interval is stable at
+    # 2,000; the user can raise it.
+    n_iter <- as.integer(input$n_iter_trend %||% 2000)
     n_iter_fmt <- format(n_iter, big.mark = ",")
     # Round 9 follow-up: withProgress bar mirrors the single-year handler so
-    # the user gets feedback during the per-year MC loop (which can take ~1
-    # minute at 10k iter × 5 years on shinyapps.io).
+    # the user gets feedback during the per-year MC loop.
     withProgress(
       message = sprintf("Trend Monte Carlo (%s iter / year)", n_iter_fmt),
       value = 0,
@@ -3677,16 +3459,31 @@ app_server <- function(input, output, session) {
           }
           setProgress(0.05, detail = "Starting per-year simulations...")
 
-          res <- run_trend_analysis(df, base_specs = rv$param_specs, n_iter = n_iter,
-                                     gwp = gv, seed = sd_, year_corr = yc,
-                                     emission_sources = input$emission_sources,
-                                     progress_fn = prog_fn)
+          # Same inputs the single-year run gives build_systems_data(): the
+          # manure sheet, the cross-group sharing mode, the active
+          # correlation matrix and the resolved sub-category matches.
+          sgm <- tryCatch(resolve_sub_category_matches(rv$param_specs, rv$manure_data)$matched,
+                          error = function(e) list())
+          res <- run_trend_analysis(
+            df, base_specs = rv$param_specs, n_iter = n_iter,
+            gwp = gv, seed = sd_, year_corr = yc,
+            emission_sources = input$emission_sources,
+            progress_fn = prog_fn,
+            manure      = rv$manure_data,
+            crossgroup  = if (identical(input$crossgroup_mode %||% "shared", "shared"))
+                            "shared" else "independent",
+            corr_matrix = if (isTRUE(input$corr_mode != "none")) rv$corr_matrix else NULL,
+            sg_to_mm    = sgm,
+            keep_samples = "ends",
+            keep_sample_rows = 4000L)
 
           setProgress(0.97, detail = "Computing slope and Δ...")
           # Round 8: res is now a list, not a data frame
           rv_trend$results         <- res$table
           rv_trend$samples_by_year <- res$samples_by_year
           rv_trend$co2e_by_year    <- res$co2e_by_year
+          # the whole result, for the per-year views and the exports
+          rv_trend$res             <- res
           rv_trend$slope           <- res$slope
           rv_trend$delta_total     <- res$delta_total
           rv_trend$year_corr       <- res$year_corr
@@ -3697,6 +3494,14 @@ app_server <- function(input, output, session) {
                            res$delta_total$pct_mean,
                            res$delta_total$pct_ci[1], res$delta_total$pct_ci[2],
                            res$slope$mean))
+          nnf <- res$n_nonfinite_by_year
+          if (length(nnf) && sum(nnf) > 0) {
+            bad <- nnf[nnf > 0]
+            rv_trend$message$text <- paste0(
+              rv_trend$message$text,
+              sprintf(" %d iteration(s) with a non-finite total were excluded (%s).",
+                      sum(bad), paste(sprintf("%s: %d", names(bad), bad), collapse = ", ")))
+          }
           # Round 9: flip Tab 5 to results-view so trend chart/table/sensitivity
           # show in place (mirrors the single-year Run handler's sim_view flip).
           rv$sim_view <- "results"
@@ -3911,29 +3716,17 @@ app_server <- function(input, output, session) {
 
   # Round 8: Trend sensitivity (per-year + delta)
 
+  # 2026-10-16: samples_by_year now holds per-system thinned draws for the
+  # first and last year, so sensitivity goes through aggregate_sensitivity()
+  # exactly as single-year does, with the same group labelling.
   trend_sens_per_year <- reactive({
-    req(rv_trend$samples_by_year, rv_trend$co2e_by_year)
-    yrs <- names(rv_trend$samples_by_year)
-    last <- yrs[length(yrs)]
-    sensitivity_analysis(
-      rv_trend$samples_by_year[[last]],
-      rv_trend$co2e_by_year[[last]],
-      method = "both"
-    )
+    req(rv_trend$res)
+    trend_sensitivity_year(rv_trend$res, method = "both")
   })
 
   trend_sens_delta <- reactive({
-    req(rv_trend$samples_by_year, rv_trend$delta_total)
-    yrs <- names(rv_trend$samples_by_year)
-    if (length(yrs) < 2) return(NULL)
-    s_y1 <- as.data.frame(rv_trend$samples_by_year[[1]])
-    s_yN <- as.data.frame(rv_trend$samples_by_year[[length(yrs)]])
-    names(s_y1) <- paste0(names(s_y1), "_y1")
-    names(s_yN) <- paste0(names(s_yN), "_yN")
-    combined <- cbind(s_y1, s_yN)
-    sensitivity_analysis(
-      combined, rv_trend$delta_total$per_iter, method = "both"
-    )
+    req(rv_trend$res)
+    trend_sensitivity_delta(rv_trend$res, method = "both")
   })
 
   # Round 9 follow-up: trend tornado now matches the single-year tornado

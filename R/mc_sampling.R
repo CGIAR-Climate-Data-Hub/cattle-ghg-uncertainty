@@ -97,11 +97,35 @@ make_uniform_corr <- function(n, rho) {
 # very high-intake dairy cow at the high end. Absent columns are untouched,
 # and the is.finite mask leaves NA alone, so a blank (not supplied) intake
 # keeps its NA and still falls back to the energy chain.
+#
+# Sign and power guards (2026-10-16): a normal distribution has no lower
+# limit, so a wide range on a positive quantity reaches below zero in the
+# far tail. On the Zambia file BW is normal(305, 168 to 442): one draw in
+# 11 million is negative, which at 35 years x 32 groups x 10,000 iterations
+# happens about once per trend run. BW^0.75 and WG^1.097 are then NaN, the
+# iteration poisons every source of that group, and quantile() stops with
+# "missing values and NaN's not allowed". The same range on N reaches zero
+# about four times in 100,000 draws and gives a negative population for the
+# iteration, which is finite and so passed unnoticed. The floors below are
+# the physical domain, never a plausibility band: no real inventory value
+# sits outside them, so the clamp only ever moves a draw the distribution
+# should not have produced. Units follow PARAM_CATALOGUE.
 .PHYSICAL_BOUNDS <- list(
   DE     = c(45, 85),
   DE_pct = c(45, 85),
   GE     = c(5, 600),
-  DMI    = c(0.2, 40)
+  DMI    = c(0.2, 40),
+  N      = c(0, Inf),      # head
+  BW     = c(1, 3000),     # kg; enters NE_m as BW^0.75
+  MW     = c(1, 3000),     # kg; enters NE_g as (BW / (C * MW))^0.75
+  WG     = c(0, 5),        # kg/day; enters NE_g as WG^1.097
+  Milk   = c(0, 100),      # kg/head/day
+  Fat    = c(0, 20),       # % of milk
+  CP     = c(0, 60),       # % of DM
+  Ym     = c(0, 20),       # % of GE
+  Bo     = c(0, 1),        # m3 CH4 / kg VS
+  ASH    = c(0, 1),        # fraction of DM
+  UE     = c(0, 1)         # fraction of GE
 )
 
 # Clamp any sampled column that has a registered physical domain into that

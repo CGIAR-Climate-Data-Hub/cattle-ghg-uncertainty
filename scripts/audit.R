@@ -837,18 +837,22 @@ section_D <- function() {
 
   trend_partial <- tryCatch(
     run_trend_analysis(trend_df, base_specs, n_iter = 500, gwp = "AR5",
-                       seed = 7, year_corr = "partial", ar1_rho = 0.7),
+                       seed = 7, year_corr = "partial", ar1_rho = 0.7,
+                       keep_samples = "all"),
     error = function(e) NULL)
+  # 2026-10-16: samples_by_year holds per-system draws; the partial mode is
+  # a Gaussian AR(1) on ranks, whose lag-1 Spearman is (6/pi) asin(rho/2),
+  # 0.68 at rho = 0.7. The check is widened to that target.
   if (!is.null(trend_partial) && !is.null(trend_partial$samples_by_year)) {
     sm_by_year <- trend_partial$samples_by_year
     has_samples <- all(c("2018","2019") %in% names(sm_by_year))
-    if (has_samples && "Ym" %in% colnames(sm_by_year[["2018"]])) {
-      lag1 <- cor(sm_by_year[["2018"]][, "Ym"],
-                  sm_by_year[["2019"]][, "Ym"],
-                  method = "spearman")
+    s18 <- if (has_samples) sm_by_year[["2018"]][[1]]$samples else NULL
+    s19 <- if (has_samples) sm_by_year[["2019"]][[1]]$samples else NULL
+    if (has_samples && !is.null(s18) && "Ym" %in% colnames(s18)) {
+      lag1 <- cor(s18[, "Ym"], s19[, "Ym"], method = "spearman")
       check_within("D2", "D",
-                   "Trend year_corr='partial' lag-1 Spearman for Ym ≈ 0.7",
-                   lag1, 0.7, tol_abs = 0.07,
+                   "Trend year_corr='partial' lag-1 Spearman for Ym ≈ 0.68",
+                   lag1, 6 / pi * asin(0.7 / 2), tol_abs = 0.08,
                    notes = sprintf("realised lag-1=%.3f", lag1))
     } else {
       record("D2", "D",
@@ -869,6 +873,51 @@ section_D <- function() {
              "Trend year_corr='none' completes and produces table with 5 rows",
              !is.null(trend_none) && !is.null(trend_none$table) &&
                nrow(trend_none$table) == 5)
+
+  # D5 (2026-10-16): multi-group trend. Country Y is one group, where the
+  # old one-system shortcut and the per-group build coincide, so it could
+  # not catch the two defects fixed on this date: the last group's value
+  # overwriting every group's, and the whole sheet run as one system.
+  mg <- do.call(rbind, lapply(c("A", "B", "C"), function(g) {
+    d <- base_specs; d$cattle_type <- "dairy"; d$aggregation_level <- "lvl"
+    d$sub_category <- g
+    n_idx <- which(d$parameter == "N")
+    d$mean[n_idx] <- c(A = 50000, B = 30000, C = 20000)[[g]]
+    d$lower[n_idx] <- d$mean[n_idx] * 0.95; d$upper[n_idx] <- d$mean[n_idx] * 1.05
+    d
+  }))
+  mg_ts <- do.call(rbind, lapply(2020:2022, function(yr) {
+    d <- mg[mg$parameter == "N", c("cattle_type", "aggregation_level", "sub_category", "parameter", "mean")]
+    d$year <- yr; d$mean <- d$mean * (1 + 0.1 * (yr - 2020)); d$uncertainty_pct <- 5; d
+  }))
+  mg_res <- tryCatch(
+    run_trend_analysis(mg_ts, mg, n_iter = 400, gwp = "AR5", seed = 11,
+                       year_corr = "full"),
+    error = function(e) NULL)
+  if (!is.null(mg_res)) {
+    # single-year path on the 2020 spec
+    sd1 <- build_systems_data(mg, manure = NULL, n_iter = 400, seed = 11)$systems
+    single <- run_inventory_simulation(sd1, n_iter = 400, gwp = "AR5", seed = 12)
+    ratio <- mg_res$table$Mean_t_CO2eq[1] / mean(single$inventory$total_co2e)
+    check_within("D5a", "D",
+                 "Multi-group trend year 1 equals the single-year path (ratio ~1)",
+                 ratio, 1, tol_abs = 0.05,
+                 notes = sprintf("ratio=%.4f (was 0.021 before the fix)", ratio))
+    # the three groups' populations are distinct in every year's spec
+    yr_specs <- .trend_year_specs(mg_ts[mg_ts$year == 2022, ], mg)
+    nN <- yr_specs$mean[yr_specs$parameter == "N"]
+    check_bool("D5b", "D",
+               "Multi-group trend keeps each group's own population",
+               length(unique(nN)) == 3 && abs(sum(nN) - 120000) < 1,
+               notes = sprintf("distinct N=%d sum=%.0f", length(unique(nN)), sum(nN)))
+    # rising 10% a year on N shows up as a rising trend
+    check_bool("D5c", "D",
+               "Multi-group trend delta vs base is positive",
+               isTRUE(mg_res$table$Delta_vs_base_pct[3] > 10))
+  } else {
+    record("D5a", "D", "Multi-group trend", "runs", NA, "FAIL",
+           "run_trend_analysis raised an error on a 3-group fixture")
+  }
 
   trend_filtered <- tryCatch(
     run_trend_analysis(trend_df, base_specs, n_iter = 500, gwp = "AR5",
