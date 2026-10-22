@@ -48,7 +48,7 @@ translator_job_update(jb2$id, status = "done", outputs = list(template = big, ch
 sent <- list()
 .auth_send_email <- function(to, subject, text, html = NULL, attachments = NULL, ...) {
   sent[[length(sent) + 1]] <<- attachments; list(ok = TRUE, provider = "stub", attempts = character(0)) }
-translator_job_email(jb2$id, "who@local", limit_bytes = 2700)
+translator_job_email(jb2$id, "who@local", limit_bytes = 2668)
 ok(length(sent[[1]]) == 1L && identical(sent[[1]][[1]]$name, "big.xlsx") && identical(translator_job_read(jb2$id)$delivery$mode, "email"),
    "email keeps the data workbook first and drops the rest when over the limit")
 translator_job_email(jb2$id, "who@local")
