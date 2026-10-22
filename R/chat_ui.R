@@ -108,6 +108,10 @@ translator_chat_ui <- function() {
     # (label, system, mapped sub-category, mapped level, merge_into,
     # confidence), from the explore reply's source_categories block.
     source_categories = NULL,
+    # 2026-10-22 (WP6): the job this session started or reconnected to,
+    # and the folder the user chose for the results (Chrome/Edge).
+    job_id = NULL,
+    dir_chosen = NULL,
     # 2026-09-17: an upload waiting for the user to pick sheets (plan F8).
     pending_upload = NULL,
     precheck_key   = NULL,
@@ -134,7 +138,9 @@ translator_chat_ui <- function() {
                  register = if (length(state$register)) state$register else NULL,
                  pending_questions = if (length(state$pending_questions)) state$pending_questions else NULL,
                  q_index = state$q_index,
-                 source_categories = if (length(state$source_categories)) state$source_categories else NULL)),
+                 source_categories = if (length(state$source_categories)) state$source_categories else NULL,
+                 last_template_json = state$last_template_json,
+                 job_id = state$job_id)),
     error = function(e) NULL)
 }
 
@@ -188,6 +194,20 @@ translator_chat_server <- function(input, output, session) {
         if (is.list(rg) && length(rg) > 0) state$register <- rg
         sc_ <- saved$extra$source_categories
         if (is.list(sc_) && length(sc_) > 0) state$source_categories <- sc_
+        # 2026-10-22 (WP6): a finished template and the job it came from
+        # survive a reload; the job file says whether it is still running.
+        ltj <- saved$extra$last_template_json
+        if (is.character(ltj) && nzchar(ltj) && .translator_template_is_well_formed(ltj))
+          state$last_template_json <- ltj
+        jid <- saved$extra$job_id
+        if (is.character(jid) && nzchar(jid)) {
+          translator_job_mark_lost()
+          jb <- translator_job_read(jid)
+          if (!is.null(jb)) {
+            state$job_id <- jid
+            translator_job_register_session(jid, session)
+          }
+        }
         pq <- saved$extra$pending_questions
         if (is.list(pq) && length(pq) > 0) {
           state$pending_questions <- pq
@@ -702,6 +722,62 @@ translator_chat_server <- function(input, output, session) {
                      class = "btn-success btn-sm")))
   })
 
+  # ---- 2026-10-22 (WP6): the job panel, from the job file ----------------------
+  job_poll <- reactivePoll(2000, session,
+    checkFunc = function() {
+      id <- isolate(state$job_id)
+      if (is.null(id)) return("")
+      p <- .translator_job_path(id)
+      paste(id, if (file.exists(p)) as.numeric(file.mtime(p)) else "")
+    },
+    valueFunc = function() translator_job_read(isolate(state$job_id)))
+  output$translator_job_panel <- renderUI({
+    jb <- job_poll()
+    if (is.null(jb)) return(NULL)
+    if (identical(jb$status, "running")) {
+      pct <- round(100 * as.numeric(jb$progress %||% 0))
+      eta <- jb$eta_sec
+      eta_txt <- if (is.null(eta) || !is.finite(as.numeric(eta))) "" else if (as.numeric(eta) < 60) t("ai_job_eta_under_min") else sprintf(t("ai_job_eta_min"), ceiling(as.numeric(eta) / 60))
+      started <- as.POSIXct(jb$started_at, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+      el <- if (is.na(started)) "" else sprintf(t("ai_job_elapsed"), round(as.numeric(difftime(Sys.time(), started, units = "mins"))))
+      lv <- unlist(jb$levels); li <- as.integer(jb$level_index %||% 0)
+      lab <- if (length(lv) && li >= 1) sprintf(t("ai_job_system"), li, length(lv), lv[min(li, length(lv))]) else (jb$stage_label %||% "")
+      tags$div(style = "margin:8px 0; padding:10px 14px; background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; font-size:0.85rem; color:#5D4037;",
+        tags$div(style = "display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;",
+                 tags$strong(t("ai_job_running")), tags$span(paste(c(el, eta_txt), collapse = " · "))),
+        tags$div(style = "height:8px; background:#FFE082; border-radius:4px; overflow:hidden; margin:6px 0;",
+                 tags$div(style = sprintf("height:100%%; width:%d%%; background:#FF6F00;", pct))),
+        tags$div(lab),
+        tags$div(style = "font-size:0.78rem; color:#8D6E63; margin-top:4px;", t("ai_job_leave_note")))
+    } else if (identical(jb$status, "failed") || identical(jb$status, "lost") || identical(jb$status, "stopped")) {
+      tags$div(style = "margin:8px 0; padding:8px 12px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px; font-size:0.85rem; color:#7F1D1D;",
+               jb$error %||% jb$stage_label %||% jb$status)
+    } else NULL
+  })
+  output$translator_delivery_line <- renderUI({
+    d <- state$dir_chosen
+    tags$div(style = "font-size:0.8rem; color:#555; margin-top:4px;",
+             if (!is.null(d) && nzchar(d)) sprintf(t("ai_delivery_folder"), d) else t("ai_delivery_default"))
+  })
+  observeEvent(input$translator_dir_chosen, {
+    v <- input$translator_dir_chosen
+    if (isTRUE(v$ok) && nzchar(v$name %||% "")) {
+      state$dir_chosen <- v$name
+      showNotification(sprintf(t("ai_dir_chosen"), v$name), type = "message", duration = 5)
+    } else if (nzchar(v$error %||% "") && !grepl("AbortError", v$error)) {
+      showNotification(t("ai_dir_failed"), type = "warning", duration = 5)
+    }
+  })
+  observeEvent(input$translator_job_saved, {
+    v <- input$translator_job_saved
+    req(is.list(v), !is.null(v$id))
+    translator_job_update(v$id, delivery = list(mode = v$mode %||% "browser",
+                                                browser_saved_at = .translator_now(),
+                                                ok = isTRUE(v$ok), error = v$error %||% NULL))
+    if (isTRUE(v$ok) && identical(v$mode, "folder"))
+      showNotification(sprintf(t("ai_saved_to_folder"), state$dir_chosen %||% ""), type = "message", duration = 8)
+  })
+
   # ---- 2026-10-22 (WP1): the register card and the edit dialog ------------
   output$translator_register <- renderUI({
     reg <- state$register
@@ -926,7 +1002,10 @@ translator_chat_server <- function(input, output, session) {
       j <- state$last_template_json
       key <- tryCatch(.tp_sha256(j), error = function(e) NULL)
       cached <- state$template_file
-      if (!is.null(key) && identical(state$template_file_key, key) &&
+      jf <- .translator_job_output(state, "template")
+      if (!is.null(jf)) {
+        file.copy(jf, file, overwrite = TRUE)
+      } else if (!is.null(key) && identical(state$template_file_key, key) &&
           !is.null(cached) && file.exists(cached)) {
         # Built at ready time by .translator_finalise_template.
         file.copy(cached, file, overwrite = TRUE)
@@ -945,9 +1024,20 @@ translator_chat_server <- function(input, output, session) {
     contentType = NULL
   )
 
+  # 2026-10-22 (WP6): a finished job's files are the ones delivered; they
+  # survive a reload and a session change.
+  .translator_job_output <- function(state, kind) {
+    jb <- translator_job_read(state$job_id)
+    if (is.null(jb) || !identical(jb$status, "done")) return(NULL)
+    p <- jb$outputs[[kind]]
+    if (is.null(p) || !file.exists(p)) return(NULL)
+    p
+  }
   output$translator_download_checks <- downloadHandler(
     filename = function() .translator_dl_name("checks"),
     content = function(file) {
+      jf <- .translator_job_output(state, "checks")
+      if (!is.null(jf)) { file.copy(jf, file, overwrite = TRUE); return(invisible(NULL)) }
       pc <- state$precheck
       if (is.null(pc)) {
         js <- state$last_template_json
@@ -966,7 +1056,11 @@ translator_chat_server <- function(input, output, session) {
   )
   output$translator_download_conversation <- downloadHandler(
     filename = function() .translator_dl_name("conversation"),
-    content = function(file) translator_write_conversation_docx(state$messages, file),
+    content = function(file) {
+      jf <- .translator_job_output(state, "conversation")
+      if (!is.null(jf)) file.copy(jf, file, overwrite = TRUE)
+      else translator_write_conversation_docx(state$messages, file)
+    },
     contentType = NULL
   )
 
@@ -1113,6 +1207,7 @@ translator_chat_server <- function(input, output, session) {
       condition = "!output.translator_template_ready",
     # 2026-10-22 (WP1): the register and the current question sit above
     # the free-text row.
+    uiOutput("translator_job_panel"),
     uiOutput("translator_register"),
     uiOutput("translator_qa_card"),
     tags$div(
@@ -1125,6 +1220,7 @@ translator_chat_server <- function(input, output, session) {
       actionButton("translator_send", t("btn_ai_send"), class = "btn-success",
                    style = "min-width:80px; height:42px;")
     ),
+    uiOutput("translator_delivery_line"),
     # Secondary action row: Produce | Reset | Stop | Download.
     # The chat-trigger detection ("produce the template", "go ahead",
     # etc.) still works, but the explicit button gives the user clear
@@ -1144,6 +1240,17 @@ translator_chat_server <- function(input, output, session) {
                    class = "btn-outline-secondary",
                    style = "font-size:0.82rem;",
                    title = t("tip_ai_reset")),
+      # 2026-10-22 (WP6): Chrome and Edge let the page ask for a folder
+      # now and write the files there when the run ends. Shown only where
+      # the browser supports it (the script below runs when the panel is
+      # inserted).
+      tags$button(id = "translator_pick_dir", type = "button",
+                  class = "btn btn-outline-secondary",
+                  style = "font-size:0.82rem; display:none;",
+                  onclick = "translatorPickDir()",
+                  title = t("tip_ai_pick_dir"),
+                  tagList(icon("folder-open"), t("btn_ai_pick_dir"))),
+      tags$script(HTML("if (window.showDirectoryPicker) { var b = document.getElementById('translator_pick_dir'); if (b) b.style.display = ''; }")),
       # Stop button. Two things happen, in this order.
       #
       # It sets an input, which the server receives on the next pump of the
@@ -2297,6 +2404,9 @@ translator_cancel_clear <- function(tok) {
     "     \"emergent_dairy\", \"commercial_beef\", \"emergent_beef\",",
     "     \"extensive_trad\"). One entry per production system the user",
     "     has confirmed.",
+    "  3. sub_categories_by_level: an object mapping each aggregation_level",
+    "     label to the array of sub-category codes it will carry. The server",
+    "     uses it only to estimate how long the batches will take.",
     "  2. The inventory_metadata object: country, region (the continent,",
     "     from the country), year (integer), species (cattle_dairy /",
     "     cattle_non_dairy / cattle_mixed), ipcc_version (2006 /",
@@ -2719,6 +2829,35 @@ translator_cancel_clear <- function(tok) {
   state$last_error <- NULL
   tok <- .translator_begin_request(session)
 
+  # 2026-10-22 (WP6): everything the run reads is taken now. Typing or
+  # editing a decision during the run cannot change the prompt mid-run,
+  # and the chain does not depend on the session being there.
+  ctx <- list(messages = state$messages, register = state$register,
+              batch_parts = state$batch_parts, user_email = state$user_email,
+              source_fp = state$source_fp)
+  job <- translator_job_new(state$user_email,
+                            prompt_hash = tryCatch(translator_system_prompt_hash(), error = function(e) NULL),
+                            emission_key = state$batch_parts_key)
+  job_id <- job$id
+  state$job_id <- job_id
+  translator_job_register_session(job_id, session)
+  translator_job_update(job_id, cancel_token = tok)
+  .translator_persist(state)
+  # progress bookkeeping (WP5)
+  jlevels <- character(0); jest <- NULL; level_i <- 0L; level_bytes <- 0
+  done_tokens <- 0; last_push <- Sys.time() - 10
+  push_progress <- function(force = FALSE) {
+    if (!force && as.numeric(difftime(Sys.time(), last_push, units = "secs")) < 2) return(invisible(NULL))
+    last_push <<- Sys.time()
+    pr <- translator_job_progress(jest, level_i, length(jlevels), done_tokens, level_bytes)
+    translator_job_update(job_id, progress = pr$progress, eta_sec = pr$eta_sec,
+                          level_index = level_i, stage = if (length(jlevels)) "batch" else "discovery")
+    tryCatch(session$sendCustomMessage("translatorJobProgress",
+                                        list(progress = pr$progress, eta = pr$eta_text, label = pr$label)),
+             error = function(e) NULL)
+    invisible(NULL)
+  }
+
   done <- function() {
     translator_cancel_clear(tok)
     state$pending <- FALSE
@@ -2726,7 +2865,14 @@ translator_cancel_clear <- function(tok) {
               error = function(e) NULL)
     invisible(NULL)
   }
-  fail <- function(msg) { state$last_error <- msg; done() }
+  fail <- function(msg) {
+    state$last_error <- msg
+    jb <- translator_job_read(job_id)
+    if (!is.null(jb) && identical(jb$status, "running"))
+      translator_job_update(job_id, status = if (grepl("^Stopped", msg)) "stopped" else "failed",
+                            error = msg, stage_label = msg)
+    done()
+  }
   # Every continuation runs from a later() callback, so each one has to
   # re-enter the session's reactive domain before touching `state`.
   inseq <- function(expr) shiny::withReactiveDomain(session, expr)
@@ -2752,15 +2898,22 @@ translator_cancel_clear <- function(tok) {
   # No later::run_now() here any more. The synchronous path needed it to
   # let a Stop click through a blocked loop; nothing is blocked now, so
   # this is only the typing-bubble keep-alive it was meant to be.
-  on_tick_cb <- function(n = 0L)
+  # 2026-10-22 (WP5): the tick carries the bytes of tool JSON received,
+  # which drives the real progress bar through the job file.
+  on_tick_cb <- function(n = 0L) {
+    level_bytes <<- level_bytes + as.numeric(n %||% 0)
+    push_progress()
     tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
               error = function(e) NULL)
-  info <- function(txt)
+  }
+  info <- function(txt) {
+    translator_job_update(job_id, stage_label = txt)
     tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
               error = function(e) NULL)
+  }
   stopper <- function() translator_cancelled(tok)
 
-  file_was_uploaded <- any(vapply(state$messages, function(m)
+  file_was_uploaded <- any(vapply(ctx$messages, function(m)
     identical(m$source, "server_upload") ||
       grepl("Parameter labels DETECTED IN THIS FILE", m$content %||% "", fixed = TRUE),
     logical(1)))
@@ -2773,11 +2926,22 @@ translator_cancel_clear <- function(tok) {
 
   # ---- Stage 3 entry -----------------------------------------------------
   finish <- function(inventory_metadata, parts, agg_levels, model_id = NULL) {
-    tryCatch(.translator_emit_finish(state, session, inventory_metadata,
-                                     parts, agg_levels, info, model_id = model_id),
-              error = function(e)
-                state$last_error <- paste0("Assembling the template failed (",
-                                           conditionMessage(e), ")."))
+    translator_job_update(job_id, stage = "assemble", stage_label = "Assembling the template and running the checks",
+                          progress = 0.94)
+    ok <- tryCatch({ .translator_emit_finish(state, session, inventory_metadata,
+                                             parts, agg_levels, info, model_id = model_id); TRUE },
+                   error = function(e) {
+                     state$last_error <- paste0("Assembling the template failed (",
+                                                conditionMessage(e), ").")
+                     translator_job_update(job_id, status = "failed", error = state$last_error)
+                     FALSE })
+    if (ok && !is.null(state$last_template_json)) {
+      .translator_persist(state)
+      tryCatch(translator_job_finish(job_id, state, session),
+               error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
+    } else if (ok) {
+      translator_job_update(job_id, status = "failed", error = state$last_error %||% "no template produced")
+    }
     done()
   }
 
@@ -2788,22 +2952,31 @@ translator_cancel_clear <- function(tok) {
       if (i > length(agg_levels)) return(finish(inventory_metadata, parts, agg_levels, model_id))
       level <- agg_levels[i]
 
-      if (!is.null(state$batch_parts[[level]])) {
+      if (!is.null(ctx$batch_parts[[level]])) {
         info(sprintf("Reusing %d of %d: %s (validated on a previous attempt)...",
                      i, length(agg_levels), level))
-        parts[[i]] <<- state$batch_parts[[level]]
+        parts[[i]] <<- ctx$batch_parts[[level]]
         return(step(i + 1L))
       }
 
+      level_i <<- i; level_bytes <<- 0
+      push_progress(TRUE)
       info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
       total_chars <<- 0L
       batch_msgs <- anthropic_build_messages(
-        system_prompt, history = state$messages,
-        new_user_message = .translator_batch_nudge(i, length(agg_levels), level, state$register))
+        system_prompt, history = ctx$messages,
+        new_user_message = .translator_batch_nudge(i, length(agg_levels), level, ctx$register))
 
       accept_raw <- function(batch_parsed) {
         batch_parsed$.requested_aggregation_level <- level
         parts[[i]] <<- batch_parsed
+        # what this system actually cost, for the estimate of the rest
+        tk <- level_bytes / 3.6
+        done_tokens <<- done_tokens + (if (!is.null(jest)) max(tk, 0) else 0)
+        act <- translator_job_read(job_id)$actual %||% list()
+        act$per_level_tokens[[level]] <- round(tk)
+        translator_job_update(job_id, actual = act)
+        push_progress(TRUE)
         step(i + 1L)
       }
       # 2026-10-22 (WP1 step 4): a batch that contradicts a decision in the
@@ -2811,7 +2984,7 @@ translator_cancel_clear <- function(tok) {
       # still contradicts, the better of the two is kept and the decision is
       # marked "not applied" (shown above the download and in the checks).
       accept <- function(batch_parsed, retried = FALSE) {
-        chk <- tryCatch(translator_register_check(state$register, batch_parsed, level),
+        chk <- tryCatch(translator_register_check(ctx$register, batch_parsed, level),
                         error = function(e) NULL)
         bad <- if (is.null(chk) || !nrow(chk)) NULL else chk[!chk$ok & chk$hard, , drop = FALSE]
         if (!is.null(chk) && nrow(chk))
@@ -2841,7 +3014,7 @@ translator_cancel_clear <- function(tok) {
               .translator_log_usage(state, rr, stage = "retry_decision", expect_warm = TRUE)
               rp <- tryCatch(jsonlite::fromJSON(rr$reply, simplifyVector = TRUE), error = function(e) NULL)
               if (is.null(.translator_validate_piece(rp, "batch"))) {
-                chk2 <- tryCatch(translator_register_check(state$register, rp, level), error = function(e) NULL)
+                chk2 <- tryCatch(translator_register_check(ctx$register, rp, level), error = function(e) NULL)
                 n2 <- if (is.null(chk2) || !nrow(chk2)) 0L else sum(!chk2$ok & chk2$hard)
                 if (n2 < nrow(bad)) best <- rp
               }
@@ -2913,9 +3086,9 @@ translator_cancel_clear <- function(tok) {
 
   # ---- Stage 1: discovery ------------------------------------------------
   info("Analysing your inventory structure...")
-  discovery_request <- .translator_discovery_request(state$register)
+  discovery_request <- .translator_discovery_request(ctx$register)
   discovery_msgs <- anthropic_build_messages(
-    system_prompt, history = state$messages,
+    system_prompt, history = ctx$messages,
     new_user_message = discovery_request)
 
   .translator_memo_call_async(discovery_msgs, tools_sig,
@@ -2947,7 +3120,7 @@ translator_cancel_clear <- function(tok) {
       agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
       # 2026-10-22 (WP1 step 4): year, species and edition come from the
       # register when the user decided them; corrected here, no re-call.
-      fix <- tryCatch(translator_register_apply_metadata(state$register, enum_parsed$inventory_metadata),
+      fix <- tryCatch(translator_register_apply_metadata(ctx$register, enum_parsed$inventory_metadata),
                       error = function(e) NULL)
       if (!is.null(fix)) {
         enum_parsed$inventory_metadata <- fix$metadata
@@ -2956,13 +3129,21 @@ translator_cancel_clear <- function(tok) {
           message("translator: discovery metadata corrected from the register: ",
                   paste(fix$corrections, collapse = ", "))
       }
+      # 2026-10-22 (WP5): the estimate, from the systems found and the
+      # usage history; the job file carries it for the progress panel.
+      jlevels <<- agg_levels
+      jest <<- tryCatch(translator_job_estimate(agg_levels, enum_parsed$sub_categories_by_level,
+                                                tryCatch(usage_log_read(), error = function(e) NULL)),
+                        error = function(e) NULL)
+      translator_job_update(job_id, levels = as.list(agg_levels), estimate = jest, stage = "batch")
       if (length(agg_levels) <= 2L) {
         message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
                         length(agg_levels)))
+        translator_job_update(job_id, stage = "full", stage_label = "Producing the template in one piece")
         done()
-        return(.translator_force_template_single(state, session))
+        return(.translator_force_template_single(state, session, job_id = job_id))
       }
-      cached_levels <- intersect(agg_levels, names(state$batch_parts))
+      cached_levels <- intersect(agg_levels, names(ctx$batch_parts))
       fresh_levels  <- setdiff(agg_levels, cached_levels)
       if (length(cached_levels) > 0)
         message(sprintf("translator: reusing %d validated batch(es): %s",
@@ -2975,7 +3156,7 @@ translator_cancel_clear <- function(tok) {
   invisible(NULL)
 }
 
-.translator_force_template_single <- function(state, session) {
+.translator_force_template_single <- function(state, session, job_id = NULL) {
   state$pending <- TRUE
   state$last_error <- NULL
   on.exit({
@@ -3420,6 +3601,11 @@ translator_cancel_clear <- function(tok) {
   state$last_template_json <- resp$reply
   .translator_finalise_template(state, resp$reply, function(txt)
     session$sendCustomMessage("translatorAppendInfoBubble", txt))
+  if (!is.null(job_id)) {
+    .translator_persist(state)
+    tryCatch(translator_job_finish(job_id, state, session),
+             error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
+  }
   # Two messages: a short one whose `payload` carries the raw JSON for the
   # expander (kept OUT of `content`, so it is never re-sent to the API on
   # later turns, plan C6), and a separate guidance bubble pointing at the

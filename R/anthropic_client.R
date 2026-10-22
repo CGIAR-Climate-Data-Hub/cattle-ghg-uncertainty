@@ -1262,6 +1262,12 @@ anthropic_chat_stream <- function(messages,
         "mode = enumerate only. The distinct production-system labels for",
         "this inventory, snake_case, lowercase, one per system the user",
         "confirmed.")),
+    sub_categories_by_level = list(
+      type = "object", additionalProperties = list(type = "array", items = list(type = "string")),
+      description = paste(
+        "mode = enumerate only, optional. Each aggregation_level label mapped",
+        "to the sub-category codes it will carry; used only to estimate the",
+        "time the batches will take.")),
     aggregation_level = list(
       type = "string",
       description = paste(

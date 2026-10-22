@@ -587,6 +587,73 @@ app_ui <- function(request = NULL) {
            if (l1) l1.innerHTML = '<strong>Saved:</strong> ' + (data && data.file ? data.file : 'the template') +
              ' is now in your browser\\'s Downloads folder. Open it from there.';
          });
+         // 2026-10-22 (WP5): real progress from the job file replaces the
+         // 60-second animation once the first estimate arrives.
+         Shiny.addCustomMessageHandler('translatorJobProgress', function(d) {
+           var slot = document.getElementById('translator_stream_target');
+           if (!slot || !slot.firstElementChild) return;
+           var bubble = slot.firstElementChild;
+           if (bubble._translatorProgressInterval) {
+             clearInterval(bubble._translatorProgressInterval);
+             bubble._translatorProgressInterval = null;
+           }
+           var fill = bubble.querySelector('[data-bar-fill=true]');
+           if (fill && d && typeof d.progress === 'number')
+             fill.style.width = Math.round(d.progress * 100) + '%';
+           bubble.querySelectorAll('div').forEach(function(l) {
+             if (l.dataset && l.dataset.elapsedLabel === 'true') {
+               var sec = Math.floor((Date.now() - (l._translatorStart || Date.now())) / 1000);
+               l.textContent = (d.label ? d.label + ' · ' : '') + sec + 's elapsed' +
+                 (d.eta ? ' · ' + d.eta : '');
+             }
+           });
+         });
+         // 2026-10-22 (WP6): the files are ready. With a folder chosen
+         // earlier (Chrome/Edge) every file is written there; otherwise
+         // the data workbook downloads by itself (a second automatic
+         // download would need a per-site permission, so the other two
+         // stay as buttons).
+         function translatorWaitFor(id, tries, cb) {
+           var el = document.getElementById(id);
+           if (el && el.href) return cb(el);
+           if (tries <= 0) return cb(null);
+           setTimeout(function() { translatorWaitFor(id, tries - 1, cb); }, 250);
+         }
+         Shiny.addCustomMessageHandler('translatorJobDone', function(d) {
+           var files = (d && d.files) || [];
+           if (window._translatorDirHandle && window.showDirectoryPicker) {
+             (async function() {
+               var okAll = true, err = '';
+               for (var i = 0; i < files.length; i++) {
+                 try {
+                   var a = await new Promise(function(res) { translatorWaitFor(files[i].output_id, 40, res); });
+                   if (!a) { okAll = false; err = 'download link not ready: ' + files[i].name; continue; }
+                   var resp = await fetch(a.href, { credentials: 'same-origin' });
+                   var blob = await resp.blob();
+                   var fh = await window._translatorDirHandle.getFileHandle(files[i].name, { create: true });
+                   var w = await fh.createWritable(); await w.write(blob); await w.close();
+                 } catch (e) { okAll = false; err = String(e); }
+               }
+               Shiny.setInputValue('translator_job_saved', { id: d.id, mode: 'folder', ok: okAll, error: err, t: Date.now() }, { priority: 'event' });
+             })();
+           } else {
+             var auto = files.filter(function(f) { return f.key === d.auto; })[0];
+             if (!auto) return;
+             translatorWaitFor(auto.output_id, 40, function(a) {
+               if (a) a.click();
+               Shiny.setInputValue('translator_job_saved', { id: d.id, mode: 'download', ok: !!a, error: a ? '' : 'download link not ready', t: Date.now() }, { priority: 'event' });
+             });
+           }
+         });
+         window.translatorPickDir = async function() {
+           try {
+             var h = await window.showDirectoryPicker({ mode: 'readwrite' });
+             window._translatorDirHandle = h;
+             Shiny.setInputValue('translator_dir_chosen', { name: h.name, ok: true, t: Date.now() }, { priority: 'event' });
+           } catch (e) {
+             Shiny.setInputValue('translator_dir_chosen', { name: '', ok: false, error: String(e), t: Date.now() }, { priority: 'event' });
+           }
+         };
          // Progress tick from the server-side force-template stream.
          // Updates the inline info bubble's elapsed-label with a
          // 'chars received' counter so the user has TWO live signals:
@@ -646,6 +713,7 @@ app_ui <- function(request = NULL) {
            var barFill = document.createElement('div');
            barFill.style.cssText = 'height:100%; width:0%;' +
              'background:#FF6F00; transition:width 0.5s linear;';
+           barFill.dataset.barFill = 'true';
            barOuter.appendChild(barFill);
            bubble.appendChild(barOuter);
            var elapsedLabel = document.createElement('div');

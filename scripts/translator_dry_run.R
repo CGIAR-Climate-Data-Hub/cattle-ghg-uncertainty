@@ -46,7 +46,10 @@ calls <- character()
   base <- list(usage = usage, model = "stub", cost_usd = 0, latency_sec = 0.1, error = NULL, cache_ttl = "1h", stopped = FALSE)
   if (grepl("mode = 'enumerate'", last, fixed = TRUE)) {
     calls <<- c(calls, "enumerate")
-    reply <- jsonlite::toJSON(list(mode = "enumerate", aggregation_levels = levels, inventory_metadata = meta), auto_unbox = TRUE)
+    # WP5: the sub-categories per system drive the time estimate
+    scbl <- lapply(setNames(levels, levels), function(lv) unique(ps$sub_category[ps$aggregation_level == lv]))
+    reply <- jsonlite::toJSON(list(mode = "enumerate", aggregation_levels = levels, inventory_metadata = meta,
+                                   sub_categories_by_level = scbl), auto_unbox = TRUE)
     return(c(list(reply = as.character(reply), tool_used = TRUE), base))
   }
   if (grepl("mode = 'batch'", last, fixed = TRUE)) {
@@ -179,6 +182,38 @@ stopifnot(sum(grepl("^retry:", calls)) == n_split_levels, isTRUE(state$register$
 out3 <- suppressMessages(parse_uploaded_template(state$template_file))
 stopifnot(!"calves_male" %in% out3$param_specs$sub_category, "calves_female" %in% out3$param_specs$sub_category)
 cat("decision enforced: calves_male absent from the final workbook\n")
+
+# ---- WP5/WP6: the job file and the delivery -----------------------------------
+jb <- translator_job_read(state$job_id)
+stopifnot(!is.null(jb), identical(jb$status, "done"), isTRUE(as.numeric(jb$progress) >= 1),
+          length(jb$outputs) == 3L, all(file.exists(unlist(jb$outputs))),
+          !is.null(jb$estimate), length(jb$levels) == length(levels),
+          identical(jb$delivery$mode, "browser"))
+cat("job", jb$id, ": done, 3 outputs,", basename(jb$outputs$template), "; estimate source:", jb$estimate$source,
+    "; delivery:", jb$delivery$mode, "\n")
+stopifnot(grepl("^Zambia_2022_cattle_uncertainty_template_", basename(jb$outputs$template)),
+          grepl("_translation_checks_", basename(jb$outputs$checks)),
+          grepl("_translation_conversation_.*docx$", basename(jb$outputs$conversation)))
+# a second session of the same user finds the job and its files
+stopifnot(identical(translator_job_find("dryrun@local")$id, jb$id))
+
+# ---- scenario 4: the tab is gone, the files go by email ------------------------
+mails <- list()
+.auth_send_email <- function(to, subject, text, html = NULL, attachments = NULL, ...) {
+  mails[[length(mails) + 1L]] <<- list(to = to, subject = subject, n_att = length(attachments),
+                                       names = vapply(attachments, function(a) a$name, character(1)))
+  list(ok = TRUE, provider = "stub", attempts = character(0))
+}
+session$close()
+calls <- character(); state$last_template_json <- NULL
+state$messages[[length(state$messages) + 1]] <- list(role = "user", content = "One more change: nothing else.", display = "answer")
+.translator_send(state, session, stage = "clarify"); settle(); stopifnot(is.null(state$last_error))
+.translator_force_template(state, session); settle()
+jb4 <- translator_job_read(state$job_id)
+cat("scenario 4: session closed; job", jb4$status, "; delivery", jb4$delivery$mode, "; mails:", length(mails),
+    if (length(mails)) paste("attachments:", mails[[1]]$n_att) else "", "\n")
+stopifnot(identical(jb4$status, "done"), identical(jb4$delivery$mode, "email"), length(mails) == 1L,
+          mails[[1]]$n_att == 3L, identical(mails[[1]]$to, "dryrun@local"))
 
 cat(sprintf("dry run finished in %.0f s\n", as.numeric(Sys.time() - t0, units = "secs")))
 cat("DRY RUN PASSED\n")

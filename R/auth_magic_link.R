@@ -196,28 +196,36 @@ auth_token_consume <- function(token) {
   avail
 }
 
-.auth_mail_request <- function(provider, to, subject, text, html, from_email, from_name) {
+.auth_mail_request <- function(provider, to, subject, text, html, from_email, from_name,
+                               attachments = NULL) {
   key <- Sys.getenv(switch(provider, brevo = "BREVO_API_KEY", resend = "RESEND_API_KEY",
                            sendgrid = "SENDGRID_API_KEY"), unset = "")
+  # 2026-10-22 (WP6): attachments as list(path, name, type), base64 in the
+  # body, each provider's own field names.
+  b64 <- function(a) gsub("\\s", "", jsonlite::base64_enc(readBin(a$path, "raw", file.size(a$path))))
+  att_brevo    <- if (length(attachments)) list(attachment = lapply(attachments, function(a) list(name = a$name, content = b64(a)))) else list()
+  att_resend   <- if (length(attachments)) list(attachments = lapply(attachments, function(a) list(filename = a$name, content = b64(a)))) else list()
+  att_sendgrid <- if (length(attachments)) list(attachments = lapply(attachments, function(a)
+    list(content = b64(a), filename = a$name, type = a$type %||% "application/octet-stream", disposition = "attachment"))) else list()
   switch(provider,
     brevo = httr2::request("https://api.brevo.com/v3/smtp/email") |>
       httr2::req_headers(`api-key` = key, `Content-Type` = "application/json", Accept = "application/json") |>
-      httr2::req_body_json(list(
+      httr2::req_body_json(c(list(
         sender = list(name = from_name, email = from_email),
         to = list(list(email = to)), subject = subject,
-        textContent = text, htmlContent = html %||% paste0("<pre>", text, "</pre>"))),
+        textContent = text, htmlContent = html %||% paste0("<pre>", text, "</pre>")), att_brevo)),
     resend = httr2::request("https://api.resend.com/emails") |>
       httr2::req_headers(Authorization = paste("Bearer", key), `Content-Type` = "application/json") |>
-      httr2::req_body_json(list(
+      httr2::req_body_json(c(list(
         from = sprintf("%s <%s>", from_name, from_email), to = list(to), subject = subject,
-        text = text, html = html %||% paste0("<pre>", text, "</pre>"))),
+        text = text, html = html %||% paste0("<pre>", text, "</pre>")), att_resend)),
     sendgrid = httr2::request("https://api.sendgrid.com/v3/mail/send") |>
       httr2::req_headers(Authorization = paste("Bearer", key), `Content-Type` = "application/json") |>
-      httr2::req_body_json(list(
+      httr2::req_body_json(c(list(
         personalizations = list(list(to = list(list(email = to)), subject = subject)),
         from = list(email = from_email, name = from_name),
         content = c(list(list(type = "text/plain", value = text)),
-                    if (!is.null(html)) list(list(type = "text/html", value = html)) else list()))),
+                    if (!is.null(html)) list(list(type = "text/html", value = html)) else list())), att_sendgrid)),
     stop("unknown mail provider ", provider)) |>
     httr2::req_timeout(20) |>
     httr2::req_error(is_error = function(resp) FALSE)
@@ -242,14 +250,16 @@ auth_token_consume <- function(token) {
 # "<provider>: <what happened>" for the log.
 .auth_send_email <- function(to, subject, text, html = NULL,
                              from_email = Sys.getenv("MAGIC_LINK_FROM", unset = "noreply@cattle-uncertainty.app"),
-                             from_name  = "IPCC Cattle GHG Tool") {
+                             from_name  = "IPCC Cattle GHG Tool",
+                             attachments = NULL) {
   chain <- .auth_mail_chain()
   if (length(chain) == 0)
     return(list(ok = FALSE, provider = NA_character_,
                 attempts = "no mail provider key set (BREVO_API_KEY / RESEND_API_KEY / SENDGRID_API_KEY)"))
   attempts <- character(0)
   for (p in chain) {
-    resp <- tryCatch(httr2::req_perform(.auth_mail_request(p, to, subject, text, html, from_email, from_name)),
+    resp <- tryCatch(httr2::req_perform(.auth_mail_request(p, to, subject, text, html, from_email, from_name,
+                                                           attachments = attachments)),
                      error = function(e) e)
     if (inherits(resp, "error")) {
       attempts <- c(attempts, sprintf("%s: request failed (%s)", p, conditionMessage(resp))); next
