@@ -359,7 +359,7 @@ translator_register_df <- function(register) {
   msg_index <- length(msgs)
   anthropic_chat_stream_async(
     req, max_tokens = 1500, temperature = 0, timeout_sec = 120,
-    on_result = function(resp) shiny::withReactiveDomain(session, {
+    on_result = function(resp) shiny::withReactiveDomain(session, shiny::isolate({
       if (!is.null(resp$error) || is.null(resp$reply)) {
         message("translator: decisions summariser failed (", resp$error %||% "no reply", ")")
         return(invisible(NULL))
@@ -378,7 +378,7 @@ translator_register_df <- function(register) {
       tryCatch(.translator_log_usage(state, resp, stage = "decisions", expect_warm = FALSE),
                error = function(e) NULL)
       invisible(NULL)
-    }))
+    })))
   invisible(NULL)
 }
 

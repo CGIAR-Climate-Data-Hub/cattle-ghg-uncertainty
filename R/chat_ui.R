@@ -112,6 +112,10 @@ translator_chat_ui <- function() {
     # and the folder the user chose for the results (Chrome/Edge).
     job_id = NULL,
     dir_chosen = NULL,
+    # 2026-10-22: the delivery pop-up has been answered once this session
+    # (a folder chosen, or Continue), and Produce is waiting on it.
+    delivery_ack = FALSE,
+    produce_after_ack = FALSE,
     # 2026-09-17: an upload waiting for the user to pick sheets (plan F8).
     pending_upload = NULL,
     precheck_key   = NULL,
@@ -636,8 +640,41 @@ translator_chat_server <- function(input, output, session) {
       showNotification(t("ai_qa_gate_notice"), type = "message", duration = 6)
       return()
     }
+    # 2026-10-22: before the first run of a session, say where the files
+    # will go and offer the folder choice; the run starts from the pop-up.
+    if (!isTRUE(state$delivery_ack)) {
+      state$produce_after_ack <- TRUE
+      showModal(.translator_delivery_modal(state$user_email))
+      return()
+    }
     .translator_start_produce(state, session)
   })
+
+  .translator_delivery_modal <- function(email) {
+    modalDialog(
+      title = t("ai_dlv_title"), easyClose = FALSE, size = "m",
+      tags$p(t("ai_dlv_intro")),
+      tags$ol(style = "padding-left:20px;",
+              tags$li(tags$strong(t("ai_dlv_opt_folder_h")), " ", t("ai_dlv_opt_folder")),
+              tags$li(tags$strong(t("ai_dlv_opt_download_h")), " ", t("ai_dlv_opt_download")),
+              tags$li(tags$strong(t("ai_dlv_opt_email_h")), " ", sprintf(t("ai_dlv_opt_email"), email %||% ""))),
+      tags$p(style = "font-size:0.85rem; color:#555;", t("ai_dlv_note")),
+      tags$script(HTML("if (!window.showDirectoryPicker) { var b = document.getElementById('translator_dlv_pick'); if (b) b.style.display = 'none'; var n = document.getElementById('translator_dlv_nopick'); if (n) n.style.display = ''; }")),
+      tags$div(id = "translator_dlv_nopick", style = "display:none; font-size:0.85rem; color:#7F1D1D;", t("ai_dlv_no_picker")),
+      footer = tagList(
+        tags$button(id = "translator_dlv_pick", type = "button", class = "btn btn-success",
+                    onclick = "translatorPickDir()", tagList(icon("folder-open"), t("ai_dlv_btn_pick"))),
+        actionButton("translator_dlv_continue", t("ai_dlv_btn_continue"), class = "btn-outline-secondary")))
+  }
+  .translator_after_ack <- function() {
+    state$delivery_ack <- TRUE
+    removeModal()
+    if (isTRUE(state$produce_after_ack)) {
+      state$produce_after_ack <- FALSE
+      .translator_start_produce(state, session)
+    }
+  }
+  observeEvent(input$translator_dlv_continue, .translator_after_ack())
 
   .translator_start_produce <- function(state, session) {
     session$sendCustomMessage("translatorAppendInfoBubble",
@@ -792,6 +829,8 @@ translator_chat_server <- function(input, output, session) {
     if (isTRUE(v$ok) && nzchar(v$name %||% "")) {
       state$dir_chosen <- v$name
       showNotification(sprintf(t("ai_dir_chosen"), v$name), type = "message", duration = 5)
+      # chosen from the pop-up: the run starts now
+      if (isTRUE(state$produce_after_ack)) .translator_after_ack()
     } else if (nzchar(v$error %||% "") && !grepl("AbortError", v$error)) {
       showNotification(t("ai_dir_failed"), type = "warning", duration = 5)
     }
@@ -2353,7 +2392,9 @@ translator_cancel_clear <- function(tok) {
         # withReactiveDomain: this runs from a later() callback, outside
         # any reactive context, so without it the writes to `state` below
         # belong to no session and Shiny never schedules a flush.
-        shiny::withReactiveDomain(session, {
+        # isolate (2026-10-22): reads of `state` are an error outside a
+        # reactive consumer; the domain alone does not provide one.
+        shiny::withReactiveDomain(session, shiny::isolate({
           tryCatch(.translator_handle_result(state, session, resp, stage),
                     error = function(e) {
                       state$last_error <- paste0(
@@ -2364,7 +2405,7 @@ translator_cancel_clear <- function(tok) {
           state$pending <- FALSE
           tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
                     error = function(e) NULL)
-        })
+        }))
       })
     return(invisible(NULL))
   }
@@ -2931,7 +2972,7 @@ translator_cancel_clear <- function(tok) {
   }
   # Every continuation runs from a later() callback, so each one has to
   # re-enter the session's reactive domain before touching `state`.
-  inseq <- function(expr) shiny::withReactiveDomain(session, expr)
+  inseq <- function(expr) shiny::withReactiveDomain(session, shiny::isolate(expr))
 
   if (budget_would_exceed())
     return(fail(paste0("The AI translator is temporarily unavailable. ",
