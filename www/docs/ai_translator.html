@@ -180,11 +180,31 @@ template is uploaded.</p>
 <div id="what-the-translator-will-ask-and-what-it-works-out-for-itself" class="section level2">
 <h2>What the translator will ask, and what it works out for itself</h2>
 <p>There is nothing to prepare and no form to fill in. The user uploads
-the file and answers questions as they arrive; the translator asks for
-what it needs, one or two questions at a time. It deliberately asks
-after it has read the file rather than before, so that it can ask about
-the actual column names and sub-category labels in the upload instead of
-hypothetical ones.</p>
+the file, with a note about it if there is something the AI should know,
+and answers the questions as they arrive. The questions are shown one at
+a time in a small card under the conversation, each with an answer box,
+a Back button and an “I do not know, use the IPCC default” button; the
+answers stay on the page and go back to the AI in one message when the
+last one is answered, so the AI reflects on all of them at once. If that
+reflection raises new questions, the same card returns.</p>
+<p>Every answer becomes a recorded decision. The card <strong>What the
+AI will apply</strong>, above the input box, lists them: the topic, the
+decision, where it came from (you said, from the file, IPCC default,
+assumed), and after the template is produced whether it was applied. A
+line can be edited there without typing in the chat. The decisions are
+sent to the AI with every emission call as binding, they override the
+file and the defaults, and the finished rows are checked against them: a
+production system that contradicts one is re-emitted once with the
+decision quoted, and if it still contradicts, the decision is listed as
+not applied above the download.</p>
+<p>Seven topics must be settled before the template is produced: the
+species covered, the IPCC edition, the inventory year, the production
+systems kept, where the manure management shares come from, how calves
+are handled, and where the uncertainty ranges come from. Any of them the
+AI has not settled, and any column where the header says percent while
+the values look like fractions, is put to the user one at a time when
+<strong>Produce template now</strong> is pressed; the template then
+starts by itself after the last answer.</p>
 <p>Almost everything comes from the file itself: the sub-category names,
 the head counts, which parameters are present and which are missing, and
 the units in use. None of that needs stating in advance.</p>
@@ -339,9 +359,10 @@ parses them and updates its internal mapping. Typical clarifications
 include:</p>
 <ul>
 <li>Sub-category vocabulary mapping (e.g., “Cows” →
-<code>other_cows</code>; “Adult males” → <code>bulls</code>; “Calves” →
-split equally into <code>calves_male</code> and
-<code>calves_female</code>).</li>
+<code>other_cows</code>; “Adult males” → <code>bulls</code>). One source
+category becomes one template category: a single calves row in the file
+becomes the pooled <code>calves</code> code, never a male and female
+split the file does not make.</li>
 <li>Unit conversions (litres of milk to kilograms using the cow-milk
 density 1.03 kg/L; digestibility expressed as a fraction 0.55 versus a
 percentage 55%).</li>
@@ -356,6 +377,14 @@ entry → <code>liquid_slurry</code>; “DL” → <code>dry_lot</code>).</li>
 national population numbers), the values can be typed directly into the
 chat. They will be incorporated into the final template alongside the
 file-derived values.</p>
+<p><strong>Re-uploading a corrected template.</strong> After a template
+has been produced, the link <strong>Back to the conversation</strong>
+keeps the answers and the history. A template produced by the tool,
+corrected in Excel and uploaded there is recognised as such: the checks
+are run on it at once, a note box carries the user’s comments, and the
+AI is told that its values outrank the original file and the earlier
+answers. Pressing <strong>Produce template now</strong> then builds the
+template from the corrected values.</p>
 </div>
 <div id="step-3-emit" class="section level3">
 <h3>Step 3: Emit</h3>
@@ -363,21 +392,42 @@ file-derived values.</p>
 <strong>Produce template now</strong>. The AI translates section B
 (file-derived values), section C (catalogue gaps to be filled with IPCC
 defaults), and the biological zeros confirmed in section D,
-mechanically, into the JSON template. The workbook is then built once
-and a green <strong>Download template (.xlsx)</strong> button appears as
-the only control, with two small links to revise or start over.</p>
-<p>Above the button sits a <strong>quality preview</strong>: the same
+mechanically, into the JSON template, one production system at a
+time.</p>
+<p>The run is a job the page does not have to stay open for. A progress
+bar shows the system being produced, the time elapsed and an estimate of
+the time left (from the size of each system and the speed of earlier
+runs). When the files are ready they are delivered by themselves: with
+<strong>Choose where to save</strong> pressed beforehand (Chrome and
+Edge), all three files are written into that folder; otherwise the data
+workbook downloads by itself and the other two files get a button. If
+the page was closed before the end, the three files are emailed to the
+signed-in address, and they also stay in the app until the server
+restarts.</p>
+<p>Three files come out of a translation, named after the country, the
+inventory year and the time: the <strong>data workbook</strong> (the
+template, with a filter on every column, flagged cells coloured red,
+orange or blue, and a Check and a Why column at the right of each
+sheet), the <strong>checks workbook</strong> (every point to review,
+failures first, with a column to record what was decided, plus the
+decisions and a summary), and the <strong>conversation document</strong>
+(the questions and the answers, raw).</p>
+<p>Above the buttons sits a <strong>quality preview</strong>: the same
 checks the QA/QC tab will run after upload (pass, warn and fail counts
-with the failing rows) plus a set of consistency notes that compare rows
-with each other. The notes name the places where a translation typically
-goes wrong: male and female calves that should carry the same numbers
-but do not, manure system shares that do not sum to 100 %, one manure
-system given different coefficients in different production systems, an
-uncertainty of 0.5 % where the same parameter runs at 50 % elsewhere,
-and a distribution that cannot represent the value it was given. Each
-note is a sentence to check against the source file. The user can ask
-the AI to revise, or download and deal with the failures on the QA/QC
-tab, where each one can be fixed or explicitly ignored.</p>
+with the failing rows) plus every consistency note that compares rows
+with each other and with the source file. The notes name the places
+where a translation typically goes wrong: a source category missing from
+the template (every category of the file must be a group unless a merge
+was agreed), a value in the Parameters sheet that differs from the time
+series for the inventory year, a percentage written as a fraction or the
+reverse, a population counted under two groups, a value tagged as read
+from the file that the file does not contain, manure shares that do not
+sum to 100 %, one manure system given different coefficients in
+different production systems, and a range or a distribution the file did
+not give and the IPCC catalogue supplied. Each note is a sentence to
+check against the source file. The user can go back to the conversation
+and correct, or download and deal with the points in the checks workbook
+and on the QA/QC tab.</p>
 <p>The downloaded file follows the official template format exactly.
 After download, the user should open the file and skim the
 <code>data_source</code> column of the Parameters sheet to confirm that

@@ -96,5 +96,28 @@ shiny::testServer(translator_chat_server, {
   stopifnot(identical(state$register$inventory_year$decision, "2021"), isTRUE(state$register$inventory_year$edited_by_user))
   saved <- conversation_load_full("loop@local")
   stopifnot(identical(saved$extra$register$inventory_year$decision, "2021"))
+
+  # ---- WP7: a corrected template comes back with a note ----------------------
+  tpl <- file.path(tempdir(), "corrected_template.xlsx")
+  generate_template_openxlsx(tpl, include_example = TRUE)
+  session$setInputs(translator_file = list(datapath = tpl, name = "corrected_template.xlsx", size = file.size(tpl)))
+  stopifnot(isTRUE(state$pending_upload$is_template), !is.null(state$pending_upload$precheck))
+  picker <- as.character(output$translator_sheet_picker$html)
+  stopifnot(grepl("looks like a template produced by the tool", picker, fixed = TRUE),
+            grepl("translator_upload_note", picker, fixed = TRUE))
+  n_sheets <- length(state$pending_upload$parsed$sheets)
+  session$setInputs(translator_sheets = as.character(seq_len(n_sheets)),
+                    translator_upload_note = "Calves are one group; the year is 2022.")
+  session$setInputs(translator_send_sheets = 1)
+  pump(state)
+  up <- Filter(function(m) identical(m$source, "server_upload"), state$messages)
+  last_up <- up[[length(up)]]
+  stopifnot(grepl("CORRECTED TEMPLATE (version 2)", last_up$content, fixed = TRUE),
+            grepl("NOTES FROM THE USER ABOUT THIS FILE", last_up$content, fixed = TRUE),
+            grepl("Calves are one group", last_up$content, fixed = TRUE),
+            grepl("Your notes: Calves are one group", last_up$display, fixed = TRUE),
+            identical(state$register$corrected_template$basis, "user"),
+            grepl("corrected_template.xlsx", state$register$corrected_template$decision, fixed = TRUE))
+  cat("corrected template: recognised, checked, sent with the note; register entry written\n")
   cat("LOOP TEST PASSED\n")
 })

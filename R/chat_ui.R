@@ -408,8 +408,17 @@ translator_chat_server <- function(input, output, session) {
     # settle before the template is produced.
     for (lab in tryCatch(.translator_detect_pct_conflicts(parsed), error = function(e) character(0)))
       state$register <- translator_register_add_pending(state$register, paste0("pct_vs_fraction:", lab))
+    # 2026-10-22 (WP7): a template produced by the tool, corrected by the
+    # user and uploaded back. The checks run on it at once (no AI call);
+    # the send handler then tells the AI it outranks the earlier answers.
+    sheet_names <- vapply(parsed$sheets, function(sh) as.character(sh$name %||% ""), character(1))
+    is_template <- all(c("Parameters", "Inventory_Metadata") %in% sheet_names) &&
+                   length(state$messages) > 1L
+    pc_t <- if (is_template) tryCatch(.translator_precheck_file(fi$datapath, source = state$source_fp),
+                                      error = function(e) NULL) else NULL
     state$pending_upload <- list(parsed = parsed, name = fi$name,
-                                 hash = parsed$file_hash)
+                                 hash = parsed$file_hash,
+                                 is_template = is_template, precheck = pc_t)
   })
 
   # The sheet picker. Rendered only while an upload is waiting to be sent.
@@ -470,7 +479,17 @@ translator_chat_server <- function(input, output, session) {
                        format(total, big.mark = ","))),
       checkboxGroupInput("translator_sheets", label = NULL, choices = choices,
                          selected = as.character(seq_along(sheets)), width = "100%"),
-      actionButton("translator_send_sheets", "Send to the AI (Step 1 of 3: explore)",
+      # 2026-10-22 (WP7): context travels with the file, in one message.
+      if (isTRUE(pu$is_template)) {
+        pc <- pu$precheck; sm <- pc$summary
+        tags$div(style = "margin:6px 0 8px 0; padding:8px 12px; background:#FEF9C3; border:1px solid #FDE68A; border-radius:6px; font-size:0.85rem; color:#713F12;",
+                 sprintf(t("ai_upload_corrected"), sm$n_fail %||% 0L, sm$n_warn %||% 0L,
+                         if (is.null(pc$issues)) 0L else nrow(pc$issues)))
+      },
+      textAreaInput("translator_upload_note", t("ai_upload_note_label"),
+                    placeholder = t("ai_upload_note_placeholder"), rows = 2, width = "100%"),
+      actionButton("translator_send_sheets",
+                   if (isTRUE(pu$is_template)) t("btn_ai_send_corrected") else "Send to the AI (Step 1 of 3: explore)",
                    class = "btn-success", style = "font-size:0.85rem;"))
   })
 
@@ -491,7 +510,16 @@ translator_chat_server <- function(input, output, session) {
     # Inline typing-indicator in the conversation while we wait for the
     # AI's first reply; cleared by translatorStreamStart.
     session$sendCustomMessage("translatorAppendTypingBubble", "")
-    built <- .translator_build_upload_message(parsed, pu$name)
+    note <- trimws(input$translator_upload_note %||% "")
+    built <- .translator_build_upload_message(parsed, pu$name, note = note,
+                                              corrected = isTRUE(pu$is_template),
+                                              precheck = pu$precheck)
+    if (isTRUE(pu$is_template)) {
+      state$register <- translator_register_set_user(
+        state$register, "corrected_template",
+        sprintf("the corrected template %s uploaded by the user is the source of truth for every value it carries", pu$name),
+        quote = note, msg_index = length(state$messages) + 1L)
+    }
     state$messages[[length(state$messages) + 1]] <-
       list(role = "user", content = built$content, display = built$display,
            # Server-injected text. The coverage scan skips messages that
@@ -1646,12 +1674,15 @@ translator_cancel_clear <- function(tok) {
 }
 
 # Provenance stamp written into the workbook's Notes (plan B6).
-.translator_stamp_text <- function(model = NULL) {
+.translator_stamp_text <- function(model = NULL, digest = NULL) {
   ph <- tryCatch(substr(translator_system_prompt_hash(), 1, 8), error = function(e) "unknown")
   mh <- tryCatch(substr(translator_prompt_inputs_hash()$master_sha256, 1, 8), error = function(e) "unknown")
   av <- Sys.getenv("APP_VERSION", unset = "")
-  sprintf("translator: app %s, prompt %s, master %s, model %s, %s",
-          if (nzchar(av)) av else "dev", ph, mh, model %||% .ANTHROPIC_DEFAULT_MODEL,
+  # 2026-10-22 (WP8): the digest of the decisions register, so a workbook
+  # can be matched to the answers it was built from.
+  dg <- if (!is.null(digest) && nzchar(digest)) paste0(", decisions ", digest) else ""
+  sprintf("translator: app %s, prompt %s, master %s, model %s%s, %s",
+          if (nzchar(av)) av else "dev", ph, mh, model %||% .ANTHROPIC_DEFAULT_MODEL, dg,
           format(Sys.Date(), "%Y-%m-%d"))
 }
 
@@ -1741,7 +1772,8 @@ translator_cancel_clear <- function(tok) {
 # Build the Explore user message from a parsed upload (the sheets the user
 # ticked). Returns list(content = what the model sees, display = what the
 # user sees in their own bubble).
-.translator_build_upload_message <- function(parsed, file_name) {
+.translator_build_upload_message <- function(parsed, file_name, note = "",
+                                             corrected = FALSE, precheck = NULL) {
   sheet_json_objs <- lapply(parsed$sheets, function(s) {
     s$json %||% .translator_table_to_json(s$preview, sheet_name = s$name)
   })
@@ -1827,11 +1859,31 @@ translator_cancel_clear <- function(tok) {
   # Scale note first, so the geographic level is the first thing the model
   # weighs rather than something it meets after mapping 10,000 groups.
   scale_block <- .translator_scale_note(.translator_scale_check(parsed))
+  # 2026-10-22 (WP7): the user's own words about the file, and the
+  # corrected-template header when the file is a template coming back.
+  note_block <- if (nzchar(note)) paste0(
+    "## NOTES FROM THE USER ABOUT THIS FILE\n\n", note,
+    "\n\nThese notes are binding: record them in your decisions block.\n\n---\n\n") else ""
+  corrected_block <- if (isTRUE(corrected)) {
+    sm <- precheck$summary
+    paste0(
+      "## CORRECTED TEMPLATE (version 2)\n\n",
+      "The user has corrected the template this conversation produced and uploaded it back. ",
+      "It is now the source of truth for every value it carries: use its rows as they are ",
+      "(data_source = 'user_file' for values the user set, keep 'ipcc_default' where the file says so), ",
+      "do not re-derive them from the original file or from earlier answers, and treat the user's ",
+      "notes as binding. Do not run a full exploration again: confirm in a few lines what changed, ",
+      "ask only about what is unclear, and end with the decisions block.",
+      if (!is.null(sm)) sprintf("\n\nThe server's checks on this file: %d failures, %d warnings, %d consistency notes.",
+                                sm$n_fail %||% 0L, sm$n_warn %||% 0L,
+                                if (is.null(precheck$issues)) 0L else nrow(precheck$issues)) else "",
+      "\n\n---\n\n")
+  } else ""
   content <- sprintf(
-    "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s%s",
+    "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s%s%s%s",
     file_name, parsed$n_total_sheets,
     if (parsed$n_total_sheets == 1L) "" else "s",
-    scale_block, exploration_block, detect_block, file_block)
+    scale_block, corrected_block, note_block, exploration_block, detect_block, file_block)
   display <- if (parsed$n_total_sheets == 1L)
     sprintf("Uploaded %s (%d rows × %d columns sent). Step 1 of 3: the AI will now explore your file and report what it found.",
             file_name, nrow(parsed$sheets[[1]]$preview), ncol(parsed$sheets[[1]]$preview))
@@ -1839,6 +1891,9 @@ translator_cancel_clear <- function(tok) {
     sprintf("Uploaded %s (%d sheets sent: %s). Step 1 of 3: the AI will now explore your file and report what it found.",
             file_name, parsed$n_total_sheets,
             paste(sapply(parsed$sheets, `[[`, "name"), collapse = ", "))
+  if (isTRUE(corrected))
+    display <- sprintf("Uploaded the corrected template %s. The AI will take its values as they are.", file_name)
+  if (nzchar(note)) display <- paste0(display, "\n\nYour notes: ", note)
   list(content = content, display = display)
 }
 
@@ -2509,6 +2564,7 @@ translator_cancel_clear <- function(tok) {
   # "Assembling the template failed (object 'enum_resp' not found)" from
   # 80dacb1 (15 October) until this fix.
   merged$.model <- model_id %||% .ANTHROPIC_DEFAULT_MODEL
+  merged$.register_digest <- translator_register_digest(state$register)
   merged_json <- jsonlite::toJSON(merged, auto_unbox = TRUE, na = "null", null = "null",
                                   dataframe = "rows", digits = NA)
 
@@ -3595,6 +3651,7 @@ translator_cancel_clear <- function(tok) {
                                                    if (isTRUE(chk$ok[k])) NULL else sprintf("%s: %s", chk$where[k], chk$found[k]))
     }
     parsed_stamp$.model <- resp$model
+    parsed_stamp$.register_digest <- translator_register_digest(state$register)
     resp$reply <- jsonlite::toJSON(parsed_stamp, auto_unbox = TRUE, na = "null",
                                    null = "null", dataframe = "rows", digits = NA)
   }
@@ -3735,7 +3792,7 @@ translator_cancel_clear <- function(tok) {
     region <- .translator_region_from_country(country)
   # Provenance stamp (plan B6): app version, prompt hash, master hash,
   # model and date, appended to whatever notes the model supplied.
-  stamp <- .translator_stamp_text(parsed$.model)
+  stamp <- .translator_stamp_text(parsed$.model, digest = parsed$.register_digest)
   prior_notes <- .translator_scalar(md$notes)
   md$notes <- if (is.na(prior_notes) || !nzchar(as.character(prior_notes))) stamp
               else paste(as.character(prior_notes), stamp, sep = " | ")

@@ -775,8 +775,16 @@ lang_state_take <- function(token) {
   ai_ready_title = list(
     en = "Your template is ready. Click the green button to save it, then open it and check the AI's work before uploading it on the 1. Data Input tab.",
     fr = "Votre modèle est prêt. Cliquez sur le bouton vert pour l'enregistrer, puis ouvrez-le et vérifiez le travail de l'IA avant de le charger dans l'onglet 1. Saisie des données."),
-  btn_ai_revise = list(en = "Change something and produce again",
-                         fr = "Modifier quelque chose et produire à nouveau"),
+  btn_ai_revise = list(en = "Back to the conversation (your answers are kept)",
+                         fr = "Retour à la conversation (vos réponses sont conservées)"),
+  ai_upload_note_label = list(en = "Anything the AI should know about this file? (optional)",
+                              fr = "Quelque chose que l'IA doit savoir sur ce fichier ? (facultatif)"),
+  ai_upload_note_placeholder = list(en = "For example: the MoE column is a fraction; calves are one group; the inventory year is 2022.",
+                                    fr = "Par exemple : la colonne MoE est une fraction ; les veaux forment un seul groupe ; l'année d'inventaire est 2022."),
+  ai_upload_corrected = list(
+    en = "This file looks like a template produced by the tool. The checks were run on it: %d failures, %d warnings, %d notes. Add your comments below and send it as the corrected version; its values will then be used as they are.",
+    fr = "Ce fichier ressemble à un modèle produit par l'outil. Les vérifications ont été faites : %d échecs, %d avertissements, %d notes. Ajoutez vos commentaires ci-dessous et envoyez-le comme version corrigée ; ses valeurs seront alors utilisées telles quelles."),
+  btn_ai_send_corrected = list(en = "Send the corrected template to the AI", fr = "Envoyer le modèle corrigé à l'IA"),
   btn_ai_new = list(en = "Start a new translation",
                       fr = "Commencer une nouvelle traduction"),
   ai_spinner_default = list(

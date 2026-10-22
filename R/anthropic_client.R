@@ -297,7 +297,7 @@ anthropic_cost_usd <- function(input_tokens, output_tokens,
 anthropic_chat <- function(messages,
                             model = .ANTHROPIC_DEFAULT_MODEL,
                             max_tokens = 16000,
-                            temperature = 0.2,
+                            temperature = 0,
                             timeout_sec = 90) {
   # Provider switch (throwaway A/B test): a Mistral model id routes to the
   # Mistral client (R/mistral_client.R). Claude path untouched otherwise.
@@ -427,7 +427,7 @@ anthropic_chat_stream_async <- function(messages,
                                         on_result = function(res) {},
                                         model = .ANTHROPIC_DEFAULT_MODEL,
                                         max_tokens = 16000,
-                                        temperature = 0.2,
+                                        temperature = 0,
                                         timeout_sec = 900,
                                         tools = NULL,
                                         tool_choice = NULL,
@@ -842,7 +842,7 @@ anthropic_chat_stream <- function(messages,
                                    should_stop = function() FALSE,
                                    model = .ANTHROPIC_DEFAULT_MODEL,
                                    max_tokens = 16000,
-                                   temperature = 0.2,
+                                   temperature = 0,
                                    # 2026-06-11: raised from 180s to 900s
                                    # after Andy's 26-sub-cat Zambia file
                                    # produced an exploration response that

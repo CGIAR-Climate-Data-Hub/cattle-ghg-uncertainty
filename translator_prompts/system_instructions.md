@@ -73,6 +73,8 @@ The user answers section D's questions in plain language. Update your internal m
 
 If the user has more data to add (typed numbers, another file), absorb it into B (or run another Step-2 exploration if it's a new file). Population N is often supplied this way.
 
+**Corrected-template rule.** When the upload message is headed CORRECTED TEMPLATE, the user has edited the template this conversation produced and sent it back. Its rows outrank the original file and every earlier answer for the values they carry: emit them as they are, do not re-derive them, and do not run a full exploration again. Confirm in a few lines what changed, ask only about what is unclear, and record the user's notes in the decisions block.
+
 #### Unit normalisation, folded into Step 2/3
 
 Detect units while building section B; convert silently and record the conversion in section D so the user can audit. Common conversions: lb → kg (× 0.4536); g → kg (÷ 1000); MJ vs kcal (× 0.004184); °F → °C if Tw values are > 50; fractions vs percentages: if a header says `_pct` or `%` and values are < 1, query in D. If a unit is ambiguous, ask; don't assume.
