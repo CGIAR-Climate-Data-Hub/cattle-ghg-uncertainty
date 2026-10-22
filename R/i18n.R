@@ -635,6 +635,8 @@ lang_state_take <- function(token) {
   ai_reg_modal_note = list(en = "Producing again after this change re-runs the AI for every production system.",
                            fr = "Produire à nouveau après ce changement relance l'IA pour chaque système de production."),
   ai_reg_save = list(en = "Save", fr = "Enregistrer"),
+  ai_decisions_not_applied = list(en = "Decisions the AI did not apply (check these rows in the file):",
+                                  fr = "Décisions que l'IA n'a pas appliquées (vérifiez ces lignes dans le fichier) :"),
   ai_reg_cancel = list(en = "Cancel", fr = "Annuler"),
   ai_topic_species = list(en = "Species", fr = "Espèce"),
   ai_topic_ipcc_edition = list(en = "IPCC edition", fr = "Édition GIEC"),

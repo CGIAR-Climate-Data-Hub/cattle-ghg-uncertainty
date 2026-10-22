@@ -387,6 +387,10 @@ SYSTEM_TYPES <- c("dairy", "beef", "mixed")
 ANIMAL_SUBCATEGORIES <- c(
   "dairy_cows", "other_cows", "bulls", "oxen",
   "heifers", "growing_males", "calves_female", "calves_male",
+  # 2026-10-22 (WP2): pooled calves. Most inventories carry one calves row
+  # per system; one source category becomes one template category, and
+  # the male/female codes are used only when the file has both.
+  "calves",
   "feedlot_cattle"
 )
 ANIMAL_SUBCATEGORY_LABELS <- c(
@@ -398,6 +402,7 @@ ANIMAL_SUBCATEGORY_LABELS <- c(
   growing_males = "Growing Males (young males 1-3yr, steers/bulls)",
   calves_female = "Calves - Female (<1yr)",
   calves_male = "Calves - Male (<1yr)",
+  calves = "Calves - pooled (<1yr, both sexes)",
   feedlot_cattle = "Feedlot Cattle (concentrated feeding)"
 )
 
@@ -533,7 +538,7 @@ C_GROWTH_BY_SUBCAT <- .master_list("C_GROWTH_BY_SUBCAT")
 SEX_BY_SUBCAT <- list(
   dairy_cows = "female", other_cows = "female", bulls = "male", oxen = "male",
   heifers = "female", growing_males = "male", calves_female = "female",
-  calves_male = "male", feedlot_cattle = "mixed"
+  calves_male = "male", calves = "mixed", feedlot_cattle = "mixed"
 )
 
 # Age class inferred from subcategory
@@ -542,6 +547,7 @@ AGE_BY_SUBCAT <- list(
   bulls = "adult_>3yr", oxen = "adult_>3yr",
   heifers = "young_1-3yr", growing_males = "young_1-3yr",
   calves_female = "calf_<1yr", calves_male = "calf_<1yr",
+  calves = "calf_<1yr",
   feedlot_cattle = "young_1-3yr"
 )
 

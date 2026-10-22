@@ -62,4 +62,43 @@ ok(length(.translator_detect_pct_conflicts(list(sheets = list(list(name = "s", p
 # ---- topic helpers --------------------------------------------------------------
 ok(grepl("MoE!moe", .translator_topic_question("pct_vs_fraction:MoE!moe"), fixed = TRUE) && grepl("6%", .translator_topic_question("pct_vs_fraction:MoE!moe"), fixed = TRUE), "server question text carries the column and the percent sign")
 ok(identical(.translator_topic_choices_for("pct_vs_fraction:x"), c("percent", "fraction")) && is.null(.translator_topic_choices_for("inventory_year")), "choices per topic kind")
+# ---- enforcement (WP1 step 4) ----------------------------------------------------
+reg_p <- translator_register_set_user(list(), "calves_handling", "pooled")
+piece_split <- list(parameters = data.frame(aggregation_level = "lvl", sub_category = c("calves_male", "calves_female", "bulls"),
+                                            parameter = "N", mean = c(50, 50, 10), stringsAsFactors = FALSE))
+piece_pooled <- list(parameters = data.frame(aggregation_level = "lvl", sub_category = c("calves", "bulls"),
+                                             parameter = "N", mean = c(100, 10), stringsAsFactors = FALSE))
+chk <- translator_register_check(reg_p, piece_split, "lvl")
+ok(nrow(chk) == 1 && !chk$ok && chk$hard && chk$topic == "calves_handling", "pooled decision vs both calves halves: hard violation")
+ok(all(translator_register_check(reg_p, piece_pooled, "lvl")$ok), "pooled decision vs one calves category: ok")
+reg_s <- translator_register_set_user(list(), "calves_handling", "split_as_in_file")
+ok(nrow(translator_register_check(reg_s, piece_split, "lvl")) == 0, "split decision: nothing to check")
+reg_m <- translator_register_set_user(list(), "mms_split_source", "herd_wide_from_file")
+mm_same <- list(manure_management = data.frame(aggregation_level = "lvl", sub_category = c("a", "a", "b", "b"), mms_type = c("pasture", "solid", "pasture", "solid"), fraction_pct = c(80, 20, 80, 20), stringsAsFactors = FALSE))
+mm_diff <- mm_same; mm_diff$manure_management$fraction_pct <- c(80, 20, 60, 40)
+ok(all(translator_register_check(reg_m, mm_same, "lvl")$ok) && !all(translator_register_check(reg_m, mm_diff, "lvl")$ok), "herd-wide manure split: identical passes, different fails")
+reg_v <- translator_register_set_user(list(), "value:Ym:El Doncello", "6.0")
+pv <- list(parameters = data.frame(aggregation_level = "x", sub_category = "el_doncello", parameter = "Ym", mean = 7, stringsAsFactors = FALSE))
+ok(!translator_register_check(reg_v, pv, "x")$ok, "numeric decision vs a different emitted value: violation")
+pv$parameters$mean <- 6.01; ok(translator_register_check(reg_v, pv, "x")$ok, "numeric decision within 0.5%: ok")
+rj <- .translator_decision_rejection(chk, "lvl"); ok(grepl("REJECTED for 'lvl'", rj, fixed = TRUE) && grepl("calves_handling", rj, fixed = TRUE), "rejection message")
+reg_md <- translator_register_set_user(translator_register_set_user(translator_register_set_user(list(), "inventory_year", "2022"), "species", "cattle_mixed"), "ipcc_edition", "2019_refinement")
+fx <- translator_register_apply_metadata(reg_md, list(year = 2021L, species = "cattle_dairy", ipcc_version = "2006"))
+ok(identical(fx$metadata$year, 2022L) && identical(fx$metadata$species, "cattle_mixed") && identical(fx$metadata$ipcc_version, "2019_refinement") &&
+   setequal(fx$corrections, c("inventory_year", "species", "ipcc_edition")) && isTRUE(fx$register$inventory_year$applied), "metadata corrected from the register and marked applied")
+# source categories
+sc_reply <- paste0("I read your file.\n\n```source_categories\n[{\"label\": \"Dairy cows\", \"system\": \"Commercial\", \"sub_category\": \"dairy_cows\", \"aggregation_level\": \"commercial_dairy\", \"confidence\": \"high\"},",
+                   " {\"label\": \"Young stock\", \"system\": \"Commercial\", \"sub_category\": \"heifers\", \"aggregation_level\": \"commercial_dairy\", \"confidence\": \"low\"}]\n```")
+srcs <- .translator_extract_source_categories(sc_reply)
+ok(length(srcs) == 2 && srcs[[2]]$confidence == "low" && srcs[[1]]$label == "Dairy cows", "source categories block parsed")
+ok(!grepl("source_categories", .translator_strip_source_categories(sc_reply), fixed = TRUE), "source categories block stripped")
+ps6 <- data.frame(cattle_type = "dairy", aggregation_level = "commercial_dairy", sub_category = c("dairy_cows", "dairy_cows"), parameter = c("N", "BW"), mean = c(100, 300), stringsAsFactors = FALSE)
+iss <- translator_consistency_checks(ps6, NULL, source = list(numbers = c(100, 300), families = character(0), family_values = list(), source_categories = srcs, register = list()))
+c6 <- iss[iss$where == "category coverage", ]
+ok(nrow(c6) == 1 && identical(c6$severity, "fail") && grepl("Young stock", c6$issue, fixed = TRUE), "C6: a source category missing from the template is a failure")
+reg_ok <- translator_register_set_user(list(), "category:Young stock", "merge into Dairy cows")
+srcs2 <- srcs; srcs2[[2]]$merge_into <- "Dairy cows"
+iss2 <- translator_consistency_checks(ps6, NULL, source = list(numbers = c(100, 300), families = character(0), family_values = list(), source_categories = srcs2, register = reg_ok))
+ok(identical(iss2$severity[iss2$where == "category coverage"], "info"), "C6: a merge the user confirmed is accepted")
+ok(identical(resolve_subcat_default("calves", "Milk")$data_source, "biological_zero") && resolve_subcat_default("calves", "BW")$value == 60, "pooled calves resolve biological zeros and their own defaults")
 cat("REGISTER TESTS PASSED\n")

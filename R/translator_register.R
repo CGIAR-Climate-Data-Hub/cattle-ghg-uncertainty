@@ -381,3 +381,186 @@ translator_register_df <- function(register) {
     }))
   invisible(NULL)
 }
+
+# ---------------------------------------------------------------------------
+# Enforcement (WP1 step 4)
+# ---------------------------------------------------------------------------
+
+.translator_norm_key <- function(x) gsub("[^a-z0-9]+", "_", tolower(trimws(as.character(x))))
+
+.translator_check_frame <- function() data.frame(
+  topic = character(0), expected = character(0), found = character(0),
+  where = character(0), ok = logical(0), hard = logical(0), stringsAsFactors = FALSE)
+
+# Compare the register with an emitted piece (a batch, or the full/merged
+# template). One row per decision checked; `hard` rows trigger a re-emit.
+translator_register_check <- function(register, piece, level = NULL) {
+  register <- register %||% list()
+  if (!length(register) || is.null(piece)) return(.translator_check_frame())
+  rows <- list()
+  add <- function(topic, expected, found, where, ok, hard = TRUE)
+    rows[[length(rows) + 1L]] <<- data.frame(topic = topic, expected = expected, found = found,
+                                             where = where, ok = ok, hard = hard,
+                                             stringsAsFactors = FALSE)
+  ps <- piece$parameters; mm <- piece$manure_management
+  lv <- if (!is.null(level) && nzchar(level)) level else "(template)"
+  decided <- function(tp) { e <- register[[tp]]; !is.null(e) && identical(e$status, "decided") }
+
+  # calves: pooled means never both halves in one production system
+  if (decided("calves_handling")) {
+    d <- tolower(register$calves_handling$decision)
+    pooled <- !grepl("^split", d) &&
+      grepl("pooled|do not split|don.t split|not split|together|one categor|as in the file|single", d)
+    if (pooled && is.data.frame(ps) && "sub_category" %in% names(ps)) {
+      lvls <- if ("aggregation_level" %in% names(ps)) as.character(ps$aggregation_level) else rep("", nrow(ps))
+      lvls[is.na(lvls)] <- ""
+      for (L in unique(lvls)) {
+        sc <- unique(as.character(ps$sub_category[lvls == L]))
+        both <- all(c("calves_male", "calves_female") %in% sc)
+        add("calves_handling", "one calves category per production system (pooled)",
+            if (both) "calves_male and calves_female both emitted" else "one calves category",
+            if (nzchar(L)) L else lv, !both)
+      }
+    }
+  }
+
+  # manure shares: herd-wide means the same split on every sub-category
+  if (decided("mms_split_source") &&
+      grepl("herd.?wide|whole herd|same split|single split", tolower(register$mms_split_source$decision)) &&
+      is.data.frame(mm) && all(c("sub_category", "mms_type", "fraction_pct") %in% names(mm)) && nrow(mm)) {
+    lvls <- if ("aggregation_level" %in% names(mm)) as.character(mm$aggregation_level) else rep("", nrow(mm))
+    lvls[is.na(lvls)] <- ""
+    for (L in unique(lvls)) {
+      sub <- mm[lvls == L, , drop = FALSE]
+      sigs <- tapply(seq_len(nrow(sub)), as.character(sub$sub_category), function(i)
+        paste(sort(paste(sub$mms_type[i], round(suppressWarnings(as.numeric(sub$fraction_pct[i])), 3))), collapse = ";"))
+      ok <- length(unique(sigs)) <= 1L
+      add("mms_split_source", "the same manure split for every sub-category (herd-wide)",
+          if (ok) "identical splits" else sprintf("%d different splits across %d sub-categories",
+                                                  length(unique(sigs)), length(sigs)),
+          if (nzchar(L)) L else lv, ok)
+    }
+  }
+
+  # numeric decisions: topic value:<parameter>:<sub_category>
+  for (nm in names(register)) {
+    e <- register[[nm]]
+    if (!identical(e$status, "decided") || !grepl("^value:", nm)) next
+    parts <- strsplit(nm, ":", fixed = TRUE)[[1]]
+    if (length(parts) < 3L) next
+    want <- suppressWarnings(as.numeric(gsub("[^0-9.eE+-]", "", e$decision)))
+    if (!is.finite(want)) next
+    if (!is.data.frame(ps) || !all(c("parameter", "sub_category", "mean") %in% names(ps))) next
+    hit <- ps$parameter == parts[2] & .translator_norm_key(ps$sub_category) == .translator_norm_key(parts[3])
+    if (!any(hit, na.rm = TRUE)) next
+    got <- suppressWarnings(as.numeric(ps$mean[which(hit)]))
+    ok <- all(is.finite(got)) && all(abs(got - want) <= 0.005 * max(1, abs(want)))
+    add(nm, sprintf("%s = %s for %s", parts[2], format(want), parts[3]),
+        paste(format(got), collapse = ", "), lv, ok)
+  }
+
+  # production systems kept: a soft check, level names are fuzzy
+  if (decided("aggregation_level") && !is.null(level) && nzchar(level)) {
+    d <- tolower(register$aggregation_level$decision)
+    if (!grepl("^all\\b|every|tous", d)) {
+      names_in <- .translator_norm_key(unlist(strsplit(d, "[,;/]|\\band\\b|\\bet\\b")))
+      names_in <- names_in[nzchar(names_in)]
+      if (length(names_in)) {
+        ok <- any(vapply(names_in, function(n) grepl(n, .translator_norm_key(level), fixed = TRUE) ||
+                                               grepl(.translator_norm_key(level), n, fixed = TRUE), logical(1)))
+        add("aggregation_level", register$aggregation_level$decision, level, lv, ok, hard = FALSE)
+      }
+    }
+  }
+
+  if (!length(rows)) return(.translator_check_frame())
+  out <- do.call(rbind, rows); rownames(out) <- NULL
+  out
+}
+
+# Metadata the register settles outright: no re-emit needed, the server
+# corrects the discovery result and records the decision as applied.
+translator_register_apply_metadata <- function(register, md) {
+  register <- register %||% list(); md <- md %||% list()
+  corrections <- character(0)
+  get <- function(tp) { e <- register[[tp]]; if (!is.null(e) && identical(e$status, "decided")) e$decision else NULL }
+  yr <- get("inventory_year")
+  if (!is.null(yr)) {
+    y <- suppressWarnings(as.integer(gsub("[^0-9]", "", yr)))
+    if (is.finite(y) && y >= 1900 && y <= 2100 && !identical(as.integer(.translator_scalar(md$year %||% NA)), y)) {
+      md$year <- y; corrections <- c(corrections, "inventory_year")
+    }
+    if (is.finite(y)) register <- translator_register_mark(register, "inventory_year", TRUE, "server-corrected")
+  }
+  sp <- get("species")
+  if (!is.null(sp) && sp %in% .translator_topic_choices("species")) {
+    if (!identical(.translator_scalar(md$species %||% ""), sp)) { md$species <- sp; corrections <- c(corrections, "species") }
+    register <- translator_register_mark(register, "species", TRUE, "server-corrected")
+  }
+  ed <- get("ipcc_edition")
+  if (!is.null(ed)) {
+    v <- if (grepl("2019", ed)) "2019_refinement" else if (grepl("2006", ed)) "2006" else NULL
+    if (!is.null(v)) {
+      if (!identical(.translator_scalar(md$ipcc_version %||% ""), v)) { md$ipcc_version <- v; corrections <- c(corrections, "ipcc_edition") }
+      register <- translator_register_mark(register, "ipcc_edition", TRUE, "server-corrected")
+    }
+  }
+  list(metadata = md, register = register, corrections = corrections)
+}
+
+translator_register_mark <- function(register, topic, applied, note = NULL) {
+  register <- register %||% list()
+  e <- register[[topic]]
+  if (is.null(e)) return(register)
+  # a decision found violated once stays marked unless a later check clears it explicitly
+  e$applied <- isTRUE(applied)
+  e$applied_note <- if (is.null(note)) e$applied_note else note
+  register[[topic]] <- e
+  register
+}
+
+.translator_decision_rejection <- function(viol, level) {
+  items <- sprintf("'%s: %s' (found: %s)", viol$topic, viol$expected, viol$found)
+  paste0("REJECTED for '", level, "': the user's binding decision(s) were not applied: ",
+         paste(items, collapse = "; "), ". Re-emit the batch for '", level,
+         "' now, honouring every decision in the BINDING DECISIONS block. ",
+         "Same tool, mode = 'batch', same aggregation_level.")
+}
+
+# ---------------------------------------------------------------------------
+# Source categories (WP2): the AI's own list of what the file contains
+# ---------------------------------------------------------------------------
+
+.TRANSLATOR_SOURCE_CATEGORIES_FENCE <- "```source_categories[ \\t]*\\n([\\s\\S]*?)\\n```"
+
+# Entries: label (as in the file), system, sub_category, aggregation_level,
+# merge_into (optional), confidence. NULL when there is no usable block.
+.translator_extract_source_categories <- function(reply) {
+  if (is.null(reply) || !nzchar(reply)) return(NULL)
+  m <- regexpr(.TRANSLATOR_SOURCE_CATEGORIES_FENCE, reply, perl = TRUE)
+  if (m < 0) return(NULL)
+  fence <- regmatches(reply, m)
+  inner <- sub("^```source_categories[ \\t]*\\n", "", fence, perl = TRUE)
+  inner <- sub("\\n```$", "", inner)
+  arr <- tryCatch(jsonlite::fromJSON(inner, simplifyVector = FALSE), error = function(e) NULL)
+  if (is.null(arr)) return(NULL)
+  if (!is.null(arr$label)) arr <- list(arr)
+  out <- list()
+  for (e in arr) {
+    if (!is.list(e)) next
+    lab <- trimws(as.character(e$label %||% ""))
+    if (!nzchar(lab)) next
+    out[[length(out) + 1L]] <- list(
+      label = lab, system = trimws(as.character(e$system %||% e$aggregation_level %||% "")),
+      sub_category = trimws(as.character(e$sub_category %||% "")),
+      aggregation_level = trimws(as.character(e$aggregation_level %||% e$system %||% "")),
+      merge_into = trimws(as.character(e$merge_into %||% "")),
+      confidence = tolower(trimws(as.character(e$confidence %||% "medium"))))
+  }
+  if (!length(out)) NULL else out
+}
+
+.translator_strip_source_categories <- function(text) {
+  if (is.null(text) || !nzchar(text)) return(text)
+  gsub("\\n{3,}", "\n\n", trimws(gsub(.TRANSLATOR_SOURCE_CATEGORIES_FENCE, "", text, perl = TRUE)))
+}

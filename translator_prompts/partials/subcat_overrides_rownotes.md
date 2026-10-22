@@ -9,7 +9,11 @@ Genuinely ambiguous across countries: the term is used for both castrate steers 
 
 ## calves_female
 
-Takes the female Eq 10.6 coefficient, on the heifer-replacement track. Some inventories do not sex-disaggregate calves at all and report a single pooled calf growth coefficient; if the source file does that, say so in section D rather than splitting it yourself.
+Takes the female Eq 10.6 coefficient, on the heifer-replacement track. Use this code only when the source file reports female calves separately from male calves; a single calves row in the file takes the pooled `calves` code below, never a split you make yourself.
+
+## calves
+
+The pooled code for a file that reports calves as one group, which most inventories do. Growth coefficient C = 0.9, the midpoint of the female (0.8) and castrate (1.0) values, is a project assumption, not an IPCC value; Cfi 0.322 follows Table 10.4, which gives one value for calves of either sex. If the file carries its own calf coefficients, honour them with `data_source = user_file`.
 
 ## calves_male
 

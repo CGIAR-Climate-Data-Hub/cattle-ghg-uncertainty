@@ -131,8 +131,11 @@ translator_source_fingerprint <- function(parsed) {
 translator_consistency_checks <- function(param_specs, manure = NULL,
                                           source = NULL) {
   out <- list()
-  add <- function(where, issue) {
+  # 2026-10-22: every issue carries a severity (fail, warn, info) so the
+  # checks workbook and the data workbook can colour it.
+  add <- function(where, issue, severity = "warn") {
     out[[length(out) + 1L]] <<- data.frame(where = where, issue = issue,
+                                            severity = severity,
                                             stringsAsFactors = FALSE)
   }
   fmt <- function(x) format(signif(x, 7), trim = TRUE)
@@ -420,8 +423,49 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     }
   }
 
+  # C6 (2026-10-22, WP2): every category the AI listed in the source must
+  # be a group in the template, unless the user confirmed a merge. One
+  # source category becomes one template category; a missing one is a
+  # failure, because the template then simply has fewer animals.
+  if (!is.null(source) && length(source$source_categories) &&
+      !is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 &&
+      all(c("sub_category", "aggregation_level") %in% names(ps))) {
+    norm <- function(x) gsub("[^a-z0-9]+", "_", tolower(trimws(as.character(x))))
+    have <- unique(paste(norm(ps$aggregation_level), norm(ps$sub_category), sep = "||"))
+    have_sc <- unique(norm(ps$sub_category))
+    reg <- source$register %||% list()
+    merge_confirmed <- function(label) {
+      e <- reg[[paste0("category:", label)]]
+      !is.null(e) && identical(e$basis, "user") && grepl("merge|fusion|combine", tolower(e$decision %||% ""))
+    }
+    missing <- character(0)
+    for (sc in source$source_categories) {
+      if (nzchar(sc$merge_into %||% "") && merge_confirmed(sc$label)) next
+      code <- norm(sc$sub_category %||% "")
+      lvl  <- norm(sc$aggregation_level %||% "")
+      found <- if (nzchar(code) && nzchar(lvl)) paste(lvl, code, sep = "||") %in% have
+               else if (nzchar(code)) code %in% have_sc
+               else TRUE
+      if (!found) missing <- c(missing, sprintf("%s (%s / %s)", sc$label, sc$aggregation_level %||% "", sc$sub_category %||% ""))
+    }
+    n_src <- length(source$source_categories)
+    n_tpl <- length(have)
+    if (length(missing)) {
+      add("category coverage", sprintf(paste0(
+        "The source file lists %d categories and the template has %d groups; ",
+        "%d source categor%s not in the template: %s. Every source category must ",
+        "appear unless you confirmed a merge in the conversation."),
+        n_src, n_tpl, length(missing), if (length(missing) == 1L) "y is" else "ies are",
+        paste(utils::head(missing, 8), collapse = "; ")), severity = "fail")
+    } else {
+      add("category coverage", sprintf("Source categories: %d; template groups: %d; every source category is in the template.", n_src, n_tpl),
+          severity = "info")
+    }
+  }
+
   if (!length(out))
-    return(data.frame(where = character(), issue = character(), stringsAsFactors = FALSE))
+    return(data.frame(where = character(), issue = character(), severity = character(),
+                      stringsAsFactors = FALSE))
   res <- do.call(rbind, out)
   rownames(res) <- NULL
   res

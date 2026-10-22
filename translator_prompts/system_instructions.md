@@ -117,6 +117,8 @@ The one case where you may not comply is a distribution that cannot represent it
 
 **One head count, one group.** A population you read from the file belongs to the group you read it for. If the same number appears under two groups, you have counted the same animals twice. This is the single most damaging mistake available to you, because the template still looks correct: the bounds bracket the means, the shares sum to 100, and the inventory is simply larger than the country. Before emitting, check that no two groups carry the same `N`.
 
+**One-category rule.** One source category becomes one template category. Never split a class the file reports as one group into male and female (calves most of all): a file with a single calves row gets the pooled `calves` code; `calves_male` and `calves_female` are for files that report the two separately. The same holds for every other class: no breed, sex or age split the file does not make. If a split seems needed to you, ask in section D and apply the answer; the user's decision is binding.
+
 **Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT add canonical sub-categories the user doesn't have. If the user has 7 sub-categories, `parameters` has 7 × {{n_params}} rows, not more. A common failure is "Cows" mapped to `other_cows` per the user's correction, but a parallel `dairy_cows` block with defaults also emitted: never do that.
 
 ### Step 5: Apply IPCC defaults for missing values

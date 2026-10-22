@@ -104,6 +104,10 @@ translator_chat_ui <- function() {
     q_index = 1L,
     produce_after_answers = FALSE,
     reg_edit_topic = NULL,
+    # 2026-10-22 (WP2): the AI's own list of the source file's categories
+    # (label, system, mapped sub-category, mapped level, merge_into,
+    # confidence), from the explore reply's source_categories block.
+    source_categories = NULL,
     # 2026-09-17: an upload waiting for the user to pick sheets (plan F8).
     pending_upload = NULL,
     precheck_key   = NULL,
@@ -129,7 +133,8 @@ translator_chat_ui <- function() {
                  batch_parts_key = state$batch_parts_key,
                  register = if (length(state$register)) state$register else NULL,
                  pending_questions = if (length(state$pending_questions)) state$pending_questions else NULL,
-                 q_index = state$q_index)),
+                 q_index = state$q_index,
+                 source_categories = if (length(state$source_categories)) state$source_categories else NULL)),
     error = function(e) NULL)
 }
 
@@ -181,6 +186,8 @@ translator_chat_server <- function(input, output, session) {
         # 2026-10-22 (WP1): the register and an unfinished question round.
         rg <- saved$extra$register
         if (is.list(rg) && length(rg) > 0) state$register <- rg
+        sc_ <- saved$extra$source_categories
+        if (is.list(sc_) && length(sc_) > 0) state$source_categories <- sc_
         pq <- saved$extra$pending_questions
         if (is.list(pq) && length(pq) > 0) {
           state$pending_questions <- pq
@@ -359,6 +366,7 @@ translator_chat_server <- function(input, output, session) {
     state$register <- translator_register_keep_user(state$register)
     state$pending_questions <- list()
     state$q_index <- 1L
+    state$source_categories <- NULL
     parsed <- tryCatch(
       .translator_read_upload_memo(fi$datapath, fi$name),
       error = function(e) {
@@ -863,7 +871,7 @@ translator_chat_server <- function(input, output, session) {
         actionLink("translator_precheck_run", t("ai_precheck_run"),
                    style = "color:#2D6A4F; font-weight:600;")))
     }
-    .translator_precheck_ui(pc)
+    tagList(.translator_decisions_ui(state$register), .translator_precheck_ui(pc))
   })
 
   observeEvent(input$translator_precheck_run, {
@@ -1389,6 +1397,19 @@ translator_cancel_clear <- function(tok) {
        n_manure = if (is.data.frame(pu$manure)) nrow(pu$manure) else 0L, error = NULL)
 }
 
+.translator_decisions_ui <- function(register) {
+  register <- register %||% list()
+  bad <- Filter(function(e) identical(e$applied, FALSE), register)
+  if (!length(bad)) return(NULL)
+  tags$div(
+    style = "text-align:left; margin:0 auto 10px auto; max-width:720px; padding:10px 14px; background:#FEF2F2; border:1px solid #FCA5A5; border-left:4px solid #DC2626; border-radius:8px; font-size:0.85rem; color:#7F1D1D;",
+    tags$strong(t("ai_decisions_not_applied")),
+    tags$ul(style = "margin:6px 0 0 0; padding-left:18px;",
+            lapply(bad, function(e) tags$li(
+              tags$span(style = "font-weight:600;", .translator_topic_label(e$topic)), ": ", e$decision,
+              if (nzchar(e$applied_note %||% "")) tags$span(style = "color:#991B1B;", paste0(" (", e$applied_note, ")"))))))
+}
+
 .translator_precheck_ui <- function(pc) {
   box <- function(...) tags$div(
     style = "text-align:left; margin:0 auto 14px auto; max-width:720px; padding:10px 14px; background:#fff; border:1px solid #CFD8DC; border-radius:8px; font-size:0.85rem; color:#333;",
@@ -1454,7 +1475,12 @@ translator_cancel_clear <- function(tok) {
     state$template_file     <- path
     state$template_file_key <- key
   }
-  state$precheck     <- if (ok) .translator_precheck_file(path, source = state$source_fp)
+  src <- isolate(state$source_fp)
+  if (!is.null(src)) {
+    src$source_categories <- isolate(state$source_categories)
+    src$register          <- isolate(state$register)
+  }
+  state$precheck     <- if (ok) .translator_precheck_file(path, source = src)
                         else list(qa = NULL, summary = NULL, issues = NULL,
                                   error = "the workbook could not be written")
   state$precheck_key <- key
@@ -1990,6 +2016,17 @@ translator_cancel_clear <- function(tok) {
              error = function(e) message("translator: summariser not started (", conditionMessage(e), ")"))
   }
   reply_vis <- .translator_strip_decisions(reply_text)
+  # 2026-10-22 (WP2): the explore reply's list of source categories; a
+  # low-confidence mapping becomes a question the user settles before
+  # Produce (topic category:<label>).
+  srcs <- if (!isTRUE(resp$tool_used)) .translator_extract_source_categories(reply_text) else NULL
+  if (!is.null(srcs)) {
+    state$source_categories <- srcs
+    for (sc in srcs) if (identical(sc$confidence, "low"))
+      state$register <- translator_register_add_pending(state$register, paste0("category:", sc$label),
+                                                        note = sc$sub_category %||% "")
+    reply_vis <- .translator_strip_source_categories(reply_vis)
+  }
   qs <- if (!isTRUE(resp$tool_used) && !template_just_ready)
     .translator_question_list(reply_vis) else character(0)
   if (length(qs)) {
@@ -2483,6 +2520,9 @@ translator_cancel_clear <- function(tok) {
   # cache on "".
   agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
   agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
+  fix <- tryCatch(translator_register_apply_metadata(state$register, enum_parsed$inventory_metadata),
+                  error = function(e) NULL)
+  if (!is.null(fix)) { enum_parsed$inventory_metadata <- fix$metadata; state$register <- fix$register }
   inventory_metadata <- enum_parsed$inventory_metadata
 
   # Decision: fall back to the monolithic path when batching wouldn't
@@ -2710,10 +2750,53 @@ translator_cancel_clear <- function(tok) {
         system_prompt, history = state$messages,
         new_user_message = .translator_batch_nudge(i, length(agg_levels), level, state$register))
 
-      accept <- function(batch_parsed) {
+      accept_raw <- function(batch_parsed) {
         batch_parsed$.requested_aggregation_level <- level
         parts[[i]] <<- batch_parsed
         step(i + 1L)
+      }
+      # 2026-10-22 (WP1 step 4): a batch that contradicts a decision in the
+      # register is re-emitted once with the violated decision quoted; if it
+      # still contradicts, the better of the two is kept and the decision is
+      # marked "not applied" (shown above the download and in the checks).
+      accept <- function(batch_parsed, retried = FALSE) {
+        chk <- tryCatch(translator_register_check(state$register, batch_parsed, level),
+                        error = function(e) NULL)
+        bad <- if (is.null(chk) || !nrow(chk)) NULL else chk[!chk$ok & chk$hard, , drop = FALSE]
+        if (!is.null(chk) && nrow(chk))
+          for (tp in unique(chk$topic[chk$ok]))
+            if (is.null(bad) || !tp %in% bad$topic)
+              state$register <- translator_register_mark(state$register, tp, TRUE)
+        if (is.null(bad) || !nrow(bad)) return(accept_raw(batch_parsed))
+        if (retried) {
+          for (k in seq_len(nrow(bad)))
+            state$register <- translator_register_mark(state$register, bad$topic[k], FALSE,
+                                                       sprintf("%s: %s", bad$where[k], bad$found[k]))
+          info(sprintf("The AI did not apply a decision for %s after one retry (%s); it is listed above the download.",
+                       level, paste(unique(bad$topic), collapse = ", ")))
+          return(accept_raw(batch_parsed))
+        }
+        message("translator: batch '", level, "' contradicts the register (",
+                paste(unique(bad$topic), collapse = ", "), "); re-emitting once")
+        info(sprintf("Batch %s did not follow a decision (%s); asking the AI once more...",
+                     level, paste(unique(bad$topic), collapse = ", ")))
+        retry_msgs <- c(batch_msgs, list(list(role = "user",
+                                              content = .translator_decision_rejection(bad, level))))
+        anthropic_chat_batch_template_force_async(
+          retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb, should_stop = stopper,
+          on_result = function(rr) inseq({
+            best <- batch_parsed
+            if (is.null(rr$error)) {
+              .translator_log_usage(state, rr, stage = "retry_decision", expect_warm = TRUE)
+              rp <- tryCatch(jsonlite::fromJSON(rr$reply, simplifyVector = TRUE), error = function(e) NULL)
+              if (is.null(.translator_validate_piece(rp, "batch"))) {
+                chk2 <- tryCatch(translator_register_check(state$register, rp, level), error = function(e) NULL)
+                n2 <- if (is.null(chk2) || !nrow(chk2)) 0L else sum(!chk2$ok & chk2$hard)
+                if (n2 < nrow(bad)) best <- rp
+              }
+            }
+            accept(best, retried = TRUE)
+          }))
       }
 
       .translator_memo_call_async(batch_msgs, tools_sig,
@@ -2811,6 +2894,17 @@ translator_cancel_clear <- function(tok) {
       }
       agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
       agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
+      # 2026-10-22 (WP1 step 4): year, species and edition come from the
+      # register when the user decided them; corrected here, no re-call.
+      fix <- tryCatch(translator_register_apply_metadata(state$register, enum_parsed$inventory_metadata),
+                      error = function(e) NULL)
+      if (!is.null(fix)) {
+        enum_parsed$inventory_metadata <- fix$metadata
+        state$register <- fix$register
+        if (length(fix$corrections))
+          message("translator: discovery metadata corrected from the register: ",
+                  paste(fix$corrections, collapse = ", "))
+      }
       if (length(agg_levels) <= 2L) {
         message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
                         length(agg_levels)))
@@ -3259,6 +3353,15 @@ translator_cancel_clear <- function(tok) {
   # Record the model that produced it, for the workbook stamp (plan B6).
   parsed_stamp <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE), error = function(e) NULL)
   if (!is.null(parsed_stamp)) {
+    # 2026-10-22 (WP1 step 4): the decisions are checked on the full piece
+    # and marked; this path (two or fewer production systems) has no
+    # targeted re-emit, the violation is listed above the download.
+    chk <- tryCatch(translator_register_check(state$register, parsed_stamp), error = function(e) NULL)
+    if (!is.null(chk) && nrow(chk)) {
+      for (k in seq_len(nrow(chk)))
+        state$register <- translator_register_mark(state$register, chk$topic[k], isTRUE(chk$ok[k]),
+                                                   if (isTRUE(chk$ok[k])) NULL else sprintf("%s: %s", chk$where[k], chk$found[k]))
+    }
     parsed_stamp$.model <- resp$model
     resp$reply <- jsonlite::toJSON(parsed_stamp, auto_unbox = TRUE, na = "null",
                                    null = "null", dataframe = "rows", digits = NA)
@@ -3985,7 +4088,7 @@ translator_cancel_clear <- function(tok) {
 .translator_subcategory_vocab <- function() {
   if (exists("ANIMAL_SUBCATEGORIES")) ANIMAL_SUBCATEGORIES else
     c("dairy_cows", "other_cows", "bulls", "oxen", "heifers", "growing_males",
-      "calves_female", "calves_male", "feedlot_cattle")
+      "calves_female", "calves_male", "calves", "feedlot_cattle")
 }
 .translator_non_dairy_subcats <- function() setdiff(.translator_subcategory_vocab(), "dairy_cows")
 #

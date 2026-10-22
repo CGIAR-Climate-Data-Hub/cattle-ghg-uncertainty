@@ -62,6 +62,7 @@ Banner in row 1, legend in row 2, header row in row 3. Data starts at row 4. One
 - `growing_males`: Growing Males (young males 1-3yr, steers/bulls)
 - `calves_female`: Calves - Female (<1yr)
 - `calves_male`: Calves - Male (<1yr)
+- `calves`: Calves - pooled (<1yr, both sexes)
 - `feedlot_cattle`: Feedlot Cattle (concentrated feeding)
 
 ## Sheet: `Manure_Management`

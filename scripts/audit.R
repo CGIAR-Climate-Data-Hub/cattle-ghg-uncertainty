@@ -2206,7 +2206,11 @@ section_F <- function() {
       identical(PARAM_CATALOGUE$parameter[1], "N") &&
       nrow(MMS_DEFAULTS) == 12L && "ipcc_variant" %in% names(MMS_DEFAULTS) &&
       nrow(MMS_FRAC_DEFAULTS_2019) == 12L &&
-      length(CFI_BY_SUBCAT) == 9L && is.numeric(unlist(CFI_BY_SUBCAT))
+      # 2026-10-22: one entry per sub-category code, the pooled `calves`
+      # included; tied to the vocabulary rather than a literal count.
+      length(CFI_BY_SUBCAT) == length(ANIMAL_SUBCATEGORIES) &&
+      setequal(names(CFI_BY_SUBCAT), ANIMAL_SUBCATEGORIES) &&
+      is.numeric(unlist(CFI_BY_SUBCAT))
   }, error = function(e) FALSE)
   check_bool("F32", "F",
              "Defaults master loads and rebuilds every constant with the expected shape",

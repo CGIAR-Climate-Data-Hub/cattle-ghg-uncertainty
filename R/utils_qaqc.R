@@ -64,8 +64,8 @@ BENCHMARK_ELIGIBLE_PARAMS <- c("BW")
   draughtcattle = "oxen", bullocks = "oxen",
   steer = "growing_males", steers = "growing_males",
   growingmales = "growing_males", growingreplacement = "growing_males",
-  calf = "calves_female", calves = "calves_female",
-  calvesonforage = "calves_female",
+  calf = "calves", calves = "calves",
+  calvesonforage = "calves",
   feedlot = "feedlot_cattle", feedlotcattle = "feedlot_cattle")
 
 .bench_subcat <- function(sub_category, cattle_type = "") {

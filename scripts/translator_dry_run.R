@@ -51,16 +51,23 @@ calls <- character()
   }
   if (grepl("mode = 'batch'", last, fixed = TRUE)) {
     lv <- levels[vapply(levels, function(l) grepl(paste0("'", l, "'"), last, fixed = TRUE), logical(1))][1]
-    calls <<- c(calls, paste0("batch:", lv))
+    rejected <- grepl("REJECTED for", last, fixed = TRUE)
+    calls <<- c(calls, paste0(if (rejected) "retry:" else "batch:", lv))
     # 2026-10-22 (WP1): the binding decisions must be the last paragraph of
     # every batch request and name this batch's level.
-    stopifnot(grepl("BINDING DECISIONS", last, fixed = TRUE),
-              grepl(sprintf("For this batch ('%s')", lv), last, fixed = TRUE),
-              grepl("inventory_year: 2022", last, fixed = TRUE))
+    if (!rejected)
+      stopifnot(grepl("BINDING DECISIONS", last, fixed = TRUE),
+                grepl(sprintf("For this batch ('%s')", lv), last, fixed = TRUE),
+                grepl("inventory_year: 2022", last, fixed = TRUE))
     nudge_checked <<- nudge_checked + 1L
+    # On a decision re-emit (WP1 step 4) the stub honours the pooled-calves
+    # decision: the male half is dropped, the female half stands for the
+    # pooled group.
+    ps_lv <- ps[ps$aggregation_level == lv, param_cols]
+    if (rejected) ps_lv <- ps_lv[ps_lv$sub_category != "calves_male", ]
     piece <- sprintf('{"mode":"batch","aggregation_level":"%s","inventory_metadata":%s,"parameters":%s,"manure_management":%s,"parameter_timeseries":%s}',
                      lv, jsonlite::toJSON(meta, auto_unbox = TRUE),
-                     rows_json(ps[ps$aggregation_level == lv, param_cols]),
+                     rows_json(ps_lv),
                      rows_json(mn[mn$aggregation_level == lv & !is.na(mn$fraction_pct), mm_cols]),
                      rows_json(ts[ts$aggregation_level == lv, ts_cols]))
     return(c(list(reply = piece, tool_used = TRUE), base))
@@ -68,9 +75,14 @@ calls <- character()
   calls <<- c(calls, "chat")
   # a clarify reply the way rule 11 asks for it: prose, questions, then the
   # decisions block
+  # The Zambia ground truth splits calves (the transcript asked for 50/50),
+  # so the stub's decision is "split" until the user says otherwise in
+  # scenario 3; from then on it is "pooled" and the batches violate it.
+  pooled <- grepl("keep calves pooled", last, fixed = TRUE)
+  calves_dec <- if (pooled) "pooled: one calves category per system" else "split into calves_male and calves_female, 50/50"
   txt <- paste0("Thanks. Before I can produce, please answer:\n\n1. Which year?\n2. Split calves?\n\n",
                 "```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"Year 2022\"},",
-                " {\"topic\": \"calves_handling\", \"decision\": \"pooled, as in the file\", \"basis\": \"file\", \"confidence\": \"high\", \"quote\": \"Calves\"}]\n```")
+                " {\"topic\": \"calves_handling\", \"decision\": \"", calves_dec, "\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"calves\"}]\n```")
   on_chunk(txt)
   c(list(reply = txt, tool_used = FALSE), base)
 }
@@ -150,6 +162,16 @@ calls <- character()
 .translator_force_template(state, session); settle()
 cat("scenario 3 calls:", paste(calls, collapse = " -> "), "\n")
 stopifnot(is.null(state$last_error), !is.null(state$last_template_json), sum(grepl("^batch:", calls)) == length(levels))
+# WP1 step 4: the new decision (pooled calves) contradicts the batches the
+# stub emits first; every level with both calves halves is re-emitted once
+# and the retry honours it, so the decision ends up applied and the final
+# workbook carries no calves_male.
+n_split_levels <- length(unique(ps$aggregation_level[ps$sub_category == "calves_male"]))
+cat("levels with both calves halves:", n_split_levels, " retries:", sum(grepl("^retry:", calls)), "\n")
+stopifnot(sum(grepl("^retry:", calls)) == n_split_levels, isTRUE(state$register$calves_handling$applied))
+out3 <- suppressMessages(parse_uploaded_template(state$template_file))
+stopifnot(!"calves_male" %in% out3$param_specs$sub_category, "calves_female" %in% out3$param_specs$sub_category)
+cat("decision enforced: calves_male absent from the final workbook\n")
 
 cat(sprintf("dry run finished in %.0f s\n", as.numeric(Sys.time() - t0, units = "secs")))
 cat("DRY RUN PASSED\n")

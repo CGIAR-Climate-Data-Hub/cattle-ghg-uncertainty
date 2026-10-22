@@ -53,7 +53,7 @@ For EVERY (parameter, sub-category) pair you can identify in the file, one row: 
 Enumerate every ambiguity for the user to resolve before emission. Don't propose answers: list the questions. Common ones:
 
 - Geographic level, when the file holds more than one (municipalities inside departments, districts inside provinces). Ask which level the inventory should run at, and say that the finer one may be too large to simulate. This goes FIRST when the server has sent a scale warning.
-- Sub-category vocabulary mapping (raw label → controlled vocabulary: dairy_cows, other_cows, bulls, oxen, heifers, growing_males, calves_female, calves_male, feedlot_cattle)
+- Sub-category vocabulary mapping (raw label → controlled vocabulary: dairy_cows, other_cows, bulls, oxen, heifers, growing_males, calves_female, calves_male, calves, feedlot_cattle)
 - Unit conversion (kg vs lb; % vs fraction; L vs kg of milk; °C vs °F)
 - Biological zeros (does the file's Milk row apply only to lactating cows? Heifers that have not calved, calves and feedlot cattle all take Milk = 0: IPCC Annex 10A.2 gives a milk yield only to its Mature Females rows.)
 - MMS code meanings (e.g. "PIT" → `liquid_slurry` or `solid_storage`?)
@@ -116,6 +116,8 @@ The one case where you may not comply is a distribution that cannot represent it
 
 **One head count, one group.** A population you read from the file belongs to the group you read it for. If the same number appears under two groups, you have counted the same animals twice. This is the single most damaging mistake available to you, because the template still looks correct: the bounds bracket the means, the shares sum to 100, and the inventory is simply larger than the country. Before emitting, check that no two groups carry the same `N`.
 
+**One-category rule.** One source category becomes one template category. Never split a class the file reports as one group into male and female (calves most of all): a file with a single calves row gets the pooled `calves` code; `calves_male` and `calves_female` are for files that report the two separately. The same holds for every other class: no breed, sex or age split the file does not make. If a split seems needed to you, ask in section D and apply the answer; the user's decision is binding.
+
 **Only-user-subcategories rule.** Emit the EXACT set of sub-categories the user's file contains (after vocabulary mapping). Do NOT add canonical sub-categories the user doesn't have. If the user has 7 sub-categories, `parameters` has 7 × 27 rows, not more. A common failure is "Cows" mapped to `other_cows` per the user's correction, but a parallel `dairy_cows` block with defaults also emitted: never do that.
 
 ### Step 5: Apply IPCC defaults for missing values
@@ -141,7 +143,7 @@ When you fill defaults:
 1. **Every catalogue parameter, for every sub-category in the inventory**, but ONLY where the file does not already supply a value. The catalogue parameters: N, BW, MW, WG, Milk, Fat, pct_pregnant, DE, Cfi, Ca, C, Cp, hours, CP, Ym, Bo, ASH, UE, EF3_PRP, EF4, EF5, Frac_GASM_PRP, Frac_LEACH_PRP, MilkPR, Tw, GE, DMI.
 2. **`pct_pregnant` when the file does not give it**: `dairy_cows` → 0.52; `other_cows` → 0.54; `heifers` (if pregnant heifers are bundled here) → 0.5 (a project assumption: Table 10A.2 leaves the cell blank); males, calves and feedlot cattle → 0 with `data_source = "biological_zero"`.
 3. **Broadcast herd-wide manure allocations.** A single MMS table that applies to the whole herd is copied to EVERY sub-category, not just `dairy_cows`; otherwise the manure CH₄ and N₂O of the other groups are silently zero. Fill every coefficient column on every MMS row.
-4. **Set `species` from the sub-categories you actually mapped: never `cattle_mixed` as a hedge.** `dairy_cows` AND any of other_cows, bulls, oxen, heifers, growing_males, calves_female, calves_male, feedlot_cattle → `cattle_mixed`; `dairy_cows` only → `cattle_dairy`; no `dairy_cows` → `cattle_non_dairy` (the common case for beef-only and smallholder inventories).
+4. **Set `species` from the sub-categories you actually mapped: never `cattle_mixed` as a hedge.** `dairy_cows` AND any of other_cows, bulls, oxen, heifers, growing_males, calves_female, calves_male, calves, feedlot_cattle → `cattle_mixed`; `dairy_cows` only → `cattle_dairy`; no `dairy_cows` → `cattle_non_dairy` (the common case for beef-only and smallholder inventories).
 5. **Set `region` from the country** (Zimbabwe → africa, India → asia, Brazil → americas, Germany → europe, Australia → oceania). Never leave it out.
 6. **In your reply, summarise what you filled with defaults vs. what came from the user's data**, in one short list. Separate THREE things, because they are three different statements about the inventory: values taken from the file; values filled from IPCC defaults; and values taken from the file whose RANGE was filled from an IPCC default. The third is the one users miss, and it is invisible in the finished template.
 

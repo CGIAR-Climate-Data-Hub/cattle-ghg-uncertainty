@@ -437,7 +437,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   # Kept for Vocab reference tables (informational, no longer used as dropdowns)
   V_SUBSYS    <- c("dairy_cows","other_cows","bulls","oxen",
                    "heifers","growing_males","calves_female","calves_male",
-                   "feedlot_cattle")
+                   "calves","feedlot_cattle")
   V_FEED      <- c("stall_fed","pasture_flat","pasture_hilly")
 
   N_DATA_ROWS <- 200   # rows to apply formatting/validation in Parameters
