@@ -422,7 +422,7 @@ anthropic_chat <- function(messages,
 #     normally drives from should_stop().
 anthropic_chat_stream_async <- function(messages,
                                         on_chunk  = function(text) {},
-                                        on_tick   = function() {},
+                                        on_tick   = function(n = 0L) {},
                                         should_stop = function() FALSE,
                                         on_result = function(res) {},
                                         model = .ANTHROPIC_DEFAULT_MODEL,
@@ -598,7 +598,7 @@ anthropic_chat_stream_async <- function(messages,
 # UTF-8, so a split character is simply still in the buffer when the next
 # chunk arrives.
 .anthropic_sse_consumer <- function(on_chunk  = function(text) {},
-                                    on_tick   = function() {},
+                                    on_tick   = function(n = 0L) {},
                                     cache_ttl = NULL) {
   st <- new.env(parent = emptyenv())
 
@@ -687,7 +687,7 @@ anthropic_chat_stream_async <- function(messages,
         } else if (identical(d$type, "input_json_delta") &&
                    !is.null(d$partial_json)) {
           st$tool_json_acc <- paste0(st$tool_json_acc, d$partial_json)
-          tryCatch(on_tick(), error = function(e)
+          tryCatch(on_tick(nchar(d$partial_json, type = "bytes")), error = function(e)
             message("translator stream on_tick error: ", conditionMessage(e)))
         }
       }
@@ -831,7 +831,7 @@ anthropic_chat_stream <- function(messages,
                                    # on_tick the user sees a frozen UI for
                                    # the entire 5-15 min force-template
                                    # emission. Default: no-op.
-                                   on_tick = function() {},
+                                   on_tick = function(n = 0L) {},
                                    # Cancellation. Called once per received
                                    # chunk; returning TRUE aborts the stream
                                    # immediately. R is single threaded, so a
@@ -989,7 +989,7 @@ anthropic_chat_stream <- function(messages,
             tool_json_acc <<- paste0(tool_json_acc, d$partial_json)
             # Keep-alive: tool_use streams produce no on_chunk callback,
             # so without this the UI freezes for the entire emission.
-            tryCatch(on_tick(), error = function(e) {
+            tryCatch(on_tick(nchar(d$partial_json, type = "bytes")), error = function(e) {
               message("translator stream on_tick error: ",
                       conditionMessage(e))
             })
@@ -1375,7 +1375,7 @@ anthropic_translator_tools <- function() {
 }
 
 anthropic_chat_enumerate_aggregation_levels_async <- function(
-    messages, on_chunk = function(text) {}, on_tick = function() {},
+    messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
     model = .ANTHROPIC_DEFAULT_MODEL, max_tokens = 4000, timeout_sec = 120,
     tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
     should_stop = function() FALSE, on_result = function(res) {}) {
@@ -1384,7 +1384,7 @@ anthropic_chat_enumerate_aggregation_levels_async <- function(
 }
 
 anthropic_chat_batch_template_force_async <- function(
-    messages, on_chunk = function(text) {}, on_tick = function() {},
+    messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
     model = .ANTHROPIC_DEFAULT_MODEL, max_tokens = 48000, timeout_sec = 900,
     tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
     should_stop = function() FALSE, on_result = function(res) {}) {

@@ -91,6 +91,10 @@ translator_chat_ui <- function() {
     # only after the merge has validated it, and the cache is persisted in
     # the conversation file so a Stop (page reload) keeps it (plan A3, F5).
     batch_parts = list(),
+    # 2026-10-22: the conversation the cached parts were validated against
+    # (sha256 of the user messages and the prompt hash); see
+    # .translator_emission_key().
+    batch_parts_key = NULL,
     # 2026-09-17: an upload waiting for the user to pick sheets (plan F8).
     pending_upload = NULL,
     precheck_key   = NULL,
@@ -112,8 +116,24 @@ translator_chat_ui <- function() {
   tryCatch(conversation_save(
     state$user_email, state$messages,
     prompt_hash = tryCatch(translator_system_prompt_hash(), error = function(e) NULL),
-    extra = list(batch_parts = if (length(state$batch_parts)) state$batch_parts else NULL)),
+    extra = list(batch_parts = if (length(state$batch_parts)) state$batch_parts else NULL,
+                 batch_parts_key = state$batch_parts_key)),
     error = function(e) NULL)
+}
+
+# The conversation a set of cached batch parts belongs to: the user's own
+# messages (uploads, answers, decisions) and the prompt they were held under.
+# Assistant turns and server notices are left out so that a download hint
+# appended after a merge does not invalidate the parts it just validated.
+.translator_emission_key <- function(state) {
+  user_txt <- vapply(state$messages, function(m) {
+    if (!identical(m$role, "user")) return("")
+    c_ <- m$content
+    if (!is.character(c_)) c_ <- paste(vapply(c_, function(b) b$text %||% "", ""), collapse = " ")
+    c_ %||% ""
+  }, character(1))
+  user_txt <- user_txt[nzchar(user_txt)]
+  .tp_sha256(c(user_txt, tryCatch(translator_system_prompt_hash(), error = function(e) "")))
 }
 
 translator_chat_server <- function(input, output, session) {
@@ -142,7 +162,10 @@ translator_chat_server <- function(input, output, session) {
         # Restore validated batch parts (plan F5) so a Stop mid-emission
         # does not throw away the batches already paid for.
         bp <- saved$extra$batch_parts
-        if (is.list(bp) && length(bp) > 0) state$batch_parts <- bp
+        if (is.list(bp) && length(bp) > 0) {
+          state$batch_parts     <- bp
+          state$batch_parts_key <- saved$extra$batch_parts_key
+        }
         # Prompt staleness (plan B5): the defaults or the template changed
         # since this conversation was held. The model's earlier replies
         # quote the old numbers, so emission from this transcript would
@@ -308,6 +331,7 @@ translator_chat_server <- function(input, output, session) {
     # prompt-staleness hold: the new upload will be explored under the
     # live prompt.
     state$batch_parts <- list()
+    state$batch_parts_key <- NULL
     state$prompt_stale <- FALSE
     parsed <- tryCatch(
       .translator_read_upload_memo(fi$datapath, fi$name),
@@ -1985,7 +2009,7 @@ translator_cancel_clear <- function(tok) {
 # tell the user. Lifted out of .translator_force_template() so the
 # synchronous loop and the asynchronous chain end the same way.
 .translator_emit_finish <- function(state, session, inventory_metadata,
-                                    parts, agg_levels, info) {
+                                    parts, agg_levels, info, model_id = NULL) {
   # ---- Stage 3: merge + validate + store --------------------------------
   info("Assembling final template...")
   merged <- .translator_merge_batches(inventory_metadata, parts, agg_levels)
@@ -2020,7 +2044,12 @@ translator_cancel_clear <- function(tok) {
         length(miss_mm), paste(utils::head(miss_mm, 6), collapse = "; ")))
   }
 
-  merged$.model <- enum_resp$model
+  # 2026-10-22: the model id is passed in. This line used to read
+  # enum_resp$model, a variable of the caller that is not in scope here, so
+  # every batched assembly (more than two production systems) failed with
+  # "Assembling the template failed (object 'enum_resp' not found)" from
+  # 80dacb1 (15 October) until this fix.
+  merged$.model <- model_id %||% .ANTHROPIC_DEFAULT_MODEL
   merged_json <- jsonlite::toJSON(merged, auto_unbox = TRUE, na = "null", null = "null",
                                   dataframe = "rows", digits = NA)
 
@@ -2037,9 +2066,15 @@ translator_cancel_clear <- function(tok) {
     return()
   }
 
-  # Validated: cache every part for a later retry (plan A3, F5).
+  # Validated: cache every part for a later retry (plan A3, F5). The cache
+  # is keyed by the conversation it was validated against (2026-10-22): a
+  # later answer from the user, or a new upload, changes the key and the
+  # next Produce discards these parts instead of replaying them. Until
+  # then an answer given after a first template never reached a production
+  # system that was already cached.
   for (p in parts) if (!is.null(p$.requested_aggregation_level))
     state$batch_parts[[p$.requested_aggregation_level]] <- p
+  state$batch_parts_key <- tryCatch(.translator_emission_key(state), error = function(e) NULL)
 
   state$last_template_json <- merged_json
   state$last_error <- if (length(merge_warnings)) paste(merge_warnings, collapse = " ") else NULL
@@ -2083,6 +2118,14 @@ translator_cancel_clear <- function(tok) {
 }
 
 .translator_force_template <- function(state, session) {
+  # 2026-10-22: cached batch parts are reused only when the conversation is
+  # the one they were validated against (same user messages, same prompt).
+  live_key <- tryCatch(.translator_emission_key(state), error = function(e) NULL)
+  if (length(state$batch_parts) && !identical(state$batch_parts_key, live_key)) {
+    message("translator: the conversation changed since the cached batches were validated; discarding them")
+    state$batch_parts <- list()
+    state$batch_parts_key <- NULL
+  }
   if (isTRUE(.TRANSLATOR_ASYNC))
     return(.translator_force_template_async(state, session))
   state$pending <- TRUE
@@ -2122,7 +2165,7 @@ translator_cancel_clear <- function(tok) {
   }
   # Keep-alive for tool_use streams (input_json_delta events): the text
   # path never fires during emission, so this keeps the typing bubble alive.
-  on_tick_cb <- function() {
+  on_tick_cb <- function(n = 0L) {
     tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
               error = function(e) NULL)
     # Give the blocked event loop a chance to receive a Stop click. Without
@@ -2299,7 +2342,7 @@ translator_cancel_clear <- function(tok) {
   }
 
   .translator_emit_finish(state, session, inventory_metadata, parts,
-                          agg_levels, info)
+                          agg_levels, info, model_id = enum_resp$model)
 }
 
 # Legacy single-call force-template path. Used by .translator_force_template()
@@ -2357,7 +2400,7 @@ translator_cancel_clear <- function(tok) {
   # No later::run_now() here any more. The synchronous path needed it to
   # let a Stop click through a blocked loop; nothing is blocked now, so
   # this is only the typing-bubble keep-alive it was meant to be.
-  on_tick_cb <- function()
+  on_tick_cb <- function(n = 0L)
     tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
               error = function(e) NULL)
   info <- function(txt)
@@ -2377,9 +2420,9 @@ translator_cancel_clear <- function(tok) {
   }
 
   # ---- Stage 3 entry -----------------------------------------------------
-  finish <- function(inventory_metadata, parts, agg_levels) {
+  finish <- function(inventory_metadata, parts, agg_levels, model_id = NULL) {
     tryCatch(.translator_emit_finish(state, session, inventory_metadata,
-                                     parts, agg_levels, info),
+                                     parts, agg_levels, info, model_id = model_id),
               error = function(e)
                 state$last_error <- paste0("Assembling the template failed (",
                                            conditionMessage(e), ")."))
@@ -2387,10 +2430,10 @@ translator_cancel_clear <- function(tok) {
   }
 
   # ---- Stage 2: one level at a time -------------------------------------
-  run_levels <- function(agg_levels, inventory_metadata) {
+  run_levels <- function(agg_levels, inventory_metadata, model_id = NULL) {
     parts <- vector("list", length(agg_levels))
     step <- function(i) {
-      if (i > length(agg_levels)) return(finish(inventory_metadata, parts, agg_levels))
+      if (i > length(agg_levels)) return(finish(inventory_metadata, parts, agg_levels, model_id))
       level <- agg_levels[i]
 
       if (!is.null(state$batch_parts[[level]])) {
@@ -2520,7 +2563,7 @@ translator_cancel_clear <- function(tok) {
                         length(cached_levels), paste(cached_levels, collapse = ", ")))
       message(sprintf("translator: dispatching %d force-template call(s): %s",
                       length(fresh_levels), paste(fresh_levels, collapse = ", ")))
-      run_levels(agg_levels, enum_parsed$inventory_metadata)
+      run_levels(agg_levels, enum_parsed$inventory_metadata, enum_resp$model)
     }))
 
   invisible(NULL)
