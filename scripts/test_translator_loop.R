@@ -11,6 +11,9 @@ auth_cookie_lookup <- function(...) "cookie"
 auth_session_cookie_verify <- function(v) "loop@local"
 auth_is_approved <- function(e) TRUE
 produce_calls <- 0L
+modal_shown <- 0L
+showModal <- function(...) { modal_shown <<- modal_shown + 1L; invisible(NULL) }
+removeModal <- function(...) invisible(NULL)
 .translator_force_template <- function(state, session) { produce_calls <<- produce_calls + 1L; invisible(NULL) }
 ai_calls <- character(); seen_hist <- list()
 with_block <- TRUE
@@ -26,8 +29,11 @@ anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, 
     resp <- c(list(reply = "[{\"topic\": \"uncertainty_source\", \"decision\": \"file_bounds\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"use my bounds\"}]"), base)
   } else {
     ai_calls <<- c(ai_calls, "chat")
-    reply <- "Thanks, noted.\n\n1. One more: which region is the herd in?"
-    if (with_block) reply <- paste0(reply, "\n\n```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"2022\"}]\n```")
+    reply <- "Thanks, noted.\n\n1. One more: which region is the herd in?\n\nPlease answer the section D questions, then click **Produce template now** when ready."
+    if (with_block) reply <- paste0(reply, "\n\n```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"2022\"},",
+                                           " {\"topic\": \"oxen_handling\", \"decision\": \"kept as one group\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"one group\"},",
+                                           " {\"topic\": \"species\", \"decision\": \"cattle_mixed\", \"basis\": \"file\", \"confidence\": \"high\", \"quote\": \"\"},",
+                                           " {\"topic\": \"mms_split_source\", \"decision\": \"pending\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"\"}]\n```")
     resp <- c(list(reply = reply), base)
   }
   later::later(function() on_result(resp), 0.01)
@@ -51,7 +57,8 @@ shiny::testServer(translator_chat_server, {
             grepl("Question 1 of 2: Which year?", state$messages[[length(state$messages)]]$display, fixed = TRUE))
   session$setInputs(translator_input = "2022"); session$setInputs(translator_send = 1)
   stopifnot(identical(state$q_index, 2L), identical(state$pending_questions[[1]]$answer, "2022"),
-            identical(tail(src_of(state$messages), 2), c("user_answer", "server_question")), length(ai_calls) == 0L)
+            identical(tail(src_of(state$messages), 2), c("user_answer", "server_question")), length(ai_calls) == 0L,
+            sum(src_of(state$messages) == "user_answer") == 1L)
   session$setInputs(translator_input = "no, keep them pooled"); session$setInputs(translator_send = 2)
   pump(state)
   batch <- Filter(function(m) identical(m$source, "answers_batch"), state$messages)
@@ -64,9 +71,15 @@ shiny::testServer(translator_chat_server, {
   # the reply settled the year (recorded line) and asked one more question (a bubble)
   stopifnot(identical(state$register$inventory_year$decision, "2022"))
   s1 <- src_of(state$messages)
-  stopifnot(any(grepl("^Recorded: ", vapply(state$messages, function(m) m$display %||% "", ""))),
+  disp <- function() vapply(state$messages, function(m) m$display %||% "", "")
+  rec <- disp()[grepl("^Recorded: ", disp())]
+  # one short line: the user's decisions in words, not the file reading, not the placeholder, no raw keys
+  stopifnot(length(rec) == 1L, grepl("Inventory year: 2022", rec, fixed = TRUE), grepl("Oxen handling: kept as one group", rec, fixed = TRUE),
+            !grepl("[?", rec, fixed = TRUE), !grepl("cattle_mixed|pending|Manure", rec), nchar(rec) < 200,
             identical(tail(s1, 1), "server_question"), length(state$pending_questions) == 1L)
-  cat("round 1: bubbles in the chat, answers batched, history filtered, recorded line posted\n")
+  # the closing "please answer" line is not shown
+  stopifnot(!any(grepl("Please answer the section D", disp(), fixed = TRUE)))
+  cat("round 1: bubbles in the chat, answers batched, history filtered, one short recorded line\n")
 
   # ---- the fallback summariser: a reply without its block ------------------
   with_block <<- FALSE
@@ -74,27 +87,40 @@ shiny::testServer(translator_chat_server, {
   pump(state)
   stopifnot(sum(ai_calls == "summariser") == 1L, identical(state$register$uncertainty_source$decision, "file_bounds"))
   with_block <<- TRUE
-  cat("round 2: summariser filled uncertainty_source\n")
+  # the stub asked the region question again: it was answered, so no new round
+  stopifnot(length(state$pending_questions) == 0L, !identical(tail(src_of(state$messages), 1), "server_question"))
+  n_rec <- sum(grepl("^Recorded: ", disp()))
+  cat("round 2: summariser filled uncertainty_source; the repeated question was not put again\n")
 
-  # ---- the Produce gate: assumptions in one line, only calves asked ----------
-  session$setInputs(translator_input = "skip"); session$setInputs(translator_send = 4); pump(state)   # close the open question
-  state$pending_questions <- list()
+  # a plain reply: the same block again records nothing new
+  session$setInputs(translator_input = "thanks"); session$setInputs(translator_send = 4); pump(state)
+  stopifnot(sum(grepl("^Recorded: ", disp())) == n_rec, length(state$pending_questions) == 0L)
+  cat("round 3: a reply with the same decisions posts no second recorded line\n")
+
+  # ---- the Produce gate: only the year is asked, then the delivery pop-up ----
+  state$register$inventory_year <- NULL
   session$setInputs(translator_force_template = 1)
   stopifnot(produce_calls == 0L, isTRUE(state$produce_after_answers))
   asked <- vapply(state$pending_questions, function(q) q$topic, "")
   cat("gate asks:", paste(asked, collapse = ", "), "\n")
-  stopifnot(identical(asked, "calves_handling"),
-            identical(state$register$species$basis, "assumed"), identical(state$register$ipcc_edition$basis, "assumed"))
+  stopifnot(identical(asked, "inventory_year"), is.null(state$register$calves_handling),
+            identical(state$register$species$basis, "file"), identical(state$register$ipcc_edition$basis, "assumed"))
   stopifnot(identical(tail(src_of(state$messages), 1), "server_question"),
-            grepl("Reply with one of", state$messages[[length(state$messages)]]$display, fixed = TRUE))
-  session$setInputs(translator_input = "keep them pooled please"); session$setInputs(translator_send = 5)
-  stopifnot(identical(state$register$calves_handling$decision, "pooled"), identical(state$register$calves_handling$basis, "user"))
-  cat("gate: one question, answered in words, mapped to the choice; Produce started:", produce_calls, "\n")
-  stopifnot(produce_calls == 1L, length(state$pending_questions) == 0L, length(translator_register_missing(state$register)) == 0L)
-  # the delivery pop-up is the next step in the live app; here the dispatcher is stubbed
-  stopifnot(!is.null(state$delivery_ack))
+            sum(grepl("^Recorded: ", disp())) == n_rec)   # the assumptions are not announced
+  session$setInputs(translator_input = "2022"); session$setInputs(translator_send = 5)
+  stopifnot(identical(state$register$inventory_year$decision, "2022"), identical(state$register$inventory_year$basis, "user"))
+  # the last answer does not start the run: the delivery pop-up comes first
+  stopifnot(produce_calls == 0L, modal_shown == 1L, isTRUE(state$produce_after_ack), !isTRUE(state$delivery_ack),
+            length(state$pending_questions) == 0L, length(translator_register_missing(state$register)) == 0L)
+  # the decision line is kept for the AI but not drawn (the answer bubble is already there)
+  dec <- Filter(function(m) identical(m$source, "user_decision"), state$messages)
+  stopifnot(length(dec) == 1L, identical(dec[[1]]$display, ""), grepl("inventory_year = 2022", dec[[1]]$content, fixed = TRUE),
+            !grepl("Decision: inventory_year", as.character(output$translator_messages$html), fixed = TRUE))
+  session$setInputs(translator_dlv_continue = 1)
+  stopifnot(produce_calls == 1L, isTRUE(state$delivery_ack), !isTRUE(state$produce_after_ack))
+  cat("gate: one question, then the pop-up, then Produce started:", produce_calls, "\n")
   saved <- conversation_load_full("loop@local")
-  stopifnot(identical(saved$extra$register$calves_handling$decision, "pooled"))
+  stopifnot(identical(saved$extra$register$inventory_year$decision, "2022"))
 
   # ---- a corrected template comes back with a note ------------------------------
   tpl <- file.path(tempdir(), "corrected_template.xlsx")

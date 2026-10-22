@@ -34,7 +34,18 @@ ok(identical(miss, "pct_vs_fraction:MoE!moe"), "missing = the ask topics not dec
 asm <- translator_register_assume_defaults(reg4)
 ok(setequal(asm$added, c("ipcc_edition", "aggregation_level", "mms_split_source", "uncertainty_source")) && identical(asm$register$ipcc_edition$basis, "assumed") &&
    identical(asm$register$species$basis, "user"), "assumptions fill the assumable topics only")
-ok(length(translator_register_missing(translator_register_set_user(list(), "inventory_year", "2022"))) == 1L, "an empty register asks for calves (year decided)")
+ok(length(translator_register_missing(translator_register_set_user(list(), "inventory_year", "2022"))) == 0L, "an empty register asks nothing once the year is decided (calves are settled by the one-category rule)")
+ok(identical(translator_register_missing(list()), "inventory_year"), "an empty register asks for the year only")
+ok(identical(.translator_topic_label("oxen_handling"), "Oxen handling") && identical(.translator_topic_label("category:Cows"), "Category: Cows") &&
+   !grepl("[?", .translator_topic_question("oxen_handling"), fixed = TRUE), "unknown topics are shown in words, never as a missing-string key")
+ok(.translator_decision_is_real("2022") && !.translator_decision_is_real("pending") && !.translator_decision_is_real("to be confirmed by the user") &&
+   identical(.translator_decision_text(paste(rep("x", 120), collapse = "")), paste0(paste(rep("x", 87), collapse = ""), "...")), "placeholder decisions are not announced; long ones are cut")
+ans <- .translator_answered_questions(list(list(source = "answers_batch", content = "Answers to your questions:\n\n1. Which year is the inventory for?\n   Answer: 2022\n\n2. Are the calves one group?\n   Answer: yes")))
+ok(identical(.translator_question_seen(c("Which year is the inventory for?", "Are the calves one group, or two?", "Which region?"), ans), c(TRUE, TRUE, FALSE)),
+   "questions already answered are recognised, reworded ones by their start")
+ok(identical(.translator_strip_answer_prompt("Noted.\n\nPlease answer the section D questions, then click **Produce template now** when ready."), "Noted.") &&
+   identical(.translator_strip_answer_prompt("All clear: click Produce template now when ready."), "All clear: click Produce template now when ready."),
+   "the closing instruction to answer is dropped; a direction to the button is kept")
 ok(identical(.translator_parse_choice(list(kind = "server", topic = "calves_handling"), "keep them together please"), "pooled") &&
    identical(.translator_parse_choice(list(kind = "server", topic = "pct_vs_fraction:x!y"), "they are fractions"), "fraction") &&
    identical(.translator_parse_choice(list(kind = "ai", text = "q"), " free text "), "free text"), "typed answers map to choices by keyword")

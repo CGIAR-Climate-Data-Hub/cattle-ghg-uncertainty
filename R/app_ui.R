@@ -465,7 +465,14 @@ app_ui <- function(request = NULL) {
            if (!text) return;
            var slot = document.getElementById('translator_stream_target');
            if (!slot) return;
+           // 2026-10-22: one echo at a time. An answer the server handles
+           // without an AI call never fires translatorStreamEnd, so an
+           // earlier echo would otherwise stay in this slot and be shown
+           // again under every following question.
+           Array.prototype.forEach.call(slot.querySelectorAll('[data-translator-echo]'),
+                                        function(e) { e.remove(); });
            var bubble = document.createElement('div');
+           bubble.setAttribute('data-translator-echo', '1');
            // Matches the user-bubble styling in chat_ui.R::output$translator_messages
            bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
              'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
@@ -647,7 +654,12 @@ app_ui <- function(request = NULL) {
          });
          window.translatorPickDir = async function() {
            try {
-             var h = await window.showDirectoryPicker({ mode: 'readwrite' });
+             // startIn: the picker opens in Downloads, where a new
+             // sub-folder can be made. Chrome refuses the top of the
+             // user folder and the system folders (contains system
+             // files) and keeps the picker open; closing it rejects
+             // with AbortError, which the server answers with the hint.
+             var h = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' });
              window._translatorDirHandle = h;
              Shiny.setInputValue('translator_dir_chosen', { name: h.name, ok: true, t: Date.now() }, { priority: 'event' });
            } catch (e) {

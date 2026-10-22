@@ -30,7 +30,12 @@
 # settled them; the others are assumed with the text below, said in one
 # line in the conversation, and corrected by replying. Seven questions
 # before every Produce was too many.
-.TRANSLATOR_ASK_TOPICS <- c("inventory_year", "calves_handling")
+# 2026-10-22, later the same day: calves are not asked either. The
+# one-category rule in the prompt settles them (one source category
+# becomes one template category, never a split the file does not make),
+# and asking after the user had confirmed everything sent the
+# conversation round in circles.
+.TRANSLATOR_ASK_TOPICS <- c("inventory_year")
 .TRANSLATOR_ASSUMED <- list(
   species            = "the species as mapped from the file",
   ipcc_edition       = "as in the file, else the latest IPCC edition",
@@ -83,23 +88,71 @@ translator_register_assume_defaults <- function(register) {
   invisible(NULL)
 }
 
-# A one-line bubble with what was just recorded, when something was.
+# A one-line bubble with what the user's answers settled, when a reply
+# recorded something new from them. Only the user's own decisions are
+# said (basis "user"); what the model read from the file or assumed is in
+# the checks workbook. A decision already recorded, or one that is only a
+# placeholder ("pending"), is not repeated. At most six items.
 .translator_post_recorded <- function(state, before) {
   before <- before %||% list(); after <- state$register %||% list()
   changed <- Filter(function(tp) {
     a <- after[[tp]]; b <- before[[tp]]
-    !identical(a$status, "pending") && nzchar(a$decision %||% "") &&
-      (is.null(b) || !identical(b$decision, a$decision))
+    identical(a$basis, "user") && identical(a$status, "decided") &&
+      .translator_decision_is_real(a$decision) &&
+      (is.null(b) || !identical(.translator_norm_text(b$decision), .translator_norm_text(a$decision)))
   }, names(after))
   if (!length(changed)) return(invisible(NULL))
-  parts <- vapply(changed, function(tp) {
-    e <- after[[tp]]
-    sprintf("%s: %s (%s)", .translator_topic_label(tp), e$decision, t(paste0("ai_reg_basis_", e$basis %||% "assumed")))
-  }, character(1))
+  parts <- vapply(changed, function(tp)
+    sprintf("%s: %s", .translator_topic_label(tp), .translator_decision_text(after[[tp]]$decision)), character(1))
+  if (length(parts) > 6L) parts <- c(parts[1:6], sprintf(t("ai_q_recorded_more"), length(parts) - 6L))
   txt <- sprintf(t("ai_q_recorded"), paste(parts, collapse = "; "))
   state$messages[[length(state$messages) + 1L]] <-
     list(role = "assistant", content = txt, display = txt, source = "server_notice", ts = .translator_now())
   invisible(NULL)
+}
+.translator_norm_text <- function(x) trimws(gsub("[^a-z0-9]+", " ", tolower(x %||% "")))
+.translator_decision_is_real <- function(d) {
+  d <- .translator_norm_text(d)
+  nzchar(d) && !grepl("^(pending|tbd|to be (decided|confirmed|determined)|unknown|not (yet )?(decided|known)|n a|none)( .*)?$", d, perl = TRUE)
+}
+.translator_decision_text <- function(d) {
+  d <- gsub("\\s+", " ", trimws(as.character(d %||% "")))
+  if (nchar(d) > 90L) paste0(substr(d, 1L, 87L), "...") else d
+}
+
+# The questions the user has answered in this conversation: the first line
+# of each question in the batched answers messages, normalised.
+.translator_answered_questions <- function(msgs) {
+  out <- character(0)
+  for (m in msgs) {
+    if (!identical(m$source %||% "", "answers_batch")) next
+    lines <- strsplit(m$content %||% "", "\n", fixed = TRUE)[[1]]
+    qs <- sub("^\\s*\\d+[.)]\\s+", "", lines[grepl("^\\s*\\d+[.)]\\s+\\S", lines, perl = TRUE)], perl = TRUE)
+    out <- c(out, .translator_norm_text(qs))
+  }
+  unique(out[nzchar(out)])
+}
+# Which of the new questions were already answered (same first line, or
+# one the start of the other when the shorter is long enough to be the same
+# question reworded).
+.translator_question_seen <- function(qs, answered) {
+  if (!length(qs) || !length(answered)) return(rep(FALSE, length(qs)))
+  firsts <- .translator_norm_text(vapply(qs, function(q) strsplit(q, "\n", fixed = TRUE)[[1]][1], character(1)))
+  vapply(firsts, function(f) {
+    if (!nzchar(f)) return(FALSE)
+    any(f == answered |
+        (pmin(nchar(f), nchar(answered)) >= 20L & (startsWith(f, answered) | startsWith(answered, f))))
+  }, logical(1), USE.NAMES = FALSE)
+}
+# The reply without its closing instruction to answer: the app puts the
+# questions one at a time, so the line only confuses.
+.translator_strip_answer_prompt <- function(text) {
+  if (is.null(text) || !nzchar(text)) return(text)
+  lines <- strsplit(text, "\n", fixed = TRUE)[[1]]
+  drop <- grepl("^\\s*[*_]*\\s*(please )?(answer|reply to|respond to) (the )?(section d |above |these |my |numbered )*questions?\\b", lines, ignore.case = TRUE, perl = TRUE) |
+          grepl("^\\s*[*_]*\\s*(merci de |veuillez )?r.pond(ez|re) (aux|. la) questions?\\b", lines, ignore.case = TRUE, perl = TRUE)
+  out <- paste(lines[!drop], collapse = "\n")
+  gsub("\\n{3,}", "\n\n", trimws(out))
 }
 
 .translator_is_skip <- function(txt) {
@@ -150,15 +203,26 @@ translator_register_assume_defaults <- function(register) {
   key  <- paste0("ai_q_", kind)
   q <- t(key)
   detail <- sub("^[^:]*:?", "", topic)
+  if (.translator_missing_string(q)) return(sprintf(t("ai_q_generic"), .translator_humanise(topic)))
   if (nzchar(detail)) q <- sprintf(q, detail)
   q
 }
 
+# The label of a topic: the translated one for the known topics, else the
+# topic name in words (the model may invent a topic such as
+# oxen_handling; it must never show as "[?ai_topic_oxen_handling?]").
 .translator_topic_label <- function(topic) {
   kind <- .translator_topic_kind(topic)
   lab <- t(paste0("ai_topic_", kind))
+  if (.translator_missing_string(lab)) lab <- .translator_humanise(kind)
   detail <- sub("^[^:]*:?", "", topic)
   if (nzchar(detail)) paste0(lab, ": ", detail) else lab
+}
+.translator_missing_string <- function(s) grepl("^\\[\\?.*\\?\\]$", s %||% "")
+.translator_humanise <- function(x) {
+  x <- trimws(gsub("[_-]+", " ", x %||% ""))
+  if (!nzchar(x)) return(x)
+  paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar(x)))
 }
 
 .translator_choice_label <- function(choice) {
@@ -396,6 +460,8 @@ translator_register_df <- function(register) {
   flush()
   blocks <- trimws(blocks)
   blocks <- sub("^\\d+[.)]\\s+", "", blocks, perl = TRUE)
+  # the closing instruction to answer is not part of the last question
+  blocks <- vapply(blocks, .translator_strip_answer_prompt, character(1), USE.NAMES = FALSE)
   blocks[grepl("\\?", blocks)]
 }
 

@@ -632,11 +632,9 @@ translator_chat_server <- function(input, output, session) {
       showNotification(t("ai_qa_answer_first"), type = "warning", duration = 5)
       return()
     }
-    # what can be assumed is assumed and said in one line; the rest is asked
-    reg_before <- state$register
-    asm <- translator_register_assume_defaults(state$register)
-    state$register <- asm$register
-    if (length(asm$added)) .translator_post_recorded(state, reg_before)
+    # what can be assumed is assumed (listed in the checks workbook and
+    # sent to the AI as binding); only the rest is asked
+    state$register <- translator_register_assume_defaults(state$register)$register
     missing <- translator_register_missing(state$register)
     if (length(missing)) {
       state$pending_questions <- lapply(seq_along(missing), function(k)
@@ -647,15 +645,20 @@ translator_chat_server <- function(input, output, session) {
       .translator_persist(state)
       return()
     }
-    # 2026-10-22: before the first run of a session, say where the files
-    # will go and offer the folder choice; the run starts from the pop-up.
+    .translator_produce_or_ask_delivery()
+  })
+  # 2026-10-22: before the first run of a session, say where the files
+  # will go and offer the folder choice; the run starts from the pop-up.
+  # Every way into a run passes here (the button, and the end of a gate
+  # round), so the pop-up is never skipped.
+  .translator_produce_or_ask_delivery <- function() {
     if (!isTRUE(state$delivery_ack)) {
       state$produce_after_ack <- TRUE
       showModal(.translator_delivery_modal(state$user_email))
-      return()
+      return(invisible(NULL))
     }
     .translator_start_produce(state, session)
-  })
+  }
 
   .translator_delivery_modal <- function(email) {
     modalDialog(
@@ -705,6 +708,8 @@ translator_chat_server <- function(input, output, session) {
     state$pending_questions <- qs
     state$messages[[length(state$messages) + 1L]] <-
       list(role = "user", content = txt, display = txt, source = "user_answer", ts = .translator_now())
+    # the answer is in the history now; the page's echo of it goes
+    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""), error = function(e) NULL)
     if (i < length(qs)) {
       state$q_index <- i + 1L
       .translator_q_bubble(state, i + 1L)
@@ -732,7 +737,7 @@ translator_chat_server <- function(input, output, session) {
                                                      msg_index = length(state$messages) + 1L)
       txt <- sprintf("Decision: %s = %s", q$topic, ans)
       state$messages[[length(state$messages) + 1L]] <-
-        list(role = "user", content = txt, display = txt, source = "user_decision", ts = .translator_now())
+        list(role = "user", content = txt, display = "", source = "user_decision", ts = .translator_now())
     }
     if (length(ai_qs)) {
       txt <- .translator_answers_message(ai_qs)
@@ -745,7 +750,7 @@ translator_chat_server <- function(input, output, session) {
     .translator_persist(state)
     if (isTRUE(state$produce_after_answers)) {
       state$produce_after_answers <- FALSE
-      .translator_start_produce(state, session)
+      .translator_produce_or_ask_delivery()
     }
     invisible(NULL)
   }
@@ -794,8 +799,8 @@ translator_chat_server <- function(input, output, session) {
       showNotification(sprintf(t("ai_dir_chosen"), v$name), type = "message", duration = 5)
       # chosen from the pop-up: the run starts now
       if (isTRUE(state$produce_after_ack)) .translator_after_ack()
-    } else if (nzchar(v$error %||% "") && !grepl("AbortError", v$error)) {
-      showNotification(t("ai_dir_failed"), type = "warning", duration = 5)
+    } else {
+      showNotification(t("ai_dir_failed"), type = "warning", duration = 12)
     }
   })
   observeEvent(input$translator_job_saved, {
@@ -825,7 +830,8 @@ translator_chat_server <- function(input, output, session) {
     if (length(state$messages) == 0 && !isTRUE(state$pending))
       return(tags$p(style = "color:#888; font-style:italic;",
                     t("ai_empty_messages")))
-    msgs <- lapply(state$messages, function(m) {
+    shown <- Filter(function(m) !identical(m$display, ""), state$messages)
+    msgs <- lapply(shown, function(m) {
       # User vs AI bubble distinction: standard chat convention:
       #   user  : light blue, right-aligned
       #   AI    : light green (CGIAR brand), left-aligned
@@ -2177,6 +2183,17 @@ translator_cancel_clear <- function(tok) {
   }
   qs <- if (!isTRUE(resp$tool_used) && !template_just_ready)
     .translator_question_list(reply_vis) else character(0)
+  # 2026-10-22: a question the user has answered in this conversation is
+  # not put again (a reply that repeats it would go round in circles), and
+  # the closing "please answer the questions" line is dropped: the app
+  # puts the questions one at a time.
+  if (length(qs)) {
+    seen <- .translator_question_seen(qs, .translator_answered_questions(state$messages))
+    if (any(seen)) {
+      reply_vis <- tryCatch(.translator_strip_question_blocks(reply_vis, qs[seen]), error = function(e) reply_vis)
+      qs <- qs[!seen]
+    }
+  }
   if (length(qs)) {
     state$pending_questions <- lapply(seq_along(qs), function(i)
       list(id = i, kind = "ai", text = qs[i], answer = NULL))
@@ -2185,6 +2202,10 @@ translator_cancel_clear <- function(tok) {
     display_text <- if (nzchar(stripped)) stripped else t("ai_qa_bubble_only_questions")
   } else {
     display_text <- .translator_extract_numbered_questions(reply_vis) %||% reply_vis
+  }
+  if (!isTRUE(resp$tool_used)) {
+    display_text <- .translator_strip_answer_prompt(display_text)
+    if (!nzchar(trimws(display_text))) display_text <- t("ai_q_nothing_open")
   }
   state$messages[[length(state$messages) + 1]] <-
     if (isTRUE(resp$tool_used))

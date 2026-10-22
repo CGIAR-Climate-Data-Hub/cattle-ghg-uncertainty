@@ -190,21 +190,24 @@ so the AI reflects on all of them at once. “skip” leaves a question to
 the IPCC default. If the reflection raises new questions, the same thing
 happens again.</p>
 <p>Every answer becomes a recorded decision, and a short line in the
-conversation says what was recorded (“Recorded: inventory year 2022 (you
-said); calves pooled (from the file)”). A wrong line is corrected by
-replying. The decisions are sent to the AI with every emission call as
-binding, they override the file and the defaults, and the finished rows
-are checked against them: a production system that contradicts one is
-re-emitted once with the decision quoted, and if it still contradicts,
-the decision is listed as not applied above the download.</p>
+conversation says what your answers settled (“Recorded: Inventory year:
+2022”). A wrong line is corrected by replying. What the AI read from the
+file or assumed is listed in the checks workbook. The decisions are sent
+to the AI with every emission call as binding, they override the file
+and the defaults, and the finished rows are checked against them: a
+production system that contradicts one is re-emitted once with the
+decision quoted, and if it still contradicts, the decision is listed as
+not applied above the download.</p>
 <p>When <strong>Produce template now</strong> is pressed, what can be
 assumed is assumed and said in one line (the species as mapped from the
 file, the IPCC edition as in the file, all production systems kept,
 manure shares from the file where present, the file’s ranges where
-given), and only what cannot be assumed is asked: the inventory year and
-the handling of calves if nothing has settled them, and any column where
-the header says percent while the values look like fractions. The
-template then starts by itself after the last answer.</p>
+given), and only what cannot be assumed is asked: the inventory year if
+nothing has settled it, and any column where the header says percent
+while the values look like fractions. Calves are never asked about: one
+source category becomes one template category, so a single calves row
+stays one group. After the last answer the pop-up asks where the files
+should go, and the template starts from there.</p>
 <p>The country name and the inventory year are also required, and are
 quick to state if they are not in the file.</p>
 </div>
