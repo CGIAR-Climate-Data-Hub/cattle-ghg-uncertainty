@@ -635,6 +635,11 @@ lang_state_take <- function(token) {
   ai_reg_modal_note = list(en = "Producing again after this change re-runs the AI for every production system.",
                            fr = "Produire à nouveau après ce changement relance l'IA pour chaque système de production."),
   ai_reg_save = list(en = "Save", fr = "Enregistrer"),
+  btn_ai_download_checks = list(en = "Download the checks (Excel)", fr = "Télécharger les vérifications (Excel)"),
+  btn_ai_download_conversation = list(en = "Download the conversation (Word)", fr = "Télécharger la conversation (Word)"),
+  ai_outputs_note = list(
+    en = "Three files: the data workbook (flagged cells are coloured, with a Check and a Why column at the right of each sheet, and filters on every column), the list of checks to review, and the questions and answers.",
+    fr = "Trois fichiers : le classeur de données (cellules signalées en couleur, avec une colonne Check et une colonne Why à droite de chaque feuille, et des filtres sur chaque colonne), la liste des vérifications à relire, et les questions et réponses."),
   ai_decisions_not_applied = list(en = "Decisions the AI did not apply (check these rows in the file):",
                                   fr = "Décisions que l'IA n'a pas appliquées (vérifiez ces lignes dans le fichier) :"),
   ai_reg_cancel = list(en = "Cancel", fr = "Annuler"),

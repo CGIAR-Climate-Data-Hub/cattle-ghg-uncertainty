@@ -122,22 +122,44 @@ translator_source_fingerprint <- function(parsed) {
   }
   fam <- tryCatch(.translator_scan_param_labels(parsed$sheets),
                   error = function(e) character(0))
+  # 2026-10-22 (WP3, C7): columns headed by a year carry the source's own
+  # per-year totals; every sheet's column sum is kept as a candidate.
+  year_sums <- list()
+  for (sh in parsed$sheets) {
+    d <- sh$preview
+    if (is.null(d) || !NROW(d)) next
+    for (col in names(d)) {
+      yr <- suppressWarnings(as.integer(trimws(as.character(col))))
+      if (is.na(yr) || yr < 1950 || yr > 2100) next
+      v <- .translator_cell_numbers(d[[col]]); v <- v[is.finite(v)]
+      if (!length(v)) next
+      key <- as.character(yr)
+      year_sums[[key]] <- c(year_sums[[key]], sum(v))
+    }
+  }
   list(numbers  = unique(round(nums, 6)),
        families = sub(" .*$", "", fam),      # "Ym (methane ...)" -> "Ym"
        family_values = tryCatch(.translator_family_column_values(parsed$sheets),
-                                error = function(e) list()))
+                                error = function(e) list()),
+       year_sums = year_sums)
 }
 
 translator_consistency_checks <- function(param_specs, manure = NULL,
-                                          source = NULL) {
+                                          source = NULL, population = NULL,
+                                          inventory_year = NULL, piece = NULL) {
   out <- list()
-  # 2026-10-22: every issue carries a severity (fail, warn, info) so the
-  # checks workbook and the data workbook can colour it.
-  add <- function(where, issue, severity = "warn") {
+  # 2026-10-22: every issue carries a severity (fail, warn, info) and, where
+  # it points at cells, the sheet, the group key and the parameter, so the
+  # checks workbook and the data workbook can colour them.
+  add <- function(where, issue, severity = "warn", sheet = NA_character_,
+                  group = NA_character_, parameter = NA_character_) {
     out[[length(out) + 1L]] <<- data.frame(where = where, issue = issue,
-                                            severity = severity,
+                                            severity = severity, sheet = sheet,
+                                            group = group, parameter = parameter,
                                             stringsAsFactors = FALSE)
   }
+  gkey <- function(df, i) paste(df$cattle_type[i] %||% "", df$aggregation_level[i] %||% "",
+                                df$sub_category[i] %||% "", sep = "||")
   fmt <- function(x) format(signif(x, 7), trim = TRUE)
 
   ps <- param_specs
@@ -463,10 +485,168 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     }
   }
 
+  # C7 (2026-10-22, WP3): the Parameters sheet and the Parameter_TimeSeries
+  # sheet must agree for the inventory year, group by group and parameter by
+  # parameter; and the time series' per-year population totals must be
+  # found among the source's own year-column sums when the file has them.
+  if (!is.null(population) && is.data.frame(population) && nrow(population) > 0 &&
+      !is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 &&
+      all(c("cattle_type", "aggregation_level", "sub_category", "year") %in% names(population))) {
+    yr0 <- suppressWarnings(as.integer(.translator_scalar(inventory_year %||% NA)))
+    pcols <- setdiff(intersect(names(population), PARAM_CATALOGUE$parameter), character(0))
+    if (!is.na(yr0) && length(pcols)) {
+      py <- population[suppressWarnings(as.integer(population$year)) == yr0, , drop = FALSE]
+      ps_key <- paste(gkey(ps, seq_len(nrow(ps))), ps$parameter, sep = "##")
+      ps_mu  <- suppressWarnings(as.numeric(ps$mean))
+      n_bad <- 0L
+      for (i in seq_len(nrow(py))) for (pc in pcols) {
+        v_ts <- suppressWarnings(as.numeric(py[[pc]][i]))
+        if (!is.finite(v_ts)) next
+        k <- paste(gkey(py, i), pc, sep = "##")
+        j <- match(k, ps_key)
+        if (is.na(j) || !is.finite(ps_mu[j])) next
+        if (abs(v_ts - ps_mu[j]) > 0.005 * max(1e-9, abs(ps_mu[j]))) {
+          n_bad <- n_bad + 1L
+          add(sprintf("%s / %s / %s", py$aggregation_level[i], py$sub_category[i], pc),
+              sprintf(paste0("Parameters gives %s for %s but Parameter_TimeSeries gives %s for the ",
+                             "inventory year %d. The two sheets must agree; one of them has the wrong value."),
+                      fmt(ps_mu[j]), pc, fmt(v_ts), yr0),
+              severity = "fail", sheet = "Parameters", group = gkey(py, i), parameter = pc)
+        }
+      }
+      if (n_bad == 0L && nrow(py))
+        add("Parameters vs time series", sprintf("Parameters and Parameter_TimeSeries agree for the inventory year %d on every group and parameter checked.", yr0),
+            severity = "info")
+    }
+    if ("N" %in% names(population) && !is.null(source) && length(source$year_sums)) {
+      yrs <- suppressWarnings(as.integer(population$year))
+      tot <- tapply(suppressWarnings(as.numeric(population$N)), yrs, sum, na.rm = TRUE)
+      for (y in names(tot)) {
+        cand <- source$year_sums[[y]]
+        if (is.null(cand) || !is.finite(tot[[y]]) || tot[[y]] <= 0) next
+        if (!any(abs(cand - tot[[y]]) <= 0.01 * tot[[y]]))
+          add(sprintf("time series / %s", y),
+              sprintf(paste0("The template's total population for %s is %s, but no column of the source ",
+                             "file headed %s sums to that (closest: %s). A group may carry a value from ",
+                             "a neighbouring year or column."),
+                      y, fmt(tot[[y]]), y, fmt(cand[which.min(abs(cand - tot[[y]]))])),
+              severity = "warn", sheet = "Parameter_TimeSeries")
+      }
+    }
+  }
+
+  # C8 (2026-10-22, WP3): percent and fraction follow the catalogue units.
+  # A % parameter below 1, or a fraction above 1, is a unit mistake that
+  # the simulation cannot detect (DE = 0.55 passes every bound check and
+  # gives an impossible energy balance).
+  if (!is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 &&
+      all(c("sub_category", "parameter", "mean") %in% names(ps))) {
+    units <- setNames(PARAM_CATALOGUE$unit, PARAM_CATALOGUE$parameter)
+    dflt  <- setNames(PARAM_CATALOGUE$ipcc_default, PARAM_CATALOGUE$parameter)
+    mu <- suppressWarnings(as.numeric(ps$mean))
+    for (i in seq_len(nrow(ps))) {
+      pn <- as.character(ps$parameter[i]); u <- units[pn]
+      if (is.na(u) || !is.finite(mu[i]) || mu[i] <= 0) next
+      bad <- NULL
+      if (identical(unname(u), "%") && mu[i] < 1)
+        bad <- sprintf("%s is %s but the catalogue unit is percent (IPCC default %s): this looks like a fraction. Multiply by 100 if so.",
+                       pn, fmt(mu[i]), fmt(suppressWarnings(as.numeric(dflt[pn]))))
+      if (grepl("^fraction", unname(u)) && mu[i] > 1)
+        bad <- sprintf("%s is %s but the catalogue unit is a fraction 0 to 1 (IPCC default %s): this looks like a percentage. Divide by 100 if so.",
+                       pn, fmt(mu[i]), fmt(suppressWarnings(as.numeric(dflt[pn]))))
+      if (!is.null(bad))
+        add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], pn), bad,
+            severity = "fail", sheet = "Parameters", group = gkey(ps, i), parameter = pn)
+    }
+  }
+  if (!is.null(manure) && is.data.frame(manure) && nrow(manure) > 0) {
+    chk_mm <- function(col, lo_frac, msg, sev) {
+      if (!col %in% names(manure)) return()
+      v <- suppressWarnings(as.numeric(manure[[col]]))
+      hit <- which(is.finite(v) & v > 0 & lo_frac(v))
+      for (i in hit)
+        add(sprintf("%s / %s / %s", manure$aggregation_level[i] %||% "", manure$sub_category[i], col),
+            sprintf(msg, col, fmt(v[i])), severity = sev, sheet = "Manure_Management",
+            group = gkey(manure, i), parameter = col)
+    }
+    chk_mm("MCF_pct", function(v) v < 0.3, "%s is %s: the column is a percentage, and a value this small is usually a fraction written where a percent was expected.", "warn")
+    chk_mm("Frac_GasMS_pct", function(v) v < 1, "%s is %s: the column is a percentage; a value below 1 looks like a fraction.", "warn")
+    chk_mm("Frac_LeachMS_pct", function(v) v < 0.1, "%s is %s: the column is a percentage; a value this small looks like a fraction.", "warn")
+    chk_mm("EF3", function(v) v > 1, "%s is %s: EF3 is a fraction (kg N2O-N per kg N, IPCC values 0.001 to 0.1); a value above 1 looks like a percentage.", "fail")
+  }
+
+  # C9 (2026-10-22, WP3): ranges and distributions the writer had to take
+  # from the catalogue because the AI supplied a value with no spread. The
+  # workbook cannot tell them apart from the user's own, so they are listed.
+  if (!is.null(piece)) {
+    d9 <- tryCatch(.translator_defaults_applied(piece), error = function(e) NULL)
+    if (!is.null(d9) && nrow(d9))
+      for (i in seq_len(nrow(d9)))
+        add(d9$where[i], d9$issue[i], severity = "info", sheet = d9$sheet[i],
+            group = d9$group[i], parameter = d9$parameter[i])
+  }
+
   if (!length(out))
     return(data.frame(where = character(), issue = character(), severity = character(),
+                      sheet = character(), group = character(), parameter = character(),
                       stringsAsFactors = FALSE))
   res <- do.call(rbind, out)
   rownames(res) <- NULL
   res
+}
+
+# The AI rows that carried a value and no spread (no bounds, no percentage),
+# or no distribution: the writer fills these from the catalogue (C9). Read
+# from the emitted JSON piece, since the written workbook no longer shows
+# the difference.
+.translator_defaults_applied <- function(piece) {
+  empty <- data.frame(where = character(), issue = character(), sheet = character(),
+                      group = character(), parameter = character(), stringsAsFactors = FALSE)
+  ps <- piece$parameters
+  rows <- list()
+  if (is.data.frame(ps) && nrow(ps) && all(c("sub_category", "parameter") %in% names(ps))) {
+    num <- function(x) suppressWarnings(as.numeric(x))
+    get <- function(nm) if (nm %in% names(ps)) ps[[nm]] else rep(NA, nrow(ps))
+    mean_v <- num(get("mean") %||% get("value")); unc <- num(get("uncertainty_pct"))
+    lo <- num(get("lower")); hi <- num(get("upper")); dist <- tolower(as.character(get("distribution")))
+    src <- tolower(as.character(get("data_source")))
+    for (i in seq_len(nrow(ps))) {
+      if (!is.finite(mean_v[i]) || identical(dist[i], "constant")) next
+      if (!grepl("^user", src[i] %||% "")) next
+      no_spread <- !is.finite(unc[i]) && !is.finite(lo[i]) && !is.finite(hi[i])
+      no_dist   <- is.na(dist[i]) || !nzchar(dist[i]) || dist[i] == "na"
+      if (!no_spread && !no_dist) next
+      what <- paste(c(if (no_spread) "range", if (no_dist) "distribution"), collapse = " and ")
+      rows[[length(rows) + 1L]] <- data.frame(
+        where = sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], ps$parameter[i]),
+        issue = sprintf("The file gave a value for %s (%s) but no %s; the IPCC catalogue %s was applied. Replace it if your inventory has its own.",
+                        ps$parameter[i], format(signif(mean_v[i], 6)), what, what),
+        sheet = "Parameters",
+        group = paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i] %||% "", sep = "||"),
+        parameter = as.character(ps$parameter[i]), stringsAsFactors = FALSE)
+    }
+  }
+  mm <- piece$manure_management
+  if (is.data.frame(mm) && nrow(mm) && "sub_category" %in% names(mm)) {
+    num <- function(x) suppressWarnings(as.numeric(x))
+    get <- function(nm) if (nm %in% names(mm)) mm[[nm]] else rep(NA, nrow(mm))
+    for (i in seq_len(nrow(mm))) {
+      mcf <- num(get("MCF_pct")[i] %||% get("mcf")[i]); ef3 <- num(get("EF3")[i] %||% get("ef3")[i])
+      if (is.finite(mcf) && !is.finite(num(get("lower_mcf")[i])) && !is.finite(num(get("upper_mcf")[i])))
+        rows[[length(rows) + 1L]] <- data.frame(
+          where = sprintf("%s / %s / MCF_pct", mm$aggregation_level[i] %||% "", mm$sub_category[i]),
+          issue = "MCF_pct came without a range; plus or minus 25% (pert) was applied as a project assumption. Replace it if your inventory has its own.",
+          sheet = "Manure_Management", group = paste(mm$cattle_type[i] %||% "", mm$aggregation_level[i] %||% "", mm$sub_category[i], sep = "||"),
+          parameter = "MCF_pct", stringsAsFactors = FALSE)
+      if (is.finite(ef3) && !is.finite(num(get("lower_ef3")[i])) && !is.finite(num(get("upper_ef3")[i])))
+        rows[[length(rows) + 1L]] <- data.frame(
+          where = sprintf("%s / %s / EF3", mm$aggregation_level[i] %||% "", mm$sub_category[i]),
+          issue = "EF3 came without a range; a factor of two either way (lognormal), the spread of the IPCC 2006 Table 10.21 ranges, was applied. Replace it if your inventory has its own.",
+          sheet = "Manure_Management", group = paste(mm$cattle_type[i] %||% "", mm$aggregation_level[i] %||% "", mm$sub_category[i], sep = "||"),
+          parameter = "EF3", stringsAsFactors = FALSE)
+    }
+  }
+  if (!length(rows)) return(empty)
+  out <- do.call(rbind, rows); rownames(out) <- NULL
+  out
 }

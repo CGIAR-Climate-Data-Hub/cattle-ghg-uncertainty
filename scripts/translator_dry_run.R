@@ -138,6 +138,13 @@ cat("workbook: params", nrow(out$param_specs), " manure", nrow(out$manure), " ts
 cmp <- merge(ps[, c("aggregation_level","sub_category","parameter","mean")], out$param_specs[, c("aggregation_level","sub_category","parameter","mean")], by = c("aggregation_level","sub_category","parameter"))
 cat("parameter means preserved end to end:", sum(abs(num(cmp$mean.x) - num(cmp$mean.y)) < 1e-6 | (is.na(cmp$mean.x) & is.na(cmp$mean.y))), "of", nrow(cmp), "\n")
 cat("notes stamp present:", grepl("translator: app", out$metadata$notes %||% "", fixed = TRUE), "\n")
+# WP4: the workbook the user downloads is annotated (filters, Check and Why)
+# and still parses; the issues carry a severity.
+wb_a <- openxlsx::loadWorkbook(state$template_file)
+hp <- openxlsx::read.xlsx(state$template_file, sheet = "Parameters", startRow = 3, colNames = TRUE)
+stopifnot(all(c("Check", "Why") %in% names(hp)), nzchar(wb_a$worksheets[[match("Parameters", names(wb_a))]]$autoFilter %||% ""))
+cat("annotated workbook: Check/Why columns and filters present; issues by severity:",
+    paste(names(table(state$precheck$issues$severity)), table(state$precheck$issues$severity), collapse = ", "), "\n")
 cat("persisted history in runtime:", length(list.files(Sys.getenv("APP_RUNTIME_DIR"), "translator_history_")), " memos:", length(list.files(Sys.getenv("APP_RUNTIME_DIR"), "translator_memo_")), "\n")
 # every group carries the full catalogue (the writer back-fills gap rows,
 # including the optional GE and DMI intake rows added in 2026-09)

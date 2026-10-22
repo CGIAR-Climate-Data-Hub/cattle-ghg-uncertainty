@@ -477,7 +477,7 @@ translator_chat_server <- function(input, output, session) {
            # Server-injected text. The coverage scan skips messages that
            # carry a `source`, so the sub-category examples in the
            # exploration contract no longer count as "mentioned in chat".
-           source = "server_upload", file_hash = pu$hash)
+           source = "server_upload", file_hash = pu$hash, ts = .translator_now())
     .translator_persist(state)
     .translator_send(state, session, stage = "explore")
   })
@@ -494,7 +494,7 @@ translator_chat_server <- function(input, output, session) {
     if (!nzchar(txt)) return()
     updateTextAreaInput(session, "translator_input", value = "")
     state$messages[[length(state$messages) + 1]] <-
-      list(role = "user", content = txt, display = txt)
+      list(role = "user", content = txt, display = txt, ts = .translator_now())
     # Persist BEFORE the AI call. If the user clicks Stop/reload
     # mid-call, this ensures their typed message survives the reload.
     .translator_persist(state)
@@ -631,12 +631,12 @@ translator_chat_server <- function(input, output, session) {
                                                      msg_index = length(state$messages) + 1L)
       txt <- sprintf("Decision: %s = %s", q$topic, ans)
       state$messages[[length(state$messages) + 1L]] <-
-        list(role = "user", content = txt, display = txt, source = "user_decision")
+        list(role = "user", content = txt, display = txt, source = "user_decision", ts = .translator_now())
     }
     if (length(ai_qs)) {
       txt <- .translator_answers_message(ai_qs)
       state$messages[[length(state$messages) + 1L]] <-
-        list(role = "user", content = txt, display = txt)
+        list(role = "user", content = txt, display = txt, ts = .translator_now())
       .translator_persist(state)
       .translator_send(state, session, stage = "clarify")
       return(invisible(NULL))
@@ -764,7 +764,7 @@ translator_chat_server <- function(input, output, session) {
                                                    edited = TRUE)
     txt <- sprintf("Decision (edited): %s = %s", tp, val)
     state$messages[[length(state$messages) + 1L]] <-
-      list(role = "user", content = txt, display = txt, source = "user_decision")
+      list(role = "user", content = txt, display = txt, source = "user_decision", ts = .translator_now())
     .translator_persist(state)
     removeModal()
   })
@@ -908,10 +908,18 @@ translator_chat_server <- function(input, output, session) {
   # case the JSON somehow becomes invalid between gate and click (e.g.
   # Reset fired mid-click), but it should never fire in practice.
   download_name <- NULL
+  # 2026-10-22 (WP4): <Country>_<year>_<what>_<stamp>, from the template's
+  # own metadata.
+  .translator_dl_name <- function(kind) {
+    piece <- tryCatch(jsonlite::fromJSON(state$last_template_json, simplifyVector = TRUE),
+                      error = function(e) NULL)
+    tryCatch(translator_output_filename(piece, kind), error = function(e)
+      paste0("translated_", kind, "_", format(Sys.time(), "%Y-%m-%d_%H%M"),
+             if (kind == "conversation") ".docx" else ".xlsx"))
+  }
   output$translator_download_template <- downloadHandler(
     filename = function() {
-      download_name <<- paste0("translated_template_",
-                               format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
+      download_name <<- .translator_dl_name("template")
       download_name
     },
     content = function(file) {
@@ -934,6 +942,31 @@ translator_chat_server <- function(input, output, session) {
                                          list(file = download_name %||% "the template")),
                error = function(e) NULL)
     },
+    contentType = NULL
+  )
+
+  output$translator_download_checks <- downloadHandler(
+    filename = function() .translator_dl_name("checks"),
+    content = function(file) {
+      pc <- state$precheck
+      if (is.null(pc)) {
+        js <- state$last_template_json
+        if (.translator_template_is_well_formed(js)) .translator_finalise_template(state, js)
+        pc <- state$precheck
+      }
+      piece <- tryCatch(jsonlite::fromJSON(state$last_template_json, simplifyVector = TRUE),
+                        error = function(e) NULL)
+      translator_write_checks_xlsx(
+        pc %||% list(), state$register, file,
+        extra = list(model = .translator_scalar(piece$.model %||% ""),
+                     prompt_hash = tryCatch(translator_system_prompt_hash(), error = function(e) ""),
+                     register_digest = translator_register_digest(state$register)))
+    },
+    contentType = NULL
+  )
+  output$translator_download_conversation <- downloadHandler(
+    filename = function() .translator_dl_name("conversation"),
+    content = function(file) translator_write_conversation_docx(state$messages, file),
     contentType = NULL
   )
 
@@ -1061,6 +1094,14 @@ translator_chat_server <- function(input, output, session) {
                        class = "btn-success btn-lg",
                        icon = icon("file-arrow-down"),
                        style = "font-size:1.05rem; padding:12px 28px;"),
+        # 2026-10-22 (WP4): the checks to review and the questions and
+        # answers, as files of their own.
+        tags$div(style = "margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;",
+                 downloadButton("translator_download_checks", t("btn_ai_download_checks"),
+                                class = "btn-outline-success btn-sm", icon = icon("list-check")),
+                 downloadButton("translator_download_conversation", t("btn_ai_download_conversation"),
+                                class = "btn-outline-secondary btn-sm", icon = icon("comments"))),
+        tags$div(style = "margin-top:6px; font-size:0.8rem; color:#374151;", t("ai_outputs_note")),
         tags$div(
           style = "margin-top:12px; font-size:0.85rem;",
           actionLink("translator_revise", t("btn_ai_revise"),
@@ -1379,7 +1420,7 @@ translator_cancel_clear <- function(tok) {
 }
 
 # Same checks on a workbook that already exists (about 4 s for 800 rows).
-.translator_precheck_file <- function(path, source = NULL) {
+.translator_precheck_file <- function(path, source = NULL, piece = NULL) {
   fail <- function(msg) list(qa = NULL, summary = NULL, issues = NULL, error = msg)
   if (is.null(path) || !file.exists(path)) return(fail("the workbook was not found"))
   pu <- tryCatch(suppressMessages(parse_uploaded_template(path)), error = function(e) NULL)
@@ -1390,7 +1431,10 @@ translator_cancel_clear <- function(tok) {
   qa <- tryCatch(run_qaqc(pu$param_specs, region = region[1], manure_data = pu$manure),
                  error = function(e) NULL)
   issues <- tryCatch(translator_consistency_checks(pu$param_specs, pu$manure,
-                                                   source = source),
+                                                   source = source,
+                                                   population = pu$population,
+                                                   inventory_year = pu$metadata$year %||% NA,
+                                                   piece = piece),
                      error = function(e) NULL)
   list(qa = qa, summary = if (!is.null(qa)) qaqc_summary(qa) else NULL,
        issues = issues, n_params = nrow(pu$param_specs),
@@ -1425,7 +1469,7 @@ translator_cancel_clear <- function(tok) {
   issues <- pc$issues
   n_issue <- if (is.null(issues)) 0L else nrow(issues)
   n_fail  <- if (is.null(fails)) 0L else nrow(fails)
-  cap <- 15L
+  cap <- max(1L, n_fail, n_issue)   # 2026-10-22 (WP4): every row, scrollable
   box(
     tags$div(style = "margin-bottom:6px;", tags$strong(t("ai_precheck_title")), " ",
              sprintf(t("ai_precheck_rows"), pc$n_params %||% 0L, pc$n_manure %||% 0L)),
@@ -1438,7 +1482,7 @@ translator_cancel_clear <- function(tok) {
       tags$div(style = "color:#166534;", t("ai_precheck_clean")),
     if (n_fail > 0L) tagList(
       tags$div(tags$strong(t("ai_precheck_fail_title")), " ", t("ai_precheck_fail_hint")),
-      tags$ul(style = "margin:4px 0 8px 0; padding-left:18px;",
+      tags$ul(style = "margin:4px 0 8px 0; padding-left:18px; max-height:220px; overflow-y:auto;",
               lapply(seq_len(min(cap, n_fail)), function(i) tags$li(
                 sprintf("%s%s, %s: %s", fails$group[i],
                         if (is.na(fails$level[i])) "" else paste0(" @", fails$level[i]),
@@ -1446,8 +1490,10 @@ translator_cancel_clear <- function(tok) {
               if (n_fail > cap) tags$li(sprintf(t("ai_precheck_more"), n_fail - cap)))),
     if (n_issue > 0L) tagList(
       tags$div(tags$strong(t("ai_precheck_issues_title")), " ", t("ai_precheck_issues_hint")),
-      tags$ul(style = "margin:4px 0 0 0; padding-left:18px;",
+      tags$ul(style = "margin:4px 0 0 0; padding-left:18px; max-height:260px; overflow-y:auto;",
               lapply(seq_len(min(cap, n_issue)), function(i) tags$li(
+                tags$span(style = sprintf("display:inline-block; width:8px; height:8px; border-radius:50%%; margin-right:6px; background:%s;",
+                                          .TRANSLATOR_SEV_FILL[[if ((issues$severity[i] %||% "warn") %in% names(.TRANSLATOR_SEV_FILL)) issues$severity[i] else "warn"]])),
                 tags$span(style = "color:#555;", paste0(issues$where[i], ": ")), issues$issue[i])),
               if (n_issue > cap) tags$li(sprintf(t("ai_precheck_more"), n_issue - cap))))
   )
@@ -1480,7 +1526,12 @@ translator_cancel_clear <- function(tok) {
     src$source_categories <- isolate(state$source_categories)
     src$register          <- isolate(state$register)
   }
-  state$precheck     <- if (ok) .translator_precheck_file(path, source = src)
+  piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
+  state$precheck     <- if (ok) .translator_precheck_file(path, source = src, piece = piece)
+  # 2026-10-22 (WP4): the checks are written into the workbook itself
+  # (filters, coloured cells, Check and Why columns) once they are known.
+  if (ok) tryCatch(.translator_annotate_workbook(path, isolate(state$precheck)$issues, isolate(state$precheck)$qa),
+                   error = function(e) message("translator: workbook annotation failed (", conditionMessage(e), ")"))
                         else list(qa = NULL, summary = NULL, issues = NULL,
                                   error = "the workbook could not be written")
   state$precheck_key <- key
@@ -2041,9 +2092,9 @@ translator_cancel_clear <- function(tok) {
   state$messages[[length(state$messages) + 1]] <-
     if (isTRUE(resp$tool_used))
       list(role = "assistant", content = reply_text, display = display_text,
-           payload = if (template_just_ready) resp$reply else NULL)
+           payload = if (template_just_ready) resp$reply else NULL, ts = .translator_now())
     else
-      list(role = "assistant", content = reply_text, display = display_text)
+      list(role = "assistant", content = reply_text, display = display_text, ts = .translator_now())
 
   # If a valid template-ready block came through in this reply, post a
   # separate small AI message pointing the user at the green Download
@@ -3637,6 +3688,20 @@ translator_cancel_clear <- function(tok) {
           v_lo   <- .translator_scalar(ai$lower_bound %||% ai$lower)
           v_hi   <- .translator_scalar(ai$upper_bound %||% ai$upper)
           v_dist <- .translator_scalar(ai$distribution)
+          # 2026-10-22 (WP3, C9): a value with no spread takes the catalogue's
+          # range, and a missing distribution the catalogue's suggested one
+          # (per sub-category where the resolver has one), so no row is left
+          # exactly known by accident. Listed as "info" in the checks.
+          num0 <- function(x) suppressWarnings(as.numeric(x))
+          is_const <- identical(tolower(as.character(v_dist)), "constant")
+          if (!is_const && !is.na(num0(v_mean))) {
+            rs9 <- tryCatch(resolve_subcat_default(sub_cat, p_name, ipcc_version),
+                            error = function(e) NULL)
+            if (is.na(v_lo) && is.na(v_hi) && is.na(num0(v_unc)))
+              v_unc <- .translator_scalar(rs9$uncertainty_pct %||% PARAM_CATALOGUE$suggested_uncertainty_pct[i])
+            if (is.na(v_dist) || !nzchar(as.character(v_dist)))
+              v_dist <- .translator_scalar(rs9$distribution %||% PARAM_CATALOGUE$suggested_distribution[i])
+          }
           .put_param(7,  v_mean)
           .put_param(8,  v_unc)
           .put_param(11, v_dist)
@@ -3799,14 +3864,34 @@ translator_cancel_clear <- function(tok) {
       if (is.na(mcf_in) && !is.na(d_mcf))
         mm_gapfilled_mcf <- TRUE
 
+      # 2026-10-22 (WP3, worklist B5): a coefficient with no range was
+      # treated as exactly known and its uncertainty never reached the
+      # result. MCF takes plus or minus 25% (pert) and EF3 a factor of two
+      # either way (lognormal, the spread of IPCC 2006 Table 10.21), both
+      # stated project assumptions, listed as "info" in the checks.
+      numm <- function(x) suppressWarnings(as.numeric(.translator_scalar(x)))
+      mcf_v <- numm(mcf_in %||% d_mcf)
+      mcf_lo <- numm(mm$lower_mcf[i]); mcf_hi <- numm(mm$upper_mcf[i])
+      mcf_dist <- .translator_scalar(mm$distribution_mcf[i])
+      if (is.finite(mcf_v) && is.na(mcf_lo) && is.na(mcf_hi)) {
+        mcf_lo <- mcf_v * 0.75; mcf_hi <- mcf_v * 1.25
+        if (is.na(mcf_dist) || !nzchar(mcf_dist)) mcf_dist <- "pert"
+      }
+      ef3_v <- numm(mm$ef3[i] %||% mm$EF3[i] %||% d_ef3)
+      ef3_lo <- numm(mm$lower_ef3[i]); ef3_hi <- numm(mm$upper_ef3[i])
+      ef3_dist <- .translator_scalar(mm$distribution_ef3[i])
+      if (is.finite(ef3_v) && is.na(ef3_lo) && is.na(ef3_hi)) {
+        ef3_lo <- ef3_v / 2; ef3_hi <- ef3_v * 2
+        if (is.na(ef3_dist) || !nzchar(ef3_dist)) ef3_dist <- "lognormal"
+      }
       .put_mm(9,  mcf_in %||% d_mcf)
-      .put_mm(10, mm$lower_mcf[i])
-      .put_mm(11, mm$upper_mcf[i])
-      .put_mm(12, mm$distribution_mcf[i])
+      .put_mm(10, mcf_lo)
+      .put_mm(11, mcf_hi)
+      .put_mm(12, mcf_dist)
       .put_mm(13, mm$ef3[i]              %||% mm$EF3[i] %||% d_ef3)
-      .put_mm(14, mm$lower_ef3[i])
-      .put_mm(15, mm$upper_ef3[i])
-      .put_mm(16, mm$distribution_ef3[i])
+      .put_mm(14, ef3_lo)
+      .put_mm(15, ef3_hi)
+      .put_mm(16, ef3_dist)
       .put_mm(17, mm$Frac_GasMS_pct[i]   %||% mm$frac_gasms_pct[i] %||%
                    mm$Frac_GasMS[i] %||% d_gas)
       .put_mm(18, mm$lower_frac_gas[i]   %||%
