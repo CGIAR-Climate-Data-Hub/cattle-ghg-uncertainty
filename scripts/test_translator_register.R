@@ -30,8 +30,16 @@ ok(identical(reg3$calves_handling$decision, "split") && identical(reg3$calves_ha
 reg4 <- translator_register_set_user(reg3, "species", "cattle_mixed")
 reg4 <- translator_register_add_pending(reg4, "pct_vs_fraction:MoE!moe")
 miss <- translator_register_missing(reg4)
-ok(all(c("ipcc_edition", "aggregation_level", "mms_split_source", "uncertainty_source", "pct_vs_fraction:MoE!moe") %in% miss) &&
-   !any(c("inventory_year", "species", "calves_handling") %in% miss), "missing = undecided required topics + pending entries")
+ok(identical(miss, "pct_vs_fraction:MoE!moe"), "missing = the ask topics not decided (year and calves are) + pending entries; the rest is assumed")
+asm <- translator_register_assume_defaults(reg4)
+ok(setequal(asm$added, c("ipcc_edition", "aggregation_level", "mms_split_source", "uncertainty_source")) && identical(asm$register$ipcc_edition$basis, "assumed") &&
+   identical(asm$register$species$basis, "user"), "assumptions fill the assumable topics only")
+ok(length(translator_register_missing(translator_register_set_user(list(), "inventory_year", "2022"))) == 1L, "an empty register asks for calves (year decided)")
+ok(identical(.translator_parse_choice(list(kind = "server", topic = "calves_handling"), "keep them together please"), "pooled") &&
+   identical(.translator_parse_choice(list(kind = "server", topic = "pct_vs_fraction:x!y"), "they are fractions"), "fraction") &&
+   identical(.translator_parse_choice(list(kind = "ai", text = "q"), " free text "), "free text"), "typed answers map to choices by keyword")
+ok(.translator_is_skip("skip") && .translator_is_skip(" I don't know. ") && !.translator_is_skip("2022"), "skip words")
+ok(length(.translator_api_history(list(list(role = "assistant", content = "q", source = "server_question"), list(role = "user", content = "a", source = "user_answer"), list(role = "user", content = "batch", source = "answers_batch"), list(role = "user", content = "x")))) == 2L, "API history drops bubbles and single answers, keeps the batch")
 ok(identical(translator_register_keep_user(reg4)$species$basis, "user"), "keep_user keeps user entries")
 ok(is.null(translator_register_keep_user(reg)$calves_handling), "keep_user drops file entries")
 

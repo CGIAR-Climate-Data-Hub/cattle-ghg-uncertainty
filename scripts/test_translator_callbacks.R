@@ -74,9 +74,9 @@ isolate({
 isolate(.translator_send(state, session, stage = "explore")); settle()
 err <- isolate(state$last_error)
 cat("after explore: error =", err %||% "none", "; messages:", length(isolate(state$messages)), "\n")
-stopifnot(is.null(err), length(isolate(state$messages)) == 2L, length(isolate(state$pending_questions)) == 1L)
+stopifnot(is.null(err), length(isolate(state$messages)) >= 2L, length(isolate(state$pending_questions)) == 1L)
 # an answer: the reply has no block, so the summariser callback runs too
-isolate({ state$messages[[3]] <- list(role = "user", content = "2022", display = "2022") })
+isolate({ state$messages[[length(state$messages) + 1L]] <- list(role = "user", content = "2022", display = "2022") })
 isolate(.translator_send(state, session, stage = "clarify")); settle(); later::run_now(0.3)
 stopifnot(is.null(isolate(state$last_error)), "summariser" %in% calls,
           identical(isolate(state$register)$species$decision, "cattle_non_dairy"))

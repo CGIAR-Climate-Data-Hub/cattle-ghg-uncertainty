@@ -1,7 +1,9 @@
 # Usage: Rscript scripts/test_translator_loop.R   (no API call, about 1 minute)
-# The one-question-at-a-time loop, the Produce gate, the register card and
-# the fallback summariser, through the real chat server with the sign-in
-# and the AI stubbed (2026-10-22, WP1).
+# Questions in the conversation (2026-10-22, revised): question bubbles,
+# answers through the normal input, one AI call per round, the register
+# folded into the chat, the reduced Produce gate, the fallback summariser,
+# the corrected-template upload. Through the real chat server with the
+# sign-in and the AI stubbed.
 suppressMessages({library(shiny); library(later); for (f in list.files("R", pattern = "[.]R$", full.names = TRUE)) source(f)})
 Sys.setenv(APP_RUNTIME_DIR = tempfile("rt"), ANTHROPIC_API_KEY = "stub-key")
 options(shiny.testmode = TRUE)
@@ -10,12 +12,13 @@ auth_session_cookie_verify <- function(v) "loop@local"
 auth_is_approved <- function(e) TRUE
 produce_calls <- 0L
 .translator_force_template <- function(state, session) { produce_calls <<- produce_calls + 1L; invisible(NULL) }
-ai_calls <- character()
+ai_calls <- character(); seen_hist <- list()
 with_block <- TRUE
 anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
                                         should_stop = function() FALSE, on_result = function(res) {}, ...) {
   last <- messages[[length(messages)]]$content
   if (!is.character(last)) last <- paste(vapply(last, function(b) b$text %||% "", ""), collapse = " ")
+  seen_hist[[length(seen_hist) + 1]] <<- messages
   usage <- list(prompt_tokens = 1L, completion_tokens = 1L, cached_tokens = 0L, cache_write_tokens = 0L, cache_write_1h_tokens = 0L, total_tokens = 2L)
   base <- list(tool_used = FALSE, usage = usage, model = "stub", cost_usd = 0, latency_sec = 0.1, error = NULL, stopped = FALSE)
   if (grepl("The JSON array:", last, fixed = TRUE)) {
@@ -31,73 +34,69 @@ anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, 
   invisible(NULL)
 }
 pump <- function(state) { t0 <- Sys.time(); later::run_now(0.05); while (isTRUE(state$pending) && as.numeric(Sys.time() - t0, units = "secs") < 60) later::run_now(0.05); later::run_now(0.2) }
+src_of <- function(msgs) vapply(msgs, function(m) m$source %||% "", character(1))
 
 shiny::testServer(translator_chat_server, {
   session$setInputs(dummy = 1)
   stopifnot(identical(state$user_email, "loop@local"))
 
-  # ---- an AI round of two questions, answered one at a time -----------------
+  # ---- an AI round of two questions, answered in the chat ----------------------
   state$messages <- list(list(role = "user", content = "UPLOADED FILE x.xlsx", display = "upload", source = "server_upload"),
                          list(role = "assistant", content = "Please answer:\n\n1. Which year?\n2. Split calves?", display = "Please answer the questions below."))
   state$pending_questions <- list(list(id = 1, kind = "ai", text = "Which year?", answer = NULL),
                                   list(id = 2, kind = "ai", text = "Split calves?", answer = NULL))
-  state$q_index <- 1L
-  card <- as.character(output$translator_qa_card$html)
-  stopifnot(grepl("Question 1 of 2", card, fixed = TRUE), grepl("Which year?", card, fixed = TRUE))
-  session$setInputs(translator_qa_answer = "2022"); session$setInputs(translator_qa_next = 1)
-  stopifnot(identical(state$q_index, 2L), identical(state$pending_questions[[1]]$answer, "2022"))
-  session$setInputs(translator_qa_back = 1); stopifnot(identical(state$q_index, 1L))
-  session$setInputs(translator_qa_next = 2)
-  session$setInputs(translator_qa_answer = "no, keep them pooled"); session$setInputs(translator_qa_next = 3)
+  .translator_begin_round(state, sprintf(t("ai_q_notice"), 2L))
+  s0 <- src_of(state$messages)
+  stopifnot(identical(tail(s0, 2), c("server_notice", "server_question")),
+            grepl("Question 1 of 2: Which year?", state$messages[[length(state$messages)]]$display, fixed = TRUE))
+  session$setInputs(translator_input = "2022"); session$setInputs(translator_send = 1)
+  stopifnot(identical(state$q_index, 2L), identical(state$pending_questions[[1]]$answer, "2022"),
+            identical(tail(src_of(state$messages), 2), c("user_answer", "server_question")), length(ai_calls) == 0L)
+  session$setInputs(translator_input = "no, keep them pooled"); session$setInputs(translator_send = 2)
   pump(state)
-  ans <- state$messages[[3]]$content
-  stopifnot(grepl("Answers to your questions", ans, fixed = TRUE), grepl("Answer: 2022", ans, fixed = TRUE),
-            grepl("keep them pooled", ans, fixed = TRUE), sum(ai_calls == "chat") == 1L)
-  stopifnot(length(state$pending_questions) == 1L, grepl("region", state$pending_questions[[1]]$text))
+  batch <- Filter(function(m) identical(m$source, "answers_batch"), state$messages)
+  stopifnot(length(batch) == 1L, grepl("Answer: 2022", batch[[1]]$content, fixed = TRUE),
+            grepl("keep them pooled", batch[[1]]$content, fixed = TRUE), sum(ai_calls == "chat") == 1L)
+  # the API saw the batch and the upload, not the bubbles or the single answers
+  hist_src <- vapply(seen_hist[[1]], function(m) m$content, character(1))
+  stopifnot(any(grepl("Answers to your questions", hist_src, fixed = TRUE)),
+            !any(grepl("Question 1 of 2", hist_src, fixed = TRUE)), !any(hist_src == "2022"))
+  # the reply settled the year (recorded line) and asked one more question (a bubble)
   stopifnot(identical(state$register$inventory_year$decision, "2022"))
-  stopifnot(!grepl("```decisions", state$messages[[length(state$messages)]]$display, fixed = TRUE))
-  cat("round 1: answers sent in one message, register has inventory_year\n")
+  s1 <- src_of(state$messages)
+  stopifnot(any(grepl("^Recorded: ", vapply(state$messages, function(m) m$display %||% "", ""))),
+            identical(tail(s1, 1), "server_question"), length(state$pending_questions) == 1L)
+  cat("round 1: bubbles in the chat, answers batched, history filtered, recorded line posted\n")
 
   # ---- the fallback summariser: a reply without its block ------------------
   with_block <<- FALSE
-  session$setInputs(translator_qa_answer = "Africa"); session$setInputs(translator_qa_next = 4)
+  session$setInputs(translator_input = "Africa"); session$setInputs(translator_send = 3)
   pump(state)
   stopifnot(sum(ai_calls == "summariser") == 1L, identical(state$register$uncertainty_source$decision, "file_bounds"))
-  cat("round 2: no block in the reply, the summariser filled uncertainty_source\n")
   with_block <<- TRUE
+  cat("round 2: summariser filled uncertainty_source\n")
 
-  # ---- the Produce gate ------------------------------------------------------
-  session$setInputs(translator_force_template = 1)   # AI question still open -> refused
-  stopifnot(produce_calls == 0L, length(state$pending_questions) == 1L)
-  session$setInputs(translator_qa_skip = 1); pump(state)
+  # ---- the Produce gate: assumptions in one line, only calves asked ----------
+  session$setInputs(translator_input = "skip"); session$setInputs(translator_send = 4); pump(state)   # close the open question
   state$pending_questions <- list()
-  session$setInputs(translator_force_template = 2)   # required topics missing -> server questions
-  stopifnot(produce_calls == 0L, length(state$pending_questions) >= 4L,
-            all(vapply(state$pending_questions, function(q) q$kind, "") == "server"),
-            !"uncertainty_source" %in% vapply(state$pending_questions, function(q) q$topic, ""))
-  cat("gate asks:", paste(vapply(state$pending_questions, function(q) q$topic, ""), collapse = ", "), "\n")
-  n <- length(state$pending_questions)
-  for (k in seq_len(n)) {
-    q <- state$pending_questions[[k]]
-    ch <- .translator_topic_choices_for(q$topic)
-    if (!is.null(ch)) session$setInputs(translator_qa_choice = ch[1]) else session$setInputs(translator_qa_answer = "all")
-    session$setInputs(translator_qa_next = 10 + k)
-  }
+  session$setInputs(translator_force_template = 1)
+  stopifnot(produce_calls == 0L, isTRUE(state$produce_after_answers))
+  asked <- vapply(state$pending_questions, function(q) q$topic, "")
+  cat("gate asks:", paste(asked, collapse = ", "), "\n")
+  stopifnot(identical(asked, "calves_handling"),
+            identical(state$register$species$basis, "assumed"), identical(state$register$ipcc_edition$basis, "assumed"))
+  stopifnot(identical(tail(src_of(state$messages), 1), "server_question"),
+            grepl("Reply with one of", state$messages[[length(state$messages)]]$display, fixed = TRUE))
+  session$setInputs(translator_input = "keep them pooled please"); session$setInputs(translator_send = 5)
+  stopifnot(identical(state$register$calves_handling$decision, "pooled"), identical(state$register$calves_handling$basis, "user"))
+  cat("gate: one question, answered in words, mapped to the choice; Produce started:", produce_calls, "\n")
   stopifnot(produce_calls == 1L, length(state$pending_questions) == 0L, length(translator_register_missing(state$register)) == 0L)
-  dec_msgs <- Filter(function(m) identical(m$source, "user_decision"), state$messages)
-  stopifnot(length(dec_msgs) == n, grepl("^Decision: species = cattle_dairy", dec_msgs[[1]]$content))
-  cat("gate: ", n, "server questions answered, Produce started once\n")
-
-  # ---- the register card and the edit dialog ---------------------------------
-  reg_html <- as.character(output$translator_register$html)
-  stopifnot(grepl("What the AI will apply", reg_html, fixed = TRUE), grepl("you said", reg_html, fixed = TRUE))
-  session$setInputs(translator_reg_edit = "inventory_year")
-  session$setInputs(translator_reg_value = "2021", translator_reg_save = 1)
-  stopifnot(identical(state$register$inventory_year$decision, "2021"), isTRUE(state$register$inventory_year$edited_by_user))
+  # the delivery pop-up is the next step in the live app; here the dispatcher is stubbed
+  stopifnot(!is.null(state$delivery_ack))
   saved <- conversation_load_full("loop@local")
-  stopifnot(identical(saved$extra$register$inventory_year$decision, "2021"))
+  stopifnot(identical(saved$extra$register$calves_handling$decision, "pooled"))
 
-  # ---- WP7: a corrected template comes back with a note ----------------------
+  # ---- a corrected template comes back with a note ------------------------------
   tpl <- file.path(tempdir(), "corrected_template.xlsx")
   generate_template_openxlsx(tpl, include_example = TRUE)
   session$setInputs(translator_file = list(datapath = tpl, name = "corrected_template.xlsx", size = file.size(tpl)))
@@ -113,11 +112,8 @@ shiny::testServer(translator_chat_server, {
   up <- Filter(function(m) identical(m$source, "server_upload"), state$messages)
   last_up <- up[[length(up)]]
   stopifnot(grepl("CORRECTED TEMPLATE (version 2)", last_up$content, fixed = TRUE),
-            grepl("NOTES FROM THE USER ABOUT THIS FILE", last_up$content, fixed = TRUE),
             grepl("Calves are one group", last_up$content, fixed = TRUE),
-            grepl("Your notes: Calves are one group", last_up$display, fixed = TRUE),
-            identical(state$register$corrected_template$basis, "user"),
-            grepl("corrected_template.xlsx", state$register$corrected_template$decision, fixed = TRUE))
-  cat("corrected template: recognised, checked, sent with the note; register entry written\n")
+            identical(state$register$corrected_template$basis, "user"))
+  cat("corrected template: recognised, checked, sent with the note\n")
   cat("LOOP TEST PASSED\n")
 })

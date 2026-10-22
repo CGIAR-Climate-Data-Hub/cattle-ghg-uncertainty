@@ -602,6 +602,15 @@ lang_state_take <- function(token) {
     fr = "Ce fichier fait %s Mo. La limite de téléversement est de %d Mo, il n'a donc pas été envoyé. Enregistrez les feuilles nécessaires à l'inventaire dans un fichier .xlsx séparé et téléversez celui-ci : un calculateur national contient souvent de grandes tables d'aliments ou de correspondance que l'outil ne lit pas."),
 
   # ---- AI translator: questions one at a time, decisions register (2026-10-22)
+  ai_q_notice = list(en = "I will ask these %d questions one at a time. Type your answer below and press Send; write \"skip\" to use the IPCC default.",
+                     fr = "Je vais poser ces %d questions une à la fois. Tapez votre réponse ci-dessous et appuyez sur Envoyer ; écrivez « skip » pour utiliser la valeur GIEC par défaut."),
+  ai_q_gate_notice = list(en = "Before I produce the template, %d quick question(s). Answer below; the template starts by itself after the last one.",
+                          fr = "Avant de produire le modèle, %d question(s) rapide(s). Répondez ci-dessous ; le modèle démarre de lui-même après la dernière."),
+  ai_q_bubble = list(en = "Question %d of %d: %s", fr = "Question %d sur %d : %s"),
+  ai_q_choices = list(en = "Reply with one of: %s", fr = "Répondez par l'un de : %s"),
+  ai_q_recorded = list(en = "Recorded: %s. Reply to correct any of these.",
+                       fr = "Enregistré : %s. Répondez pour corriger l'un de ces points."),
+  ai_q_sent = list(en = "(your answers were sent to the AI)", fr = "(vos réponses ont été envoyées à l'IA)"),
   ai_qa_title = list(en = "Question %d of %d", fr = "Question %d sur %d"),
   ai_qa_server_intro = list(en = "Before the template is produced, please confirm. ",
                             fr = "Avant de produire le modèle, merci de confirmer. "),

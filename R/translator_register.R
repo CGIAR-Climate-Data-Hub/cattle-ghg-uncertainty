@@ -26,6 +26,109 @@
 .TRANSLATOR_REQUIRED_TOPICS <- c("species", "ipcc_edition", "inventory_year",
                                  "aggregation_level", "mms_split_source",
                                  "calves_handling", "uncertainty_source")
+# Revised the same day: only these two are put to the user when nothing has
+# settled them; the others are assumed with the text below, said in one
+# line in the conversation, and corrected by replying. Seven questions
+# before every Produce was too many.
+.TRANSLATOR_ASK_TOPICS <- c("inventory_year", "calves_handling")
+.TRANSLATOR_ASSUMED <- list(
+  species            = "the species as mapped from the file",
+  ipcc_edition       = "as in the file, else the latest IPCC edition",
+  aggregation_level  = "all production systems in the file",
+  mms_split_source   = "from the file where present, else the IPCC default split",
+  uncertainty_source = "the file's ranges where given, IPCC catalogue ranges elsewhere")
+
+# Fill the assumable topics that have no decision with their assumption
+# (basis "assumed"). Returns the register and the topics added.
+translator_register_assume_defaults <- function(register) {
+  register <- register %||% list(); added <- character(0)
+  for (tp in names(.TRANSLATOR_ASSUMED)) {
+    e <- register[[tp]]
+    if (!is.null(e) && identical(e$status, "decided")) next
+    register[[tp]] <- list(topic = tp, decision = .TRANSLATOR_ASSUMED[[tp]], basis = "assumed",
+                           confidence = "medium", status = "decided", quote = "",
+                           set_at = .translator_now(), msg_index = NA_integer_,
+                           edited_by_user = FALSE, applied = NULL, applied_note = NULL)
+    added <- c(added, tp)
+  }
+  list(register = register, added = added)
+}
+
+# What the API sees: the upload, the typed messages, the batched answers
+# and the decisions; not the question bubbles, the per-question answers
+# (the batch carries them) or the server's notices.
+.translator_api_history <- function(msgs) {
+  Filter(function(m) !(m$source %||% "") %in% c("server_question", "server_notice", "user_answer"), msgs)
+}
+
+# One question as a bubble in the conversation.
+.translator_q_bubble <- function(state, i) {
+  qs <- state$pending_questions; q <- qs[[i]]
+  txt <- sprintf(t("ai_q_bubble"), i, length(qs), q$text)
+  ch <- if (identical(q$kind, "server")) .translator_topic_choices_for(q$topic) else NULL
+  if (!is.null(ch))
+    txt <- paste0(txt, "\n", sprintf(t("ai_q_choices"),
+                                     paste(vapply(ch, .translator_choice_label, character(1)), collapse = " / ")))
+  state$messages[[length(state$messages) + 1L]] <-
+    list(role = "assistant", content = txt, display = txt, source = "server_question", ts = .translator_now())
+  invisible(NULL)
+}
+
+# Start a round: the notice bubble, then the first question.
+.translator_begin_round <- function(state, notice) {
+  state$q_index <- 1L
+  state$messages[[length(state$messages) + 1L]] <-
+    list(role = "assistant", content = notice, display = notice, source = "server_notice", ts = .translator_now())
+  .translator_q_bubble(state, 1L)
+  invisible(NULL)
+}
+
+# A one-line bubble with what was just recorded, when something was.
+.translator_post_recorded <- function(state, before) {
+  before <- before %||% list(); after <- state$register %||% list()
+  changed <- Filter(function(tp) {
+    a <- after[[tp]]; b <- before[[tp]]
+    !identical(a$status, "pending") && nzchar(a$decision %||% "") &&
+      (is.null(b) || !identical(b$decision, a$decision))
+  }, names(after))
+  if (!length(changed)) return(invisible(NULL))
+  parts <- vapply(changed, function(tp) {
+    e <- after[[tp]]
+    sprintf("%s: %s (%s)", .translator_topic_label(tp), e$decision, t(paste0("ai_reg_basis_", e$basis %||% "assumed")))
+  }, character(1))
+  txt <- sprintf(t("ai_q_recorded"), paste(parts, collapse = "; "))
+  state$messages[[length(state$messages) + 1L]] <-
+    list(role = "assistant", content = txt, display = txt, source = "server_notice", ts = .translator_now())
+  invisible(NULL)
+}
+
+.translator_is_skip <- function(txt) {
+  grepl("^\\s*(skip|pass|default|idk|i do not know|i don't know|je ne sais pas|-)\\s*[.!]?\\s*$", tolower(txt), perl = TRUE)
+}
+
+# Map a typed answer to one of a server question's choices when it clearly
+# names one; otherwise keep the text.
+.translator_parse_choice <- function(q, txt) {
+  ch <- if (identical(q$kind, "server")) .translator_topic_choices_for(q$topic) else NULL
+  if (is.null(ch)) return(trimws(txt))
+  low <- tolower(txt)
+  labs <- tolower(vapply(ch, .translator_choice_label, character(1)))
+  hit <- which(vapply(seq_along(ch), function(k)
+    grepl(ch[k], low, fixed = TRUE) || grepl(gsub("_", " ", ch[k]), low, fixed = TRUE) ||
+      grepl(substr(labs[k], 1, 12), low, fixed = TRUE), logical(1)))
+  if (length(hit) == 1L) return(ch[hit])
+  kw <- list(percent = "percent|%|pourcent", fraction = "fraction",
+             pooled = "pool|together|one group|single|un seul|regroup|ensemble",
+             split_as_in_file = "split|separate|s\u00e9par|male",
+             cattle_dairy = "^\\s*dairy|laitier", cattle_non_dairy = "non.?dairy|beef|viande|non laitier",
+             cattle_mixed = "both|mixed|mixte|all|les deux",
+             `2006` = "2006", `2019_refinement` = "2019|refine|affine",
+             herd_wide_from_file = "herd|whole|entire|same|tout le|m\u00eame",
+             per_subcategory_from_file = "per |each|chaque|sub", ipcc_default_split = "default|ipcc|d\u00e9faut",
+             file_bounds = "file|bound|fichier|borne", catalogue_ranges = "catalog|ipcc", mixed = "mix")
+  for (c_ in ch) if (!is.null(kw[[c_]]) && grepl(kw[[c_]], low, perl = TRUE)) return(c_)
+  trimws(txt)
+}
 
 # Fixed choices per topic; NULL means free text.
 .translator_topic_choices <- function(topic) {
@@ -177,7 +280,7 @@ translator_register_keep_user <- function(register) {
 translator_register_missing <- function(register) {
   register <- register %||% list()
   miss <- character(0)
-  for (tp in .TRANSLATOR_REQUIRED_TOPICS) {
+  for (tp in .TRANSLATOR_ASK_TOPICS) {
     e <- register[[tp]]
     if (is.null(e) || !identical(e$status, "decided")) miss <- c(miss, tp)
   }
