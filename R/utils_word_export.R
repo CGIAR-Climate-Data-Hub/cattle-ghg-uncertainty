@@ -546,7 +546,13 @@ build_trend_summary_docx <- function(path,
                                       n_iter      = 2000,
                                       ipcc_meta   = NULL,
                                       param_specs = NULL,
-                                      app_version = NULL) {
+                                      app_version = NULL,
+                                      # 2026-10-22: what to report and the
+                                      # IPCC reporting table for the chosen
+                                      # base year and year t
+                                      headline    = NULL,
+                                      ipcc_table  = NULL,
+                                      compare     = NULL) {
 
   doc <- officer::read_docx()
   yrs <- if (!is.null(years)) range(years) else range(trend_results$Year)
@@ -569,6 +575,29 @@ build_trend_summary_docx <- function(path,
   doc <- .add_h2(doc, "Executive summary")
   doc <- .add_p(doc, .build_trend_exec_summary(trend_results, slope, delta_total,
                                                  sensitivity_delta, year_corr, n_iter))
+
+  # ---- What to report (base year and year t) ------------------------------
+  if (!is.null(headline)) {
+    doc <- .add_h2(doc, "What to report")
+    for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
+    if (!is.null(compare)) {
+      doc <- .add_h3(doc, sprintf("The two years side by side, by emission source (%d and %d)",
+                                  headline$base_year, headline$year_t))
+      doc <- .add_flextable_safe(doc, .styled_flextable(.trend_compare_flextable(compare)))
+    }
+    if (!is.null(ipcc_table)) {
+      doc <- .add_h3(doc, sprintf("IPCC Table 3.3, general reporting table for uncertainty (base year %d, year t %d)",
+                                  headline$base_year, headline$year_t))
+      doc <- .add_p(doc, paste(
+        "Approach 2 (Monte Carlo). Values in t CO2eq; divide by 1,000 for Gg.",
+        if (isTRUE(attr(ipcc_table, "has_ad_ef")))
+          "Activity data and emission factor columns come from two extra simulations for year t with the other side held at its mean."
+        else "Activity data and emission factor columns were not computed for this report; IPCC allows them to be left blank.",
+        "Contribution to variance is each source's covariance with the total divided by the variance of the total; the six sources sum to 1.",
+        "Trend uncertainty is in percentage points around the trend, the IPCC convention."))
+      doc <- .add_flextable_safe(doc, .styled_flextable(.trend_ipcc_flextable(ipcc_table)))
+    }
+  }
 
   # ---- Run settings -------------------------------------------------------
   doc <- .add_h2(doc, "1. What was run")
@@ -702,8 +731,8 @@ build_trend_summary_docx <- function(path,
 .build_trend_exec_summary <- function(trend_results, slope, delta_total,
                                         sensitivity_delta, year_corr, n_iter) {
   yrs <- range(trend_results$Year)
-  delta_pct_str <- sprintf("%s%% (95%% CI %s%%, %s%%)",
-                            .fmt_signed(delta_total$pct_mean, 1),
+  delta_pct_str <- sprintf("%s%% (95%% range %s%% to %s%%)",
+                            .fmt_signed(trend_results$Delta_vs_base_pct[nrow(trend_results)], 1),
                             .fmt_signed(delta_total$pct_ci[1], 1),
                             .fmt_signed(delta_total$pct_ci[2], 1))
   slope_str <- sprintf("%s t CO2eq/yr (95%% CI %s, %s)",
@@ -923,11 +952,11 @@ build_trend_summary_docx <- function(path,
   df <- trend_results[, cols, drop = FALSE]
   pretty <- c(Year = "Year",
               Mean_t_CO2eq = "Mean (t CO2eq)",
-              CI_Lower_t   = "CI lower",
-              CI_Upper_t   = "CI upper",
-              MoE_95_pct   = "95% MoE (%)",
-              Delta_vs_base_pct = "Δ vs base (%)",
-              YoY_pct      = "YoY (%)")
+              CI_Lower_t   = "95% range lower",
+              CI_Upper_t   = "95% range upper",
+              MoE_95_pct   = "+/- % of mean (95%)",
+              Delta_vs_base_pct = "Change since base year (%)",
+              YoY_pct      = "Change from previous year (%)")
   names(df) <- pretty[names(df)]
   flextable::flextable(df)
 }
@@ -1483,4 +1512,60 @@ WORD_SENS_MAX <- 50L
     ggplot2::labs(x = "ΔCO2eq (t) between Y_N and Y_1", y = "Frequency",
                    title = "Distribution of ΔY_N − Y_1: uncertainty on the trend itself") +
     ggplot2::theme_minimal(base_size = 10)
+}
+
+# ---- 2026-10-22: what to report, for the Word trend report ----------------
+# English sentences from trend_headline(); the app phrases the same numbers
+# through i18n.
+.trend_headline_sentences <- function(h) {
+  f0 <- function(x) format(round(x, 0), big.mark = ",")
+  f1 <- function(x) formatC(x, digits = 1, format = "f")
+  fs <- function(x) { v <- formatC(x, digits = 1, format = "f"); if (x > 0) paste0("+", v) else v }
+  c(sprintf("Base year %d: %s t CO2eq, plus or minus %s%% (95%% range %s to %s t).",
+            h$base_year, f0(h$base_mean), f1(h$base_moe), f0(h$base_lo), f0(h$base_hi)),
+    sprintf("Year t %d: %s t CO2eq, plus or minus %s%% (95%% range %s to %s t).",
+            h$year_t, f0(h$t_mean), f1(h$t_moe), f0(h$t_lo), f0(h$t_hi)),
+    sprintf("Change from %d to %d: %s%%. The 95%% range of this change is %s%% to %s%%, that is %s to %s percentage points around the trend.",
+            h$base_year, h$year_t, fs(h$trend_pct), fs(h$trend_lo_pct), fs(h$trend_hi_pct),
+            fs(h$trend_lo_pp), fs(h$trend_hi_pp)),
+    if (isTRUE(h$zero_inside))
+      "This range includes zero: at 95%, the inventory cannot tell an increase from a decrease."
+    else "This range does not include zero: the direction of the change is clear at 95%.")
+}
+
+.trend_compare_flextable <- function(cmp) {
+  fs <- function(x) ifelse(is.na(x), "", ifelse(x > 0, paste0("+", formatC(x, digits = 1, format = "f")),
+                                                formatC(x, digits = 1, format = "f")))
+  df <- data.frame(
+    `Emission source` = cmp$category,
+    `Base year (t CO2eq)` = format(round(cmp$base_mean, 0), big.mark = ","),
+    `Base year +/- %` = formatC(cmp$base_moe_pct, digits = 1, format = "f"),
+    `Year t (t CO2eq)` = format(round(cmp$t_mean, 0), big.mark = ","),
+    `Year t +/- %` = formatC(cmp$t_moe_pct, digits = 1, format = "f"),
+    `Change (%)` = fs(cmp$trend_pct),
+    `Change, 95% range (%)` = ifelse(is.na(cmp$trend_lo_pp), "",
+                                     paste0(fs(cmp$trend_pct + cmp$trend_lo_pp), " to ",
+                                            fs(cmp$trend_pct + cmp$trend_hi_pp))),
+    `Share of year t variance` = ifelse(cmp$is_source | cmp$var == "total_co2e",
+                                        formatC(cmp$contribution, digits = 3, format = "f"), ""),
+    check.names = FALSE, stringsAsFactors = FALSE)
+  ft <- flextable::flextable(df)
+  ft <- flextable::fontsize(ft, size = 8, part = "all")
+  flextable::autofit(ft)
+}
+
+.trend_ipcc_flextable <- function(tab) {
+  df <- tab
+  for (j in 3:4) df[[j]] <- format(round(df[[j]], 0), big.mark = ",")
+  for (j in 5:10) df[[j]] <- ifelse(is.na(df[[j]]), "", formatC(df[[j]], digits = 1, format = "f"))
+  df[[11]] <- ifelse(is.na(df[[11]]), "", formatC(df[[11]], digits = 3, format = "f"))
+  for (j in 12:14) df[[j]] <- ifelse(is.na(df[[j]]), "", formatC(df[[j]], digits = 1, format = "f"))
+  names(df) <- c("IPCC category", "Gas", "Base year (t CO2eq)", "Year t (t CO2eq)",
+                 "AD (-) %", "AD (+) %", "EF (-) %", "EF (+) %",
+                 "Combined (-) %", "Combined (+) %", "Share of variance, year t",
+                 "Trend (% of base)", "Trend unc. (-) pp", "Trend unc. (+) pp",
+                 "Approach and comments")
+  ft <- flextable::flextable(df)
+  ft <- flextable::fontsize(ft, size = 6.5, part = "all")
+  flextable::autofit(ft)
 }

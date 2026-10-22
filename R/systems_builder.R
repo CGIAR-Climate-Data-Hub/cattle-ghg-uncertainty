@@ -420,3 +420,52 @@ make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
     blocks
   }
 }
+
+# ---------------------------------------------------------------------------
+# AD/EF split (IPCC Table 3.3 columns E and F). Lifted verbatim from the
+# run_sim observer on 2026-10-22 so trend_decompose_year() runs the same
+# two fixed-parameter simulations as single-year. fix_type = "coefficient"
+# holds every coefficient at its mean (the AD-only run); "activity_data"
+# holds the activity data at its mean (the EF-only run).
+fix_params_for_decomposition <- function(sd, fix_type) {
+  ps <- sd$param_specs
+  ps$param_type[is.na(ps$param_type)] <- "coefficient"
+  rows <- ps$param_type == fix_type
+  ps$distribution[rows] <- "constant"
+  ps$lower[rows] <- ps$mean[rows]
+  ps$upper[rows] <- ps$mean[rows]
+  sd$param_specs <- ps
+  if (fix_type == "coefficient") {
+    sd$ef_corr_matrix <- NULL
+    # Andreas 28/5/26 #9: per-MMS sample matrices (mcf_samples,
+    # ef3_samples, frac_gas_samples, frac_leach_samples) and the
+    # MMS-allocation sample matrix (mms_fraction_samples) all
+    # carry coefficient-side variance: they were leaking
+    # iteration-to-iteration MCF / EF3 / Frac variation into the
+    # AD-only run, so AD-only CV differed across emission sources
+    # even though N was the only AD parameter. Null them here so
+    # the AD-only run sees deterministic per-MMS values
+    # (mcf_values / ef3_values / frac_gas_values / frac_leach_values
+    # / mms_fractions are still respected: they are the central
+    # values used when the matrices are NULL).
+    sd$mcf_samples           <- NULL
+    sd$ef3_samples           <- NULL
+    sd$frac_gas_samples      <- NULL
+    sd$frac_leach_samples    <- NULL
+    sd$mms_fraction_samples  <- NULL
+    # Cross-group shared coefficient draws are pure coefficient
+    # variance, exactly like the per-MMS matrices above. Leaving
+    # them in the AD-only run would leak that variance into the
+    # activity-data column of IPCC Table 3.3, the same class of
+    # bug as the 2026-05 per-MMS leak.
+    sd$pre_sampled_coefficients <- NULL
+  }
+  if (fix_type == "activity_data") {
+    sd$corr_matrix         <- NULL
+    sd$unified_corr_matrix <- NULL
+    # Per-MMS sample matrices STAY active in the EF-only run -
+    # they are coefficient-side variance and are exactly what
+    # the EF-only run is meant to expose.
+  }
+  sd
+}

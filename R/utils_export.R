@@ -196,7 +196,12 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
 # Sensitivity_per_year_*, Sensitivity_delta_*, Methodology.
 export_trend_xlsx <- function(results_table, slope, delta_total,
                                sensitivity_per_year, sensitivity_delta,
-                               year_corr, n_iter, filepath) {
+                               year_corr, n_iter, filepath,
+                               # 2026-10-22: what to report (base year and
+                               # year t), IPCC Table 3.3, the two years by
+                               # source, every year by source and by group
+                               headline = NULL, ipcc_table = NULL, compare = NULL,
+                               sources_long = NULL, by_group = NULL) {
   slope_delta_summary <- data.frame(
     Metric = c("Trend slope (t CO2eq / yr)",
                "Trend slope 95% CI lower",
@@ -228,7 +233,69 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     sens[[key]]
   }
 
-  sheets <- list(
+  report_sheets <- list()
+  if (!is.null(headline)) {
+    h <- headline
+    report_sheets$What_to_report <- data.frame(
+      Item = c("Base year", "Base year total (t CO2eq)", "Base year uncertainty (+/- % of mean)",
+               "Base year 95% range lower (t)", "Base year 95% range upper (t)",
+               "Year t", "Year t total (t CO2eq)", "Year t uncertainty (+/- % of mean)",
+               "Year t 95% range lower (t)", "Year t 95% range upper (t)",
+               "Change from base year to year t (%)",
+               "Change, 95% range lower (%)", "Change, 95% range upper (%)",
+               "Uncertainty in the trend (-) percentage points",
+               "Uncertainty in the trend (+) percentage points",
+               "95% range of the change includes zero",
+               "Year-to-year correlation of coefficients"),
+      Value = c(h$base_year, round(h$base_mean, 1), round(h$base_moe, 1),
+                round(h$base_lo, 1), round(h$base_hi, 1),
+                h$year_t, round(h$t_mean, 1), round(h$t_moe, 1),
+                round(h$t_lo, 1), round(h$t_hi, 1),
+                round(h$trend_pct, 1), round(h$trend_lo_pct, 1), round(h$trend_hi_pct, 1),
+                round(h$trend_lo_pp, 1), round(h$trend_hi_pp, 1),
+                if (isTRUE(h$zero_inside)) "yes" else "no", h$year_corr),
+      stringsAsFactors = FALSE)
+  }
+  if (!is.null(ipcc_table)) report_sheets$IPCC_Table_3_3 <- ipcc_table
+  if (!is.null(compare)) {
+    cmp <- compare
+    report_sheets$Two_years_by_source <- data.frame(
+      `Emission source` = cmp$category, Gas = cmp$gas,
+      `Base year mean (t CO2eq)` = round(cmp$base_mean, 1),
+      `Base year +/- %` = round(cmp$base_moe_pct, 1),
+      `Base year (-) %` = round(cmp$base_lower_pct, 1),
+      `Base year (+) %` = round(cmp$base_upper_pct, 1),
+      `Year t mean (t CO2eq)` = round(cmp$t_mean, 1),
+      `Year t +/- %` = round(cmp$t_moe_pct, 1),
+      `Year t (-) %` = round(cmp$t_lower_pct, 1),
+      `Year t (+) %` = round(cmp$t_upper_pct, 1),
+      `Change (%)` = round(cmp$trend_pct, 1),
+      `Change 95% lower (%)` = round(cmp$trend_pct + cmp$trend_lo_pp, 1),
+      `Change 95% upper (%)` = round(cmp$trend_pct + cmp$trend_hi_pp, 1),
+      `Share of year t variance` = round(cmp$contribution, 4),
+      check.names = FALSE, stringsAsFactors = FALSE)
+  }
+  if (!is.null(sources_long)) {
+    sl <- sources_long
+    report_sheets$All_years_by_source <- data.frame(
+      Year = sl$year, `Emission source` = sl$category, Gas = sl$gas,
+      `Mean (t CO2eq)` = round(sl$mean_t_co2e, 1),
+      `95% lower (t)` = round(sl$lo, 1), `95% upper (t)` = round(sl$hi, 1),
+      `+/- %` = round(sl$moe_pct, 1), `(-) %` = round(sl$lower_pct, 1),
+      `(+) %` = round(sl$upper_pct, 1),
+      check.names = FALSE, stringsAsFactors = FALSE)
+  }
+  if (!is.null(by_group)) {
+    bg <- by_group
+    report_sheets$All_years_by_group <- data.frame(
+      Year = bg$year, `Cattle type` = bg$cattle_type,
+      `Production system` = bg$aggregation_level, `Sub-category` = bg$sub_category,
+      Source = bg$source, Mean = round(bg$mean, 2),
+      `95% lower` = round(bg$lo, 2), `95% upper` = round(bg$hi, 2),
+      check.names = FALSE, stringsAsFactors = FALSE)
+  }
+
+  sheets <- c(report_sheets, list(
     Trend_summary    = results_table,
     Slope_and_delta  = slope_delta_summary,
     Sensitivity_per_year_SRC  = pull_df(sensitivity_per_year, "src"),
@@ -236,6 +303,6 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     Sensitivity_delta_SRC     = pull_df(sensitivity_delta, "src"),
     Sensitivity_delta_PRCC    = pull_df(sensitivity_delta, "prcc"),
     Methodology      = methodology
-  )
+  ))
   writexl::write_xlsx(sheets, path = filepath)
 }

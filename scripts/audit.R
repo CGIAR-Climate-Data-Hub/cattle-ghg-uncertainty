@@ -914,6 +914,31 @@ section_D <- function() {
     check_bool("D5c", "D",
                "Multi-group trend delta vs base is positive",
                isTRUE(mg_res$table$Delta_vs_base_pct[3] > 10))
+    # D6 (2026-10-22): IPCC Table 3.3 for base year and year t, from the
+    # retained per-year totals. The six sources' shares of the year-t
+    # variance must sum to 1 (covariance decomposition), column I must equal
+    # the trend table's change, and the trend uncertainty (column J) must
+    # bracket zero around the trend.
+    tab <- tryCatch(trend_ipcc_table(mg_res, 2020, 2022, year_corr = "full"),
+                    error = function(e) NULL)
+    if (!is.null(tab) && nrow(tab) == 9L) {
+      share <- sum(tab[[11]][1:6])
+      check_within("D6a", "D",
+                   "Trend Table 3.3: the six sources' variance shares sum to 1",
+                   share, 1, tol_abs = 0.02,
+                   notes = sprintf("sum=%.4f", share))
+      check_within("D6b", "D",
+                   "Trend Table 3.3: column I (total) equals the trend table's change vs base",
+                   tab[[12]][9], mg_res$table$Delta_vs_base_pct[3], tol_abs = 0.2,
+                   notes = sprintf("I=%.1f table=%.1f", tab[[12]][9], mg_res$table$Delta_vs_base_pct[3]))
+      check_bool("D6c", "D",
+                 "Trend Table 3.3: trend uncertainty (-) <= 0 <= (+) for the total",
+                 isTRUE(tab[[13]][9] <= 0 && tab[[14]][9] >= 0),
+                 notes = sprintf("J=(%.1f, %.1f) pp", tab[[13]][9], tab[[14]][9]))
+    } else {
+      record("D6a", "D", "Trend Table 3.3", "9 rows", NA, "FAIL",
+             "trend_ipcc_table() failed or returned the wrong shape")
+    }
   } else {
     record("D5a", "D", "Multi-group trend", "runs", NA, "FAIL",
            "run_trend_analysis raised an error on a 3-group fixture")
@@ -3664,20 +3689,45 @@ section_F <- function() {
   # the no-correlation comparison run must both null the shared block, or
   # coefficient variance leaks into the AD column and the comparison bars come
   # out identical to the main run (the June-2026 bug).
+  # 2026-10-22: the AD-only half is behavioural. fix_params() moved out of
+  # app_server.R into fix_params_for_decomposition() (R/systems_builder.R),
+  # shared with the trend's AD/EF split, so a source scan of one file would
+  # go stale the moment the rule moved (knowledge/13-open-items.md said so).
+  # The comparison-run half stays a source scan of app_server.R, where the
+  # comparison run is still built inline.
   f61_fail <- tryCatch({
     f <- character(0)
+    sd <- list(param_specs = data.frame(parameter = c("N", "Ym"),
+                                        param_type = c("activity_data", "coefficient"),
+                                        mean = c(100, 6.5), lower = c(90, 6), upper = c(110, 7),
+                                        distribution = c("normal", "normal"),
+                                        stringsAsFactors = FALSE),
+               pre_sampled_coefficients = matrix(6.5, nrow = 10, ncol = 1,
+                                                 dimnames = list(NULL, "Ym")),
+               mcf_samples = matrix(1, 10, 1), ef3_samples = matrix(1, 10, 1))
+    ad <- fix_params_for_decomposition(sd, "coefficient")
+    if (!is.null(ad$pre_sampled_coefficients))
+      f <- c(f, "AD-only run kept the shared coefficient block")
+    if (!is.null(ad$mcf_samples) || !is.null(ad$ef3_samples))
+      f <- c(f, "AD-only run kept the per-MMS sample matrices")
+    if (!all(ad$param_specs$distribution[ad$param_specs$param_type == "coefficient"] == "constant"))
+      f <- c(f, "AD-only run did not hold the coefficients constant")
+    ef <- fix_params_for_decomposition(sd, "activity_data")
+    if (is.null(ef$pre_sampled_coefficients))
+      f <- c(f, "EF-only run dropped the shared coefficient block")
+    if (!all(ef$param_specs$distribution[ef$param_specs$param_type == "activity_data"] == "constant"))
+      f <- c(f, "EF-only run did not hold the activity data constant")
     src <- readLines("R/app_server.R", warn = FALSE)
     src <- src[!grepl("^\\s*#", src)]
-    hits <- grep("pre_sampled_coefficients\\s*<-\\s*NULL", src)
-    if (length(hits) < 2L)
-      f <- c(f, sprintf("expected the shared block to be nulled in both the AD-only run and the comparison run; found %d site(s)", length(hits)))
+    if (!any(grepl("pre_sampled_coefficients\\s*<-\\s*NULL", src)))
+      f <- c(f, "the no-correlation comparison run in app_server.R no longer nulls the shared block")
     f
   }, error = function(e) conditionMessage(e))
   f61_ok <- length(f61_fail) == 0L
   check_bool("F61", "F",
              "The shared coefficient block is nulled for the AD-only run and for the no-correlation comparison run",
              f61_ok,
-             notes = if (f61_ok) "both sites present"
+             notes = if (f61_ok) "AD-only and EF-only behave; comparison-run site present"
                      else paste(f61_fail, collapse = "; "))
 
   # ---------------------------------------------------------------------

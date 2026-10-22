@@ -1857,48 +1857,9 @@ app_server <- function(input, output, session) {
             setProgress(0.48, detail = sprintf("Running AD-only simulation (%d group(s))...",
                                                length(systems_data)))
 
-            fix_params <- function(sd, fix_type) {
-              ps <- sd$param_specs
-              ps$param_type[is.na(ps$param_type)] <- "coefficient"
-              rows <- ps$param_type == fix_type
-              ps$distribution[rows] <- "constant"
-              ps$lower[rows] <- ps$mean[rows]
-              ps$upper[rows] <- ps$mean[rows]
-              sd$param_specs <- ps
-              if (fix_type == "coefficient") {
-                sd$ef_corr_matrix <- NULL
-                # Andreas 28/5/26 #9: per-MMS sample matrices (mcf_samples,
-                # ef3_samples, frac_gas_samples, frac_leach_samples) and the
-                # MMS-allocation sample matrix (mms_fraction_samples) all
-                # carry coefficient-side variance: they were leaking
-                # iteration-to-iteration MCF / EF3 / Frac variation into the
-                # AD-only run, so AD-only CV differed across emission sources
-                # even though N was the only AD parameter. Null them here so
-                # the AD-only run sees deterministic per-MMS values
-                # (mcf_values / ef3_values / frac_gas_values / frac_leach_values
-                # / mms_fractions are still respected: they are the central
-                # values used when the matrices are NULL).
-                sd$mcf_samples           <- NULL
-                sd$ef3_samples           <- NULL
-                sd$frac_gas_samples      <- NULL
-                sd$frac_leach_samples    <- NULL
-                sd$mms_fraction_samples  <- NULL
-                # Cross-group shared coefficient draws are pure coefficient
-                # variance, exactly like the per-MMS matrices above. Leaving
-                # them in the AD-only run would leak that variance into the
-                # activity-data column of IPCC Table 3.3, the same class of
-                # bug as the 2026-05 per-MMS leak.
-                sd$pre_sampled_coefficients <- NULL
-              }
-              if (fix_type == "activity_data") {
-                sd$corr_matrix         <- NULL
-                sd$unified_corr_matrix <- NULL
-                # Per-MMS sample matrices STAY active in the EF-only run -
-                # they are coefficient-side variance and are exactly what
-                # the EF-only run is meant to expose.
-              }
-              sd
-            }
+            # 2026-10-22: fix_params() moved to R/systems_builder.R as
+            # fix_params_for_decomposition(), shared with the trend's AD/EF split.
+            fix_params <- fix_params_for_decomposition
 
             systems_ad <- lapply(systems_data, fix_params, fix_type = "coefficient")
             ad_result  <- run_inventory_simulation(
@@ -3413,7 +3374,12 @@ app_server <- function(input, output, session) {
   rv_trend <- reactiveValues(results = NULL, samples_by_year = NULL,
                               co2e_by_year = NULL, slope = NULL,
                               delta_total = NULL, year_corr = NULL,
-                              years = NULL, message = NULL, res = NULL)
+                              years = NULL, message = NULL, res = NULL,
+                              # 2026-10-22: the frame and settings the run
+                              # used, so the AD/EF split for a chosen year
+                              # can rebuild that year exactly; decomp is
+                              # keyed by year
+                              trend_df = NULL, run_args = NULL, decomp = list())
 
   observeEvent(input$run_trend, {
     req(rv$param_specs)
@@ -3464,15 +3430,16 @@ app_server <- function(input, output, session) {
           # correlation matrix and the resolved sub-category matches.
           sgm <- tryCatch(resolve_sub_category_matches(rv$param_specs, rv$manure_data)$matched,
                           error = function(e) list())
+          cg <- if (identical(input$crossgroup_mode %||% "shared", "shared")) "shared" else "independent"
+          cm <- if (isTRUE(input$corr_mode != "none")) rv$corr_matrix else NULL
           res <- run_trend_analysis(
             df, base_specs = rv$param_specs, n_iter = n_iter,
             gwp = gv, seed = sd_, year_corr = yc,
             emission_sources = input$emission_sources,
             progress_fn = prog_fn,
             manure      = rv$manure_data,
-            crossgroup  = if (identical(input$crossgroup_mode %||% "shared", "shared"))
-                            "shared" else "independent",
-            corr_matrix = if (isTRUE(input$corr_mode != "none")) rv$corr_matrix else NULL,
+            crossgroup  = cg,
+            corr_matrix = cm,
             sg_to_mm    = sgm,
             keep_samples = "ends",
             keep_sample_rows = 4000L)
@@ -3484,14 +3451,25 @@ app_server <- function(input, output, session) {
           rv_trend$co2e_by_year    <- res$co2e_by_year
           # the whole result, for the per-year views and the exports
           rv_trend$res             <- res
+          rv_trend$trend_df        <- df
+          rv_trend$run_args        <- list(n_iter = n_iter, gwp = gv, seed = sd_,
+                                           manure = rv$manure_data, crossgroup = cg,
+                                           corr_matrix = cm, sg_to_mm = sgm, year_corr = yc)
+          rv_trend$decomp          <- list()
+          # year selectors: base year = first, year t = last, on both tabs
+          yrs_chr <- as.character(res$years)
+          for (id in c("trend_base_year", "trend_base_year_rep"))
+            updateSelectInput(session, id, choices = yrs_chr, selected = yrs_chr[1])
+          for (id in c("trend_year_t", "trend_year_t_rep", "trend_detail_year"))
+            updateSelectInput(session, id, choices = yrs_chr, selected = yrs_chr[length(yrs_chr)])
           rv_trend$slope           <- res$slope
           rv_trend$delta_total     <- res$delta_total
           rv_trend$year_corr       <- res$year_corr
           rv_trend$years           <- res$years
           rv_trend$message <- list(type = "success",
-            text = sprintf("Trend computed for %d years (%d–%d). Δ vs base: %.1f%% [95%% CI %.1f%%, %.1f%%]; slope: %.0f t CO₂eq/yr.",
+            text = sprintf("Trend computed for %d years (%d to %d). Change since base year: %+.1f%% (95%% range %+.1f%% to %+.1f%%); average change per year: %+.0f t CO₂eq.",
                            nrow(res$table), min(res$table$Year), max(res$table$Year),
-                           res$delta_total$pct_mean,
+                           res$table$Delta_vs_base_pct[nrow(res$table)],
                            res$delta_total$pct_ci[1], res$delta_total$pct_ci[2],
                            res$slope$mean))
           nnf <- res$n_nonfinite_by_year
@@ -3555,13 +3533,17 @@ app_server <- function(input, output, session) {
     if (x > 0) paste0("+", s, "%") else paste0(s, "%")
   }
 
+  # 2026-10-22: the change is the IPCC column I definition, on the means
+  # (the trend table's Delta_vs_base_pct), so the value box, the message,
+  # the What to report sentences and Table 3.3 all show one number. The
+  # range is the per-iteration 95% range, as before.
   output$vb_trend_delta <- renderText({
-    req(rv_trend$delta_total)
-    .fmt_signed_pct(rv_trend$delta_total$pct_mean, 1)
+    req(rv_trend$results)
+    .fmt_signed_pct(rv_trend$results$Delta_vs_base_pct[nrow(rv_trend$results)], 1)
   })
   output$vb_trend_delta_sub <- renderText({
     req(rv_trend$delta_total)
-    sprintf("95%% CI %s to %s",
+    sprintf("95%% range %s to %s",
             .fmt_signed_pct(rv_trend$delta_total$pct_ci[1], 1),
             .fmt_signed_pct(rv_trend$delta_total$pct_ci[2], 1))
   })
@@ -3619,9 +3601,9 @@ app_server <- function(input, output, session) {
     req(rv_trend$results, rv_trend$year_corr)
     df <- rv_trend$results
     yc_label <- switch(rv_trend$year_corr,
-                        full    = "fully correlated coefficients (IPCC 2019 default)",
-                        partial = "partial year-correlation (AR(1), ρ=0.7)",
-                        none    = "independent years")
+                        full    = "coefficients held the same across years (IPCC default)",
+                        partial = "coefficients drifting slowly between years",
+                        none    = "coefficients redrawn every year")
     sprintf("Year range: %d – %d  ·  %d years analysed  ·  %s",
             min(df$Year), max(df$Year), nrow(df), yc_label)
   })
@@ -3689,7 +3671,7 @@ app_server <- function(input, output, session) {
     req(rv_trend$results)
     df <- rv_trend$results
     sub <- if (!is.null(rv_trend$slope) && !is.null(rv_trend$delta_total)) {
-      sprintf("Δ vs base: %.1f%% (95%% CI %.1f%%, %.1f%%)  •  Slope: %.0f t CO₂eq/yr (95%% CI %.0f, %.0f)",
+      sprintf("Change since base year: %.1f%% (95%% range %.1f%%, %.1f%%)  •  Average change per year: %.0f t CO₂eq (95%% range %.0f, %.0f)",
               rv_trend$delta_total$pct_mean,
               rv_trend$delta_total$pct_ci[1], rv_trend$delta_total$pct_ci[2],
               rv_trend$slope$mean,
@@ -3715,6 +3697,133 @@ app_server <- function(input, output, session) {
   })
 
   # Round 8: Trend sensitivity (per-year + delta)
+
+  # ---- 2026-10-22: what to report (base year and year t) -------------------
+  # The two selectors exist on the Results tab and on the IPCC Report tab;
+  # each pair is kept in step so the user sees one choice everywhere.
+  .sync_select <- function(a, b) {
+    observeEvent(input[[a]], {
+      if (!is.null(input[[a]]) && !identical(input[[a]], input[[b]]))
+        updateSelectInput(session, b, selected = input[[a]])
+    }, ignoreInit = TRUE)
+  }
+  .sync_select("trend_base_year", "trend_base_year_rep")
+  .sync_select("trend_base_year_rep", "trend_base_year")
+  .sync_select("trend_year_t", "trend_year_t_rep")
+  .sync_select("trend_year_t_rep", "trend_year_t")
+
+  trend_sel_years <- reactive({
+    req(rv_trend$res)
+    yrs <- rv_trend$res$years
+    b  <- suppressWarnings(as.integer(input$trend_base_year))
+    tt <- suppressWarnings(as.integer(input$trend_year_t))
+    if (length(b) != 1 || is.na(b) || !b %in% yrs) b <- yrs[1]
+    if (length(tt) != 1 || is.na(tt) || !tt %in% yrs) tt <- yrs[length(yrs)]
+    list(base = b, t = tt)
+  })
+  trend_gwp  <- reactive(rv_trend$run_args$gwp %||% "AR5")
+  trend_cmp  <- reactive({ ys <- trend_sel_years()
+                           trend_compare_years(rv_trend$res, ys$base, ys$t, trend_gwp()) })
+  trend_head <- reactive({ ys <- trend_sel_years()
+                           trend_headline(rv_trend$res, ys$base, ys$t, trend_gwp()) })
+  trend_ipcc <- reactive({
+    ys <- trend_sel_years()
+    trend_ipcc_table(rv_trend$res, ys$base, ys$t, trend_gwp(),
+                     decomp = rv_trend$decomp[[as.character(ys$t)]],
+                     year_corr = rv_trend$year_corr %||% "full")
+  })
+
+  .fs <- function(x, d = 1) {
+    if (is.null(x) || is.na(x)) return("-")
+    v <- formatC(x, digits = d, format = "f", big.mark = ",")
+    if (x > 0) paste0("+", v) else v
+  }
+  .f0 <- function(x) if (is.null(x) || is.na(x)) "-" else format(round(x, 0), big.mark = ",")
+  .f1 <- function(x) if (is.null(x) || is.na(x)) "-" else formatC(x, digits = 1, format = "f")
+
+  .trend_report_ui <- function() {
+    h <- trend_head(); req(h)
+    s1 <- sprintf(t("trend_line_year"), t("trend_word_base_year"), h$base_year,
+                  .f0(h$base_mean), .f1(h$base_moe), .f0(h$base_lo), .f0(h$base_hi))
+    s2 <- sprintf(t("trend_line_year"), t("trend_word_year_t"), h$year_t,
+                  .f0(h$t_mean), .f1(h$t_moe), .f0(h$t_lo), .f0(h$t_hi))
+    s3 <- sprintf(t("trend_line_change"), h$base_year, h$year_t, .fs(h$trend_pct),
+                  .fs(h$trend_lo_pct), .fs(h$trend_hi_pct),
+                  .fs(h$trend_lo_pp), .fs(h$trend_hi_pp))
+    s4 <- if (isTRUE(h$zero_inside)) t("trend_line_zero_in") else t("trend_line_zero_out")
+    tags$ul(style = "font-size:1rem; line-height:1.7; margin-bottom:0;",
+            tags$li(tags$strong(s1)), tags$li(tags$strong(s2)),
+            tags$li(s3), tags$li(s4),
+            tags$li(tags$em(style = "color:#555;", t("trend_line_where"))))
+  }
+  output$trend_report_text        <- renderUI(.trend_report_ui())
+  output$trend_report_text_report <- renderUI(.trend_report_ui())
+
+  output$trend_compare_table <- DT::renderDT({
+    cmp <- trend_cmp(); req(cmp)
+    rng <- function(lo, hi) ifelse(is.na(lo), "", paste0(.fs_vec(lo), " to ", .fs_vec(hi)))
+    df <- data.frame(
+      cmp$category,
+      round(cmp$base_mean, 0), round(cmp$base_moe_pct, 1),
+      round(cmp$t_mean, 0),    round(cmp$t_moe_pct, 1),
+      round(cmp$trend_pct, 1),
+      rng(cmp$trend_pct + cmp$trend_lo_pp, cmp$trend_pct + cmp$trend_hi_pp),
+      ifelse(cmp$is_source | cmp$var == "total_co2e", round(cmp$contribution, 3), NA),
+      check.names = FALSE, stringsAsFactors = FALSE)
+    names(df) <- c(t("trend_col_source"), t("trend_col_base_mean"), t("trend_col_base_moe"),
+                   t("trend_col_t_mean"), t("trend_col_t_moe"), t("trend_col_change"),
+                   t("trend_col_change_range"), t("trend_col_contrib"))
+    DT::datatable(df, rownames = FALSE,
+                  options = list(pageLength = 12, dom = "t", ordering = FALSE)) |>
+      DT::formatCurrency(c(2, 4), currency = "", digits = 0)
+  })
+  .fs_vec <- function(x, d = 1) vapply(x, function(v) .fs(v, d), character(1))
+
+  output$trend_year_groups <- DT::renderDT({
+    req(rv_trend$res, rv_trend$res$system_summary)
+    ss <- rv_trend$res$system_summary
+    yr <- suppressWarnings(as.integer(input$trend_detail_year))
+    if (length(yr) != 1 || is.na(yr) || !yr %in% ss$year) yr <- max(ss$year)
+    d <- ss[ss$year == yr & ss$source == "total_co2e", , drop = FALSE]
+    df <- data.frame(
+      paste(d$cattle_type, d$aggregation_level, d$sub_category, sep = " / "),
+      round(d$mean, 0),
+      round(ifelse(d$mean > 0, (d$hi - d$lo) / 2 / d$mean * 100, NA), 1),
+      round(d$lo, 0), round(d$hi, 0),
+      check.names = FALSE, stringsAsFactors = FALSE)
+    names(df) <- c(t("trend_col_group"), t("trend_col_year_mean"), t("trend_col_year_moe"),
+                   t("trend_col_year_lo"), t("trend_col_year_hi"))
+    df <- df[order(-df[[2]]), , drop = FALSE]
+    DT::datatable(df, rownames = FALSE, options = list(pageLength = 15, dom = "tp")) |>
+      DT::formatCurrency(c(2, 4, 5), currency = "", digits = 0)
+  })
+
+  output$trend_ipcc_table <- DT::renderDT({
+    tab <- trend_ipcc(); req(tab)
+    DT::datatable(tab, rownames = FALSE,
+                  options = list(pageLength = 12, dom = "t", ordering = FALSE, scrollX = TRUE)) |>
+      DT::formatCurrency(c(3, 4), currency = "", digits = 0)
+  })
+  output$trend_adef_status <- renderText({
+    ys <- trend_sel_years()
+    if (is.null(rv_trend$decomp[[as.character(ys$t)]])) t("trend_adef_empty")
+    else sprintf(t("trend_adef_done"), ys$t)
+  })
+  observeEvent(input$trend_adef_btn, {
+    req(rv_trend$res, rv_trend$trend_df, rv_trend$run_args)
+    ys <- trend_sel_years(); a <- rv_trend$run_args
+    d <- withProgress(message = sprintf(t("trend_adef_running"), ys$t), value = 0.1, {
+      tryCatch(
+        trend_decompose_year(rv_trend$trend_df, rv$param_specs, ys$t,
+                             n_iter = a$n_iter, gwp = a$gwp, seed = a$seed,
+                             manure = a$manure, crossgroup = a$crossgroup,
+                             corr_matrix = a$corr_matrix, sg_to_mm = a$sg_to_mm,
+                             year_corr = a$year_corr,
+                             progress_fn = function(lbl) incProgress(0.4, detail = lbl)),
+        error = function(e) { showNotification(conditionMessage(e), type = "error"); NULL })
+    })
+    if (!is.null(d)) { dc <- rv_trend$decomp; dc[[as.character(ys$t)]] <- d; rv_trend$decomp <- dc }
+  })
 
   # 2026-10-16: samples_by_year now holds per-system thinned draws for the
   # first and last year, so sensitivity goes through aggregate_sensitivity()
@@ -3867,7 +3976,7 @@ app_server <- function(input, output, session) {
 
   output$trend_tornado_delta <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers: Δ Y_N − Y_1")
+                         "Top 10 drivers of the change between first and last year")
   })
 
   # Round 9: mirror outputs for the IPCC Report tab. Shiny requires unique
@@ -3882,7 +3991,7 @@ app_server <- function(input, output, session) {
     req(rv_trend$results)
     df <- rv_trend$results
     sub <- if (!is.null(rv_trend$slope) && !is.null(rv_trend$delta_total)) {
-      sprintf("Δ vs base: %.1f%% (95%% CI %.1f%%, %.1f%%)  •  Slope: %.0f t CO₂eq/yr (95%% CI %.0f, %.0f)",
+      sprintf("Change since base year: %.1f%% (95%% range %.1f%%, %.1f%%)  •  Average change per year: %.0f t CO₂eq (95%% range %.0f, %.0f)",
               rv_trend$delta_total$pct_mean,
               rv_trend$delta_total$pct_ci[1], rv_trend$delta_total$pct_ci[2],
               rv_trend$slope$mean,
@@ -3912,7 +4021,7 @@ app_server <- function(input, output, session) {
   })
   output$trend_tornado_delta_report <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers: Δ Y_N − Y_1")
+                         "Top 10 drivers of the change between first and last year")
   })
   # Round 9 follow-up: third copy of the trend tornadoes for Tab 6 (Sensitivity)
   # since each Shiny output ID can render in only one UI element. All three
@@ -3923,7 +4032,7 @@ app_server <- function(input, output, session) {
   })
   output$trend_tornado_delta_sens <- plotly::renderPlotly({
     .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers: Δ Y_N − Y_1")
+                         "Top 10 drivers of the change between first and last year")
   })
   # Round 9 follow-up: rankings tables (Top 15) for trend mode, mirroring
   # the single-year output$sensitivity_table. Both SRC and PRCC columns
@@ -3948,7 +4057,7 @@ app_server <- function(input, output, session) {
     content = function(file) {
       shiny::validate(shiny::need(!is.null(rv_trend$results),
                     "Run a trend simulation on Tab 7 before downloading."))
-      n_iter_val <- as.integer(input$n_iter %||% 10000)
+      n_iter_val <- as.integer(rv_trend$run_args$n_iter %||% input$n_iter_trend %||% 2000)
       export_trend_xlsx(
         results_table        = rv_trend$results,
         slope                = rv_trend$slope,
@@ -3957,7 +4066,12 @@ app_server <- function(input, output, session) {
         sensitivity_delta    = trend_sens_delta(),
         year_corr            = rv_trend$year_corr,
         n_iter               = n_iter_val,
-        filepath             = file
+        filepath             = file,
+        headline             = trend_head(),
+        ipcc_table           = trend_ipcc(),
+        compare              = trend_cmp(),
+        sources_long         = trend_sources_long(rv_trend$res, trend_gwp()),
+        by_group             = rv_trend$res$system_summary
       )
     }
   )
@@ -3976,7 +4090,7 @@ app_server <- function(input, output, session) {
     content = function(file) {
       shiny::validate(shiny::need(!is.null(rv_trend$results),
                     "Run a trend simulation on Tab 7 before downloading."))
-      n_iter_val <- as.integer(input$n_iter %||% 10000)
+      n_iter_val <- as.integer(rv_trend$run_args$n_iter %||% input$n_iter_trend %||% 2000)
       build_trend_summary_docx(
         path                 = file,
         trend_results        = rv_trend$results,
@@ -3988,7 +4102,10 @@ app_server <- function(input, output, session) {
         years                = rv_trend$years,
         n_iter               = n_iter_val,
         ipcc_meta            = rv$inv_metadata,
-        param_specs          = rv$param_specs
+        param_specs          = rv$param_specs,
+        headline             = trend_head(),
+        ipcc_table           = trend_ipcc(),
+        compare              = trend_cmp()
       )
     }
   )

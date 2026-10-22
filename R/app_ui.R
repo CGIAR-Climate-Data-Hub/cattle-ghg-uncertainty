@@ -2234,6 +2234,21 @@ app_ui <- function(request = NULL) {
         # value-boxes-then-charts pattern but with trend-specific metrics.
         conditionalPanel(
           condition = "input.analysis_mode == 'trend'",
+          # 2026-10-22: what a compiler reports, first. IPCC Table 3.3 wants
+          # a base year and a year t; the selectors drive the sentences,
+          # the comparison table and the IPCC table on the report tab.
+          bslib::card(
+            bslib::card_header(t("trend_report_h")),
+            bslib::card_body(
+              p(t("trend_report_intro")),
+              div(style = "display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;",
+                  selectInput("trend_base_year", t("trend_base_year_label"),
+                              choices = NULL, width = "180px"),
+                  selectInput("trend_year_t", t("trend_year_t_label"),
+                              choices = NULL, width = "220px")),
+              uiOutput("trend_report_text")
+            )
+          ),
           bslib::layout_columns(
             col_widths = c(3, 3, 3, 3),
             bslib::value_box(title = t("res_vb_trend_delta"),
@@ -2255,6 +2270,13 @@ app_ui <- function(request = NULL) {
           ),
           div(style = "padding: 0 12px 8px; color: #555; font-size: 0.85rem;",
               tags$em(textOutput("vb_trend_inline", inline = TRUE))),
+          bslib::card(
+            bslib::card_header(t("trend_compare_h")),
+            bslib::card_body(
+              p(tags$em(t("trend_compare_note"))),
+              DT::DTOutput("trend_compare_table")
+            )
+          ),
           bslib::layout_columns(
             col_widths = c(7, 5),
             bslib::card(
@@ -2271,6 +2293,15 @@ app_ui <- function(request = NULL) {
             bslib::card_body(
               p(tags$em(t("res_trend_delta_hist_note"))),
               plotly::plotlyOutput("trend_delta_histogram", height = "300px")
+            )
+          ),
+          bslib::card(
+            bslib::card_header(t("trend_year_detail_h")),
+            bslib::card_body(
+              p(tags$em(t("trend_year_detail_note"))),
+              selectInput("trend_detail_year", t("trend_year_detail_label"),
+                          choices = NULL, width = "160px"),
+              DT::DTOutput("trend_year_groups")
             )
           ),
           bslib::card(
@@ -2521,6 +2552,29 @@ app_ui <- function(request = NULL) {
         div(class = "info-panel", style = "margin: 16px;",
             tags$strong(paste0(t("what_to_do_label"), " ")),
             t("info_trend_report_what")),
+        bslib::card(
+          bslib::card_header(t("trend_report_h")),
+          bslib::card_body(
+            div(style = "display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;",
+                selectInput("trend_base_year_rep", t("trend_base_year_label"),
+                            choices = NULL, width = "180px"),
+                selectInput("trend_year_t_rep", t("trend_year_t_label"),
+                            choices = NULL, width = "220px")),
+            uiOutput("trend_report_text_report")
+          )
+        ),
+        bslib::card(
+          bslib::card_header(t("trend_ipcc_h")),
+          bslib::card_body(
+            p(tags$em(t("trend_ipcc_note"))),
+            div(style = "display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px;",
+                actionButton("trend_adef_btn", t("trend_adef_btn"),
+                             class = "btn-outline-success", icon = icon("calculator")),
+                tags$em(style = "color:#555; font-size:0.85rem;",
+                        textOutput("trend_adef_status", inline = TRUE))),
+            DT::DTOutput("trend_ipcc_table")
+          )
+        ),
         bslib::card(
           bslib::card_header(t("card_trend_downloads")),
           bslib::card_body(

@@ -1206,14 +1206,14 @@ lang_state_take <- function(token) {
     en = "Trend sensitivity has two complementary views. ",
     fr = "La sensibilité de tendance comporte deux vues complémentaires. "
   ),
-  info_trend_sens_per_year_label = list(en = "Per-year (latest)",
-                                           fr = "Par année (la plus récente)"),
+  info_trend_sens_per_year_label = list(en = "Latest year",
+                                           fr = "Dernière année"),
   info_trend_sens_per_year_body = list(
     en = ": which parameters dominate the uncertainty in the most recent year. ",
     fr = " : quels paramètres dominent l'incertitude dans l'année la plus récente. "
   ),
-  info_trend_sens_delta_label = list(en = "Trend driver (Δ Y_N − Y_1)",
-                                        fr = "Pilote de tendance (Δ Y_N − Y_1)"),
+  info_trend_sens_delta_label = list(en = "Change between first and last year",
+                                        fr = "Variation entre la première et la dernière année"),
   info_trend_sens_delta_body = list(
     en = ": which parameters drive the change between the first and last year (per IPCC Vol 1 Ch 3 §3.7). Bars are coloured by ",
     fr = " : quels paramètres pilotent le changement entre la première et la dernière année (selon IPCC Vol 1 Ch 3 §3.7). Les barres sont colorées par "
@@ -1236,10 +1236,10 @@ lang_state_take <- function(token) {
     en = "Focus your data improvement efforts on green-coloured parameters in the top 5: those give you the biggest uncertainty reduction with locally-collectible data.",
     fr = "Concentrez vos efforts d'amélioration des données sur les paramètres verts du top 5 : ils donnent la plus grande réduction d'incertitude avec des données collectables localement."
   ),
-  trend_sens_per_year_h = list(en = "Per-year drivers (latest year)",
-                                  fr = "Pilotes par année (année la plus récente)"),
-  trend_sens_delta_h = list(en = "Trend driver (Δ Y_N − Y_1)",
-                              fr = "Pilote de tendance (Δ Y_N − Y_1)"),
+  trend_sens_per_year_h = list(en = "What drives the uncertainty in the latest year",
+                                  fr = "Ce qui pilote l'incertitude de la dernière année"),
+  trend_sens_delta_h = list(en = "What drives the change between the first and last year",
+                              fr = "Ce qui pilote la variation entre la première et la dernière année"),
   tornado_top10 = list(en = "Tornado: top 10", fr = "Tornado, top 10"),
   trend_rankings_top15 = list(en = "Rankings: top 15 (SRC + PRCC)",
                                 fr = "Classements : top 15 (SRC + PRCC)"),
@@ -1344,24 +1344,84 @@ lang_state_take <- function(token) {
   btn_download_docx = list(en = "Download Word summary",
                               fr = "Télécharger le résumé Word"),
   info_trend_report_what = list(
-    en = "This page presents the trend results: year-by-year totals, the trend slope and Δ across years with their own 95% CIs, and the sensitivity drivers per IPCC Vol 1 Ch 3 §3.7. Use the downloads below to export the trend report as Excel (multi-sheet workbook), CSV (table only), or Word (full IPCC-style narrative report including the executive summary and methodological notes on the year-correlation mode you chose).",
-    fr = "Cette page présente les résultats de tendance : totaux annuels, pente de tendance et Δ entre les années avec leurs propres IC à 95 %, et les pilotes de sensibilité selon IPCC Vol 1 Ch 3 §3.7. Utilisez les téléchargements ci-dessous pour exporter le rapport de tendance en Excel (classeur multi-feuilles), CSV (table uniquement), ou Word (rapport narratif complet au style IPCC incluant le résumé exécutif et les notes méthodologiques sur le mode de corrélation inter-années choisi)."
+    en = "This page gives what you report for a multi-year inventory: the two years IPCC asks for (base year and year t) in plain sentences, the IPCC reporting table for those two years, every year's total with its uncertainty, and what drives the uncertainty. The same content can be downloaded as Excel (several sheets), CSV (the year table) or Word (full report).",
+    fr = "Cette page donne ce qu'il faut déclarer pour un inventaire pluriannuel : les deux années demandées par le GIEC (année de base et année t) en phrases simples, le tableau de déclaration GIEC pour ces deux années, le total de chaque année avec son incertitude, et ce qui pilote l'incertitude. Le même contenu se télécharge en Excel (plusieurs feuilles), CSV (le tableau des années) ou Word (rapport complet)."
   ),
+  # ---- Trend: what to report (2026-10-22) ----------------------------------
+  trend_report_h = list(en = "What to report", fr = "Ce qu'il faut déclarer"),
+  trend_report_intro = list(
+    en = "IPCC asks for two years: the base year and the year you are reporting (year t). Pick them here. The sentences, the comparison table and the IPCC reporting table follow your choice.",
+    fr = "Le GIEC demande deux années : l'année de base et l'année déclarée (année t). Choisissez-les ici. Les phrases, le tableau de comparaison et le tableau de déclaration GIEC suivent votre choix."),
+  trend_base_year_label = list(en = "Base year", fr = "Année de base"),
+  trend_year_t_label = list(en = "Year to report (year t)", fr = "Année à déclarer (année t)"),
+  trend_word_base_year = list(en = "Base year", fr = "Année de base"),
+  trend_word_year_t = list(en = "Year t", fr = "Année t"),
+  trend_line_year = list(
+    en = "%s %d: %s t CO₂eq, plus or minus %s%% (95%% range %s to %s t).",
+    fr = "%s %d : %s t CO₂éq, plus ou moins %s %% (plage à 95 %% de %s à %s t)."),
+  trend_line_change = list(
+    en = "Change from %d to %d: %s%%. The 95%% range of this change is %s%% to %s%%, that is %s to %s percentage points around the trend.",
+    fr = "Variation de %d à %d : %s %%. La plage à 95 %% de cette variation va de %s %% à %s %%, soit %s à %s points de pourcentage autour de la tendance."),
+  trend_line_zero_in = list(
+    en = "This range includes zero: at 95%, the inventory cannot tell an increase from a decrease.",
+    fr = "Cette plage inclut zéro : à 95 %, l'inventaire ne permet pas de distinguer une hausse d'une baisse."),
+  trend_line_zero_out = list(
+    en = "This range does not include zero: the direction of the change is clear at 95%.",
+    fr = "Cette plage n'inclut pas zéro : le sens de la variation est clair à 95 %."),
+  trend_line_where = list(
+    en = "The IPCC reporting table for these two years is on the IPCC Report tab and in the downloads. Every other year is in the table further down.",
+    fr = "Le tableau de déclaration GIEC pour ces deux années se trouve dans l'onglet Rapport GIEC et dans les téléchargements. Toutes les autres années sont dans le tableau plus bas."),
+  trend_compare_h = list(en = "The two years side by side, by emission source",
+                         fr = "Les deux années côte à côte, par source d'émission"),
+  trend_compare_note = list(
+    en = "Mean and 95% uncertainty of each source in both years, the change between the years and its 95% range. The last column shows which sources drive the uncertainty of year t; the six sources add up to 1.",
+    fr = "Moyenne et incertitude à 95 % de chaque source pour les deux années, la variation entre les années et sa plage à 95 %. La dernière colonne montre quelles sources pilotent l'incertitude de l'année t ; les six sources totalisent 1."),
+  trend_col_source = list(en = "Emission source", fr = "Source d'émission"),
+  trend_col_base_mean = list(en = "Base year (t CO₂eq)", fr = "Année de base (t CO₂éq)"),
+  trend_col_base_moe = list(en = "Base year ± %", fr = "Année de base ± %"),
+  trend_col_t_mean = list(en = "Year t (t CO₂eq)", fr = "Année t (t CO₂éq)"),
+  trend_col_t_moe = list(en = "Year t ± %", fr = "Année t ± %"),
+  trend_col_change = list(en = "Change (%)", fr = "Variation (%)"),
+  trend_col_change_range = list(en = "Change, 95% range (%)", fr = "Variation, plage à 95 % (%)"),
+  trend_col_contrib = list(en = "Share of year t variance", fr = "Part de la variance de l'année t"),
+  trend_year_detail_h = list(en = "One year in detail, by group", fr = "Une année en détail, par groupe"),
+  trend_year_detail_label = list(en = "Year", fr = "Année"),
+  trend_year_detail_note = list(
+    en = "Mean total and 95% range for each group in the selected year, as a single-year run shows them.",
+    fr = "Total moyen et plage à 95 % pour chaque groupe de l'année choisie, comme dans une exécution sur une seule année."),
+  trend_col_group = list(en = "Group", fr = "Groupe"),
+  trend_col_year_mean = list(en = "Mean (t CO₂eq)", fr = "Moyenne (t CO₂éq)"),
+  trend_col_year_moe = list(en = "± %", fr = "± %"),
+  trend_col_year_lo = list(en = "95% lower (t)", fr = "Borne basse 95 % (t)"),
+  trend_col_year_hi = list(en = "95% upper (t)", fr = "Borne haute 95 % (t)"),
+  trend_ipcc_h = list(en = "IPCC reporting table (Table 3.3) for the two years",
+                      fr = "Tableau de déclaration GIEC (tableau 3.3) pour les deux années"),
+  trend_ipcc_note = list(
+    en = "The general reporting table for uncertainty from IPCC 2006 Vol. 1 Ch. 3, filled with Approach 2 (Monte Carlo). Values are in t CO₂eq; divide by 1,000 for Gg. The activity data and emission factor columns need two extra simulations for year t: use the button to fill them.",
+    fr = "Le tableau général de déclaration de l'incertitude du GIEC 2006 Vol. 1 Ch. 3, rempli avec l'approche 2 (Monte Carlo). Valeurs en t CO₂éq ; diviser par 1 000 pour des Gg. Les colonnes données d'activité et facteurs d'émission nécessitent deux simulations supplémentaires pour l'année t : utilisez le bouton pour les remplir."),
+  trend_adef_btn = list(en = "Fill the activity data and emission factor columns",
+                        fr = "Remplir les colonnes données d'activité et facteurs d'émission"),
+  trend_adef_running = list(en = "Running the two extra simulations for year %d...",
+                            fr = "Exécution des deux simulations supplémentaires pour l'année %d..."),
+  trend_adef_done = list(en = "Activity data and emission factor columns filled for year %d.",
+                         fr = "Colonnes données d'activité et facteurs d'émission remplies pour l'année %d."),
+  trend_adef_empty = list(en = "The activity data and emission factor columns stay empty until you press the button.",
+                          fr = "Les colonnes données d'activité et facteurs d'émission restent vides tant que le bouton n'est pas utilisé."),
   card_trend_downloads = list(en = "Trend report: downloads",
                                 fr = "Rapport de tendance : téléchargements"),
   trend_downloads_note = list(
     en = "Available after a successful trend run on the Simulate tab. Filename includes the year-correlation mode you picked.",
     fr = "Disponible après une exécution de tendance réussie sur l'onglet Simulation. Le nom de fichier inclut le mode de corrélation inter-années choisi."
   ),
-  card_trend_chart_h = list(en = "Trend chart: Total CO₂eq with 95% CI band",
-                              fr = "Graphique de tendance : CO₂éq total avec bande IC 95 %"),
-  card_trend_table_h = list(en = "Trend table", fr = "Tableau de tendance"),
+  card_trend_chart_h = list(en = "Total CO₂eq per year with its 95% range",
+                              fr = "CO₂éq total par année avec sa plage à 95 %"),
+  card_trend_table_h = list(en = "Every year: total and 95% range", fr = "Chaque année : total et plage à 95 %"),
   trend_table_note = list(
-    en = "Year-by-year mean, 95% CI bounds, CV%, MoE%, Δ vs. base year, and year-over-year change.",
-    fr = "Moyenne annuelle, bornes IC 95 %, CV%, MoE%, Δ vs année de base et variation interannuelle."
+    en = "One row per year: mean total, lower and upper bound of the 95% range, uncertainty as ± % of the mean, change since the base year, change from the previous year.",
+    fr = "Une ligne par année : total moyen, bornes basse et haute de la plage à 95 %, incertitude en ± % de la moyenne, variation depuis l'année de base, variation par rapport à l'année précédente."
   ),
-  card_trend_sens_h = list(en = "Sensitivity drivers (per-year + trend)",
-                              fr = "Pilotes de sensibilité (par année + tendance)"),
+  card_trend_sens_h = list(en = "What drives the uncertainty",
+                              fr = "Ce qui pilote l'incertitude"),
   trend_sens_note = list(
     en = "Per-year tornado shows drivers of the latest year; Δ Y_N − Y_1 tornado shows what drives the change between the first and last year (per IPCC Vol 1 Ch 3 §3.7).",
     fr = "Le tornado par année montre les pilotes de l'année la plus récente ; le tornado Δ Y_N − Y_1 montre ce qui pilote le changement entre la première et la dernière année (selon IPCC Vol 1 Ch 3 §3.7)."
@@ -1821,8 +1881,8 @@ lang_state_take <- function(token) {
   # Trend Results value boxes
   res_vb_trend_latest = list(en = "Latest year: Total CO₂eq",
                                 fr = "Année la plus récente : CO₂éq total"),
-  res_vb_trend_delta = list(en = "Δ vs base year",
-                              fr = "Δ vs année de base"),
+  res_vb_trend_delta = list(en = "Change since base year",
+                              fr = "Variation depuis l'année de base"),
   res_vb_trend_slope = list(en = "Trend slope (per year)",
                               fr = "Pente de tendance (par an)"),
   res_vb_trend_yoy = list(en = "Year-over-year change (latest)",
@@ -1933,24 +1993,24 @@ lang_state_take <- function(token) {
     fr = "Chaque ligne est une ligne de rapport d'inventaire IPCC (groupe × source). La granularité correspond à celle des rapports d'incertitude IPCC Volume 1 Chapitre 3."
   ),
 
-  res_vb_trend_slope_short = list(en = "Trend slope", fr = "Pente de tendance"),
-  res_vb_trend_latest_short = list(en = "Latest year", fr = "Année la plus récente"),
-  res_vb_trend_yoy_largest = list(en = "Largest YoY change",
-                                     fr = "Plus grande variation interannuelle"),
+  res_vb_trend_slope_short = list(en = "Average change per year", fr = "Variation moyenne par an"),
+  res_vb_trend_latest_short = list(en = "Latest year total", fr = "Total de la dernière année"),
+  res_vb_trend_yoy_largest = list(en = "Largest one-year change",
+                                     fr = "Plus grande variation sur un an"),
 
   res_trend_yoy_h = list(en = "Year-over-year % change",
                            fr = "Variation interannuelle (%)"),
   res_trend_delta_hist_h = list(
-    en = "Distribution of Δ Y_N − Y_1: uncertainty on the trend itself",
-    fr = "Distribution de Δ Y_N − Y_1 : incertitude sur la tendance elle-même"
+    en = "How certain is the change between the first and last year?",
+    fr = "Quelle certitude sur la variation entre la première et la dernière année ?"
   ),
   res_trend_delta_hist_note = list(
-    en = "This histogram shows the Monte Carlo distribution of the absolute change in CO₂eq between the first and last year. The dashed red lines mark the 95% CI; the dotted line marks zero. If zero falls inside the CI, the trend is not statistically distinguishable from no change at this confidence level.",
-    fr = "Cet histogramme montre la distribution Monte Carlo de la variation absolue de CO₂éq entre la première et la dernière année. Les lignes rouges pointillées marquent l'IC 95 % ; la ligne en pointillés marque zéro. Si zéro tombe dans l'IC, la tendance n'est pas statistiquement distinguable d'aucun changement à ce niveau de confiance."
+    en = "Each bar counts simulation runs by the size of the change in total CO₂eq between the first and last year. The dashed red lines mark the 95% range; the dotted line marks zero. If zero lies inside the range, the inventory cannot tell an increase from a decrease at 95%.",
+    fr = "Chaque barre compte les tirages de simulation selon l'ampleur de la variation du CO₂éq total entre la première et la dernière année. Les lignes rouges en tirets marquent la plage à 95 % ; la ligne pointillée marque zéro. Si zéro est dans la plage, l'inventaire ne permet pas de distinguer une hausse d'une baisse à 95 %."
   ),
   res_trend_footer_note = list(
-    en = "Sensitivity drivers (per-year + Δ Y_N − Y_1) are on Tab 6 (Sensitivity). Word / Excel / CSV trend reports are on Tab 7 (IPCC Report).",
-    fr = "Les pilotes de sensibilité (par année + Δ Y_N − Y_1) sont sur l'onglet 6 (Sensibilité). Les rapports de tendance Word / Excel / CSV sont sur l'onglet 7 (Rapport IPCC)."
+    en = "What drives the uncertainty (latest year, and the change between the first and last year) is on the Sensitivity tab. Word, Excel and CSV reports are on the IPCC Report tab.",
+    fr = "Ce qui pilote l'incertitude (dernière année, et variation entre la première et la dernière année) se trouve dans l'onglet Sensibilité. Les rapports Word, Excel et CSV sont dans l'onglet Rapport GIEC."
   ),
   res_trend_plot_title = list(en = "Trend in total CO₂eq emissions (95% CI)",
                                 fr = "Tendance des émissions CO₂éq totales (IC 95 %)"),
