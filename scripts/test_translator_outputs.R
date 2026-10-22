@@ -22,8 +22,19 @@ iss <- translator_consistency_checks(ps, NULL, source = src, population = pop, i
 c7 <- iss[grepl("heifers / N", iss$where), ]
 ok(nrow(c7) == 1 && identical(c7$severity, "fail") && grepl("200", c7$issue) && grepl("250", c7$issue), "C7: a time-series value that differs from Parameters for the inventory year fails")
 ok(!any(grepl("bulls / N", iss$where)), "C7: an agreeing value is not flagged")
-ok(any(iss$where == "time series / 2022" & iss$severity == "warn"), "C7: a per-year total absent from the source year columns warns")
-ok(!any(iss$where == "time series / 2021"), "C7: a per-year total that matches a source column is silent")
+ok(any(iss$where == "year 2022" & iss$severity == "warn" & iss$sheet == "Parameter_TimeSeries" & iss$parameter == "N" & iss$check == "time series totals"),
+   "C7: a per-year total absent from the source year columns warns, on the time-series sheet, parameter N")
+ok(!any(iss$where == "year 2021"), "C7: a per-year total that matches a source column is silent")
+ok(identical(c7$check, "Parameters vs time series") && identical(c7$sheet, "Parameters") && nzchar(c7$group), "C7: the row carries its check name, sheet and group")
+# every check names its sheet; the older checks now carry group and parameter too
+ps3 <- rbind(ps, grp("calves", 50, 58)); ps3$uncertainty_pct[ps3$parameter == "DE" & ps3$sub_category == "calves"] <- 0.5
+iss3 <- translator_consistency_checks(ps3, NULL, source = src)
+u <- iss3[iss3$check %in% "uncertainty scale", ]
+ok(nrow(u) == 1 && identical(u$sheet, "Parameters") && identical(u$group, "non_dairy||lvl||calves") && identical(u$parameter, "DE"),
+   "uncertainty-scale check: sheet, group and parameter on the row")
+ok(all(!is.na(iss3$sheet) & nzchar(iss3$sheet)) && all(!is.na(iss3$check) & nzchar(iss3$check)), "every issue names its sheet and its check")
+nf <- iss3[iss3$check %in% "value not in file", ]
+ok(nrow(nf) >= 2 && all(nzchar(nf$group)) && all(nzchar(nf$parameter)), "values not found in the file: one row per cell, with its group and parameter")
 # C8
 ps8 <- ps; ps8$mean[ps8$parameter == "DE" & ps8$sub_category == "bulls"] <- 0.55
 ps8$mean[ps8$parameter == "pct_pregnant" & ps8$sub_category == "heifers"] <- 52
@@ -34,7 +45,7 @@ mm8 <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_cate
                   fraction_pct = 100, MCF_pct = 0.02, EF3 = 2, Frac_GasMS_pct = 20, Frac_LeachMS_pct = 5, stringsAsFactors = FALSE)
 iss8m <- translator_consistency_checks(ps, mm8, source = src)
 ok(any(iss8m$parameter == "MCF_pct" & iss8m$severity == "warn") && any(iss8m$parameter == "EF3" & iss8m$severity == "fail"), "C8: MCF 0.02 warns, EF3 2 fails")
-ok(all(c("sheet", "group", "parameter") %in% names(iss8m)) && identical(iss8m$sheet[which(iss8m$parameter == "EF3")], "Manure_Management"), "issues carry sheet, group and parameter")
+ok(all(c("sheet", "group", "parameter") %in% names(iss8m)) && all(iss8m$sheet[iss8m$parameter == "EF3"] == "Manure_Management"), "issues carry sheet, group and parameter")
 # C9
 piece <- list(parameters = data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = "bulls",
                                       parameter = c("BW", "Ym"), mean = c(300, 6.5), uncertainty_pct = c(NA, 20),
@@ -65,6 +76,9 @@ sh <- readxl::excel_sheets(f_chk)
 ok(identical(sh, c("Checks", "Decisions", "Summary")), "checks workbook has the three sheets")
 ck <- readxl::read_excel(f_chk, "Checks")
 ok(nrow(ck) == nrow(iss8m) + 1 && identical(ck$Severity[1], "fail") && "Your decision" %in% names(ck), "checks sheet: every row, fail first, a decision column")
+ok(all(!is.na(ck$Sheet) & nzchar(ck$Sheet)) && !any(grepl(" / ", ck$Check)) && all(!is.na(ck$Check)), "checks sheet: Sheet filled on every row, Check is a name, never a location")
+ok(sum(is.na(ck$Group)) <= sum(ck$Check %in% c("manure coefficient consistency", "manure bounds", "manure bounds missing", "default replaced file value", "category coverage")),
+   "checks sheet: Group blank only for checks that span groups")
 dc <- readxl::read_excel(f_chk, "Decisions"); ok(nrow(dc) == 1 && dc$Topic[1] == "calves_handling", "decisions sheet")
 wbc <- openxlsx::loadWorkbook(f_chk); ok(!is.null(wbc$worksheets[[1]]$autoFilter) && nzchar(wbc$worksheets[[1]]$autoFilter), "checks sheet has an autofilter")
 
@@ -87,13 +101,27 @@ pu0 <- suppressMessages(parse_uploaded_template(f_tpl))
 one <- pu0$param_specs[1, ]
 iss_a <- data.frame(where = "x", issue = "flag me", severity = "fail", sheet = "Parameters",
                     group = paste(one$cattle_type, one$aggregation_level, one$sub_category, sep = "||"),
-                    parameter = one$parameter, stringsAsFactors = FALSE)
-ok(isTRUE(.translator_annotate_workbook(f_tpl, iss_a, NULL)), "annotation runs on the example template")
+                    parameter = one$parameter, check = "unit test", stringsAsFactors = FALSE)
+two <- pu0$param_specs[2, ]
+qa_a <- data.frame(group = paste(two$cattle_type, two$sub_category, sep = " / "), parameter = two$parameter,
+                   check = "benchmark_deviation", status = "warn", message = "far from the default",
+                   level = two$aggregation_level, stringsAsFactors = FALSE)
+ts0 <- tryCatch(openxlsx::read.xlsx(f_tpl, sheet = "Parameter_TimeSeries", startRow = 2), error = function(e) NULL)
+yr_a <- if (!is.null(ts0) && "year" %in% names(ts0) && any(!is.na(ts0$year))) as.character(ts0$year[!is.na(ts0$year)][1]) else NULL
+if (!is.null(yr_a)) iss_a <- rbind(iss_a, data.frame(where = paste("year", yr_a), issue = "total off", severity = "warn", sheet = "Parameter_TimeSeries",
+                                                       group = NA_character_, parameter = "N", check = "time series totals", stringsAsFactors = FALSE))
+ok(isTRUE(.translator_annotate_workbook(f_tpl, iss_a, qa_a)), "annotation runs on the example template")
 wba <- openxlsx::loadWorkbook(f_tpl)
 pidx <- match("Parameters", names(wba))
 ok(!is.null(wba$worksheets[[pidx]]$autoFilter) && nzchar(wba$worksheets[[pidx]]$autoFilter), "Parameters has an autofilter")
 hdr <- openxlsx::read.xlsx(f_tpl, sheet = "Parameters", startRow = 3, colNames = TRUE)
 ok(all(c("Check", "Why") %in% names(hdr)) && any(hdr$Check == "fail", na.rm = TRUE) && any(grepl("flag me", hdr$Why)), "Check and Why columns written")
+ok(any(hdr$Check == "warn" & hdr$parameter == two$parameter & hdr$sub_category == two$sub_category, na.rm = TRUE) && any(grepl("far from the default", hdr$Why)),
+   "a QA/QC row (cattle_type / sub_category + level) lands on its Parameters row")
+if (!is.null(yr_a)) {
+  ts1 <- openxlsx::read.xlsx(f_tpl, sheet = "Parameter_TimeSeries", startRow = 2)
+  ok(all(ts1$Check[!is.na(ts1$year) & as.character(ts1$year) == yr_a] == "warn"), "a time-series total flag lands on every row of that year")
+}
 pu1 <- suppressMessages(parse_uploaded_template(f_tpl))
 ok(nrow(pu1$param_specs) == nrow(pu0$param_specs) && identical(pu1$param_specs$mean, pu0$param_specs$mean), "the annotated workbook still parses identically")
 cat("OUTPUT TESTS PASSED\n")

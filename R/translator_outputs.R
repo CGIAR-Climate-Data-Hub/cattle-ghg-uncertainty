@@ -39,19 +39,24 @@ translator_output_filename <- function(piece, kind = c("template", "checks", "co
                       severity = character(0), text = character(0), stringsAsFactors = FALSE)
   rows <- list()
   if (!is.null(issues) && is.data.frame(issues) && nrow(issues) && "sheet" %in% names(issues)) {
-    ok <- !is.na(issues$sheet) & nzchar(issues$sheet) & !is.na(issues$group)
+    grp <- as.character(issues$group)
+    # a time-series total names a year, not a group: the year column is matched
+    yr <- is.na(grp) & grepl("^year ", as.character(issues$where))
+    grp[yr] <- as.character(issues$where)[yr]
+    ok <- !is.na(issues$sheet) & nzchar(issues$sheet) & !is.na(grp)
+    name <- if ("check" %in% names(issues)) ifelse(is.na(issues$check), issues$where, issues$check) else issues$where
     if (any(ok))
       rows[[length(rows) + 1L]] <- data.frame(
-        sheet = issues$sheet[ok], group = issues$group[ok],
+        sheet = issues$sheet[ok], group = grp[ok],
         parameter = if ("parameter" %in% names(issues)) issues$parameter[ok] else NA_character_,
         severity = issues$severity[ok] %||% "warn",
-        text = paste0(issues$where[ok], ": ", issues$issue[ok]), stringsAsFactors = FALSE)
+        text = paste0(name[ok], ": ", issues$issue[ok]), stringsAsFactors = FALSE)
   }
   if (!is.null(qa) && is.data.frame(qa) && nrow(qa) && all(c("group", "parameter", "status") %in% names(qa))) {
     keep <- qa$status %in% c("fail", "warn")
     if (any(keep))
       rows[[length(rows) + 1L]] <- data.frame(
-        sheet = "Parameters", group = as.character(qa$group[keep]),
+        sheet = "Parameters", group = .translator_qa_group_key(qa)[keep],
         parameter = as.character(qa$parameter[keep]),
         severity = as.character(qa$status[keep]),
         text = paste0(if ("check" %in% names(qa)) paste0(qa$check[keep], ": ") else "", qa$message[keep]),
@@ -63,6 +68,21 @@ translator_output_filename <- function(piece, kind = c("template", "checks", "co
 }
 
 # The header row of a sheet: the first of the top rows holding "cattle_type".
+# The QA/QC rows name a group "cattle_type / sub_category" and carry the
+# production system in `level`; the workbook key is
+# cattle_type||level||sub_category. Without a level, the sub-category alone
+# (every system's row of it is matched).
+.translator_qa_group_key <- function(qa) {
+  g <- as.character(qa$group)
+  lv <- if ("level" %in% names(qa)) as.character(qa$level) else rep(NA_character_, length(g))
+  parts <- strsplit(g, " / ", fixed = TRUE)
+  vapply(seq_along(g), function(i) {
+    p <- parts[[i]]
+    if (length(p) == 2L && !is.na(lv[i]) && nzchar(lv[i])) paste(p[1], lv[i], p[2], sep = "||")
+    else if (length(p) == 2L) p[2] else g[i]
+  }, character(1))
+}
+
 .translator_sheet_header_row <- function(wb, sheet) {
   top <- tryCatch(openxlsx::read.xlsx(wb, sheet = sheet, colNames = FALSE, rows = 1:8,
                                       skipEmptyRows = FALSE, skipEmptyCols = FALSE),
@@ -101,9 +121,16 @@ translator_output_filename <- function(piece, kind = c("template", "checks", "co
     has <- rowSums(!is.na(full[, keycols, drop = FALSE]) & full[, keycols, drop = FALSE] != "") > 0
     last_data <- if (any(has)) max(which(has)) else 0L
     if (!last_data) next
-    last_col  <- ncol(full)
-    check_col <- last_col + 1L
-    why_col   <- last_col + 2L
+    # a workbook annotated before (a corrected template coming back, or a
+    # second pass) keeps its two columns: they are cleared and written again
+    check_col <- match("Check", names(full)); why_col <- match("Why", names(full))
+    if (is.na(check_col) || is.na(why_col)) {
+      last_col  <- ncol(full)
+      check_col <- last_col + 1L
+      why_col   <- last_col + 2L
+    } else {
+      openxlsx::deleteData(wb, sh, cols = c(check_col, why_col), rows = (hdr + 1L):(hdr + last_data), gridExpand = TRUE)
+    }
 
     openxlsx::writeData(wb, sh, "Check", startRow = hdr, startCol = check_col, colNames = FALSE)
     openxlsx::writeData(wb, sh, "Why",   startRow = hdr, startCol = why_col,   colNames = FALSE)
@@ -140,7 +167,9 @@ translator_output_filename <- function(piece, kind = c("template", "checks", "co
     cell_hits <- list()
     for (k in seq_len(nrow(fs))) {
       g <- fs$group[k]
-      rows_hit <- which(key == g | subc == g | (nzchar(g) & grepl(g, key, fixed = TRUE)))
+      rows_hit <- if (identical(sh, "Parameter_TimeSeries") && grepl("^year ", g) && "year" %in% names(full))
+        which(as.character(full$year) == sub("^year ", "", g))
+      else which(key == g | subc == g | (nzchar(g) & grepl(g, key, fixed = TRUE)))
       if (!length(rows_hit)) next
       prm <- fs$parameter[k]
       col_hit <- NA_integer_
@@ -183,11 +212,16 @@ translator_checks_table <- function(pc) {
   rows <- list()
   iss <- pc$issues
   if (!is.null(iss) && is.data.frame(iss) && nrow(iss)) {
+    name <- if ("check" %in% names(iss)) ifelse(is.na(iss$check), iss$where, iss$check) else iss$where
+    grp <- if ("group" %in% names(iss)) ifelse(is.na(iss$group), "", gsub("||", " / ", iss$group, fixed = TRUE)) else rep("", nrow(iss))
+    # a check with no group but a place in its label (a manure system, a year) shows the place
+    place <- !nzchar(grp) & !is.na(iss$where) & iss$where != name & !iss$where %in% c("Manure_Management", "Parameters")
+    grp[place] <- iss$where[place]
     rows[[length(rows) + 1L]] <- data.frame(
       Sheet = if ("sheet" %in% names(iss)) ifelse(is.na(iss$sheet), "", iss$sheet) else "",
-      Group = if ("group" %in% names(iss)) ifelse(is.na(iss$group), "", gsub("||", " / ", iss$group, fixed = TRUE)) else "",
+      Group = grp,
       Parameter = if ("parameter" %in% names(iss)) ifelse(is.na(iss$parameter), "", iss$parameter) else "",
-      Check = iss$where, Severity = if ("severity" %in% names(iss)) iss$severity else "warn",
+      Check = name, Severity = if ("severity" %in% names(iss)) iss$severity else "warn",
       Explanation = iss$issue, `Your decision` = "", check.names = FALSE, stringsAsFactors = FALSE)
   }
   qa <- pc$qa
@@ -195,7 +229,7 @@ translator_checks_table <- function(pc) {
     keep <- qa$status %in% c("fail", "warn")
     if (any(keep))
       rows[[length(rows) + 1L]] <- data.frame(
-        Sheet = "Parameters", Group = as.character(qa$group[keep]),
+        Sheet = "Parameters", Group = gsub("||", " / ", .translator_qa_group_key(qa)[keep], fixed = TRUE),
         Parameter = as.character(qa$parameter[keep]),
         Check = if ("check" %in% names(qa)) as.character(qa$check[keep]) else "QA/QC",
         Severity = as.character(qa$status[keep]), Explanation = as.character(qa$message[keep]),

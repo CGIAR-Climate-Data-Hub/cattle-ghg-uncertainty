@@ -144,6 +144,17 @@ translator_source_fingerprint <- function(parsed) {
        year_sums = year_sums)
 }
 
+# The short name of a check from its location label, for the checks that
+# pass only a label (2026-10-22): the checks workbook shows the name in its
+# Check column and the label, when it is a place, in Group.
+.translator_check_name <- function(where) {
+  w <- where %||% ""
+  if (w %in% c("source reconciliation", "category coverage", "Parameters vs time series")) return(w)
+  if (identical(w, "Manure_Management")) return("manure bounds")
+  if (grepl("^year ", w)) return("time series totals")
+  NA_character_
+}
+
 translator_consistency_checks <- function(param_specs, manure = NULL,
                                           source = NULL, population = NULL,
                                           inventory_year = NULL, piece = NULL) {
@@ -152,11 +163,12 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   # it points at cells, the sheet, the group key and the parameter, so the
   # checks workbook and the data workbook can colour them.
   add <- function(where, issue, severity = "warn", sheet = NA_character_,
-                  group = NA_character_, parameter = NA_character_) {
+                  group = NA_character_, parameter = NA_character_, check = NA_character_) {
+    if (is.na(check)) check <- .translator_check_name(where)
     out[[length(out) + 1L]] <<- data.frame(where = where, issue = issue,
                                             severity = severity, sheet = sheet,
                                             group = group, parameter = parameter,
-                                            stringsAsFactors = FALSE)
+                                            check = check, stringsAsFactors = FALSE)
   }
   gkey <- function(df, i) paste(df$cattle_type[i] %||% "", df$aggregation_level[i] %||% "",
                                 df$sub_category[i] %||% "", sep = "||")
@@ -191,7 +203,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
                            "If the source file has a single calves row, both halves ",
                            "should be identical to it."),
                     paste(sprintf("%s (%s vs %s)", m$parameter, fmt(m$m), fmt(m$f)),
-                          collapse = ", ")))
+                          collapse = ", ")),
+            sheet = "Parameters", group = gkey(ps, a[1]), check = "calves halves")
       }
     }
 
@@ -208,7 +221,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], p),
               sprintf(paste0("Uncertainty %s%% is far below the %s%% typical for %s in this ",
                              "file. A fraction may have been copied instead of a percentage."),
-                      fmt(u_all[i]), fmt(med), p))
+                      fmt(u_all[i]), fmt(med), p),
+              sheet = "Parameters", group = gkey(ps, i), parameter = p, check = "uncertainty scale")
         }
       }
     }
@@ -221,13 +235,15 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       bad_beta <- which(d == "beta" & !is.na(mu) & (mu <= 0 | mu >= 1))
       for (i in bad_beta)
         add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),
-            sprintf("A beta distribution was assigned to a value of %s. Beta only fits values between 0 and 1; the source most likely meant a normal or triangular distribution.", fmt(mu[i])))
+            sprintf("A beta distribution was assigned to a value of %s. Beta only fits values between 0 and 1; the source most likely meant a normal or triangular distribution.", fmt(mu[i])),
+            sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "distribution fit")
       if (all(c("lower", "upper") %in% names(ps))) {
         lo <- suppressWarnings(as.numeric(ps$lower)); hi <- suppressWarnings(as.numeric(ps$upper))
         bad_b <- which(!is.na(mu) & !is.na(lo) & !is.na(hi) & d != "constant" & (lo > mu | mu > hi))
         for (i in bad_b)
           add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),
-              sprintf("The bounds %s to %s do not bracket the mean %s. Either the mean or the bounds came from a different year or group of the source file.", fmt(lo[i]), fmt(hi[i]), fmt(mu[i])))
+              sprintf("The bounds %s to %s do not bracket the mean %s. Either the mean or the bounds came from a different year or group of the source file.", fmt(lo[i]), fmt(hi[i]), fmt(mu[i])),
+              sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "bounds bracket mean")
       }
     }
   }
@@ -246,7 +262,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       if (all(is.na(fr[key == k]))) next   # placeholder or empty rows
       s <- sum(fr[key == k], na.rm = TRUE)
       if (abs(s - 100) > 1)
-        add(k, sprintf("Manure system shares sum to %s%%, not 100%%. A system may have been added or a share copied from another group.", fmt(s)))
+        add(k, sprintf("Manure system shares sum to %s%%, not 100%%. A system may have been added or a share copied from another group.", fmt(s)),
+            sheet = "Manure_Management", group = gkey(mm, which(key == k)[1]), parameter = "fraction_pct", check = "manure shares sum")
     }
 
     # 5. One manure system, one set of coefficients. MCF depends on climate
@@ -264,7 +281,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           sprintf("%s in %s", fmt(x), paste(utils::head(grp, 3), collapse = ", "))
         }, character(1))
         add(mt, sprintf("%s takes %d different values for the same manure system: %s. Check which one the source file gives.",
-                        col, length(vals), paste(by_val, collapse = "; ")))
+                        col, length(vals), paste(by_val, collapse = "; ")),
+            sheet = "Manure_Management", parameter = col, check = "manure coefficient consistency")
       }
     }
 
@@ -304,7 +322,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
                              "percentage OF EACH SHARE, so a %s%% share becomes %s to %s, not %s to %s."),
                       n_sh, sum(ok), fmt(b[1]), fmt(b[2]),
                       paste(fmt(utils::head(sort(cen), 3)), collapse = ", "),
-                      fmt(bg), fmt(bg * 0.5), fmt(bg * 1.5), fmt(b[1]), fmt(b[2])))
+                      fmt(bg), fmt(bg * 0.5), fmt(bg * 1.5), fmt(b[1]), fmt(b[2])),
+              sheet = "Manure_Management", parameter = "lower_fraction", check = "manure bounds reused")
         }
       }
     }
@@ -333,7 +352,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
             sprintf(paste0("%s has a value on %d row(s) but no lower or upper bound on any of them, so the tool will ",
                            "treat it as exactly known and its uncertainty will not reach the result. If the source ",
                            "gives a range for it, add %s and %s."),
-                    col, n_val, lo_col, hi_col))
+                    col, n_val, lo_col, hi_col),
+            sheet = "Manure_Management", parameter = col, check = "manure bounds missing")
     }
   }
 
@@ -359,14 +379,14 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           any(abs(cand - v) <= 5e-4 * max(1, abs(v))), logical(1))
         if (any(!seen)) {
           miss <- which(verbatim)[!seen]
-          shown <- utils::head(unique(sprintf("%s%s%s = %s",
-            lvl2[miss], ifelse(nzchar(lvl2[miss]), " / ", ""),
-            ps$parameter[miss], fmt(val[miss]))), 6)
-          add("source reconciliation", sprintf(paste0(
-            "%d value(s) are marked as taken from your file but no matching ",
-            "number is in it: %s. Either the value was altered, or it was ",
-            "computed and should be marked user_chat rather than user_file."),
-            length(miss), paste(shown, collapse = "; ")))
+          for (i in miss)
+            add(sprintf("%s%s%s / %s", lvl2[i], ifelse(nzchar(lvl2[i]), " / ", ""), ps$sub_category[i], ps$parameter[i]),
+                sprintf(paste0(
+                  "%s = %s is marked as taken from your file but no matching number is in it ",
+                  "(%d such value(s) in all). Either the value was altered, or it was computed ",
+                  "and should be marked user_chat rather than user_file."),
+                  ps$parameter[i], fmt(val[i]), length(miss)),
+                sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "value not in file")
         }
       }
     }
@@ -381,12 +401,15 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       dup <- val[isN][duplicated(round(val[isN], 4))]
       if (length(dup)) {
         for (d in unique(dup)) {
-          w <- key[round(val[isN], 4) == round(d, 4)]
-          add("source reconciliation", sprintf(paste0(
-            "The population %s appears on %d groups (%s). A head count read ",
-            "from the file belongs to one group, so this is usually the same ",
-            "animals counted twice."), fmt(d), length(w),
-            paste(utils::head(w, 4), collapse = ", ")))
+          same <- round(val[isN], 4) == round(d, 4)
+          w <- key[same]
+          for (i in which(isN)[same])
+            add("source reconciliation", sprintf(paste0(
+              "The population %s appears on %d groups (%s). A head count read ",
+              "from the file belongs to one group, so this is usually the same ",
+              "animals counted twice."), fmt(d), length(w),
+              paste(utils::head(w, 4), collapse = ", ")),
+              sheet = "Parameters", group = gkey(ps, i), parameter = "N", check = "duplicate population")
         }
       }
     }
@@ -400,11 +423,13 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         by_p <- split(which(filled), ps$parameter[filled])
         for (pn in names(by_p)) {
           i <- by_p[[pn]]
-          add("source reconciliation", sprintf(paste0(
-            "%s was filled from the IPCC default on %d row(s) (%s), but %s is ",
-            "present in your file. Check whether the file's value should have ",
-            "been used."), pn, length(i),
-            paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn))
+          for (j in i)
+            add("source reconciliation", sprintf(paste0(
+              "%s was filled from the IPCC default on %d row(s) (%s), but %s is ",
+              "present in your file. Check whether the file's value should have ",
+              "been used."), pn, length(i),
+              paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn),
+              sheet = "Parameters", group = gkey(ps, j), parameter = pn, check = "default replaced file value")
         }
       }
     }
@@ -440,7 +465,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           "gives %s. An IPCC default appears to have replaced a value your ",
           "file supplies. Check which should be used."),
           cn, paste(fmt(v[!seen]), collapse = ", "), fam,
-          paste(fmt(utils::head(sort(fv[[fam]]), 4)), collapse = ", ")))
+          paste(fmt(utils::head(sort(fv[[fam]]), 4)), collapse = ", ")),
+          sheet = "Manure_Management", parameter = cn, check = "default replaced file value")
       }
     }
   }
@@ -478,10 +504,10 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         "%d source categor%s not in the template: %s. Every source category must ",
         "appear unless you confirmed a merge in the conversation."),
         n_src, n_tpl, length(missing), if (length(missing) == 1L) "y is" else "ies are",
-        paste(utils::head(missing, 8), collapse = "; ")), severity = "fail")
+        paste(utils::head(missing, 8), collapse = "; ")), severity = "fail", sheet = "Parameters")
     } else {
       add("category coverage", sprintf("Source categories: %d; template groups: %d; every source category is in the template.", n_src, n_tpl),
-          severity = "info")
+          severity = "info", sheet = "Parameters")
     }
   }
 
@@ -511,12 +537,12 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
               sprintf(paste0("Parameters gives %s for %s but Parameter_TimeSeries gives %s for the ",
                              "inventory year %d. The two sheets must agree; one of them has the wrong value."),
                       fmt(ps_mu[j]), pc, fmt(v_ts), yr0),
-              severity = "fail", sheet = "Parameters", group = gkey(py, i), parameter = pc)
+              severity = "fail", sheet = "Parameters", group = gkey(py, i), parameter = pc, check = "Parameters vs time series")
         }
       }
       if (n_bad == 0L && nrow(py))
         add("Parameters vs time series", sprintf("Parameters and Parameter_TimeSeries agree for the inventory year %d on every group and parameter checked.", yr0),
-            severity = "info")
+            severity = "info", sheet = "Parameters")
     }
     if ("N" %in% names(population) && !is.null(source) && length(source$year_sums)) {
       yrs <- suppressWarnings(as.integer(population$year))
@@ -525,12 +551,12 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         cand <- source$year_sums[[y]]
         if (is.null(cand) || !is.finite(tot[[y]]) || tot[[y]] <= 0) next
         if (!any(abs(cand - tot[[y]]) <= 0.01 * tot[[y]]))
-          add(sprintf("time series / %s", y),
+          add(sprintf("year %s", y),
               sprintf(paste0("The template's total population for %s is %s, but no column of the source ",
                              "file headed %s sums to that (closest: %s). A group may carry a value from ",
                              "a neighbouring year or column."),
                       y, fmt(tot[[y]]), y, fmt(cand[which.min(abs(cand - tot[[y]]))])),
-              severity = "warn", sheet = "Parameter_TimeSeries")
+              severity = "warn", sheet = "Parameter_TimeSeries", parameter = "N", check = "time series totals")
       }
     }
   }
@@ -556,7 +582,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
                        pn, fmt(mu[i]), fmt(suppressWarnings(as.numeric(dflt[pn]))))
       if (!is.null(bad))
         add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], pn), bad,
-            severity = "fail", sheet = "Parameters", group = gkey(ps, i), parameter = pn)
+            severity = "fail", sheet = "Parameters", group = gkey(ps, i), parameter = pn, check = "percent vs fraction")
     }
   }
   if (!is.null(manure) && is.data.frame(manure) && nrow(manure) > 0) {
@@ -567,7 +593,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       for (i in hit)
         add(sprintf("%s / %s / %s", manure$aggregation_level[i] %||% "", manure$sub_category[i], col),
             sprintf(msg, col, fmt(v[i])), severity = sev, sheet = "Manure_Management",
-            group = gkey(manure, i), parameter = col)
+            group = gkey(manure, i), parameter = col, check = "percent vs fraction")
     }
     chk_mm("MCF_pct", function(v) v < 0.3, "%s is %s: the column is a percentage, and a value this small is usually a fraction written where a percent was expected.", "warn")
     chk_mm("Frac_GasMS_pct", function(v) v < 1, "%s is %s: the column is a percentage; a value below 1 looks like a fraction.", "warn")
@@ -583,13 +609,13 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     if (!is.null(d9) && nrow(d9))
       for (i in seq_len(nrow(d9)))
         add(d9$where[i], d9$issue[i], severity = "info", sheet = d9$sheet[i],
-            group = d9$group[i], parameter = d9$parameter[i])
+            group = d9$group[i], parameter = d9$parameter[i], check = "default applied")
   }
 
   if (!length(out))
     return(data.frame(where = character(), issue = character(), severity = character(),
                       sheet = character(), group = character(), parameter = character(),
-                      stringsAsFactors = FALSE))
+                      check = character(), stringsAsFactors = FALSE))
   res <- do.call(rbind, out)
   rownames(res) <- NULL
   res
