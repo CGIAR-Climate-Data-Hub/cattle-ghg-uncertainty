@@ -768,11 +768,13 @@ translator_chat_server <- function(input, output, session) {
     jb <- job_poll()
     if (is.null(jb)) return(NULL)
     if (identical(jb$status, "running")) {
+      invalidateLater(1000, session)   # the clock ticks every second, whatever the file does
       pct <- round(100 * as.numeric(jb$progress %||% 0))
       eta <- jb$eta_sec
       eta_txt <- if (is.null(eta) || !is.finite(as.numeric(eta))) "" else if (as.numeric(eta) < 60) t("ai_job_eta_under_min") else sprintf(t("ai_job_eta_min"), ceiling(as.numeric(eta) / 60))
       started <- as.POSIXct(jb$started_at, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-      el <- if (is.na(started)) "" else sprintf(t("ai_job_elapsed"), round(as.numeric(difftime(Sys.time(), started, units = "mins"))))
+      secs <- if (is.na(started)) NA else max(0, floor(as.numeric(difftime(Sys.time(), started, units = "secs"))))
+      el <- if (is.na(secs)) "" else sprintf(t("ai_job_elapsed"), secs %/% 60, secs %% 60)
       lv <- unlist(jb$levels); li <- as.integer(jb$level_index %||% 0)
       lab <- if (length(lv) && li >= 1) sprintf(t("ai_job_system"), li, length(lv), lv[min(li, length(lv))]) else (jb$stage_label %||% "")
       tags$div(style = "margin:8px 0; padding:10px 14px; background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; font-size:0.85rem; color:#5D4037;",

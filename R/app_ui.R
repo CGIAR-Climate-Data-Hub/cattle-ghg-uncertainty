@@ -600,20 +600,12 @@ app_ui <- function(request = NULL) {
            var slot = document.getElementById('translator_stream_target');
            if (!slot || !slot.firstElementChild) return;
            var bubble = slot.firstElementChild;
-           if (bubble._translatorProgressInterval) {
-             clearInterval(bubble._translatorProgressInterval);
-             bubble._translatorProgressInterval = null;
-           }
+           // the clock keeps ticking (see translatorAppendInfoBubble); this
+           // message only sets the bar and what the clock shows beside it
            var fill = bubble.querySelector('[data-bar-fill=true]');
            if (fill && d && typeof d.progress === 'number')
              fill.style.width = Math.round(d.progress * 100) + '%';
-           bubble.querySelectorAll('div').forEach(function(l) {
-             if (l.dataset && l.dataset.elapsedLabel === 'true') {
-               var sec = Math.floor((Date.now() - (l._translatorStart || Date.now())) / 1000);
-               l.textContent = (d.label ? d.label + ' · ' : '') + sec + 's elapsed' +
-                 (d.eta ? ' · ' + d.eta : '');
-             }
-           });
+           bubble._translatorLast = { label: (d && d.label) || '', eta: (d && d.eta) || '', real: true };
          });
          // 2026-10-22 (WP6): the files are ready. With a folder chosen
          // earlier (Chrome/Edge) every file is written there; otherwise
@@ -735,16 +727,27 @@ app_ui <- function(request = NULL) {
            elapsedLabel._translatorStart = Date.now();
            bubble.appendChild(elapsedLabel);
            slot.appendChild(bubble);
-           // Drive the progress bar from a JS timer.
+           // The clock ticks every second on wall time for the whole run
+           // (2026-10-22: it used to stop at the first server progress
+           // message and then move only when data arrived, which looked
+           // frozen). Until the server reports real progress the bar
+           // creeps to 90% over a minute; after that the server owns it.
            var startTime = Date.now();
            var targetSec = 60;
+           bubble._translatorLast = { label: '', eta: '', real: false };
            var iv = setInterval(function() {
              var sec = Math.floor((Date.now() - startTime) / 1000);
-             var pct = Math.min(90, (sec / targetSec) * 90);
-             barFill.style.width = pct + '%';
-             elapsedLabel.textContent = sec + 's elapsed' +
-               (sec >= targetSec ? ': still working, large inventories take longer' : '');
-           }, 500);
+             var last = bubble._translatorLast || {};
+             if (!last.real) {
+               var pct = Math.min(90, (sec / targetSec) * 90);
+               barFill.style.width = pct + '%';
+             }
+             var m = Math.floor(sec / 60), s = sec % 60;
+             var clock = (m > 0 ? m + ' min ' : '') + s + ' s elapsed';
+             elapsedLabel.textContent = (last.label ? last.label + ' · ' : '') + clock +
+               (last.eta ? ' · ' + last.eta : '') +
+               (!last.real && sec >= targetSec ? ' · waiting for the first data from the AI' : '');
+           }, 1000);
            bubble._translatorProgressInterval = iv;
            var scroller = bubble.closest('[data-translator-scroller]');
            if (scroller) scroller.scrollTop = scroller.scrollHeight;
