@@ -95,6 +95,15 @@ translator_chat_ui <- function() {
     # (sha256 of the user messages and the prompt hash); see
     # .translator_emission_key().
     batch_parts_key = NULL,
+    # 2026-10-22 (WP1): the decisions register (R/translator_register.R),
+    # the questions waiting for an answer, put to the user one at a time,
+    # the index of the current one, and whether Produce should start by
+    # itself once the server's own questions are answered.
+    register = list(),
+    pending_questions = list(),
+    q_index = 1L,
+    produce_after_answers = FALSE,
+    reg_edit_topic = NULL,
     # 2026-09-17: an upload waiting for the user to pick sheets (plan F8).
     pending_upload = NULL,
     precheck_key   = NULL,
@@ -117,7 +126,10 @@ translator_chat_ui <- function() {
     state$user_email, state$messages,
     prompt_hash = tryCatch(translator_system_prompt_hash(), error = function(e) NULL),
     extra = list(batch_parts = if (length(state$batch_parts)) state$batch_parts else NULL,
-                 batch_parts_key = state$batch_parts_key)),
+                 batch_parts_key = state$batch_parts_key,
+                 register = if (length(state$register)) state$register else NULL,
+                 pending_questions = if (length(state$pending_questions)) state$pending_questions else NULL,
+                 q_index = state$q_index)),
     error = function(e) NULL)
 }
 
@@ -165,6 +177,14 @@ translator_chat_server <- function(input, output, session) {
         if (is.list(bp) && length(bp) > 0) {
           state$batch_parts     <- bp
           state$batch_parts_key <- saved$extra$batch_parts_key
+        }
+        # 2026-10-22 (WP1): the register and an unfinished question round.
+        rg <- saved$extra$register
+        if (is.list(rg) && length(rg) > 0) state$register <- rg
+        pq <- saved$extra$pending_questions
+        if (is.list(pq) && length(pq) > 0) {
+          state$pending_questions <- pq
+          state$q_index <- max(1L, as.integer(saved$extra$q_index %||% 1L))
         }
         # Prompt staleness (plan B5): the defaults or the template changed
         # since this conversation was held. The model's earlier replies
@@ -333,6 +353,12 @@ translator_chat_server <- function(input, output, session) {
     state$batch_parts <- list()
     state$batch_parts_key <- NULL
     state$prompt_stale <- FALSE
+    # 2026-10-22 (WP1): a new file keeps what the user decided and drops
+    # what the model read from the previous file; an unfinished question
+    # round belongs to that file and is dropped too.
+    state$register <- translator_register_keep_user(state$register)
+    state$pending_questions <- list()
+    state$q_index <- 1L
     parsed <- tryCatch(
       .translator_read_upload_memo(fi$datapath, fi$name),
       error = function(e) {
@@ -349,6 +375,11 @@ translator_chat_server <- function(input, output, session) {
     # long after that (see translator_consistency_checks).
     state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
                                 error = function(e) NULL)
+    # 2026-10-22 (WP1): a column whose header says percent while its values
+    # sit in (0, 1], or the reverse, becomes a pending topic the user has to
+    # settle before the template is produced.
+    for (lab in tryCatch(.translator_detect_pct_conflicts(parsed), error = function(e) character(0)))
+      state$register <- translator_register_add_pending(state$register, paste0("pct_vs_fraction:", lab))
     state$pending_upload <- list(parsed = parsed, name = fi$name,
                                  hash = parsed$file_hash)
   })
@@ -530,9 +561,204 @@ translator_chat_server <- function(input, output, session) {
         type = "warning", duration = 8)
       return()
     }
+    # 2026-10-22 (WP1): questions first. An unanswered round from the AI
+    # must be answered; then every required topic without a decision, and
+    # every conflict the upload scan found, is put to the user one at a
+    # time. Produce starts by itself when the last one is confirmed.
+    if (length(state$pending_questions)) {
+      showNotification(t("ai_qa_answer_first"), type = "warning", duration = 5)
+      return()
+    }
+    missing <- translator_register_missing(state$register)
+    if (length(missing)) {
+      state$pending_questions <- lapply(seq_along(missing), function(k)
+        list(id = k, kind = "server", topic = missing[k],
+             text = .translator_topic_question(missing[k]), answer = NULL))
+      state$q_index <- 1L
+      state$produce_after_answers <- TRUE
+      .translator_persist(state)
+      showNotification(t("ai_qa_gate_notice"), type = "message", duration = 6)
+      return()
+    }
+    .translator_start_produce(state, session)
+  })
+
+  .translator_start_produce <- function(state, session) {
     session$sendCustomMessage("translatorAppendInfoBubble",
       "Generating the full template now. A small inventory takes 1 to 3 minutes; a large one with several production systems takes 10 to 40 minutes, one production system at a time, and this panel stays busy throughout. The Download button appears when it finishes.")
     .translator_force_template(state, session)
+  }
+
+  # ---- 2026-10-22 (WP1): one question at a time ----------------------------
+  # The AI's questions are answered locally, one by one; the answers go back
+  # in ONE message when the last is answered, and the AI reflects once. The
+  # server's own questions (required topics, upload conflicts) use the same
+  # card; their answers go to the register and to the transcript as
+  # "Decision: ..." messages, with no AI call.
+  .qa_current <- function() {
+    qs <- state$pending_questions
+    if (!length(qs)) return(NULL)
+    max(1L, min(as.integer(state$q_index %||% 1L), length(qs)))
+  }
+  .qa_store <- function(i) {
+    qs <- state$pending_questions
+    q  <- qs[[i]]
+    has_choices <- identical(q$kind, "server") && !is.null(.translator_topic_choices_for(q$topic))
+    val <- if (has_choices) input$translator_qa_choice %||% ""
+           else trimws(input$translator_qa_answer %||% "")
+    qs[[i]]$answer <- val
+    state$pending_questions <- qs
+    .translator_persist(state)
+    val
+  }
+  .translator_finish_round <- function() {
+    qs <- state$pending_questions
+    state$pending_questions <- list()
+    state$q_index <- 1L
+    srv_qs <- Filter(function(q) identical(q$kind, "server"), qs)
+    ai_qs  <- Filter(function(q) identical(q$kind, "ai"), qs)
+    for (q in srv_qs) {
+      ans <- q$answer %||% ""
+      state$register <- translator_register_set_user(state$register, q$topic, ans,
+                                                     msg_index = length(state$messages) + 1L)
+      txt <- sprintf("Decision: %s = %s", q$topic, ans)
+      state$messages[[length(state$messages) + 1L]] <-
+        list(role = "user", content = txt, display = txt, source = "user_decision")
+    }
+    if (length(ai_qs)) {
+      txt <- .translator_answers_message(ai_qs)
+      state$messages[[length(state$messages) + 1L]] <-
+        list(role = "user", content = txt, display = txt)
+      .translator_persist(state)
+      .translator_send(state, session, stage = "clarify")
+      return(invisible(NULL))
+    }
+    .translator_persist(state)
+    if (isTRUE(state$produce_after_answers)) {
+      state$produce_after_answers <- FALSE
+      .translator_start_produce(state, session)
+    }
+    invisible(NULL)
+  }
+  observeEvent(input$translator_qa_back, {
+    i <- .qa_current(); req(i)
+    .qa_store(i)
+    state$q_index <- max(1L, i - 1L)
+  })
+  observeEvent(input$translator_qa_skip, {
+    i <- .qa_current(); req(i)
+    qs <- state$pending_questions; qs[[i]]$answer <- ""; state$pending_questions <- qs
+    if (i < length(qs)) state$q_index <- i + 1L else .translator_finish_round()
+  })
+  observeEvent(input$translator_qa_next, {
+    i <- .qa_current(); req(i)
+    val <- .qa_store(i)
+    q <- state$pending_questions[[i]]
+    if (identical(q$kind, "server") && !nzchar(val)) {
+      showNotification(t("ai_qa_need_answer"), type = "warning", duration = 4)
+      return()
+    }
+    if (i < length(state$pending_questions)) state$q_index <- i + 1L
+    else .translator_finish_round()
+  })
+  output$translator_qa_card <- renderUI({
+    qs <- state$pending_questions
+    if (!length(qs)) return(NULL)
+    i <- max(1L, min(as.integer(state$q_index %||% 1L), length(qs)))
+    q <- qs[[i]]
+    is_server <- identical(q$kind, "server")
+    choices <- if (is_server) .translator_topic_choices_for(q$topic) else NULL
+    ans <- q$answer %||% ""
+    tags$div(
+      style = paste("margin:10px 0 6px 0; padding:12px 14px; background:#F0FDF4;",
+                    "border:1px solid #BBF7D0; border-left:4px solid #2D6A4F; border-radius:8px;"),
+      tags$div(style = "font-size:0.78rem; color:#166534; margin-bottom:4px;",
+               if (is_server) t("ai_qa_server_intro") else "",
+               sprintf(t("ai_qa_title"), i, length(qs))),
+      tags$div(style = "white-space:pre-wrap; font-size:0.92rem; margin-bottom:8px;", q$text),
+      if (!is.null(choices))
+        radioButtons("translator_qa_choice", NULL,
+                     choices = setNames(choices, vapply(choices, .translator_choice_label, character(1))),
+                     selected = if (nzchar(ans) && ans %in% choices) ans else character(0))
+      else
+        textAreaInput("translator_qa_answer", NULL, value = ans, rows = 2, width = "100%",
+                      placeholder = t("ai_qa_answer_placeholder")),
+      tags$div(style = "display:flex; gap:8px; flex-wrap:wrap; align-items:center;",
+        if (i > 1L) actionButton("translator_qa_back", t("ai_qa_back"),
+                                 class = "btn-outline-secondary btn-sm"),
+        if (!is_server) actionButton("translator_qa_skip", t("ai_qa_skip"),
+                                     class = "btn-outline-secondary btn-sm"),
+        actionButton("translator_qa_next",
+                     if (i < length(qs)) t("ai_qa_next")
+                     else if (is_server) t("ai_qa_confirm") else t("ai_qa_send"),
+                     class = "btn-success btn-sm")))
+  })
+
+  # ---- 2026-10-22 (WP1): the register card and the edit dialog ------------
+  output$translator_register <- renderUI({
+    reg <- state$register
+    if (!length(reg)) return(NULL)
+    rows <- lapply(reg[order(names(reg))], function(e) {
+      badge_col <- switch(e$basis %||% "assumed", user = "#2D6A4F", file = "#1D4ED8",
+                          default = "#6B7280", server = "#B45309", "#B45309")
+      status_txt <- if (identical(e$status, "pending")) t("ai_reg_status_pending")
+                    else if (identical(e$status, "unclear")) t("ai_reg_status_unclear") else ""
+      applied_txt <- if (is.null(e$applied)) "" else if (isTRUE(e$applied)) t("ai_reg_applied")
+                     else t("ai_reg_not_applied")
+      tags$div(
+        style = "display:flex; gap:8px; align-items:baseline; font-size:0.85rem; padding:3px 0; border-bottom:1px solid #F1F5F9;",
+        tags$span(style = "min-width:150px; color:#374151;", .translator_topic_label(e$topic)),
+        tags$span(style = "flex:1;",
+                  if (nzchar(e$decision %||% "")) e$decision else tags$em(status_txt),
+                  if (nzchar(e$decision %||% "") && nzchar(status_txt))
+                    tags$em(style = "color:#B45309;", paste0(" (", status_txt, ")"))),
+        tags$span(style = sprintf("font-size:0.72rem; color:white; background:%s; border-radius:10px; padding:1px 7px;", badge_col),
+                  t(paste0("ai_reg_basis_", e$basis %||% "assumed"))),
+        if (nzchar(applied_txt)) tags$span(style = "font-size:0.72rem; color:#555;", applied_txt),
+        tags$a(href = "#", style = "font-size:0.78rem;",
+               onclick = sprintf("Shiny.setInputValue('translator_reg_edit', '%s', {priority: 'event'}); return false;", e$topic),
+               t("ai_reg_edit")))
+    })
+    tags$details(
+      open = NA,
+      style = "margin:8px 0; padding:8px 12px; background:#FAFAF9; border:1px solid #E7E5E4; border-radius:8px;",
+      tags$summary(style = "cursor:pointer; font-weight:600; font-size:0.88rem; color:#1B4332;",
+                   sprintf("%s (%d)", t("ai_reg_title"), length(reg))),
+      tags$div(style = "font-size:0.78rem; color:#555; margin:4px 0 6px 0;", t("ai_reg_note")),
+      rows)
+  })
+  observeEvent(input$translator_reg_edit, {
+    tp <- input$translator_reg_edit
+    req(is.character(tp), nzchar(tp))
+    e <- state$register[[tp]]
+    choices <- .translator_topic_choices_for(tp)
+    state$reg_edit_topic <- tp
+    showModal(modalDialog(
+      title = .translator_topic_label(tp), easyClose = TRUE,
+      tags$p(style = "font-size:0.85rem; color:#555;", .translator_topic_question(tp)),
+      if (!is.null(choices))
+        radioButtons("translator_reg_value", NULL,
+                     choices = setNames(choices, vapply(choices, .translator_choice_label, character(1))),
+                     selected = if (!is.null(e) && (e$decision %||% "") %in% choices) e$decision else character(0))
+      else
+        textAreaInput("translator_reg_value", NULL, value = e$decision %||% "", rows = 2, width = "100%"),
+      tags$p(style = "font-size:0.8rem; color:#7F1D1D; margin-top:8px;", t("ai_reg_modal_note")),
+      footer = tagList(modalButton(t("ai_reg_cancel")),
+                       actionButton("translator_reg_save", t("ai_reg_save"), class = "btn-success"))))
+  })
+  observeEvent(input$translator_reg_save, {
+    tp <- state$reg_edit_topic
+    req(is.character(tp), nzchar(tp))
+    val <- trimws(as.character(input$translator_reg_value %||% ""))
+    if (!nzchar(val)) return()
+    state$register <- translator_register_set_user(state$register, tp, val,
+                                                   msg_index = length(state$messages) + 1L,
+                                                   edited = TRUE)
+    txt <- sprintf("Decision (edited): %s = %s", tp, val)
+    state$messages[[length(state$messages) + 1L]] <-
+      list(role = "user", content = txt, display = txt, source = "user_decision")
+    .translator_persist(state)
+    removeModal()
   })
 
   # ---- Render the message history ------------------------------------------
@@ -836,6 +1062,10 @@ translator_chat_server <- function(input, output, session) {
 
     conditionalPanel(
       condition = "!output.translator_template_ready",
+    # 2026-10-22 (WP1): the register and the current question sit above
+    # the free-text row.
+    uiOutput("translator_register"),
+    uiOutput("translator_qa_card"),
     tags$div(
       style = "display:flex; gap:8px; align-items:flex-end;",
       div(style = "flex:1;",
@@ -1745,8 +1975,32 @@ translator_cancel_clear <- function(tok) {
   # postamble), set display to just the numbered items. The full reply
   # stays in `content` so the chat-bubble expander surfaces it on
   # demand.
-  display_text <- .translator_extract_numbered_questions(reply_text) %||%
-                  reply_text
+  # 2026-10-22 (WP1): the decisions block goes to the register and the
+  # questions to the one-at-a-time loop. The full reply, block included,
+  # stays in `content` so the model keeps seeing its own decisions.
+  decs <- if (!isTRUE(resp$tool_used)) .translator_extract_decisions(reply_text) else NULL
+  if (!is.null(decs)) {
+    state$register <- translator_register_merge(state$register, decs,
+                                                msg_index = length(state$messages) + 1L)
+  } else if (identical(stage, "clarify") && length(state$messages) &&
+             identical(state$messages[[length(state$messages)]]$role, "user")) {
+    # The reply to an answer came without its block: one cheap call asks
+    # for the decisions alone (fallback, see translator_register.R).
+    tryCatch(.translator_register_summarise_async(state, session),
+             error = function(e) message("translator: summariser not started (", conditionMessage(e), ")"))
+  }
+  reply_vis <- .translator_strip_decisions(reply_text)
+  qs <- if (!isTRUE(resp$tool_used) && !template_just_ready)
+    .translator_question_list(reply_vis) else character(0)
+  if (length(qs)) {
+    state$pending_questions <- lapply(seq_along(qs), function(i)
+      list(id = i, kind = "ai", text = qs[i], answer = NULL))
+    state$q_index <- 1L
+    stripped <- tryCatch(.translator_strip_question_blocks(reply_vis, qs), error = function(e) reply_vis)
+    display_text <- if (nzchar(stripped)) stripped else t("ai_qa_bubble_only_questions")
+  } else {
+    display_text <- .translator_extract_numbered_questions(reply_vis) %||% reply_vis
+  }
   state$messages[[length(state$messages) + 1]] <-
     if (isTRUE(resp$tool_used))
       list(role = "assistant", content = reply_text, display = display_text,
@@ -1943,7 +2197,8 @@ translator_cancel_clear <- function(tok) {
 # change what the model is asked for.
 # The discovery instruction. Extracted alongside .translator_batch_nudge()
 # so the asynchronous chain asks for exactly the same thing.
-.translator_discovery_request <- function() {
+.translator_discovery_request <- function(register = NULL) {
+    block <- translator_register_block(register)
     paste(
     "STEP 3 OF 3: EMISSION SETUP. Before producing the filled template,",
     "the in-app handler needs you to enumerate two things from this",
@@ -1963,11 +2218,13 @@ translator_cancel_clear <- function(tok) {
     "Call the emit_inventory_piece tool exactly once with mode = 'enumerate'.",
     "Do NOT emit any parameters, manure_management, or time-series rows",
     "here: those come in per-aggregation-level follow-up calls.",
+    if (nzchar(block)) paste0("\n", block) else "",
     sep = "\n")
 }
 
-.translator_batch_nudge <- function(i, n_levels, level) {
-      sprintf(paste(
+.translator_batch_nudge <- function(i, n_levels, level, register = NULL) {
+      block <- translator_register_block(register, level = level)
+      out <- sprintf(paste(
       "STEP 3 OF 3: BATCH %d OF %d (aggregation_level = '%s').",
       "",
       "Emit ONLY the parameters, manure_management, and",
@@ -2003,6 +2260,10 @@ translator_cancel_clear <- function(tok) {
       "zeros with distribution='constant'.",
       sep = "\n"),
           i, n_levels, level, level, level, level, nrow(PARAM_CATALOGUE))
+      # The binding decisions go last: the nudge is the uncached tail of the
+      # request, and the end of a long prompt is where the model weighs
+      # text most.
+      if (nzchar(block)) paste0(out, "\n\n", block) else out
 }
 
 # Stage 3 of the emission: merge the per-level pieces, validate, store and
@@ -2181,7 +2442,7 @@ translator_cancel_clear <- function(tok) {
   # conversation (plan F6): a second click on Produce with nothing changed
   # costs nothing.
   info("Analysing your inventory structure...")
-  discovery_request <- .translator_discovery_request()
+  discovery_request <- .translator_discovery_request(state$register)
   discovery_msgs <- anthropic_build_messages(
     system_prompt, history = state$messages,
     new_user_message = discovery_request)
@@ -2273,7 +2534,7 @@ translator_cancel_clear <- function(tok) {
     info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
     total_chars <- 0L
 
-    batch_nudge <- .translator_batch_nudge(i, length(agg_levels), level)
+    batch_nudge <- .translator_batch_nudge(i, length(agg_levels), level, state$register)
     batch_msgs <- anthropic_build_messages(
       system_prompt, history = state$messages,
       new_user_message = batch_nudge)
@@ -2447,7 +2708,7 @@ translator_cancel_clear <- function(tok) {
       total_chars <<- 0L
       batch_msgs <- anthropic_build_messages(
         system_prompt, history = state$messages,
-        new_user_message = .translator_batch_nudge(i, length(agg_levels), level))
+        new_user_message = .translator_batch_nudge(i, length(agg_levels), level, state$register))
 
       accept <- function(batch_parsed) {
         batch_parsed$.requested_aggregation_level <- level
@@ -2518,7 +2779,7 @@ translator_cancel_clear <- function(tok) {
 
   # ---- Stage 1: discovery ------------------------------------------------
   info("Analysing your inventory structure...")
-  discovery_request <- .translator_discovery_request()
+  discovery_request <- .translator_discovery_request(state$register)
   discovery_msgs <- anthropic_build_messages(
     system_prompt, history = state$messages,
     new_user_message = discovery_request)
@@ -2620,7 +2881,8 @@ translator_cancel_clear <- function(tok) {
     "The translation rule, applied row-by-row:",
     "  (1) Every (parameter, sub-cat) pair in your section B inventory →",
     "      one row with: value = file mean, lower = file lower (if listed),",
-    "      upper = file upper (if listed), distribution = pert,",
+    "      upper = file upper (if listed), distribution = the file's named",
+    "      distribution if it gives one, else the catalogue's suggested one,",
     "      data_source = 'user_file'. Apply the user's clarifications",
     "      from section D (e.g. unit conversions, sub-cat vocabulary",
     "      mapping, biological-zero overrides).",
@@ -2711,8 +2973,9 @@ translator_cancel_clear <- function(tok) {
     "5. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
     "   upper bounds (Lower CI / Upper CI / lower / upper / ci_lower",
     "   / ci_upper / p2.5 / p97.5), USE those as `lower` and `upper`",
-    "   directly, set `distribution = pert`, and leave",
-    "   `uncertainty_pct` blank. Do NOT fall back to a symmetric",
+    "   directly, keep the file's named distribution if it gives one",
+    "   (else the catalogue's suggested one for that parameter), and",
+    "   leave `uncertainty_pct` blank. Do NOT fall back to a symmetric",
     "   ±% from the catalogue.",
     "",
     "6. Manure_Management must contain rows for EVERY sub-category,",
@@ -2741,7 +3004,10 @@ translator_cancel_clear <- function(tok) {
     "template-ready JSON matching the schema.",
     sep = "\n")
   msgs <- anthropic_build_messages(system_prompt, history = state$messages,
-                                  new_user_message = hard_requirements)
+                                  new_user_message = paste0(
+                                    hard_requirements,
+                                    local({ b <- translator_register_block(state$register)
+                                            if (nzchar(b)) paste0("\n\n", b) else "" })))
 
   # Try once; if the JSON parses, use it. If not (truncation, schema
   # mismatch, etc.), retry ONCE before giving up. Two attempts is a

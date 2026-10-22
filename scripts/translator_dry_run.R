@@ -52,6 +52,12 @@ calls <- character()
   if (grepl("mode = 'batch'", last, fixed = TRUE)) {
     lv <- levels[vapply(levels, function(l) grepl(paste0("'", l, "'"), last, fixed = TRUE), logical(1))][1]
     calls <<- c(calls, paste0("batch:", lv))
+    # 2026-10-22 (WP1): the binding decisions must be the last paragraph of
+    # every batch request and name this batch's level.
+    stopifnot(grepl("BINDING DECISIONS", last, fixed = TRUE),
+              grepl(sprintf("For this batch ('%s')", lv), last, fixed = TRUE),
+              grepl("inventory_year: 2022", last, fixed = TRUE))
+    nudge_checked <<- nudge_checked + 1L
     piece <- sprintf('{"mode":"batch","aggregation_level":"%s","inventory_metadata":%s,"parameters":%s,"manure_management":%s,"parameter_timeseries":%s}',
                      lv, jsonlite::toJSON(meta, auto_unbox = TRUE),
                      rows_json(ps[ps$aggregation_level == lv, param_cols]),
@@ -60,10 +66,15 @@ calls <- character()
     return(c(list(reply = piece, tool_used = TRUE), base))
   }
   calls <<- c(calls, "chat")
-  txt <- "Thanks. Section D: 1. Which year? 2. Split calves?"
+  # a clarify reply the way rule 11 asks for it: prose, questions, then the
+  # decisions block
+  txt <- paste0("Thanks. Before I can produce, please answer:\n\n1. Which year?\n2. Split calves?\n\n",
+                "```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"Year 2022\"},",
+                " {\"topic\": \"calves_handling\", \"decision\": \"pooled, as in the file\", \"basis\": \"file\", \"confidence\": \"high\", \"quote\": \"Calves\"}]\n```")
   on_chunk(txt)
   c(list(reply = txt, tool_used = FALSE), base)
 }
+nudge_checked <- 0L
 anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
                                         should_stop = function() FALSE, model = "stub", max_tokens = 1,
                                         temperature = 0, timeout_sec = 1, tools = NULL, tool_choice = NULL,
