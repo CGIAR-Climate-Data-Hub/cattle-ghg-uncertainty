@@ -205,6 +205,59 @@ translator_source_fingerprint <- function(parsed) {
   piece
 }
 
+# 2026-10-23: the Parameters sheet is the single-year snapshot of the time
+# series, so for the inventory year the two must agree. On the Zambia run
+# of 15:50 the model emitted four systems' populations from its
+# exploration table, built for 2022 before the user chose 2024, while the
+# time series (read straight from the year columns) was right. Where they
+# differ by more than 0.5 %, the Parameters value is set to the
+# time-series value, explicit bounds are scaled with it, and the
+# correction is listed for the user.
+.translator_fix_year_from_timeseries <- function(piece) {
+  ps <- piece$parameters; ts <- piece$parameter_timeseries
+  if (!is.data.frame(ps) || !nrow(ps) || !is.data.frame(ts) || !nrow(ts)) return(piece)
+  if (!all(c("sub_category", "parameter", "mean") %in% names(ps)) || !"year" %in% names(ts)) return(piece)
+  yr <- suppressWarnings(as.integer(.translator_scalar(piece$inventory_metadata$year %||% NA)))
+  if (is.na(yr)) return(piece)
+  num <- function(x) suppressWarnings(as.numeric(x))
+  key <- function(df, i) paste(df$cattle_type[i] %||% "", df$aggregation_level[i] %||% "", df$sub_category[i] %||% "", sep = "||")
+  py <- ts[num(ts$year) == yr, , drop = FALSE]
+  if (!nrow(py)) return(piece)
+  pcols <- intersect(names(py), if (exists("PARAM_CATALOGUE")) PARAM_CATALOGUE$parameter else character(0))
+  if (!length(pcols)) return(piece)
+  ps_key <- paste(key(ps, seq_len(nrow(ps))), ps$parameter, sep = "##")
+  mu <- num(ps$mean)
+  lo <- if ("lower" %in% names(ps)) num(ps$lower) else rep(NA_real_, nrow(ps))
+  hi <- if ("upper" %in% names(ps)) num(ps$upper) else rep(NA_real_, nrow(ps))
+  rows <- list(); fixed <- integer(0)
+  for (i in seq_len(nrow(py))) for (pc in pcols) {
+    v <- num(py[[pc]][i]); if (!is.finite(v)) next
+    j <- match(paste(key(py, i), pc, sep = "##"), ps_key)
+    if (is.na(j) || !is.finite(mu[j]) || abs(v - mu[j]) <= 0.005 * max(1e-9, abs(mu[j]))) next
+    ratio <- if (mu[j] != 0) v / mu[j] else NA_real_
+    old <- mu[j]; mu[j] <- v
+    if (is.finite(ratio) && ratio > 0) { if (is.finite(lo[j])) lo[j] <- lo[j] * ratio; if (is.finite(hi[j])) hi[j] <- hi[j] * ratio }
+    fixed <- c(fixed, j)
+    rows[[length(rows) + 1L]] <- data.frame(
+      where = sprintf("%s / %s / %s", ps$aggregation_level[j] %||% "", ps$sub_category[j], pc),
+      issue = sprintf(paste0("Parameters gave %s for %s but the time series gives %s for the inventory year %d. ",
+                             "The single-year sheet must agree with the time series, so the row was set to %s",
+                             "%s. Check it against your file."),
+                      format(signif(old, 7)), pc, format(signif(v, 7)), yr, format(signif(v, 7)),
+                      if (is.finite(ratio) && (is.finite(lo[j]) || is.finite(hi[j]))) " and its bounds scaled with it" else ""),
+      sheet = "Parameters", group = key(ps, j), parameter = pc, check = "year value (corrected)", stringsAsFactors = FALSE)
+  }
+  if (!length(fixed)) return(piece)
+  ps$mean <- mu
+  if ("lower" %in% names(ps)) ps$lower <- lo
+  if ("upper" %in% names(ps)) ps$upper <- hi
+  piece$parameters <- ps
+  corr <- do.call(rbind, rows); rownames(corr) <- NULL
+  piece$server_corrections <- if (is.data.frame(piece$server_corrections) && nrow(piece$server_corrections))
+    rbind(piece$server_corrections, corr) else corr
+  piece
+}
+
 # The template JSON after the server-side corrections; the same text when
 # there was nothing to correct, so the caller can tell.
 .translator_fix_piece_json <- function(json) {
@@ -213,6 +266,7 @@ translator_source_fingerprint <- function(parsed) {
   if (is.null(piece) || !is.data.frame(piece$parameters)) return(json)
   before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
   piece <- .translator_fix_uncertainty_scale(piece)
+  piece <- tryCatch(.translator_fix_year_from_timeseries(piece), error = function(e) piece)
   after <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
   if (after == before) return(json)
   as.character(jsonlite::toJSON(piece, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
@@ -517,6 +571,29 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
               paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn),
               sheet = "Parameters", group = gkey(ps, j), parameter = pn, check = "default replaced file value")
         }
+      }
+    }
+  }
+
+  # C3m (2026-10-23). A manure coefficient must be a number of the file
+  # when the file carries that coefficient at all (the scan found the
+  # family). The Zambia run of 15:50 came out with MCF 4.59 and 50 and
+  # Frac_GasMS 48, none of which exist in the file, and nothing said so:
+  # C5 compares against the file's own column, which the row-block layout
+  # of the Coefficients sheet does not yield.
+  if (!is.null(source) && length(source$numbers) && !is.null(manure) && is.data.frame(manure) && nrow(manure) > 0) {
+    fam_of <- c(MCF_pct = "MCF", EF3 = "EF3", Frac_GasMS_pct = "Frac_GasMS", Frac_LeachMS_pct = "Frac_LeachMS")
+    cand <- unique(as.vector(outer(source$numbers, .TRANSLATOR_VALUE_TRANSFORMS, "*")))
+    for (cn in intersect(names(fam_of), names(manure))) {
+      if (!fam_of[[cn]] %in% (source$families %||% character(0))) next
+      v <- suppressWarnings(as.numeric(manure[[cn]]))
+      for (i in which(is.finite(v) & v > 0)) {
+        if (any(abs(cand - v[i]) <= 5e-4 * max(1, abs(v[i])))) next
+        add(sprintf("%s / %s / %s", manure$aggregation_level[i] %||% "", manure$sub_category[i], cn),
+            sprintf(paste0("%s = %s is not a number in your file, which does carry %s. The AI may have invented or ",
+                           "mis-assigned this coefficient; check the file's value for this manure system."),
+                    cn, fmt(v[i]), fam_of[[cn]]),
+            severity = "warn", sheet = "Manure_Management", group = gkey(manure, i), parameter = cn, check = "value not in file")
       }
     }
   }

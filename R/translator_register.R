@@ -387,6 +387,13 @@ translator_register_block <- function(register, level = NULL) {
     sprintf("- %s: %s [%s%s]", e$topic, e$decision, src, q)
   }
   for (e in decided) lines <- c(lines, fmt(e))
+  # 2026-10-23: the single-year values come from the chosen year's column,
+  # not from the exploration table (built before the year was settled)
+  yr <- suppressWarnings(as.integer(sub("^.*?(\\d{4}).*$", "\\1", register$inventory_year$decision %||% "")))
+  if (identical(register$inventory_year$status, "decided") && !is.na(yr))
+    lines <- c(lines, sprintf(paste0("Single-year values (the Parameters sheet) are the file's values for %d: where the file ",
+                                     "has a column per year, read the %d column for every row, not the column used in your ",
+                                     "exploration table. The time series row for %d must carry the same numbers."), yr, yr, yr))
   for (e in unclear)
     lines <- c(lines, sprintf("- UNRESOLVED %s: %s. Do not resolve this yourself: follow the file literally and tag affected rows data_source = 'placeholder'.",
                               e$topic, e$decision))

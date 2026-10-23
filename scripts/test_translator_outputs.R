@@ -104,6 +104,31 @@ ok(!identical(jz, jz2) && identical(.translator_fix_piece_json(jz2), jz2) &&
 ok(identical(.translator_fix_piece_json(as.character(jsonlite::toJSON(list(parameters = grp("bulls", 100, 55)), auto_unbox = TRUE, dataframe = "rows"))),
              as.character(jsonlite::toJSON(list(parameters = grp("bulls", 100, 55)), auto_unbox = TRUE, dataframe = "rows"))), "nothing to fix: the same text back")
 
+# ---- the single-year sheet corrected from the time series (2026-10-23) ------------------
+pzy <- pz
+pzy$parameters$lower[pzy$parameters$parameter == "N" & pzy$parameters$sub_category == "bulls"] <- 80
+pzy$parameters$upper[pzy$parameters$parameter == "N" & pzy$parameters$sub_category == "bulls"] <- 120
+pzy$parameter_timeseries <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = c("bulls", "heifers", "calves"),
+                                       year = 2024L, N = c(150, 200, 50), DE = c(55, 60, 58), stringsAsFactors = FALSE)
+fy <- .translator_fix_year_from_timeseries(pzy)
+gn <- function(sc, p) fy$parameters[fy$parameters$parameter == p & fy$parameters$sub_category == sc, ]
+ok(gn("bulls", "N")$mean == 150 && gn("bulls", "N")$lower == 120 && gn("bulls", "N")$upper == 180 && gn("heifers", "N")$mean == 200 && gn("calves", "DE")$mean == 58,
+   "a Parameters value that differs from the time series for the inventory year takes the time-series value, bounds scaled; agreeing rows untouched")
+ok(is.data.frame(fy$server_corrections) && nrow(fy$server_corrections) == 1 && fy$server_corrections$check == "year value (corrected)" && grepl("150", fy$server_corrections$issue),
+   "the correction is listed")
+jy <- as.character(jsonlite::toJSON(pzy, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows"))
+jy2 <- jsonlite::fromJSON(.translator_fix_piece_json(jy), simplifyVector = TRUE)
+ok(jy2$parameters$mean[jy2$parameters$parameter == "N" & jy2$parameters$sub_category == "bulls"] == 150 && nrow(jy2$server_corrections) == 2,
+   "the JSON path applies the year fix together with the scale fix (the bulls N row has bounds, so only DE gets the scale fix)")
+# a manure coefficient that is not in the file, when the file carries that coefficient
+src_m <- list(numbers = c(100, 200, 55, 60, 25, 0.02), families = c("MCF", "EF3"), family_values = list())
+mm_v <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = c("bulls", "heifers"), mms_type = "pasture",
+                   fraction_pct = 100, MCF_pct = c(25, 4.59), EF3 = 0.02, Frac_GasMS_pct = c(30, 48), Frac_LeachMS_pct = 5, stringsAsFactors = FALSE)
+iss_v <- translator_consistency_checks(ps, mm_v, source = src_m)
+nv <- iss_v[iss_v$check %in% "value not in file" & iss_v$sheet == "Manure_Management", ]
+ok(nrow(nv) == 1 && nv$parameter == "MCF_pct" && grepl("4.59", nv$issue) && grepl("heifers", nv$group),
+   "MCF 4.59 is flagged as not in the file; MCF 25 is not; Frac_GasMS 48 is not checked because the file has no Frac_GasMS family")
+
 # ---- the Parameters-versus-time-series check runs on a written template (2026-10-23) ----
 pz7 <- pz
 pz7$parameter_timeseries <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = c("bulls", "heifers", "calves"),
