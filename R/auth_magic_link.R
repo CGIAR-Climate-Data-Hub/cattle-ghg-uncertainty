@@ -295,8 +295,11 @@ auth_send_magic_link <- function(email, token,
   r <- .auth_send_email(email, "Sign in to the IPCC Cattle GHG Uncertainty tool", text, html,
                         from_email = from_email, from_name = from_name)
   if (r$ok) {
-    if (length(r$attempts)) message("auth: sign-in email sent via ", r$provider,
-                                    " after: ", paste(r$attempts, collapse = " | "))
+    # 2026-10-23: logged on every send (no token), so a "the mail never
+    # came" report can be checked against the server log: a line here
+    # means the provider accepted it and the rest is on the receiving side.
+    message("auth: sign-in email sent via ", r$provider, " to ", email,
+            if (length(r$attempts)) paste0(" after: ", paste(r$attempts, collapse = " | ")) else "")
     return(TRUE)
   }
   message("auth: sign-in email NOT sent. ", paste(r$attempts, collapse = " | "))
