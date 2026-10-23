@@ -455,12 +455,18 @@ anthropic_chat_stream_async <- function(messages,
                                       cache_ttl = cache_ttl)
   st <- new.env(parent = emptyenv())
   st$stopped  <- FALSE
+  st$t0       <- Sys.time()   # the async result carries its duration too (2026-10-23)
   st$reported <- FALSE
   st$handle   <- NULL
 
   report <- function(res) {
     if (st$reported) return(invisible(NULL))
     st$reported <- TRUE
+    # The usage log's latency was NA on every async call, so the job
+    # estimator never saw a measured rate and fell back to 35 tokens/s
+    # (a third of the real speed).
+    if (is.list(res) && is.null(res$latency_sec))
+      res$latency_sec <- as.numeric(difftime(Sys.time(), st$t0, units = "secs"))
     tryCatch(on_result(res), error = function(e)
       message("translator async: on_result failed: ", conditionMessage(e)))
     invisible(NULL)

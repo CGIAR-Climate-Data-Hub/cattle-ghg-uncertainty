@@ -11,7 +11,7 @@ est <- translator_job_estimate(c("a", "b"), list(a = c("bulls", "cows"), b = c("
 ok(identical(est$source, "usage_log") && abs(est$tok_per_sec - 35) < 1 && est$discovery_sec == 20, "estimate: speed and discovery time from the usage log medians")
 ok(est$per_level_tokens$a > est$per_level_tokens$b && est$total_tokens == est$per_level_tokens$a + est$per_level_tokens$b, "estimate: more sub-categories, more tokens")
 est0 <- translator_job_estimate(c("a", "b"), NULL, NULL)
-ok(identical(est0$source, "fallback") && est0$tok_per_sec == 35 && est0$per_level_tokens$a == 9000, "estimate: fallbacks with no history and no sub-categories")
+ok(identical(est0$source, "fallback") && est0$tok_per_sec == 100 && est0$per_level_tokens$a == 9000, "estimate: fallbacks with no history and no sub-categories")
 pr0 <- translator_job_progress(est, 1L, 2L, 0, 0)
 pr1 <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, 0)
 pr2 <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, est$per_level_tokens$b * 3.6)
@@ -19,7 +19,7 @@ ok(pr0$progress < pr1$progress && pr1$progress < pr2$progress && pr2$progress <=
 ok(grepl("first-run estimate", translator_job_progress(est0, 1L, 2L, 0, 0)$eta_text, fixed = TRUE), "a fallback estimate says so")
 # the time series counts: a 35-year file is a bigger job than a single year
 est35 <- translator_job_estimate(c("a", "b"), list(a = c("bulls", "cows"), b = c("bulls")), ul, n_years = 35)
-ok(est35$per_level_tokens$a > 1.5 * est$per_level_tokens$a && est35$per_level_tokens$a == est$per_level_tokens$a + 2 * 35 * 40,
+ok(est35$per_level_tokens$a > 1.5 * est$per_level_tokens$a && est35$per_level_tokens$a == est$per_level_tokens$a + 2 * 35 * 65,
    "the estimate grows with the years of the time series")
 # just past the estimate: the bar creeps on, no note yet
 pp <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, est$per_level_tokens$b * 3.6 * 1.2)

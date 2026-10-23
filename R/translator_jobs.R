@@ -144,7 +144,7 @@ translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = 
   levels <- as.character(levels %||% character(0))
   df <- usage_df
   num <- function(x) suppressWarnings(as.numeric(x))
-  tok_per_sec <- 35; src <- "fallback"
+  tok_per_sec <- 100; src <- "fallback"   # Sonnet 4.6 measured at about 110 tokens/s on 2026-10-23
   batch_tokens_hist <- numeric(0); enum_sec <- 25
   if (!is.null(df) && is.data.frame(df) && nrow(df) && all(c("stage", "completion_tokens", "latency_sec") %in% names(df))) {
     b <- df[df$stage %in% c("batch", "full", "retry_defaults_only", "retry_decision") &
@@ -157,18 +157,21 @@ translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = 
     if (nrow(e)) enum_sec <- stats::median(num(e$latency_sec))
   }
   n_params <- nrow(PARAM_CATALOGUE)
+  # per sub-category: a parameter row is about 60 tokens of JSON, a manure
+  # row 70 (eight systems), a time-series row 65 (the Zambia run of
+  # 2026-10-23: 17,500 to 35,400 tokens per system of 5 or 6 sub-categories)
   n_years <- suppressWarnings(as.numeric(n_years %||% 0)); if (!is.finite(n_years)) n_years <- 0
-  ts_tokens <- if (n_years > 1) n_years * 40 else 0
+  ts_tokens <- if (n_years > 1) n_years * 65 else 0
   per_level <- vapply(levels, function(lv) {
     sc <- subcats_by_level[[lv]]
-    if (!is.null(sc) && length(sc)) length(unique(unlist(sc))) * (n_params * 42 + 6 * 70 + ts_tokens) + 400
+    if (!is.null(sc) && length(sc)) length(unique(unlist(sc))) * (n_params * 60 + 8 * 70 + ts_tokens) + 400
     else if (length(batch_tokens_hist)) stats::median(batch_tokens_hist)
     else 9000
   }, numeric(1))
   n_rows <- sum(vapply(levels, function(lv) { sc <- subcats_by_level[[lv]]; if (!is.null(sc)) length(unique(unlist(sc))) else 6L }, numeric(1))) * n_params
   list(tok_per_sec = max(5, tok_per_sec), per_level_tokens = as.list(per_level),
        total_tokens = sum(per_level), discovery_sec = enum_sec,
-       assemble_sec = 45 + 0.07 * n_rows, delivery_sec = 5, source = src)
+       assemble_sec = 60 + 0.12 * n_rows, delivery_sec = 5, source = src)   # 729 rows took about 2.7 min
 }
 
 # Progress fraction and remaining time, from what has been emitted so far.
