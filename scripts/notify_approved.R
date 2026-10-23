@@ -29,7 +29,7 @@ if (basename(getwd()) == "scripts") setwd("..")
   text <- paste0(
         "Hello,\n\n",
         "You've been approved to use the AI Translator on the IPCC Tier 2 ",
-        "Livestock GHG Uncertainty Calculator.\n\n",
+        "Cattle GHG Uncertainty Calculator.\n\n",
         "To get started:\n\n",
         "  1. Open the app: ", app_url, "\n",
         "  2. Go to the Resources tab and find the AI Translator card.\n",
@@ -49,7 +49,7 @@ if (basename(getwd()) == "scripts") setwd("..")
       )
   res <- .auth_send_email(
     to      = to_email,
-    subject = "You're approved: IPCC Tier 2 Livestock GHG Uncertainty Calculator",
+    subject = "You're approved: IPCC Tier 2 Cattle GHG Uncertainty Calculator",
     text    = text,
     from_email = from_email, from_name = from_name)
   if (isTRUE(res$ok))

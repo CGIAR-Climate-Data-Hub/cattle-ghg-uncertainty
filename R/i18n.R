@@ -161,8 +161,8 @@ lang_state_take <- function(token) {
 
   # ---- App-wide title strip (top of navbar) -----------------------------
   app_title = list(
-    en = "IPCC Tier 2 Livestock GHG Uncertainty Calculator",
-    fr = "Calculateur d'incertitude GES Bétail IPCC Niveau 2"
+    en = "IPCC Tier 2 Cattle GHG Uncertainty Calculator",
+    fr = "Calculateur d'incertitude GES Bovins IPCC Niveau 2"
   ),
   app_subtitle = list(
     en = "Approach 2 Monte Carlo · CGIAR Alliance / Bioversity-CIAT · funded by the Global Methane Hub",
@@ -236,10 +236,10 @@ lang_state_take <- function(token) {
   ),
 
   # ---- Home tab: hero section -----------------------------------------
-  hero_title    = list(en = "IPCC Tier 2 Livestock GHG Uncertainty Calculator",
-                       fr = "Calculateur d'incertitude GES Bétail IPCC Niveau 2"),
+  hero_title    = list(en = "IPCC Tier 2 Cattle GHG Uncertainty Calculator",
+                       fr = "Calculateur d'incertitude GES Bovins IPCC Niveau 2"),
   hero_subtitle = list(en = "Monte Carlo uncertainty analysis for national cattle methane and nitrous oxide inventories.",
-                       fr = "Analyse Monte Carlo de l'incertitude pour les inventaires nationaux de méthane et de protoxyde d'azote du bétail."),
+                       fr = "Analyse Monte Carlo de l'incertitude pour les inventaires nationaux de méthane et de protoxyde d'azote des bovins."),
   hero_credit   = list(en = "Developed by CGIAR Alliance of Bioversity International and CIAT | Funded by Global Methane Hub",
                        fr = "Développé par l'Alliance CGIAR Bioversity International et CIAT | Financé par Global Methane Hub"),
 

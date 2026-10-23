@@ -141,7 +141,7 @@ app_ui <- function(request = NULL) {
             HTML(jsonlite::toJSON(list(
               "@context" = "https://schema.org",
               "@type" = "SoftwareApplication",
-              name = "Cattle GHG Uncertainty Calculator (IPCC Tier 2 Livestock GHG Uncertainty Calculator)",
+              name = "IPCC Tier 2 Cattle GHG Uncertainty Calculator",
               url = .SEO_APP_URL,
               sameAs = c(.SEO_REPO_URL, .SEO_SITE_URL),
               description = t("seo_meta_description"),

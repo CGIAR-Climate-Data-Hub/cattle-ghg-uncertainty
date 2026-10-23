@@ -1,4 +1,4 @@
-# IPCC Tier 2 Livestock GHG Uncertainty Calculator
+# IPCC Tier 2 Cattle GHG Uncertainty Calculator
 # Developed by CIAT/CGIAR Alliance | Funded by Global Methane Hub
 
 # Source all R files

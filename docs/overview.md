@@ -1,4 +1,4 @@
-# Cattle GHG Uncertainty Calculator (IPCC Tier 2 Livestock GHG Uncertainty Calculator)
+# IPCC Tier 2 Cattle GHG Uncertainty Calculator
 
 A free, open-source (MIT) web tool for national greenhouse-gas inventory teams to quantify and report uncertainty in IPCC Tier 2 cattle emission estimates. Live app: https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/ . Source: https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty . Website: https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/
 
@@ -22,4 +22,4 @@ National inventory compilers preparing Biennial Transparency Reports (BTRs), Bie
 
 ## Citation
 
-Alliance of Bioversity International and CIAT (CGIAR) (2026). IPCC Tier 2 Livestock GHG Uncertainty Calculator (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
+Alliance of Bioversity International and CIAT (CGIAR) (2026). IPCC Tier 2 Cattle GHG Uncertainty Calculator (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty

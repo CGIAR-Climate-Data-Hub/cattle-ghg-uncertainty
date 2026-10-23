@@ -1,5 +1,5 @@
 ---
-title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
+title: "IPCC Tier 2 Cattle GHG Uncertainty Calculator"
 subtitle: "User Guide"
 author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
@@ -37,7 +37,7 @@ header-includes:
   - \setlength{\headheight}{14pt}
   - \pagestyle{fancy}
   - \fancyhf{}
-  - \fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Livestock GHG Uncertainty Calculator}}
+  - \fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Cattle GHG Uncertainty Calculator}}
   - \fancyhead[R]{\textcolor{darkgrey}{\small User Guide}}
   - \fancyfoot[C]{\textcolor{darkgrey}{\small \thepage}}
   - \renewcommand{\headrulewidth}{0.4pt}

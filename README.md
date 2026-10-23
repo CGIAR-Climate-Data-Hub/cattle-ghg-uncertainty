@@ -1,4 +1,4 @@
-# IPCC Tier 2 Livestock GHG Uncertainty Calculator
+# IPCC Tier 2 Cattle GHG Uncertainty Calculator
 
 [![Launch App](https://img.shields.io/badge/Launch%20App-shinyapps.io-2D6A4F?style=for-the-badge&logo=r)](https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/)
 [![Website](https://img.shields.io/badge/Website-cattle--ghg--uncertainty-1B4332?style=for-the-badge)](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/)
@@ -157,7 +157,7 @@ This tool was developed as part of project **D614: GMH Emissions Uncertainty** f
 
 If you use this tool in your inventory work or research, please cite it (see [CITATION.cff](CITATION.cff), rendered by GitHub's "Cite this repository" button):
 
-> Alliance of Bioversity International and CIAT (CGIAR) (2026). *IPCC Tier 2 Livestock GHG Uncertainty Calculator* (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
+> Alliance of Bioversity International and CIAT (CGIAR) (2026). *IPCC Tier 2 Cattle GHG Uncertainty Calculator* (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
 
 A DOI badge will appear here once the first archived release is minted.
 

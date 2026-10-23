@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in the IPCC Tier 2 Livestock GHG Uncertainty Calculator.
+Thanks for your interest in the IPCC Tier 2 Cattle GHG Uncertainty Calculator.
 This document covers how to report problems, how to propose changes, and the one
 rule that matters more than any other in this repository.
 

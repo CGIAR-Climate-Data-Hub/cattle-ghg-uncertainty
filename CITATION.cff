@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this tool, please cite it as below."
 type: software
-title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
+title: "IPCC Tier 2 Cattle GHG Uncertainty Calculator"
 authors:
   - name: "Alliance of Bioversity International and CIAT (CGIAR)"
     city: "Cali"

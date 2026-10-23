@@ -1,5 +1,5 @@
 ---
-title: "IPCC Tier 2 Livestock GHG Uncertainty Calculator"
+title: "IPCC Tier 2 Cattle GHG Uncertainty Calculator"
 subtitle: "Technical Methodology: Equations, Monte Carlo Procedure, and Uncertainty Reporting"
 author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
@@ -33,7 +33,7 @@ header-includes:
   - \definecolor{darkgrey}{RGB}{60,60,60}
   - \pagestyle{fancy}
   - \fancyhf{}
-  - \fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Livestock GHG Uncertainty Calculator}}
+  - \fancyhead[L]{\textcolor{cgiargreen}{\small IPCC Tier 2 Cattle GHG Uncertainty Calculator}}
   - \fancyhead[R]{\textcolor{darkgrey}{\small Technical Methodology}}
   - \fancyfoot[C]{\textcolor{darkgrey}{\small \thepage}}
   - \renewcommand{\headrulewidth}{0.4pt}
@@ -76,7 +76,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 ## Purpose
 
-The **IPCC Tier 2 Livestock GHG Uncertainty Calculator** is a web-based tool that enables national inventory compilers to quantify the uncertainty in cattle greenhouse gas (GHG) emission estimates produced using the IPCC Tier 2 methodology. The tool implements the Monte Carlo (Approach 2) uncertainty framework described in IPCC (2006) Volume 1, Chapter 3, applied to the full emission equation chain of IPCC (2006) Volume 4, Chapter 10 and Chapter 11 for pasture N$_2$O.
+The **IPCC Tier 2 Cattle GHG Uncertainty Calculator** is a web-based tool that enables national inventory compilers to quantify the uncertainty in cattle greenhouse gas (GHG) emission estimates produced using the IPCC Tier 2 methodology. The tool implements the Monte Carlo (Approach 2) uncertainty framework described in IPCC (2006) Volume 1, Chapter 3, applied to the full emission equation chain of IPCC (2006) Volume 4, Chapter 10 and Chapter 11 for pasture N$_2$O.
 
 Under the Paris Agreement Enhanced Transparency Framework (ETF), national inventory reports are expected to include quantitative uncertainty estimates alongside emission totals. This tool automates that process, from parameter sampling to the formatted IPCC Table 3.3 output, for inventories of GHG emissions from one or more sub-categories of cattle.
 

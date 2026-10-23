@@ -22,4 +22,4 @@ Q: Does it cover other species or Tier 1?
 A: Current release: cattle, full Tier 2 chain (dairy and other cattle, user-defined sub-categories). No Tier 1 mode. Other ruminants are on the development agenda.
 
 Q: How do I cite it?
-A: Alliance of Bioversity International and CIAT (CGIAR) (2026). IPCC Tier 2 Livestock GHG Uncertainty Calculator (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
+A: Alliance of Bioversity International and CIAT (CGIAR) (2026). IPCC Tier 2 Cattle GHG Uncertainty Calculator (software). https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty
