@@ -636,11 +636,24 @@ app_ui <- function(request = NULL) {
          // the data workbook downloads by itself (a second automatic
          // download would need a per-site permission, so the other two
          // stay as buttons).
+         // 2026-10-23: a download anchor starts with an empty href, and
+         // el.href then resolves to the page itself: the folder save wrote
+         // the app's HTML page under the workbook's name. Wait for a real
+         // download link, and check the bytes before writing.
          function translatorWaitFor(id, tries, cb) {
            var el = document.getElementById(id);
-           if (el && el.href) return cb(el);
+           var h = el ? (el.getAttribute('href') || '') : '';
+           if (el && h.indexOf('download') >= 0) return cb(el);
            if (tries <= 0) return cb(null);
            setTimeout(function() { translatorWaitFor(id, tries - 1, cb); }, 250);
+         }
+         async function translatorFetchFile(a) {
+           var resp = await fetch(a.href, { credentials: 'same-origin' });
+           if (!resp.ok) throw new Error('download failed (' + resp.status + ')');
+           var blob = await resp.blob();
+           var head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+           if (head.length < 2 || head[0] !== 80 || head[1] !== 75) throw new Error('not a workbook');
+           return blob;
          }
          Shiny.addCustomMessageHandler('translatorJobDone', function(d) {
            var files = (d && d.files) || [];
@@ -649,10 +662,9 @@ app_ui <- function(request = NULL) {
                var okAll = true, err = '';
                for (var i = 0; i < files.length; i++) {
                  try {
-                   var a = await new Promise(function(res) { translatorWaitFor(files[i].output_id, 40, res); });
+                   var a = await new Promise(function(res) { translatorWaitFor(files[i].output_id, 120, res); });
                    if (!a) { okAll = false; err = 'download link not ready: ' + files[i].name; continue; }
-                   var resp = await fetch(a.href, { credentials: 'same-origin' });
-                   var blob = await resp.blob();
+                   var blob = await translatorFetchFile(a);
                    var fh = await window._translatorDirHandle.getFileHandle(files[i].name, { create: true });
                    var w = await fh.createWritable(); await w.write(blob); await w.close();
                  } catch (e) { okAll = false; err = String(e); }
@@ -662,7 +674,7 @@ app_ui <- function(request = NULL) {
            } else {
              var auto = files.filter(function(f) { return f.key === d.auto; })[0];
              if (!auto) return;
-             translatorWaitFor(auto.output_id, 40, function(a) {
+             translatorWaitFor(auto.output_id, 120, function(a) {
                if (a) a.click();
                Shiny.setInputValue('translator_job_saved', { id: d.id, mode: 'download', ok: !!a, error: a ? '' : 'download link not ready', t: Date.now() }, { priority: 'event' });
              });

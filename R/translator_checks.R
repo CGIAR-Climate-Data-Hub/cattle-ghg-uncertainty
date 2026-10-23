@@ -144,6 +144,72 @@ translator_source_fingerprint <- function(parsed) {
        year_sums = year_sums)
 }
 
+# 2026-10-23: a relative uncertainty written as a fraction of 1 (0.5 for
+# 50 %) where the catalogue and the rest of the file say percent. The
+# Zambia MoE sheet gives "95% margin of error (%)" as 0.5; the user
+# confirmed it means 50 %, and one production system still came out with
+# 0.5. The reference is the catalogue's suggested uncertainty for the
+# parameter, else the median of the other rows of the same parameter: when
+# it is 5 % or more and the row is below 1 with no explicit bounds, the row
+# is multiplied by 100 (never beyond 200 %) and the correction is listed
+# in piece$server_corrections for the checks.
+.translator_fix_uncertainty_scale <- function(piece) {
+  ps <- piece$parameters
+  if (!is.data.frame(ps) || !nrow(ps) || !all(c("parameter", "uncertainty_pct") %in% names(ps)))
+    return(piece)
+  u <- suppressWarnings(as.numeric(ps$uncertainty_pct))
+  lo <- if ("lower" %in% names(ps)) suppressWarnings(as.numeric(ps$lower)) else rep(NA_real_, nrow(ps))
+  hi <- if ("upper" %in% names(ps)) suppressWarnings(as.numeric(ps$upper)) else rep(NA_real_, nrow(ps))
+  cat_u <- if (exists("PARAM_CATALOGUE") && all(c("parameter", "suggested_uncertainty_pct") %in% names(PARAM_CATALOGUE)))
+    stats::setNames(suppressWarnings(as.numeric(PARAM_CATALOGUE$suggested_uncertainty_pct)), PARAM_CATALOGUE$parameter) else numeric(0)
+  rows <- list(); fixed <- integer(0)
+  for (p in unique(as.character(ps$parameter))) {
+    idx <- which(as.character(ps$parameter) == p)
+    ref <- if (p %in% names(cat_u)) cat_u[[p]] else NA_real_
+    if (!is.finite(ref)) {
+      others <- u[idx][is.finite(u[idx]) & u[idx] >= 1]
+      ref <- if (length(others) >= 2L) stats::median(others) else NA_real_
+    }
+    if (!is.finite(ref) || ref < 5) next
+    for (i in idx) {
+      if (!is.finite(u[i]) || u[i] <= 0 || u[i] >= 1) next
+      if (is.finite(lo[i]) || is.finite(hi[i])) next   # explicit bounds carry the spread
+      if (u[i] * 100 > 200) next
+      new <- u[i] * 100
+      u[i] <- new; fixed <- c(fixed, i)
+      rows[[length(rows) + 1L]] <- data.frame(
+        where = sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], p),
+        issue = sprintf(paste0("Uncertainty was written as %s for %s, a fraction where the template takes a ",
+                               "percentage (the IPCC catalogue suggests about %s%% for %s). Read as %s%% and ",
+                               "corrected on this row. Check it against your file."),
+                        format(signif(u[i] / 100, 4)), p, format(signif(ref, 3)), p, format(signif(new, 4))),
+        sheet = "Parameters",
+        group = paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i] %||% "", sep = "||"),
+        parameter = p, check = "uncertainty scale (corrected)", stringsAsFactors = FALSE)
+    }
+  }
+  if (!length(fixed)) return(piece)
+  ps$uncertainty_pct <- u
+  piece$parameters <- ps
+  corr <- do.call(rbind, rows); rownames(corr) <- NULL
+  piece$server_corrections <- if (is.data.frame(piece$server_corrections) && nrow(piece$server_corrections))
+    rbind(piece$server_corrections, corr) else corr
+  piece
+}
+
+# The template JSON after the server-side corrections; the same text when
+# there was nothing to correct, so the caller can tell.
+.translator_fix_piece_json <- function(json) {
+  if (is.null(json) || !nzchar(json)) return(json)
+  piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
+  if (is.null(piece) || !is.data.frame(piece$parameters)) return(json)
+  before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
+  piece <- .translator_fix_uncertainty_scale(piece)
+  after <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
+  if (after == before) return(json)
+  as.character(jsonlite::toJSON(piece, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
+}
+
 # The short name of a check from its location label, for the checks that
 # pass only a label (2026-10-22): the checks workbook shows the name in its
 # Check column and the label, when it is a place, in Group.
@@ -212,12 +278,17 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     #    a fraction copied where a percentage was expected (0.5 for 50 %).
     if ("uncertainty_pct" %in% names(ps)) {
       u_all <- suppressWarnings(as.numeric(ps$uncertainty_pct))
+      # a row with explicit bounds takes its spread from them, not from
+      # uncertainty_pct (2026-10-23)
+      lo2 <- if ("lower" %in% names(ps)) suppressWarnings(as.numeric(ps$lower)) else rep(NA_real_, nrow(ps))
+      hi2 <- if ("upper" %in% names(ps)) suppressWarnings(as.numeric(ps$upper)) else rep(NA_real_, nrow(ps))
+      has_bounds <- is.finite(lo2) | is.finite(hi2)
       for (p in unique(ps$parameter)) {
         idx <- which(ps$parameter == p & !is.na(u_all) & u_all > 0)
         if (length(idx) < 3) next
         med <- stats::median(u_all[idx])
         if (med < 5) next
-        for (i in idx[u_all[idx] < 1]) {
+        for (i in idx[u_all[idx] < 1 & !has_bounds[idx]]) {
           add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], p),
               sprintf(paste0("Uncertainty %s%% is far below the %s%% typical for %s in this ",
                              "file. A fraction may have been copied instead of a percentage."),
@@ -610,6 +681,13 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       for (i in seq_len(nrow(d9)))
         add(d9$where[i], d9$issue[i], severity = "info", sheet = d9$sheet[i],
             group = d9$group[i], parameter = d9$parameter[i], check = "default applied")
+    # 2026-10-23: what the server corrected before writing (see
+    # .translator_fix_uncertainty_scale), for the user to check
+    sc <- piece$server_corrections
+    if (is.data.frame(sc) && nrow(sc))
+      for (i in seq_len(nrow(sc)))
+        add(sc$where[i], sc$issue[i], severity = "warn", sheet = sc$sheet[i],
+            group = sc$group[i], parameter = sc$parameter[i], check = sc$check[i] %||% "corrected by the tool")
   }
 
   if (!length(out))

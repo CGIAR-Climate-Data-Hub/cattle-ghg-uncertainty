@@ -166,20 +166,48 @@ translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = 
 }
 
 # Progress fraction and remaining time, from what has been emitted so far.
-translator_job_progress <- function(est, level_index, n_levels, done_tokens, level_bytes = 0, scale = 1) {
-  if (is.null(est) || !n_levels) return(list(progress = 0.05, eta_sec = NA_real_, eta_text = "", label = ""))
+# 2026-10-23: a system that runs past its token estimate used to freeze
+# the bar and the time left ("about 2 min left" for a quarter of an hour).
+# Now the bar keeps creeping towards, never reaching, the end of that
+# system, the time left says "running longer than estimated", and once
+# systems have finished their measured durations (level_secs, with the
+# time spent on the current one in level_elapsed) replace the token
+# arithmetic for the systems still to come.
+translator_job_progress <- function(est, level_index, n_levels, done_tokens, level_bytes = 0, scale = 1,
+                                    level_elapsed = NA_real_, level_secs = numeric(0)) {
+  if (is.null(est) || !n_levels) return(list(progress = 0.05, eta_sec = NA_real_, eta_text = "", label = "", over = FALSE))
   per <- unlist(est$per_level_tokens) * scale
   total <- sum(per)
   cur_est <- if (level_index >= 1 && level_index <= length(per)) per[level_index] else 0
-  cur_done <- min(level_bytes / 3.6, cur_est)
-  tokens_done <- done_tokens + cur_done
-  frac <- if (total > 0) tokens_done / total else 0
-  remaining_tokens <- max(0, total - tokens_done)
+  cur_seen <- level_bytes / 3.6
+  over <- is.finite(cur_est) && cur_est > 0 && cur_seen > cur_est
+  # the current system is credited at most 90% of its estimate until it is
+  # done, so the bar never claims a system is finished before it is
+  if (over) {
+    # the share reached at the estimate, then a slow creep towards the rest
+    frac_base <- if (total > 0) min(1, (done_tokens + 0.9 * cur_est) / total) else 0
+    frac <- frac_base + (1 - frac_base) * (1 - cur_est / cur_seen) * 0.9
+    remaining_tokens <- max(0, total - done_tokens - cur_est)
+  } else {
+    tokens_done <- done_tokens + min(cur_seen, 0.9 * cur_est)
+    frac <- if (total > 0) tokens_done / total else 0
+    remaining_tokens <- max(0, total - done_tokens - min(cur_seen, cur_est))
+  }
   eta <- remaining_tokens / est$tok_per_sec + est$assemble_sec + est$delivery_sec
+  if (length(level_secs) && level_index >= 1) {
+    mean_sec <- mean(level_secs)
+    n_after <- max(0, n_levels - level_index)
+    cur_left <- if (!is.finite(level_elapsed)) mean_sec
+                else if (level_elapsed < mean_sec) mean_sec - level_elapsed
+                else 0.15 * mean_sec
+    if (is.finite(level_elapsed) && level_elapsed > mean_sec) over <- TRUE
+    eta <- n_after * mean_sec + cur_left + est$assemble_sec + est$delivery_sec
+  }
   progress <- 0.05 + 0.88 * max(0, min(1, frac))
-  eta_text <- if (eta < 60) "less than a minute left" else sprintf("about %d min left", ceiling(eta / 60))
-  if (identical(est$source, "fallback")) eta_text <- paste0(eta_text, " (first-run estimate)")
-  list(progress = progress, eta_sec = eta, eta_text = eta_text,
+  eta_text <- if (eta < 60) t("ai_job_eta_under_min") else sprintf(t("ai_job_eta_min"), ceiling(eta / 60))
+  if (over) eta_text <- paste0(eta_text, " (", t("ai_job_eta_over"), ")")
+  else if (identical(est$source, "fallback")) eta_text <- paste0(eta_text, " (first-run estimate)")
+  list(progress = progress, eta_sec = eta, eta_text = eta_text, over = over,
        label = sprintf("system %d of %d", max(level_index, 1L), n_levels))
 }
 

@@ -58,6 +58,30 @@ ok(nrow(d9) == 3 && any(grepl("BW", d9$where) & grepl("range and distribution", 
 iss9 <- translator_consistency_checks(ps, NULL, source = src, piece = piece)
 ok(sum(iss9$severity == "info" & grepl("was applied", iss9$issue)) == 3, "C9 rows join the issues as info")
 
+# ---- the uncertainty-scale correction (2026-10-23) -------------------------------------
+pz <- list(parameters = rbind(grp("bulls", 100, 55), grp("heifers", 200, 60), grp("calves", 50, 58)),
+           manure_management = data.frame(), inventory_metadata = list(country = "Z", year = 2024L))
+pz$parameters$uncertainty_pct[pz$parameters$parameter == "N" & pz$parameters$sub_category == "bulls"] <- 0.5      # a fraction: 50 %
+pz$parameters$uncertainty_pct[pz$parameters$parameter == "DE" & pz$parameters$sub_category == "calves"] <- 0.2     # a fraction: 20 %
+pz$parameters$uncertainty_pct[pz$parameters$parameter == "Ym" & pz$parameters$sub_category == "heifers"] <- 0.3    # with bounds: left alone
+pz$parameters$lower[pz$parameters$parameter == "Ym" & pz$parameters$sub_category == "heifers"] <- 5
+pz$parameters$upper[pz$parameters$parameter == "Ym" & pz$parameters$sub_category == "heifers"] <- 8
+fz <- .translator_fix_uncertainty_scale(pz)
+gu <- function(p, sc) fz$parameters$uncertainty_pct[fz$parameters$parameter == p & fz$parameters$sub_category == sc]
+ok(gu("N", "bulls") == 50 && gu("DE", "calves") == 20 && gu("Ym", "heifers") == 0.3 && gu("N", "heifers") == 10,
+   "0.5 and 0.2 become 50 and 20 (catalogue says percent); a row with bounds and the normal rows are untouched")
+ok(is.data.frame(fz$server_corrections) && nrow(fz$server_corrections) == 2 && all(fz$server_corrections$check == "uncertainty scale (corrected)") &&
+   all(grepl("Read as", fz$server_corrections$issue)), "two corrections listed with the reason")
+isz <- translator_consistency_checks(fz$parameters, NULL, source = src, piece = fz)
+ok(sum(isz$check == "uncertainty scale (corrected)" & isz$severity == "warn") == 2 && !any(isz$check == "uncertainty scale"),
+   "the corrections reach the checks as warnings and the scale warning no longer fires")
+jz <- as.character(jsonlite::toJSON(pz, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows"))
+jz2 <- .translator_fix_piece_json(jz)
+ok(!identical(jz, jz2) && identical(.translator_fix_piece_json(jz2), jz2) &&
+   jsonlite::fromJSON(jz2, simplifyVector = TRUE)$parameters$uncertainty_pct[1] == 50, "the JSON round trip applies the fix once and is then stable")
+ok(identical(.translator_fix_piece_json(as.character(jsonlite::toJSON(list(parameters = grp("bulls", 100, 55)), auto_unbox = TRUE, dataframe = "rows"))),
+             as.character(jsonlite::toJSON(list(parameters = grp("bulls", 100, 55)), auto_unbox = TRUE, dataframe = "rows"))), "nothing to fix: the same text back")
+
 # ---- file names -----------------------------------------------------------------------
 p2 <- list(inventory_metadata = list(country = "Costa Rica", year = 2022L))
 fn <- translator_output_filename(p2, "template", stamp = as.POSIXct("2026-10-22 15:30:00"))

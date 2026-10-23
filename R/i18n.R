@@ -663,6 +663,9 @@ lang_state_take <- function(token) {
   ai_job_eta_under_min = list(en = "less than a minute left", fr = "moins d'une minute restante"),
   ai_job_eta_min = list(en = "about %d min left", fr = "environ %d min restantes"),
   ai_job_elapsed = list(en = "%d min %02d s elapsed", fr = "%d min %02d s écoulées"),
+  ai_job_eta_over = list(en = "running longer than estimated", fr = "plus long que prévu"),
+  ai_save_failed = list(en = "The files could not be saved to the folder (%s). Use the download buttons below instead.",
+                        fr = "Les fichiers n'ont pas pu être enregistrés dans le dossier (%s). Utilisez plutôt les boutons de téléchargement ci-dessous."),
   ai_job_system = list(en = "System %d of %d: %s", fr = "Système %d sur %d : %s"),
   ai_job_leave_note = list(
     en = "You can leave this page. When the files are ready they are saved to your chosen folder or downloaded; if this page is closed, they are emailed to you.",

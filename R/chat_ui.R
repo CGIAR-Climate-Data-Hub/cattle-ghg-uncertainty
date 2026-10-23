@@ -775,6 +775,7 @@ translator_chat_server <- function(input, output, session) {
       pct <- round(100 * as.numeric(jb$progress %||% 0))
       eta <- jb$eta_sec
       eta_txt <- if (is.null(eta) || !is.finite(as.numeric(eta))) "" else if (as.numeric(eta) < 60) t("ai_job_eta_under_min") else sprintf(t("ai_job_eta_min"), ceiling(as.numeric(eta) / 60))
+      if (isTRUE(jb$eta_over) && nzchar(eta_txt)) eta_txt <- paste0(eta_txt, " (", t("ai_job_eta_over"), ")")
       started <- as.POSIXct(jb$started_at, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
       secs <- if (is.na(started)) NA else max(0, floor(as.numeric(difftime(Sys.time(), started, units = "secs"))))
       el <- if (is.na(secs)) "" else sprintf(t("ai_job_elapsed"), secs %/% 60, secs %% 60)
@@ -816,6 +817,8 @@ translator_chat_server <- function(input, output, session) {
                                                 ok = isTRUE(v$ok), error = v$error %||% NULL))
     if (isTRUE(v$ok) && identical(v$mode, "folder"))
       showNotification(sprintf(t("ai_saved_to_folder"), state$dir_chosen %||% ""), type = "message", duration = 8)
+    else if (!isTRUE(v$ok))
+      showNotification(sprintf(t("ai_save_failed"), v$error %||% ""), type = "warning", duration = 15)
   })
 
 
@@ -1534,6 +1537,14 @@ translator_cancel_clear <- function(tok) {
               if (nzchar(e$applied_note %||% "")) tags$span(style = "color:#991B1B;", paste0(" (", e$applied_note, ")"))))))
 }
 
+# The dots of the pre-download preview: stronger than the cell fills, so a
+# failure reads as red at a glance (2026-10-23).
+.TRANSLATOR_SEV_DOT <- c(fail = "#DC2626", warn = "#F59E0B", info = "#3B82F6")
+.translator_sev_dot <- function(sev) {
+  sev <- if (!is.null(sev) && sev %in% names(.TRANSLATOR_SEV_DOT)) sev else "warn"
+  tags$span(style = sprintf("display:inline-block; width:8px; height:8px; border-radius:50%%; margin-right:6px; background:%s;", .TRANSLATOR_SEV_DOT[[sev]]))
+}
+
 .translator_precheck_ui <- function(pc) {
   box <- function(...) tags$div(
     style = "text-align:left; margin:0 auto 14px auto; max-width:720px; padding:10px 14px; background:#fff; border:1px solid #CFD8DC; border-radius:8px; font-size:0.85rem; color:#333;",
@@ -1564,6 +1575,7 @@ translator_cancel_clear <- function(tok) {
       tags$div(tags$strong(t("ai_precheck_fail_title")), " ", t("ai_precheck_fail_hint")),
       tags$ul(style = "margin:4px 0 8px 0; padding-left:18px; max-height:220px; overflow-y:auto;",
               lapply(seq_len(min(cap, n_fail)), function(i) tags$li(
+                .translator_sev_dot("fail"),
                 sprintf("%s%s, %s: %s", fails$group[i],
                         if (is.na(fails$level[i])) "" else paste0(" @", fails$level[i]),
                         fails$parameter[i], fails$message[i]))),
@@ -1572,8 +1584,7 @@ translator_cancel_clear <- function(tok) {
       tags$div(tags$strong(t("ai_precheck_issues_title")), " ", t("ai_precheck_issues_hint")),
       tags$ul(style = "margin:4px 0 0 0; padding-left:18px; max-height:260px; overflow-y:auto;",
               lapply(seq_len(min(cap, n_issue)), function(i) tags$li(
-                tags$span(style = sprintf("display:inline-block; width:8px; height:8px; border-radius:50%%; margin-right:6px; background:%s;",
-                                          .TRANSLATOR_SEV_FILL[[if ((issues$severity[i] %||% "warn") %in% names(.TRANSLATOR_SEV_FILL)) issues$severity[i] else "warn"]])),
+                .translator_sev_dot(issues$severity[i] %||% "warn"),
                 tags$span(style = "color:#555;", paste0(issues$where[i], ": ")), issues$issue[i])),
               if (n_issue > cap) tags$li(sprintf(t("ai_precheck_more"), n_issue - cap))))
   )
@@ -1586,6 +1597,13 @@ translator_cancel_clear <- function(tok) {
 # Keyed on the JSON hash so a revised template rebuilds and a repeated
 # call is free.
 .translator_finalise_template <- function(state, json, notify = function(txt) NULL) {
+  # 2026-10-23: what the server can settle from the catalogue is settled
+  # before anything is written (an uncertainty given as a fraction of 1)
+  fixed <- tryCatch(.translator_fix_piece_json(json), error = function(e) NULL)
+  if (!is.null(fixed) && !identical(fixed, json)) {
+    json <- fixed
+    state$last_template_json <- fixed
+  }
   key <- tryCatch(.tp_sha256(json), error = function(e) NULL)
   if (is.null(key)) return(invisible(NULL))
   cached <- isolate(state$template_file)
@@ -2910,11 +2928,14 @@ translator_cancel_clear <- function(tok) {
   # progress bookkeeping (WP5)
   jlevels <- character(0); jest <- NULL; level_i <- 0L; level_bytes <- 0
   done_tokens <- 0; last_push <- Sys.time() - 10
+  level_started <- NULL; level_secs <- numeric(0)   # measured durations (2026-10-23)
   push_progress <- function(force = FALSE) {
     if (!force && as.numeric(difftime(Sys.time(), last_push, units = "secs")) < 2) return(invisible(NULL))
     last_push <<- Sys.time()
-    pr <- translator_job_progress(jest, level_i, length(jlevels), done_tokens, level_bytes)
-    translator_job_update(job_id, progress = pr$progress, eta_sec = pr$eta_sec,
+    el <- if (is.null(level_started)) NA_real_ else as.numeric(difftime(Sys.time(), level_started, units = "secs"))
+    pr <- translator_job_progress(jest, level_i, length(jlevels), done_tokens, level_bytes,
+                                  level_elapsed = el, level_secs = level_secs)
+    translator_job_update(job_id, progress = pr$progress, eta_sec = pr$eta_sec, eta_over = isTRUE(pr$over),
                           level_index = level_i, stage = if (length(jlevels)) "batch" else "discovery")
     tryCatch(session$sendCustomMessage("translatorJobProgress",
                                         list(progress = pr$progress, eta = pr$eta_text, label = pr$label)),
@@ -3023,7 +3044,7 @@ translator_cancel_clear <- function(tok) {
         return(step(i + 1L))
       }
 
-      level_i <<- i; level_bytes <<- 0
+      level_i <<- i; level_bytes <<- 0; level_started <<- Sys.time()
       push_progress(TRUE)
       info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
       total_chars <<- 0L
@@ -3037,6 +3058,8 @@ translator_cancel_clear <- function(tok) {
         # what this system actually cost, for the estimate of the rest
         tk <- level_bytes / 3.6
         done_tokens <<- done_tokens + (if (!is.null(jest)) max(tk, 0) else 0)
+        if (!is.null(level_started))
+          level_secs <<- c(level_secs, as.numeric(difftime(Sys.time(), level_started, units = "secs")))
         act <- translator_job_read(job_id)$actual %||% list()
         act$per_level_tokens[[level]] <- round(tk)
         translator_job_update(job_id, actual = act)

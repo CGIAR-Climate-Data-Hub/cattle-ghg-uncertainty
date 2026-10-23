@@ -17,6 +17,16 @@ pr1 <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, 0)
 pr2 <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, est$per_level_tokens$b * 3.6)
 ok(pr0$progress < pr1$progress && pr1$progress < pr2$progress && pr2$progress <= 0.93 && grepl("min left|minute left", pr1$eta_text), "progress is monotone and carries an ETA text")
 ok(grepl("first-run estimate", translator_job_progress(est0, 1L, 2L, 0, 0)$eta_text, fixed = TRUE), "a fallback estimate says so")
+# a system running past its estimate: the bar keeps moving, the text says so
+po1 <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, est$per_level_tokens$b * 3.6 * 2)
+po2 <- translator_job_progress(est, 2L, 2L, est$per_level_tokens$a, est$per_level_tokens$b * 3.6 * 4)
+ok(isTRUE(po1$over) && isTRUE(po2$over) && po1$progress >= pr2$progress && po2$progress > po1$progress && po2$progress < 0.93 &&
+   grepl("longer than estimated", po1$eta_text, fixed = TRUE), "past the estimate: progress still rises, never completes, and the text says so")
+# measured durations replace the token arithmetic for the systems to come
+pm <- translator_job_progress(est, 2L, 3L, est$per_level_tokens$a, 0, level_elapsed = 10, level_secs = 100)
+ok(abs(pm$eta_sec - (100 + 90 + est$assemble_sec + est$delivery_sec)) < 1e-6 && !isTRUE(pm$over), "ETA from measured durations: one more system plus the rest of this one")
+pm2 <- translator_job_progress(est, 3L, 3L, est$per_level_tokens$a, 0, level_elapsed = 150, level_secs = c(100, 100))
+ok(isTRUE(pm2$over) && abs(pm2$eta_sec - (15 + est$assemble_sec + est$delivery_sec)) < 1e-6, "the last system past its mean duration: a small remainder and the note")
 
 # ---- job file ------------------------------------------------------------------------
 Sys.setenv(APP_RUNTIME_DIR = tempfile("rt"))
