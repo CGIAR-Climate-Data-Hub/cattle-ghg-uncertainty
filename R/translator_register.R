@@ -94,14 +94,22 @@ translator_register_assume_defaults <- function(register) {
 # the checks workbook. A decision already recorded, or one that is only a
 # placeholder ("pending"), is not repeated. At most six items.
 .translator_post_recorded <- function(state, before) {
-  before <- before %||% list(); after <- state$register %||% list()
+  after <- state$register %||% list()
+  # 2026-10-23: each topic is announced once. The model restates every
+  # decision in every reply, often reworded; a new line only when the
+  # user's own words changed as well (a correction), not for a rewording.
+  seen <- state$recorded %||% list()
   changed <- Filter(function(tp) {
-    a <- after[[tp]]; b <- before[[tp]]
-    identical(a$basis, "user") && identical(a$status, "decided") &&
-      .translator_decision_is_real(a$decision) &&
-      (is.null(b) || !identical(.translator_norm_text(b$decision), .translator_norm_text(a$decision)))
+    a <- after[[tp]]
+    if (!identical(a$basis, "user") || !identical(a$status, "decided") || !.translator_decision_is_real(a$decision)) return(FALSE)
+    s <- seen[[tp]]
+    if (is.null(s)) return(TRUE)
+    !identical(s$decision, .translator_norm_text(a$decision)) && !identical(s$quote, .translator_norm_text(a$quote))
   }, names(after))
   if (!length(changed)) return(invisible(NULL))
+  for (tp in changed) seen[[tp]] <- list(decision = .translator_norm_text(after[[tp]]$decision),
+                                         quote = .translator_norm_text(after[[tp]]$quote))
+  state$recorded <- seen
   parts <- vapply(changed, function(tp)
     sprintf("%s: %s", .translator_topic_label(tp), .translator_decision_text(after[[tp]]$decision)), character(1))
   if (length(parts) > 6L) parts <- c(parts[1:6], sprintf(t("ai_q_recorded_more"), length(parts) - 6L))
@@ -117,7 +125,11 @@ translator_register_assume_defaults <- function(register) {
 }
 .translator_decision_text <- function(d) {
   d <- gsub("\\s+", " ", trimws(as.character(d %||% "")))
-  if (nchar(d) > 90L) paste0(substr(d, 1L, 87L), "...") else d
+  if (nchar(d) <= 90L) return(d)
+  cut <- substr(d, 1L, 87L)
+  sp <- regexpr("\\s[^\\s]*$", cut, perl = TRUE)   # cut at a word, not inside one
+  if (sp > 40L) cut <- substr(cut, 1L, sp - 1L)
+  paste0(cut, "...")
 }
 
 # The questions the user has answered in this conversation: the first line
@@ -446,7 +458,7 @@ translator_register_df <- function(register) {
   if (is.null(content) || !nzchar(content)) return(character(0))
   lines <- strsplit(content, "\n", fixed = TRUE)[[1]]
   is_numbered <- grepl("^\\s{0,3}\\d+[.)]\\s+\\S", lines, perl = TRUE)
-  if (!any(is_numbered)) return(character(0))
+  if (!any(is_numbered)) return(.translator_trailing_question(content))
   blocks <- character(0); cur <- character(0); in_block <- FALSE; blank <- 0L
   flush <- function() if (length(cur)) blocks <<- c(blocks, paste(cur, collapse = "\n"))
   for (i in seq_along(lines)) {
@@ -465,8 +477,23 @@ translator_register_df <- function(register) {
   blocks[grepl("\\?", blocks)]
 }
 
-# The reply without its numbered question blocks (what stays in the bubble
-# while the questions are put one at a time).
+# A reply that asks one question without numbering it ("Please also
+# confirm: ..."), 2026-10-23: the last paragraph, when it ends with a
+# question mark, is the question, so it still becomes the last bubble
+# instead of staying buried above the recorded line.
+.translator_trailing_question <- function(content) {
+  paras <- trimws(strsplit(content, "\\n\\s*\\n", perl = TRUE)[[1]])
+  paras <- paras[nzchar(paras)]
+  if (!length(paras)) return(character(0))
+  last <- .translator_strip_answer_prompt(paras[length(paras)])
+  if (!nzchar(last) || nchar(last) > 700L) return(character(0))
+  if (!grepl("\\?\\s*[*_]*\\s*$", last, perl = TRUE)) return(character(0))
+  if (grepl("^\\s{0,3}\\d+[.)]\\s", last, perl = TRUE)) return(character(0))
+  last
+}
+
+# The reply without its question blocks (what stays in the bubble while
+# the questions are put one at a time).
 .translator_strip_question_blocks <- function(content, questions) {
   if (is.null(content) || !length(questions)) return(content)
   out <- content
@@ -474,9 +501,10 @@ translator_register_df <- function(register) {
     first <- strsplit(q, "\n", fixed = TRUE)[[1]][1]
     # the block runs from its numbered line to the next numbered line or the
     # next blank line, whichever comes first
-    out <- sub(paste0("(?m)^\\s{0,3}\\d+[.)]\\s+", .translator_regex_escape(first),
-                      "[^\\n]*(\\n(?!\\s{0,3}\\d+[.)]\\s)[ \\t]*\\S[^\\n]*)*"),
-               "", out, perl = TRUE)
+    pat <- paste0("(?m)^\\s{0,3}\\d+[.)]\\s+", .translator_regex_escape(first),
+                  "[^\\n]*(\\n(?!\\s{0,3}\\d+[.)]\\s)[ \\t]*\\S[^\\n]*)*")
+    if (grepl(pat, out, perl = TRUE)) out <- sub(pat, "", out, perl = TRUE)
+    else out <- sub(q, "", out, fixed = TRUE)   # an unnumbered closing question
   }
   gsub("\\n{3,}", "\n\n", trimws(out))
 }
@@ -542,6 +570,8 @@ translator_register_df <- function(register) {
       entries <- Filter(Negate(is.null), lapply(arr, .translator_norm_decision))
       if (length(entries)) {
         state$register <- translator_register_merge(state$register, entries, msg_index = msg_index)
+        # what the user's answer settled is said now, not with the next reply
+        tryCatch(.translator_post_recorded(state, NULL), error = function(e) NULL)
         tryCatch(.translator_persist(state), error = function(e) NULL)
       }
       tryCatch(.translator_log_usage(state, resp, stage = "decisions", expect_warm = FALSE),

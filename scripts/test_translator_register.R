@@ -46,6 +46,13 @@ ok(identical(.translator_question_seen(c("Which year is the inventory for?", "Ar
 ok(identical(.translator_strip_answer_prompt("Noted.\n\nPlease answer the section D questions, then click **Produce template now** when ready."), "Noted.") &&
    identical(.translator_strip_answer_prompt("All clear: click Produce template now when ready."), "All clear: click Produce template now when ready."),
    "the closing instruction to answer is dropped; a direction to the button is kept")
+tq <- "Please also confirm: is the MoE relative, so 0.5 means 50%?"
+ok(identical(.translator_question_list(paste0("Noted.\n\nSome explanation here.\n\n", tq)), tq) &&
+   identical(.translator_strip_question_blocks(paste0("Noted.\n\nSome explanation here.\n\n", tq), tq), "Noted.\n\nSome explanation here.") &&
+   length(.translator_question_list("All set.\n\nClick Produce template now when ready.")) == 0L,
+   "an unnumbered closing question is lifted out of the reply; a closing direction is not")
+ok(identical(.translator_decision_text(paste(rep("word", 30), collapse = " ")), paste0(paste(rep("word", 17), collapse = " "), "...")),
+   "a long decision is cut at a word boundary")
 ok(identical(.translator_parse_choice(list(kind = "server", topic = "calves_handling"), "keep them together please"), "pooled") &&
    identical(.translator_parse_choice(list(kind = "server", topic = "pct_vs_fraction:x!y"), "they are fractions"), "fraction") &&
    identical(.translator_parse_choice(list(kind = "ai", text = "q"), " free text "), "free text"), "typed answers map to choices by keyword")

@@ -604,6 +604,8 @@ lang_state_take <- function(token) {
   # ---- AI translator: questions one at a time, decisions register (2026-10-22)
   ai_q_notice = list(en = "I will ask these %d questions one at a time. Type your answer below and press Send.",
                      fr = "Je vais poser ces %d questions une à la fois. Tapez votre réponse ci-dessous et appuyez sur Envoyer."),
+  ai_q_notice_one = list(en = "One question. Type your answer below and press Send.",
+                         fr = "Une question. Tapez votre réponse ci-dessous et appuyez sur Envoyer."),
   ai_q_gate_notice = list(en = "Before I produce the template, %d quick question(s). Answer below; the template starts by itself after the last one.",
                           fr = "Avant de produire le modèle, %d question(s) rapide(s). Répondez ci-dessous ; le modèle démarre de lui-même après la dernière."),
   ai_q_bubble = list(en = "Question %d of %d: %s", fr = "Question %d sur %d : %s"),

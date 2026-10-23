@@ -101,6 +101,7 @@ translator_chat_ui <- function() {
     # itself once the server's own questions are answered.
     register = list(),
     pending_questions = list(),
+    recorded = list(),
     q_index = 1L,
     produce_after_answers = FALSE,
     reg_edit_topic = NULL,
@@ -141,6 +142,7 @@ translator_chat_ui <- function() {
                  batch_parts_key = state$batch_parts_key,
                  register = if (length(state$register)) state$register else NULL,
                  pending_questions = if (length(state$pending_questions)) state$pending_questions else NULL,
+                 recorded = if (length(state$recorded)) state$recorded else NULL,
                  q_index = state$q_index,
                  source_categories = if (length(state$source_categories)) state$source_categories else NULL,
                  last_template_json = state$last_template_json,
@@ -217,6 +219,7 @@ translator_chat_server <- function(input, output, session) {
           state$pending_questions <- pq
           state$q_index <- max(1L, as.integer(saved$extra$q_index %||% 1L))
         }
+        if (is.list(saved$extra$recorded)) state$recorded <- saved$extra$recorded
         # Prompt staleness (plan B5): the defaults or the template changed
         # since this conversation was held. The model's earlier replies
         # quote the old numbers, so emission from this transcript would
@@ -2219,7 +2222,7 @@ translator_cancel_clear <- function(tok) {
   # 2026-10-22: what the reply settled, in one line; then the questions,
   # one bubble at a time, answered in the normal input.
   .translator_post_recorded(state, reg_before)
-  if (length(qs)) .translator_begin_round(state, sprintf(t("ai_q_notice"), length(qs)))
+  if (length(qs)) .translator_begin_round(state, if (length(qs) == 1L) t("ai_q_notice_one") else sprintf(t("ai_q_notice"), length(qs)))
 
   # If a valid template-ready block came through in this reply, post a
   # separate small AI message pointing the user at the green Download

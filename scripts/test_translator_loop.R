@@ -30,7 +30,9 @@ anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, 
   } else {
     ai_calls <<- c(ai_calls, "chat")
     reply <- "Thanks, noted.\n\n1. One more: which region is the herd in?\n\nPlease answer the section D questions, then click **Produce template now** when ready."
-    if (with_block) reply <- paste0(reply, "\n\n```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"2022\"},",
+    # from the third reply on, the model rewords the year decision (same quote): not a new decision
+    dec_year <- if (sum(ai_calls == "chat") >= 3L) "2022 (single year, confirmed)" else "2022"
+    if (with_block) reply <- paste0(reply, "\n\n```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"", dec_year, "\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"2022\"},",
                                            " {\"topic\": \"oxen_handling\", \"decision\": \"kept as one group\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"one group\"},",
                                            " {\"topic\": \"species\", \"decision\": \"cattle_mixed\", \"basis\": \"file\", \"confidence\": \"high\", \"quote\": \"\"},",
                                            " {\"topic\": \"mms_split_source\", \"decision\": \"pending\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"\"}]\n```")
@@ -92,10 +94,12 @@ shiny::testServer(translator_chat_server, {
   n_rec <- sum(grepl("^Recorded: ", disp()))
   cat("round 2: summariser filled uncertainty_source; the repeated question was not put again\n")
 
-  # a plain reply: the same block again records nothing new
+  # a plain reply: the same decisions, reworded by the model, record nothing new
   session$setInputs(translator_input = "thanks"); session$setInputs(translator_send = 4); pump(state)
-  stopifnot(sum(grepl("^Recorded: ", disp())) == n_rec, length(state$pending_questions) == 0L)
-  cat("round 3: a reply with the same decisions posts no second recorded line\n")
+  stopifnot(sum(grepl("^Recorded: ", disp())) == n_rec, length(state$pending_questions) == 0L,
+            identical(state$register$inventory_year$decision, "2022 (single year, confirmed)"),
+            !is.null(state$recorded$inventory_year), !is.null(conversation_load_full("loop@local")$extra$recorded))
+  cat("round 3: a reworded decision posts no second recorded line; the announced topics persist\n")
 
   # ---- the Produce gate: only the year is asked, then the delivery pop-up ----
   state$register$inventory_year <- NULL
