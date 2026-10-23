@@ -1513,10 +1513,17 @@ translator_cancel_clear <- function(tok) {
   if (!length(region) || is.na(region[1]) || !nzchar(region[1])) region <- "global"
   qa <- tryCatch(run_qaqc(pu$param_specs, region = region[1], manure_data = pu$manure),
                  error = function(e) NULL)
+  # 2026-10-23: the parsed metadata names the year `inventory_year`;
+  # `year` was always NULL, so the Parameters-versus-time-series check
+  # never ran and two 2022 populations in a 2024 template went unseen.
+  yr <- suppressWarnings(as.integer(.translator_scalar(
+    pu$metadata$inventory_year %||% pu$metadata$year %||% piece$inventory_metadata$year %||% NA)))
+  if ((is.null(yr) || is.na(yr)) && is.data.frame(pu$population) && "year" %in% names(pu$population))
+    yr <- suppressWarnings(max(as.integer(pu$population$year), na.rm = TRUE))
   issues <- tryCatch(translator_consistency_checks(pu$param_specs, pu$manure,
                                                    source = source,
                                                    population = pu$population,
-                                                   inventory_year = pu$metadata$year %||% NA,
+                                                   inventory_year = if (length(yr) && is.finite(yr)) yr else NA,
                                                    piece = piece),
                      error = function(e) NULL)
   list(qa = qa, summary = if (!is.null(qa)) qaqc_summary(qa) else NULL,

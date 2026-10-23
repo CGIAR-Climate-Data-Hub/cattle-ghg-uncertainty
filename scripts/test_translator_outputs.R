@@ -104,6 +104,17 @@ ok(!identical(jz, jz2) && identical(.translator_fix_piece_json(jz2), jz2) &&
 ok(identical(.translator_fix_piece_json(as.character(jsonlite::toJSON(list(parameters = grp("bulls", 100, 55)), auto_unbox = TRUE, dataframe = "rows"))),
              as.character(jsonlite::toJSON(list(parameters = grp("bulls", 100, 55)), auto_unbox = TRUE, dataframe = "rows"))), "nothing to fix: the same text back")
 
+# ---- the Parameters-versus-time-series check runs on a written template (2026-10-23) ----
+pz7 <- pz
+pz7$parameter_timeseries <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = c("bulls", "heifers", "calves"),
+                                       year = 2024L, N = c(100, 999, 50), stringsAsFactors = FALSE)
+f7 <- file.path(td, "tpl7.xlsx")
+.translator_write_template_xlsx(as.character(jsonlite::toJSON(pz7, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows")), f7)
+pc7 <- .translator_precheck_file(f7)
+c7f <- pc7$issues[pc7$issues$check %in% "Parameters vs time series", ]
+ok(is.null(pc7$error) && nrow(c7f) == 1 && identical(c7f$severity, "fail") && grepl("heifers", c7f$group) && grepl("999", c7f$issue),
+   "the year is read from the written template's metadata, and a time-series value that differs from Parameters fails")
+
 # ---- file names -----------------------------------------------------------------------
 p2 <- list(inventory_metadata = list(country = "Costa Rica", year = 2022L))
 fn <- translator_output_filename(p2, "template", stamp = as.POSIXct("2026-10-22 15:30:00"))
