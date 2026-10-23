@@ -1981,6 +1981,17 @@ translator_cancel_clear <- function(tok) {
     # Header row (Excel row 1) then every cell of every column, remembering
     # the Excel row (data starts at row 2).
     cand <- data.frame(text = tolower(trimws(names(df))), row = 1L, stringsAsFactors = FALSE)
+    # 2026-10-23: a sheet without numbers is a notes sheet, and a label on
+    # it is not a value. The Zambia notes sheet lists ASH, UE and Tw as
+    # MISSING, and the scan reported them present, which then flagged every
+    # default as replacing a file value. (A label on a block-header row of
+    # a data sheet still counts: the numbers sit on the rows below it.)
+    num_mat <- vapply(seq_len(ncol(df)), function(j) {
+      x <- df[[j]]
+      if (is.numeric(x)) is.finite(x) & !is.na(x)
+      else !is.na(x) & grepl("^[-+]?[0-9][0-9.,]*([eE][-+]?[0-9]+)?\\s*%?$", trimws(as.character(x)), perl = TRUE)
+    }, logical(nrow(df)))
+    if (sum(num_mat) < 1L) next
     for (col_idx in seq_len(ncol(df))) {
       v <- df[[col_idx]]
       if (is.numeric(v) || inherits(v, "Date") || inherits(v, "POSIXt")) next

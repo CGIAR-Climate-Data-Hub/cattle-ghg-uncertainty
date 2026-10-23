@@ -58,6 +58,28 @@ ok(nrow(d9) == 3 && any(grepl("BW", d9$where) & grepl("range and distribution", 
 iss9 <- translator_consistency_checks(ps, NULL, source = src, piece = piece)
 ok(sum(iss9$severity == "info" & grepl("was applied", iss9$issue)) == 3, "C9 rows join the issues as info")
 
+# ---- the source fingerprint and the label scan (2026-10-23) -----------------------------
+pop_sheet <- data.frame(Description = c("Total cattle", "cows", "bulls", "ALL DAIRY", "notes"), `1990` = c(300, 100, 200, 300, NA), `1991` = c(330, 110, 220, 330, NA),
+                        check.names = FALSE, stringsAsFactors = FALSE)
+notes_sheet <- data.frame(a = c("Missing country-specific values:", "ASH", "UE", "Tw"), b = c(NA, "not available", NA, NA), stringsAsFactors = FALSE)
+data_sheet <- data.frame(parameter = c("DE", "Ym"), value = c(60, 6.5), stringsAsFactors = FALSE)
+fp <- translator_source_fingerprint(list(sheets = list(list(name = "pop", preview = pop_sheet), list(name = "notes", preview = notes_sheet), list(name = "data", preview = data_sheet))))
+ok(all(c(300, 900) %in% fp$year_sums[["1990"]]) && 330 %in% fp$year_sums[["1991"]],
+   "a year column gives the herd (rows not labelled total, and the total row itself) as well as the whole column")
+ok(all(c("DE", "Ym") %in% fp$families) && !any(c("ASH", "UE", "Tw") %in% fp$families),
+   "a parameter named on a row without a number (the notes sheet) is not reported as present")
+pop2 <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = c("bulls", "heifers"), year = c(1990, 1990), N = c(100, 200), stringsAsFactors = FALSE)
+iss_fp <- translator_consistency_checks(ps, NULL, source = fp, population = pop2, inventory_year = 2022)
+ok(!any(iss_fp$check %in% "time series totals"), "a template whose year total equals the source's sub-category rows is not flagged")
+mm_ct <- data.frame(cattle_type = c("dairy", "dairy", "non_dairy", "non_dairy"), aggregation_level = "lvl", sub_category = c("dairy_cows", "heifers", "bulls", "steers"),
+                    mms_type = "pasture", fraction_pct = 100, MCF_pct = c(1, 1, 2, 2), EF3 = 0.02, Frac_GasMS_pct = c(30, 30, 45, 45), Frac_LeachMS_pct = 5, stringsAsFactors = FALSE)
+iss_mm <- translator_consistency_checks(ps, mm_ct, source = src)
+ok(!any(iss_mm$check %in% "manure coefficient consistency"), "dairy and other cattle may carry different coefficients for the same manure system")
+mm_ct$Frac_GasMS_pct[2] <- 40
+iss_mm2 <- translator_consistency_checks(ps, mm_ct, source = src)
+ok(sum(iss_mm2$check %in% "manure coefficient consistency") == 1 && grepl("(dairy)", iss_mm2$issue[iss_mm2$check %in% "manure coefficient consistency"], fixed = TRUE),
+   "two values within one cattle type are still flagged, naming the cattle type")
+
 # ---- the uncertainty-scale correction (2026-10-23) -------------------------------------
 pz <- list(parameters = rbind(grp("bulls", 100, 55), grp("heifers", 200, 60), grp("calves", 50, 58)),
            manure_management = data.frame(), inventory_metadata = list(country = "Z", year = 2024L))

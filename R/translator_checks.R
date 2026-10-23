@@ -124,17 +124,25 @@ translator_source_fingerprint <- function(parsed) {
                   error = function(e) character(0))
   # 2026-10-22 (WP3, C7): columns headed by a year carry the source's own
   # per-year totals; every sheet's column sum is kept as a candidate.
+  # 2026-10-23: a population sheet carries subtotal and total rows, so the
+  # whole column is a multiple of the herd (Zambia: four times). Three
+  # candidates per column: the whole column, the rows not labelled total,
+  # and the largest cell (a grand-total row is the herd itself).
   year_sums <- list()
   for (sh in parsed$sheets) {
     d <- sh$preview
     if (is.null(d) || !NROW(d)) next
+    tot_row <- tryCatch(apply(d, 1, function(r) any(grepl("\\btotal\\b|^\\s*all\\b", as.character(r), ignore.case = TRUE))),
+                        error = function(e) rep(FALSE, NROW(d)))
+    tot_row[is.na(tot_row)] <- FALSE
     for (col in names(d)) {
       yr <- suppressWarnings(as.integer(trimws(as.character(col))))
       if (is.na(yr) || yr < 1950 || yr > 2100) next
-      v <- .translator_cell_numbers(d[[col]]); v <- v[is.finite(v)]
-      if (!length(v)) next
+      vv <- suppressWarnings(as.numeric(gsub(",", "", as.character(d[[col]]))))
+      if (!any(is.finite(vv))) next
       key <- as.character(yr)
-      year_sums[[key]] <- c(year_sums[[key]], sum(v))
+      cands <- c(sum(vv[is.finite(vv)]), sum(vv[is.finite(vv) & !tot_row]), max(vv[is.finite(vv)]))
+      year_sums[[key]] <- unique(c(year_sums[[key]], cands[is.finite(cands) & cands > 0]))
     }
   }
   list(numbers  = unique(round(nums, 6)),
@@ -340,19 +348,26 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     # 5. One manure system, one set of coefficients. MCF depends on climate
     #    and system, not on which herd uses it, so different values for the
     #    same system across the file point at a copy error.
+    #    2026-10-23: within a cattle type. The IPCC tables and the Zambia
+    #    file give dairy and other cattle different Frac_GasMS for the same
+    #    system, which is not a copy error.
     coef_cols <- intersect(c("MCF_pct", "EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct"), names(mm))
+    ct <- if ("cattle_type" %in% names(mm)) as.character(mm$cattle_type) else rep("", nrow(mm)); ct[is.na(ct)] <- ""
+    mtyp <- as.character(mm$mms_type); mtyp[is.na(mtyp)] <- ""
     for (col in coef_cols) {
       v <- suppressWarnings(as.numeric(mm[[col]]))
-      for (mt in unique(as.character(mm$mms_type))) {
-        sel <- which(as.character(mm$mms_type) == mt & !is.na(v))
+      for (g in unique(paste(ct, mtyp, sep = "##"))) {
+        parts <- strsplit(g, "##", fixed = TRUE)[[1]]
+        ct_i <- parts[1]; mt <- if (length(parts) > 1) parts[2] else ""
+        sel <- which(ct == ct_i & mtyp == mt & !is.na(v))
         vals <- unique(round(v[sel], 6))
         if (length(vals) < 2) next
         by_val <- vapply(vals, function(x) {
           grp <- unique(key[sel][round(v[sel], 6) == x])
           sprintf("%s in %s", fmt(x), paste(utils::head(grp, 3), collapse = ", "))
         }, character(1))
-        add(mt, sprintf("%s takes %d different values for the same manure system: %s. Check which one the source file gives.",
-                        col, length(vals), paste(by_val, collapse = "; ")),
+        add(mt, sprintf("%s takes %d different values for the same manure system%s: %s. Check which one the source file gives.",
+                        col, length(vals), if (nzchar(ct_i)) paste0(" (", ct_i, ")") else "", paste(by_val, collapse = "; ")),
             sheet = "Manure_Management", parameter = col, check = "manure coefficient consistency")
       }
     }
