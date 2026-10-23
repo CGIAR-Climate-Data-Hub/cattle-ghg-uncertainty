@@ -23,6 +23,7 @@ What the AI translator is told, and why it changed. Hand-kept, newest first. The
 - Relative-uncertainty rule, per-manure-system uncertainty rule, named-distribution rule, right-row-right-column rule (the Zambia review by Andreas).
 - 2026-10-22, in-app rule 10 (R/openai_client.R): the questions are shown one at a time by the app, so the reply must not end with "Please answer the section D questions"; after the answers, a question already answered is not asked again, and when nothing is open the reply says so and asks nothing.
 - 2026-10-23, in-app rule 10: every question in every reply is a numbered item, even a single one, and the numbered questions come last in the reply (a question written in prose, "Please also confirm: ...", was missed by the app and buried under the recorded line).
+- 2026-10-23, later: anything the user must answer, confirm or check ("please confirm", "please check whether") is such a numbered item; no request in prose, no lead-in line such as "One more question:" (the Zambia reply had a "please check whether" in prose above a numbered question and asked it again a turn later).
 - The onboarding questionnaire and getting-started files were removed from the kit; questions are asked after the file is seen.
 
 ## 2026-09-17 and 2026-09-18

@@ -2228,7 +2228,7 @@ translator_cancel_clear <- function(tok) {
     state$pending_questions <- lapply(seq_along(qs), function(i)
       list(id = i, kind = "ai", text = qs[i], answer = NULL))
     state$q_index <- 1L
-    stripped <- tryCatch(.translator_strip_question_blocks(reply_vis, qs), error = function(e) reply_vis)
+    stripped <- .translator_strip_lead_ins(tryCatch(.translator_strip_question_blocks(reply_vis, qs), error = function(e) reply_vis))
     display_text <- if (nzchar(stripped)) stripped else t("ai_qa_bubble_only_questions")
   } else {
     display_text <- .translator_extract_numbered_questions(reply_vis) %||% reply_vis
@@ -2929,11 +2929,13 @@ translator_cancel_clear <- function(tok) {
   jlevels <- character(0); jest <- NULL; level_i <- 0L; level_bytes <- 0
   done_tokens <- 0; last_push <- Sys.time() - 10
   level_started <- NULL; level_secs <- numeric(0)   # measured durations (2026-10-23)
+  level_ratios <- numeric(0)   # actual / estimated tokens of finished systems: calibrates the rest
   push_progress <- function(force = FALSE) {
     if (!force && as.numeric(difftime(Sys.time(), last_push, units = "secs")) < 2) return(invisible(NULL))
     last_push <<- Sys.time()
     el <- if (is.null(level_started)) NA_real_ else as.numeric(difftime(Sys.time(), level_started, units = "secs"))
-    pr <- translator_job_progress(jest, level_i, length(jlevels), done_tokens, level_bytes,
+    sc <- if (length(level_ratios)) min(3, max(0.5, stats::median(level_ratios))) else 1
+    pr <- translator_job_progress(jest, level_i, length(jlevels), done_tokens, level_bytes, scale = sc,
                                   level_elapsed = el, level_secs = level_secs)
     translator_job_update(job_id, progress = pr$progress, eta_sec = pr$eta_sec, eta_over = isTRUE(pr$over),
                           level_index = level_i, stage = if (length(jlevels)) "batch" else "discovery")
@@ -3060,6 +3062,8 @@ translator_cancel_clear <- function(tok) {
         done_tokens <<- done_tokens + (if (!is.null(jest)) max(tk, 0) else 0)
         if (!is.null(level_started))
           level_secs <<- c(level_secs, as.numeric(difftime(Sys.time(), level_started, units = "secs")))
+        est_lv <- suppressWarnings(as.numeric(jest$per_level_tokens[[level]] %||% NA))
+        if (is.finite(est_lv) && est_lv > 0 && tk > 0) level_ratios <<- c(level_ratios, tk / est_lv)
         act <- translator_job_read(job_id)$actual %||% list()
         act$per_level_tokens[[level]] <- round(tk)
         translator_job_update(job_id, actual = act)
@@ -3220,7 +3224,8 @@ translator_cancel_clear <- function(tok) {
       # usage history; the job file carries it for the progress panel.
       jlevels <<- agg_levels
       jest <<- tryCatch(translator_job_estimate(agg_levels, enum_parsed$sub_categories_by_level,
-                                                tryCatch(usage_log_read(), error = function(e) NULL)),
+                                                tryCatch(usage_log_read(), error = function(e) NULL),
+                                                n_years = length(ctx$source_fp$year_sums %||% list())),
                         error = function(e) NULL)
       translator_job_update(job_id, levels = as.list(agg_levels), estimate = jest, stage = "batch")
       if (length(agg_levels) <= 2L) {

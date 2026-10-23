@@ -604,6 +604,8 @@ lang_state_take <- function(token) {
   # ---- AI translator: questions one at a time, decisions register (2026-10-22)
   ai_q_notice = list(en = "I will ask these %d questions one at a time. Type your answer below and press Send.",
                      fr = "Je vais poser ces %d questions une à la fois. Tapez votre réponse ci-dessous et appuyez sur Envoyer."),
+  ai_stream_questions = list(en = "Preparing the questions: %d so far...",
+                             fr = "Préparation des questions : %d jusqu'ici..."),
   ai_stream_reading = list(en = "Reading the file: %d values noted so far...",
                            fr = "Lecture du fichier : %d valeurs relevées jusqu'ici..."),
   ai_reply_cut = list(en = "The reply was cut off at the length limit. Asking the AI for the rest.",

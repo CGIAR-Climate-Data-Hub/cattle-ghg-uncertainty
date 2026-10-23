@@ -136,7 +136,11 @@ translator_job_open_session <- function(id) {
 
 # Expected output tokens per production system and the speed, from the
 # discovery result and the usage log. All fallbacks are stated.
-translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = NULL) {
+# 2026-10-23: the time series (one row per sub-category per year) was not
+# counted, so a system with a 35-year series was judged "over" at half
+# its real length; n_years comes from the source fingerprint's year
+# columns. Manure rows: six systems per sub-category as a middle value.
+translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = NULL, n_years = 0) {
   levels <- as.character(levels %||% character(0))
   df <- usage_df
   num <- function(x) suppressWarnings(as.numeric(x))
@@ -153,9 +157,11 @@ translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = 
     if (nrow(e)) enum_sec <- stats::median(num(e$latency_sec))
   }
   n_params <- nrow(PARAM_CATALOGUE)
+  n_years <- suppressWarnings(as.numeric(n_years %||% 0)); if (!is.finite(n_years)) n_years <- 0
+  ts_tokens <- if (n_years > 1) n_years * 40 else 0
   per_level <- vapply(levels, function(lv) {
     sc <- subcats_by_level[[lv]]
-    if (!is.null(sc) && length(sc)) length(unique(unlist(sc))) * (n_params * 42 + 4 * 70) + 400
+    if (!is.null(sc) && length(sc)) length(unique(unlist(sc))) * (n_params * 42 + 6 * 70 + ts_tokens) + 400
     else if (length(batch_tokens_hist)) stats::median(batch_tokens_hist)
     else 9000
   }, numeric(1))
@@ -180,10 +186,13 @@ translator_job_progress <- function(est, level_index, n_levels, done_tokens, lev
   total <- sum(per)
   cur_est <- if (level_index >= 1 && level_index <= length(per)) per[level_index] else 0
   cur_seen <- level_bytes / 3.6
-  over <- is.finite(cur_est) && cur_est > 0 && cur_seen > cur_est
+  past <- is.finite(cur_est) && cur_est > 0 && cur_seen > cur_est
+  # "running longer than estimated" only well past the estimate (1.5x):
+  # an estimate is rough, and the note fired at three minutes (2026-10-23)
+  over <- past && cur_seen > 1.5 * cur_est
   # the current system is credited at most 90% of its estimate until it is
   # done, so the bar never claims a system is finished before it is
-  if (over) {
+  if (past) {
     # the share reached at the estimate, then a slow creep towards the rest
     frac_base <- if (total > 0) min(1, (done_tokens + 0.9 * cur_est) / total) else 0
     frac <- frac_base + (1 - frac_base) * (1 - cur_est / cur_seen) * 0.9
@@ -193,16 +202,22 @@ translator_job_progress <- function(est, level_index, n_levels, done_tokens, lev
     frac <- if (total > 0) tokens_done / total else 0
     remaining_tokens <- max(0, total - done_tokens - min(cur_seen, cur_est))
   }
-  eta <- remaining_tokens / est$tok_per_sec + est$assemble_sec + est$delivery_sec
-  if (length(level_secs) && level_index >= 1) {
-    mean_sec <- mean(level_secs)
-    n_after <- max(0, n_levels - level_index)
-    cur_left <- if (!is.finite(level_elapsed)) mean_sec
-                else if (level_elapsed < mean_sec) mean_sec - level_elapsed
-                else 0.15 * mean_sec
-    if (is.finite(level_elapsed) && level_elapsed > mean_sec) over <- TRUE
-    eta <- n_after * mean_sec + cur_left + est$assemble_sec + est$delivery_sec
-  }
+  # The time left: the tokens still to come (the systems after this one,
+  # plus what is left of this one, a 15% tail once past its estimate) at
+  # the rate measured on the finished systems, else the usage-log rate.
+  # Systems differ in size, so the finished ones give a RATE, not a mean
+  # duration: a mean made the time left grow after every bigger system
+  # (2026-10-23). Within a system the figure only falls.
+  after_tokens <- if (level_index >= 1 && level_index < length(per))
+    sum(per[(level_index + 1L):length(per)], na.rm = TRUE) else 0
+  cur_left_tokens <- if (!is.finite(cur_est) || cur_est <= 0) 0
+                     else if (past) 0.15 * cur_est * (cur_est / cur_seen)   # a shrinking tail
+                     else max(cur_est - cur_seen, 0.15 * cur_est)
+  rate <- if (length(level_secs) && done_tokens > 0 && sum(level_secs) > 0) done_tokens / sum(level_secs) else est$tok_per_sec
+  rate <- max(rate, 1)
+  eta <- (after_tokens + cur_left_tokens) / rate + est$assemble_sec + est$delivery_sec
+  if (length(level_secs) && is.finite(level_elapsed) && is.finite(cur_est) && cur_est > 0 &&
+      level_elapsed > 1.25 * cur_est / rate) over <- TRUE
   progress <- 0.05 + 0.88 * max(0, min(1, frac))
   eta_text <- if (eta < 60) t("ai_job_eta_under_min") else sprintf(t("ai_job_eta_min"), ceiling(eta / 60))
   if (over) eta_text <- paste0(eta_text, " (", t("ai_job_eta_over"), ")")

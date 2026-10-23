@@ -468,6 +468,12 @@ translator_register_df <- function(register) {
   d <- regexpr("(?m)^#{2,4}\\s*D\\.[^\\n]*\\n?", txt, perl = TRUE)
   if (d > 0) {
     rest <- trimws(substr(txt, d + attr(d, "match.length"), nchar(txt)))
+    if (live) {
+      # the questions are put one at a time once the reply is complete;
+      # showing them here as well was confusing (2026-10-23)
+      n_q <- sum(grepl("^\\s{0,3}\\d+[.)]\\s", strsplit(rest, "\n", fixed = TRUE)[[1]], perl = TRUE))
+      rest <- sprintf(t("ai_stream_questions"), n_q)
+    }
     parts <- c(head, rest)
     return(trimws(paste(parts[nzchar(parts)], collapse = "\n\n")))
   }
@@ -481,7 +487,7 @@ translator_register_df <- function(register) {
   if (is.null(content) || !nzchar(content)) return(character(0))
   lines <- strsplit(content, "\n", fixed = TRUE)[[1]]
   is_numbered <- grepl("^\\s{0,3}\\d+[.)]\\s+\\S", lines, perl = TRUE)
-  if (!any(is_numbered)) return(.translator_trailing_question(content))
+  if (!any(is_numbered)) return(.translator_prose_questions(content))
   # numbered items after a "### D." header are questions even without a
   # question mark (2026-10-23: "7. MoE or 95%CI sheet: percentage" was dropped)
   d_line <- grep("^#{2,4}\\s*D\\.", lines, perl = TRUE)
@@ -502,22 +508,44 @@ translator_register_df <- function(register) {
   # the closing instruction to answer is not part of the last question
   blocks <- vapply(blocks, .translator_strip_answer_prompt, character(1), USE.NAMES = FALSE)
   keep <- grepl("\\?", blocks) | (!is.na(d_line) & starts > d_line)
-  blocks[keep & nzchar(blocks)]
+  kept <- blocks[keep & nzchar(blocks)]
+  c(kept, .translator_prose_questions(content, kept))
 }
 
-# A reply that asks one question without numbering it ("Please also
-# confirm: ..."), 2026-10-23: the last paragraph, when it ends with a
-# question mark, is the question, so it still becomes the last bubble
-# instead of staying buried above the recorded line.
-.translator_trailing_question <- function(content) {
-  paras <- trimws(strsplit(content, "\\n\\s*\\n", perl = TRUE)[[1]])
+# Questions written in prose (2026-10-23): a paragraph that ends with a
+# question mark, or that carries a sentence starting "please confirm /
+# check / verify / clarify ...", outside sections A to C and not already
+# inside a numbered block. The model is told to number every question;
+# when it does not, the request still becomes its own bubble instead of
+# staying in the explanation and being asked again later.
+.translator_prose_questions <- function(content, numbered_blocks = character(0)) {
+  zone <- .translator_reply_visible(content)
+  if (is.null(zone) || !nzchar(zone)) return(character(0))
+  paras <- trimws(strsplit(zone, "\\n\\s*\\n", perl = TRUE)[[1]])
   paras <- paras[nzchar(paras)]
-  if (!length(paras)) return(character(0))
-  last <- .translator_strip_answer_prompt(paras[length(paras)])
-  if (!nzchar(last) || nchar(last) > 700L) return(character(0))
-  if (!grepl("\\?\\s*[*_]*\\s*$", last, perl = TRUE)) return(character(0))
-  if (grepl("^\\s{0,3}\\d+[.)]\\s", last, perl = TRUE)) return(character(0))
-  last
+  out <- character(0)
+  for (p in paras) {
+    p <- .translator_strip_answer_prompt(p)
+    if (!nzchar(p) || nchar(p) > 700L) next
+    if (grepl("^\\s{0,3}(\\d+[.)]\\s|#|\\|)", p, perl = TRUE)) next
+    asks <- grepl("\\?\\s*[*_]*\\s*$", p, perl = TRUE) ||
+      grepl("(^|[.!?]\\s+)[*_-]*\\s*please\\s+(also\\s+)?(confirm|check|verify|clarify|tell me|let me know|advise|indicate|specify|choose|decide)\\b",
+            p, ignore.case = TRUE, perl = TRUE)
+    if (!asks) next
+    if (length(numbered_blocks) && any(vapply(numbered_blocks, function(b) grepl(p, b, fixed = TRUE), logical(1)))) next
+    out <- c(out, p)
+  }
+  out
+}
+
+# Lead-in lines left behind when the questions are lifted out ("Also one
+# more question before emission:", "Questions:"), 2026-10-23.
+.translator_strip_lead_ins <- function(text) {
+  if (is.null(text) || !nzchar(text)) return(text)
+  lines <- strsplit(text, "\n", fixed = TRUE)[[1]]
+  drop <- grepl(":\\s*[*_]*\\s*$", lines, perl = TRUE) &
+          grepl("question|ambiguit|clarif|confirm", lines, ignore.case = TRUE) & nchar(lines) < 160L
+  gsub("\\n{3,}", "\n\n", trimws(paste(lines[!drop], collapse = "\n")))
 }
 
 # The reply without its question blocks (what stays in the bubble while

@@ -60,6 +60,15 @@ ok(identical(.translator_reply_visible(substr(ex, 1, regexpr("### C", ex) - 1), 
    "the live bubble before D: a progress line instead of the table")
 ok(identical(.translator_reply_visible("Plain reply with no sections.\n\n1. Which year?"), "Plain reply with no sections.\n\n1. Which year?"), "a reply without sections is untouched")
 ok(identical(.translator_question_list(.translator_strip_decisions(ex)), c("Which year?", "MoE sheet: percentage or fraction")), "numbered items after the D header are questions even without a question mark")
+ok(identical(.translator_reply_visible(ex, live = TRUE), "I read your file: 2 sheets.\n\nMissing: Tw.\n\nPreparing the questions: 2 so far..."),
+   "the live bubble while section D streams: a count, not the questions")
+pq <- "All confirmed.\n\nOne flag before I can confirm everything is clean: the X population is 12,963, the same as Y. Please check whether X should be a different number for 2024.\n\nAlso one more question before emission:\n\n1. The MoE sheet gives one row per system. Is that correct?"
+qq <- .translator_question_list(pq)
+ok(length(qq) == 2 && startsWith(qq[1], "The MoE sheet") && startsWith(qq[2], "One flag before"),
+   "a prose request (please check whether) is lifted as a question after the numbered one")
+ok(identical(.translator_strip_lead_ins(.translator_strip_question_blocks(pq, qq)), "All confirmed."), "the lead-in line and both questions leave the bubble")
+ok(length(.translator_question_list("Noted. Please note that Tw is filled from the default.\n\nUpdated values I will use (from the 2024 column):\n\n- cows 86,421")) == 0L,
+   "a note and a values list are not questions")
 ok(identical(.translator_parse_choice(list(kind = "server", topic = "calves_handling"), "keep them together please"), "pooled") &&
    identical(.translator_parse_choice(list(kind = "server", topic = "pct_vs_fraction:x!y"), "they are fractions"), "fraction") &&
    identical(.translator_parse_choice(list(kind = "ai", text = "q"), " free text "), "free text"), "typed answers map to choices by keyword")
