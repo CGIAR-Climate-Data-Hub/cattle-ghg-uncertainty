@@ -184,6 +184,10 @@ shiny::testServer(translator_chat_server, {
   # ---- the past-translation button (2026-10-23) --------------------------------------
   fp_before <- state$source_fp
   state$last_template_json <- "{\"parameters\": []}"   # a template was ready
+  stopifnot(!isTRUE(state$revising))                       # not offered in the first conversation
+  session$setInputs(translator_revise = 1)                 # Back to the conversation
+  stopifnot(isTRUE(state$revising), is.null(state$last_template_json),
+            grepl("translator_past_file", as.character(output$translator_past_upload$html), fixed = TRUE))
   session$setInputs(translator_past_file = list(datapath = tpl, name = "past_translation.xlsx", size = file.size(tpl)))
   stopifnot(isTRUE(state$pending_upload$past), isTRUE(state$pending_upload$is_template), is.null(state$last_template_json),
             identical(state$source_fp, fp_before), !is.null(state$pending_upload$precheck))

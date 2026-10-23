@@ -102,6 +102,7 @@ translator_chat_ui <- function() {
     register = list(),
     pending_questions = list(),
     recorded = list(),
+    revising = FALSE,
     q_index = 1L,
     produce_after_answers = FALSE,
     reg_edit_topic = NULL,
@@ -143,6 +144,7 @@ translator_chat_ui <- function() {
                  register = if (length(state$register)) state$register else NULL,
                  pending_questions = if (length(state$pending_questions)) state$pending_questions else NULL,
                  recorded = if (length(state$recorded)) state$recorded else NULL,
+                 revising = isTRUE(state$revising),
                  q_index = state$q_index,
                  source_categories = if (length(state$source_categories)) state$source_categories else NULL,
                  last_template_json = state$last_template_json,
@@ -220,6 +222,7 @@ translator_chat_server <- function(input, output, session) {
           state$q_index <- max(1L, as.integer(saved$extra$q_index %||% 1L))
         }
         if (is.list(saved$extra$recorded)) state$recorded <- saved$extra$recorded
+        state$revising <- isTRUE(saved$extra$revising)
         # Prompt staleness (plan B5): the defaults or the template changed
         # since this conversation was held. The model's earlier replies
         # quote the old numbers, so emission from this transcript would
@@ -387,6 +390,7 @@ translator_chat_server <- function(input, output, session) {
     state$batch_parts <- list()
     state$batch_parts_key <- NULL
     state$prompt_stale <- FALSE
+    state$revising <- FALSE
     # 2026-10-22 (WP1): a new file keeps what the user decided and drops
     # what the model read from the previous file; an unfinished question
     # round belongs to that file and is dropped too.
@@ -617,8 +621,10 @@ translator_chat_server <- function(input, output, session) {
     req(state$user_email)
     state$last_template_json <- NULL
     state$last_error <- NULL
-    showNotification("Type your change below, then click Produce template now again.",
-                     type = "message", duration = 5)
+    # 2026-10-23: the revision of a produced template is where a past
+    # translation can be uploaded next to the source file
+    state$revising <- TRUE
+    showNotification(t("ai_revise_notice"), type = "message", duration = 8)
   })
   observeEvent(input$translator_reset_after, {
     req(state$user_email)
@@ -632,6 +638,7 @@ translator_chat_server <- function(input, output, session) {
     state$messages           <- list()
     state$last_template_json <- NULL
     state$last_error         <- NULL
+    state$revising           <- FALSE
     # Drop any cached per-batch parts so a fresh conversation starts
     # with no resume state.
     state$batch_parts        <- list()
@@ -831,11 +838,12 @@ translator_chat_server <- function(input, output, session) {
                jb$error %||% jb$stage_label %||% jb$status)
     } else NULL
   })
-  # 2026-10-23: the past-translation button, once a source file has been
-  # explored; it sits at the foot of the card so it is there in the
-  # conversation and in the ready state alike.
+  # 2026-10-23: the past-translation button, only in the revision of a
+  # produced template (after "Back to the conversation"): the first
+  # conversation is about the source file; a past translation belongs to
+  # its revision, read next to it.
   output$translator_past_upload <- renderUI({
-    if (length(state$messages) < 2L) return(NULL)
+    if (!isTRUE(state$revising) || !is.null(state$last_template_json) || length(state$messages) < 2L) return(NULL)
     tags$div(style = "margin-top:14px; padding:10px 12px 0 12px; border:1px dashed #A7F3D0; border-radius:8px; background:#F0FDF4;",
       fileInput("translator_past_file",
                 label = tagList(tags$strong(t("ai_past_label")),
@@ -1235,6 +1243,7 @@ translator_chat_server <- function(input, output, session) {
     # 2026-10-22 (WP1): the register and the current question sit above
     # the free-text row.
     uiOutput("translator_job_panel"),
+    uiOutput("translator_past_upload"),
     tags$div(
       style = "display:flex; gap:8px; align-items:flex-end;",
       div(style = "flex:1;",
@@ -1303,7 +1312,6 @@ translator_chat_server <- function(input, output, session) {
       )
     )),
 
-    uiOutput("translator_past_upload"),
     uiOutput("translator_last_error"))
 }
 
