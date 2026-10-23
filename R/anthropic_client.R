@@ -608,6 +608,7 @@ anthropic_chat_stream_async <- function(messages,
     st$tool_block    <- NULL
     st$usage_in      <- 0L
     st$usage_out     <- 0L
+    st$stop_reason   <- NULL   # "end_turn", "max_tokens", "tool_use" (2026-10-23)
     st$cache_read    <- 0L
     st$cache_write   <- 0L
     st$cache_write1h <- 0L
@@ -694,6 +695,7 @@ anthropic_chat_stream_async <- function(messages,
       if (identical(parsed$type, "message_delta")) {
         u <- parsed$usage %||% list()
         if (!is.null(u$output_tokens)) st$usage_out <- u$output_tokens
+        if (!is.null(parsed$delta$stop_reason)) st$stop_reason <- parsed$delta$stop_reason
       }
     }
     invisible(NULL)
@@ -715,6 +717,7 @@ anthropic_chat_stream_async <- function(messages,
                        total_tokens          = st$usage_in + st$usage_out +
                                                st$cache_read + st$cache_write +
                                                st$cache_write1h),
+      stop_reason = st$stop_reason,
       model     = model
     )
   }
@@ -897,6 +900,7 @@ anthropic_chat_stream <- function(messages,
   tool_block    <- NULL  # captured tool_use content_block (name + initial input)
   usage_in      <- 0L
   usage_out     <- 0L
+  stop_reason   <- NULL
   cache_read    <- 0L
   cache_write   <- 0L    # 5-minute cache writes
   cache_write1h <- 0L    # 1-hour cache writes (billed at 2x input)
@@ -906,7 +910,7 @@ anthropic_chat_stream <- function(messages,
     attempt <- attempt + 1
     accumulated <- ""; tool_json_acc <- ""; tool_block <- NULL
     usage_in <- 0L; usage_out <- 0L; cache_read <- 0L; cache_write <- 0L
-    cache_write1h <- 0L
+    cache_write1h <- 0L; stop_reason <- NULL
     sse_buffer <- ""
 
     stopped_early <- FALSE
@@ -999,6 +1003,7 @@ anthropic_chat_stream <- function(messages,
         if (identical(parsed$type, "message_delta")) {
           u <- parsed$usage %||% list()
           if (!is.null(u$output_tokens)) usage_out <<- u$output_tokens
+          if (!is.null(parsed$delta$stop_reason)) stop_reason <<- parsed$delta$stop_reason
         }
       }
       TRUE
@@ -1096,6 +1101,7 @@ anthropic_chat_stream <- function(messages,
   list(
     reply    = final_reply,
     tool_used = !is.null(tool_block) && nzchar(tool_json_acc),
+    stop_reason = stop_reason,
     usage    = list(prompt_tokens      = usage_in,
                      completion_tokens  = usage_out,
                      cached_tokens      = cache_read,

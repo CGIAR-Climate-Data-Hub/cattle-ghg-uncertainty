@@ -53,6 +53,13 @@ ok(identical(.translator_question_list(paste0("Noted.\n\nSome explanation here.\
    "an unnumbered closing question is lifted out of the reply; a closing direction is not")
 ok(identical(.translator_decision_text(paste(rep("word", 30), collapse = " ")), paste0(paste(rep("word", 17), collapse = " "), "...")),
    "a long decision is cut at a word boundary")
+ex <- "I read your file: 2 sheets.\n\nMissing: Tw.\n\n### A. File shape\n- x\n\n### B. Inventory\n| N | a |\n| N | b |\n\n### C. Gaps\nnone\n\n### D. Ambiguities to ask the user\n\n1. Which year?\n\n2. MoE sheet: percentage or fraction\n\n```decisions\n[]\n```"
+ok(identical(.translator_reply_visible(.translator_strip_decisions(ex)), "I read your file: 2 sheets.\n\nMissing: Tw.\n\n1. Which year?\n\n2. MoE sheet: percentage or fraction"),
+   "the finished bubble: orientation lines and section D, sections A to C out")
+ok(identical(.translator_reply_visible(substr(ex, 1, regexpr("### C", ex) - 1), live = TRUE), "I read your file: 2 sheets.\n\nMissing: Tw.\n\nReading the file: 2 values noted so far..."),
+   "the live bubble before D: a progress line instead of the table")
+ok(identical(.translator_reply_visible("Plain reply with no sections.\n\n1. Which year?"), "Plain reply with no sections.\n\n1. Which year?"), "a reply without sections is untouched")
+ok(identical(.translator_question_list(.translator_strip_decisions(ex)), c("Which year?", "MoE sheet: percentage or fraction")), "numbered items after the D header are questions even without a question mark")
 ok(identical(.translator_parse_choice(list(kind = "server", topic = "calves_handling"), "keep them together please"), "pooled") &&
    identical(.translator_parse_choice(list(kind = "server", topic = "pct_vs_fraction:x!y"), "they are fractions"), "fraction") &&
    identical(.translator_parse_choice(list(kind = "ai", text = "q"), " free text "), "free text"), "typed answers map to choices by keyword")

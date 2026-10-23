@@ -17,16 +17,24 @@ removeModal <- function(...) invisible(NULL)
 .translator_force_template <- function(state, session) { produce_calls <<- produce_calls + 1L; invisible(NULL) }
 ai_calls <- character(); seen_hist <- list()
 with_block <- TRUE
+truncate_next <- FALSE
 anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
                                         should_stop = function() FALSE, on_result = function(res) {}, ...) {
   last <- messages[[length(messages)]]$content
   if (!is.character(last)) last <- paste(vapply(last, function(b) b$text %||% "", ""), collapse = " ")
   seen_hist[[length(seen_hist) + 1]] <<- messages
   usage <- list(prompt_tokens = 1L, completion_tokens = 1L, cached_tokens = 0L, cache_write_tokens = 0L, cache_write_1h_tokens = 0L, total_tokens = 2L)
-  base <- list(tool_used = FALSE, usage = usage, model = "stub", cost_usd = 0, latency_sec = 0.1, error = NULL, stopped = FALSE)
+  base <- list(tool_used = FALSE, usage = usage, model = "stub", cost_usd = 0, latency_sec = 0.1, error = NULL, stopped = FALSE, stop_reason = "end_turn")
   if (grepl("The JSON array:", last, fixed = TRUE)) {
     ai_calls <<- c(ai_calls, "summariser")
     resp <- c(list(reply = "[{\"topic\": \"uncertainty_source\", \"decision\": \"file_bounds\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"use my bounds\"}]"), base)
+  } else if (truncate_next) {
+    ai_calls <<- c(ai_calls, "chat"); truncate_next <<- FALSE
+    resp <- c(list(reply = "I read your file: 2 sheets.\n\n### A. File shape\n- x\n\n### B. Inventory of values found\n| N | a |\n| N | b |\n\n### D. Ambiguities to ask the user\n\n1. Which year is the inv"),
+              base[setdiff(names(base), "stop_reason")], list(stop_reason = "max_tokens"))
+  } else if (grepl("cut off by the output length limit", last, fixed = TRUE)) {
+    ai_calls <<- c(ai_calls, "chat")
+    resp <- c(list(reply = "Section D:\n\n1. Which year do you want for the point estimate?"), base)
   } else {
     ai_calls <<- c(ai_calls, "chat")
     reply <- "Thanks, noted.\n\n1. One more: which region is the herd in?\n\nPlease answer the section D questions, then click **Produce template now** when ready."
@@ -100,6 +108,32 @@ shiny::testServer(translator_chat_server, {
             identical(state$register$inventory_year$decision, "2022 (single year, confirmed)"),
             !is.null(state$recorded$inventory_year), !is.null(conversation_load_full("loop@local")$extra$recorded))
   cat("round 3: a reworded decision posts no second recorded line; the announced topics persist\n")
+
+  # ---- a reply cut off at the output length limit: one continuation ----------
+  n_chat <- sum(ai_calls == "chat")
+  truncate_next <<- TRUE
+  session$setInputs(translator_input = "explore again please"); session$setInputs(translator_send = 10)
+  # the continuation is scheduled 0.2 s after the first reply: pump until its reply has settled
+  t0 <- Sys.time()
+  while (!(sum(ai_calls == "chat") >= n_chat + 2L && !isTRUE(state$pending)) && as.numeric(Sys.time() - t0, units = "secs") < 30) later::run_now(0.05)
+  later::run_now(0.2)
+  src4 <- src_of(state$messages); dsp4 <- disp()
+  cut_i <- which(src4 == "user_continue")
+  stopifnot(length(cut_i) == 1L, identical(state$messages[[cut_i]]$display, ""),
+            grepl("cut off by the output length limit", state$messages[[cut_i]]$content, fixed = TRUE),
+            any(grepl("cut off at the length limit", dsp4, fixed = TRUE)),
+            sum(ai_calls == "chat") == n_chat + 2L)
+  # the truncated bubble shows the orientation line, not the table; the continuation's question is the open one
+  trunc_disp <- dsp4[cut_i - 2L]
+  stopifnot(startsWith(trunc_disp, "I read your file: 2 sheets."), !grepl("### B", trunc_disp, fixed = TRUE), !grepl("| N | a |", trunc_disp, fixed = TRUE),
+            length(state$pending_questions) == 1L, grepl("point estimate", state$pending_questions[[1]]$text, fixed = TRUE),
+            identical(tail(src4, 1), "server_question"))
+  # the continuation request reaches the API, the bubbles do not
+  hist4 <- vapply(seen_hist[[length(seen_hist)]], function(m) if (is.character(m$content)) m$content else "", character(1))
+  stopifnot(any(grepl("cut off by the output length limit", hist4, fixed = TRUE)))
+  cat("cut-off reply: one continuation asked and answered; the table stays out of the bubble\n")
+  session$setInputs(translator_input = "2022"); session$setInputs(translator_send = 11); pump(state)
+  stopifnot(length(state$pending_questions) == 0L)
 
   # ---- the Produce gate: only the year is asked, then the delivery pop-up ----
   state$register$inventory_year <- NULL

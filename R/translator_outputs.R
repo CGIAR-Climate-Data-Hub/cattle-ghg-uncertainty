@@ -307,7 +307,7 @@ translator_write_conversation_docx <- function(messages, path) {
   doc <- para(doc, "")
   for (m in messages) {
     src <- m$source %||% ""
-    if (src %in% c("server_notice", "answers_batch")) next
+    if (src %in% c("server_notice", "answers_batch", "user_continue")) next
     if (identical(m$role, "user")) {
       txt <- if (identical(src, "server_upload")) paste0("[", m$display %||% "File uploaded", "]")
              else m$display %||% m$content %||% ""

@@ -2186,7 +2186,14 @@ translator_cancel_clear <- function(tok) {
                                                         note = sc$sub_category %||% "")
     reply_vis <- .translator_strip_source_categories(reply_vis)
   }
-  qs <- if (!isTRUE(resp$tool_used) && !template_just_ready)
+  # 2026-10-23: a reply cut off by the output length limit is kept as it
+  # is and one continuation is requested; its questions, incomplete, are
+  # not put to the user, the continuation brings them.
+  truncated <- identical(resp$stop_reason, "max_tokens") && !isTRUE(resp$tool_used) && !template_just_ready
+  users <- Filter(function(m) identical(m$role, "user"), state$messages)
+  already_continued <- length(users) > 0 && identical(users[[length(users)]]$source, "user_continue")
+  continue_now <- truncated && !already_continued
+  qs <- if (!isTRUE(resp$tool_used) && !template_just_ready && !continue_now)
     .translator_question_list(reply_vis) else character(0)
   # 2026-10-22: a question the user has answered in this conversation is
   # not put again (a reply that repeats it would go round in circles), and
@@ -2209,7 +2216,8 @@ translator_cancel_clear <- function(tok) {
     display_text <- .translator_extract_numbered_questions(reply_vis) %||% reply_vis
   }
   if (!isTRUE(resp$tool_used)) {
-    display_text <- .translator_strip_answer_prompt(display_text)
+    # the orientation lines and the questions; sections A to C go to the expander
+    display_text <- .translator_reply_visible(.translator_strip_answer_prompt(display_text))
     if (!nzchar(trimws(display_text))) display_text <- t("ai_q_nothing_open")
   }
   state$messages[[length(state$messages) + 1]] <-
@@ -2223,6 +2231,17 @@ translator_cancel_clear <- function(tok) {
   # one bubble at a time, answered in the normal input.
   .translator_post_recorded(state, reg_before)
   if (length(qs)) .translator_begin_round(state, if (length(qs) == 1L) t("ai_q_notice_one") else sprintf(t("ai_q_notice"), length(qs)))
+  if (continue_now) {
+    state$messages[[length(state$messages) + 1L]] <-
+      list(role = "assistant", content = t("ai_reply_cut"), display = t("ai_reply_cut"), source = "server_notice", ts = .translator_now())
+    state$messages[[length(state$messages) + 1L]] <-
+      list(role = "user", content = .TRANSLATOR_CONTINUE_TEXT, display = "", source = "user_continue", ts = .translator_now())
+    .translator_persist(state)
+    # after this callback has finished (it clears `pending` on its way out)
+    later::later(function() shiny::withReactiveDomain(session, shiny::isolate(
+      tryCatch(.translator_send(state, session, stage = stage),
+               error = function(e) message("translator: continuation not sent (", conditionMessage(e), ")")))), 0.2)
+  }
 
   # If a valid template-ready block came through in this reply, post a
   # separate small AI message pointing the user at the green Download
@@ -2235,6 +2254,17 @@ translator_cancel_clear <- function(tok) {
   .translator_persist(state)
   invisible(NULL)
 }
+
+# 2026-10-23: the explore reply carries the full table of values read
+# (sections A to C) before its questions; at 16,000 output tokens the
+# Zambia file's reply was cut off inside section D twice. 32,000 covers
+# it, and a reply that still hits the limit gets one continuation request.
+.TRANSLATOR_CHAT_MAX_TOKENS <- 32000L
+.TRANSLATOR_CONTINUE_TEXT <- paste(
+  "Your previous reply was cut off by the output length limit. Do not repeat",
+  "sections A, B or C. Continue with section D only: every numbered question",
+  "in full, numbered from 1, then the decisions block and the",
+  "source_categories block.")
 
 .translator_send <- function(state, session, stage = "clarify") {
   state$pending <- TRUE
@@ -2295,9 +2325,17 @@ translator_cancel_clear <- function(tok) {
   # calls invalidates the cached message prefix. Rule 9 tells the model not
   # to call the tool from a chat reply; if it does anyway, the block below
   # promotes a complete piece and explains a partial one.
+  # 2026-10-23: the live bubble shows what the finished bubble will show:
+  # the orientation lines and section D as it arrives. Sections A to C
+  # (the table of every value read) are replaced by a progress line while
+  # they stream. The whole visible text is sent each time it changes.
+  stream_acc <- ""; stream_last <- NULL
   on_chunk_cb <- function(text) {
-    tryCatch(session$sendCustomMessage("translatorStreamChunk", text),
-              error = function(e) NULL)
+    stream_acc <<- paste0(stream_acc, text)
+    vis <- tryCatch(.translator_reply_visible(stream_acc, live = TRUE), error = function(e) stream_acc)
+    if (identical(vis, stream_last)) return(invisible(NULL))
+    stream_last <<- vis
+    tryCatch(session$sendCustomMessage("translatorStreamSet", vis), error = function(e) NULL)
   }
   # 2026-10-15: this path passed no should_stop at all, so Stop did nothing
   # during an exploration or a chat reply. It only ever worked on the
@@ -2315,6 +2353,7 @@ translator_cancel_clear <- function(tok) {
       should_stop = stopper,
       tools       = anthropic_translator_tools(),
       tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+      max_tokens  = .TRANSLATOR_CHAT_MAX_TOKENS,
       on_result   = function(resp) {
         # withReactiveDomain: this runs from a later() callback, outside
         # any reactive context, so without it the writes to `state` below
@@ -2342,7 +2381,8 @@ translator_cancel_clear <- function(tok) {
     on_chunk    = on_chunk_cb,
     should_stop = stopper,
     tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO
+    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
+    max_tokens  = .TRANSLATOR_CHAT_MAX_TOKENS
   )
 
   .translator_handle_result(state, session, resp, stage)
@@ -4323,6 +4363,19 @@ translator_cancel_clear <- function(tok) {
                 summary = "Show structure / details"))
   }
   if (is.null(content) || !nzchar(content)) return(fallback)
+
+  # Case 1b (2026-10-23): the explore reply's sections A to C, the table
+  # of every value the AI read, stay out of the bubble and are offered here.
+  if (!is.null(display) && nzchar(display) && !identical(display, content)) {
+    m_a <- regexpr("(?m)^#{2,4}\\s*A\\.", content, perl = TRUE)
+    if (m_a > 0) {
+      m_d <- regexpr("(?m)^#{2,4}\\s*D\\.", content, perl = TRUE)
+      hid <- if (m_d > m_a) substr(content, m_a, m_d - 1L) else substr(content, m_a, nchar(content))
+      hid <- sub("(?s)\\n```.*$", "", hid, perl = TRUE)
+      return(list(visible = display, hidden = trimws(hid),
+                  summary = "Show what the AI read from the file (sections A to C)"))
+    }
+  }
 
   # Case 1: pure-JSON body + a separate display message. Detected when
   # display differs from content AND content looks like a JSON object.

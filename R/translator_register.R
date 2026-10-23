@@ -454,16 +454,43 @@ translator_register_df <- function(register) {
 # The numbered items of a reply that read as questions, one string each.
 # Same walker as .translator_extract_numbered_questions(), without the
 # "at least two" and 30% gates: one question is still a question.
+# What a reply shows in its bubble (2026-10-23): the orientation lines
+# before the first section header, then section D (the questions) without
+# its header. Sections A to C, the table of every value the AI read, go to
+# the bubble's expander. While the reply streams (live = TRUE) and D has
+# not started, a progress line counts the table rows so far.
+.translator_reply_visible <- function(txt, live = FALSE) {
+  if (is.null(txt) || !nzchar(txt)) return(txt %||% "")
+  if (live) txt <- sub("(?s)\\n```.*$", "", txt, perl = TRUE)   # a fenced block at the end (decisions) is never shown
+  first <- regexpr("(?m)^#{2,4}\\s*[A-D]\\.", txt, perl = TRUE)
+  if (first < 0) return(txt)
+  head <- trimws(substr(txt, 1L, first - 1L))
+  d <- regexpr("(?m)^#{2,4}\\s*D\\.[^\\n]*\\n?", txt, perl = TRUE)
+  if (d > 0) {
+    rest <- trimws(substr(txt, d + attr(d, "match.length"), nchar(txt)))
+    parts <- c(head, rest)
+    return(trimws(paste(parts[nzchar(parts)], collapse = "\n\n")))
+  }
+  if (!live) return(head)
+  n <- sum(grepl("^\\s*\\|", strsplit(txt, "\n", fixed = TRUE)[[1]], perl = TRUE))
+  parts <- c(head, sprintf(t("ai_stream_reading"), n))
+  trimws(paste(parts[nzchar(parts)], collapse = "\n\n"))
+}
+
 .translator_question_list <- function(content) {
   if (is.null(content) || !nzchar(content)) return(character(0))
   lines <- strsplit(content, "\n", fixed = TRUE)[[1]]
   is_numbered <- grepl("^\\s{0,3}\\d+[.)]\\s+\\S", lines, perl = TRUE)
   if (!any(is_numbered)) return(.translator_trailing_question(content))
-  blocks <- character(0); cur <- character(0); in_block <- FALSE; blank <- 0L
-  flush <- function() if (length(cur)) blocks <<- c(blocks, paste(cur, collapse = "\n"))
+  # numbered items after a "### D." header are questions even without a
+  # question mark (2026-10-23: "7. MoE or 95%CI sheet: percentage" was dropped)
+  d_line <- grep("^#{2,4}\\s*D\\.", lines, perl = TRUE)
+  d_line <- if (length(d_line)) d_line[1] else NA_integer_
+  blocks <- character(0); starts <- integer(0); cur <- character(0); cur_start <- NA_integer_; in_block <- FALSE; blank <- 0L
+  flush <- function() if (length(cur)) { blocks <<- c(blocks, paste(cur, collapse = "\n")); starts <<- c(starts, cur_start) }
   for (i in seq_along(lines)) {
     ln <- lines[i]
-    if (is_numbered[i]) { flush(); cur <- ln; in_block <- TRUE; blank <- 0L }
+    if (is_numbered[i]) { flush(); cur <- ln; cur_start <- i; in_block <- TRUE; blank <- 0L }
     else if (in_block) {
       if (!nzchar(trimws(ln))) { blank <- blank + 1L; if (blank >= 2L) { flush(); cur <- character(0); in_block <- FALSE; blank <- 0L } else cur <- c(cur, ln) }
       else { blank <- 0L; cur <- c(cur, ln) }
@@ -474,7 +501,8 @@ translator_register_df <- function(register) {
   blocks <- sub("^\\d+[.)]\\s+", "", blocks, perl = TRUE)
   # the closing instruction to answer is not part of the last question
   blocks <- vapply(blocks, .translator_strip_answer_prompt, character(1), USE.NAMES = FALSE)
-  blocks[grepl("\\?", blocks)]
+  keep <- grepl("\\?", blocks) | (!is.na(d_line) & starts > d_line)
+  blocks[keep & nzchar(blocks)]
 }
 
 # A reply that asks one question without numbering it ("Please also

@@ -343,6 +343,30 @@ app_ui <- function(request = NULL) {
            // Rearm: if the next chunk takes >1.5s, dots reappear.
            _translatorArmWatchdog();
          });
+         // 2026-10-23: the server sends the whole visible text of the live
+         // reply each time it changes (sections A to C replaced by a
+         // progress line); the bubble's text is replaced, not appended.
+         Shiny.addCustomMessageHandler('translatorStreamSet', function(text) {
+           if (typeof _translatorHideSpinner === 'function') _translatorHideSpinner();
+           if (!_translatorActiveBubble) {
+             var container = document.getElementById('translator_stream_target');
+             if (!container) return;
+             container.innerHTML = '';
+             var bubble = document.createElement('div');
+             bubble.style.cssText = 'max-width:80%; margin:6px 0;' +
+               'padding:10px 14px; border-radius:12px; white-space:pre-wrap;' +
+               'font-size:0.92rem; line-height:1.45;' +
+               'background:#E8F5E9; color:#1B4332; align-self:flex-start;' +
+               'border:1px solid #C8E6C9;';
+             container.appendChild(bubble);
+             _translatorActiveBubble = bubble;
+           }
+           _translatorClearWatchdog();
+           _translatorActiveBubble.textContent = text;
+           var scroller = _translatorActiveBubble.closest('[data-translator-scroller]');
+           if (scroller) scroller.scrollTop = scroller.scrollHeight;
+           _translatorArmWatchdog();
+         });
          Shiny.addCustomMessageHandler('translatorStreamEnd', function(_unused) {
            // Streaming is done. Cancel the watchdog so no spurious dots
            // appear after the bubble is replaced by the rendered history.
