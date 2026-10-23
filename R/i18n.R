@@ -764,6 +764,13 @@ lang_state_take <- function(token) {
   ),
 
   ai_signed_in = list(en = "Signed in:", fr = "Connecté :"),
+  ai_past_label = list(en = "3.  Upload a past translation (optional)", fr = "3.  Téléverser une traduction précédente (facultatif)"),
+  ai_past_hint = list(en = " A template produced by this tool that you corrected. Your source file stays in the conversation; the AI takes the corrected values as the truth and produces the template again from them.",
+                      fr = " Un modèle produit par cet outil que vous avez corrigé. Votre fichier source reste dans la conversation ; l'IA prend les valeurs corrigées pour vraies et reproduit le modèle à partir d'elles."),
+  ai_past_not_template = list(en = "This file is not a template produced by the tool (no Parameters and Inventory_Metadata sheets). Upload it in the raw data box instead.",
+                              fr = "Ce fichier n'est pas un modèle produit par l'outil (pas de feuilles Parameters et Inventory_Metadata). Téléversez-le plutôt dans la case des données brutes."),
+  ai_past_needs_source = list(en = "Upload your raw data first; a past translation is read next to it.",
+                              fr = "Téléversez d'abord vos données brutes ; une traduction précédente est lue à côté d'elles."),
   ai_upload_label = list(en = "1.  Upload your raw cattle data",
                            fr = "1.  Téléverser vos données brutes"),
   ai_upload_hint = list(

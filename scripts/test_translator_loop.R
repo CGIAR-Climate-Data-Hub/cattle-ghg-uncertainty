@@ -13,6 +13,7 @@ auth_is_approved <- function(e) TRUE
 produce_calls <- 0L
 modal_shown <- 0L
 showModal <- function(...) { modal_shown <<- modal_shown + 1L; invisible(NULL) }
+showNotification <- function(...) invisible(NULL)
 removeModal <- function(...) invisible(NULL)
 .translator_force_template <- function(state, session) { produce_calls <<- produce_calls + 1L; invisible(NULL) }
 ai_calls <- character(); seen_hist <- list()
@@ -179,5 +180,21 @@ shiny::testServer(translator_chat_server, {
             grepl("Calves are one group", last_up$content, fixed = TRUE),
             identical(state$register$corrected_template$basis, "user"))
   cat("corrected template: recognised, checked, sent with the note\n")
+
+  # ---- the past-translation button (2026-10-23) --------------------------------------
+  fp_before <- state$source_fp
+  state$last_template_json <- "{\"parameters\": []}"   # a template was ready
+  session$setInputs(translator_past_file = list(datapath = tpl, name = "past_translation.xlsx", size = file.size(tpl)))
+  stopifnot(isTRUE(state$pending_upload$past), isTRUE(state$pending_upload$is_template), is.null(state$last_template_json),
+            identical(state$source_fp, fp_before), !is.null(state$pending_upload$precheck))
+  session$setInputs(translator_sheets = as.character(seq_len(n_sheets)), translator_upload_note = "Corrected the two adult cow populations.")
+  session$setInputs(translator_send_sheets = 2)
+  pump(state)
+  up2 <- Filter(function(m) identical(m$source, "server_upload"), state$messages)
+  stopifnot(grepl("CORRECTED TEMPLATE", up2[[length(up2)]]$content, fixed = TRUE), grepl("two adult cow", up2[[length(up2)]]$content, fixed = TRUE))
+  csv <- file.path(tempdir(), "raw.csv"); write.csv(data.frame(a = 1:2), csv, row.names = FALSE)
+  session$setInputs(translator_past_file = list(datapath = csv, name = "raw.csv", size = file.size(csv)))
+  stopifnot(is.null(state$pending_upload))
+  cat("past translation: taken next to the source, the source fingerprint kept, a raw file refused\n")
   cat("LOOP TEST PASSED\n")
 })

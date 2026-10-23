@@ -393,7 +393,6 @@ translator_chat_server <- function(input, output, session) {
     state$register <- translator_register_keep_user(state$register)
     state$pending_questions <- list()
     state$q_index <- 1L
-    state$source_categories <- NULL
     parsed <- tryCatch(
       .translator_read_upload_memo(fi$datapath, fi$name),
       error = function(e) {
@@ -408,24 +407,63 @@ translator_chat_server <- function(input, output, session) {
     # parameter families the scan found. pending_upload is cleared once the
     # file is sent, and the emitted template is checked against the source
     # long after that (see translator_consistency_checks).
-    state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
-                                error = function(e) NULL)
-    # 2026-10-22 (WP1): a column whose header says percent while its values
-    # sit in (0, 1], or the reverse, becomes a pending topic the user has to
-    # settle before the template is produced.
-    for (lab in tryCatch(.translator_detect_pct_conflicts(parsed), error = function(e) character(0)))
-      state$register <- translator_register_add_pending(state$register, paste0("pct_vs_fraction:", lab))
     # 2026-10-22 (WP7): a template produced by the tool, corrected by the
     # user and uploaded back. The checks run on it at once (no AI call);
     # the send handler then tells the AI it outranks the earlier answers.
+    # 2026-10-23: in that case the source file's fingerprint and categories
+    # are kept (the "past translation" button below does the same).
     sheet_names <- vapply(parsed$sheets, function(sh) as.character(sh$name %||% ""), character(1))
     is_template <- all(c("Parameters", "Inventory_Metadata") %in% sheet_names) &&
                    length(state$messages) > 1L
+    if (!is_template) {
+      state$source_categories <- NULL
+      state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
+                                  error = function(e) NULL)
+      # 2026-10-22 (WP1): a column whose header says percent while its values
+      # sit in (0, 1], or the reverse, becomes a pending topic the user has to
+      # settle before the template is produced.
+      for (lab in tryCatch(.translator_detect_pct_conflicts(parsed), error = function(e) character(0)))
+        state$register <- translator_register_add_pending(state$register, paste0("pct_vs_fraction:", lab))
+    }
     pc_t <- if (is_template) tryCatch(.translator_precheck_file(fi$datapath, source = state$source_fp),
                                       error = function(e) NULL) else NULL
     state$pending_upload <- list(parsed = parsed, name = fi$name,
                                  hash = parsed$file_hash,
                                  is_template = is_template, precheck = pc_t)
+  })
+
+  # 2026-10-23: "Upload a past translation": a template from this tool,
+  # corrected by the user, read next to the source file. The source file's
+  # fingerprint and categories stay; the cached parts go (a new emission);
+  # a template that was ready gives way to the conversation again.
+  observeEvent(input$translator_past_file, {
+    req(state$user_email)
+    fi <- input$translator_past_file
+    if (is.null(fi)) return()
+    if (length(state$messages) < 2L) {
+      showNotification(t("ai_past_needs_source"), type = "warning", duration = 6)
+      return()
+    }
+    parsed <- tryCatch(.translator_read_upload_memo(fi$datapath, fi$name),
+                       error = function(e) {
+                         state$last_error <- paste0("Couldn't read the uploaded file: ", conditionMessage(e))
+                         NULL
+                       })
+    if (is.null(parsed)) return()
+    sheet_names <- vapply(parsed$sheets, function(sh) as.character(sh$name %||% ""), character(1))
+    if (!all(c("Parameters", "Inventory_Metadata") %in% sheet_names)) {
+      showNotification(t("ai_past_not_template"), type = "warning", duration = 8)
+      return()
+    }
+    state$last_error <- NULL
+    state$batch_parts <- list(); state$batch_parts_key <- NULL
+    state$prompt_stale <- FALSE
+    state$register <- translator_register_keep_user(state$register)
+    state$pending_questions <- list(); state$q_index <- 1L
+    state$last_template_json <- NULL
+    pc_t <- tryCatch(.translator_precheck_file(fi$datapath, source = state$source_fp), error = function(e) NULL)
+    state$pending_upload <- list(parsed = parsed, name = fi$name, hash = parsed$file_hash,
+                                 is_template = TRUE, precheck = pc_t, past = TRUE)
   })
 
   # The sheet picker. Rendered only while an upload is waiting to be sent.
@@ -792,6 +830,17 @@ translator_chat_server <- function(input, output, session) {
       tags$div(style = "margin:8px 0; padding:8px 12px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px; font-size:0.85rem; color:#7F1D1D;",
                jb$error %||% jb$stage_label %||% jb$status)
     } else NULL
+  })
+  # 2026-10-23: the past-translation button, once a source file has been
+  # explored; it sits at the foot of the card so it is there in the
+  # conversation and in the ready state alike.
+  output$translator_past_upload <- renderUI({
+    if (length(state$messages) < 2L) return(NULL)
+    tags$div(style = "margin-top:14px; padding:10px 12px 0 12px; border:1px dashed #A7F3D0; border-radius:8px; background:#F0FDF4;",
+      fileInput("translator_past_file",
+                label = tagList(tags$strong(t("ai_past_label")),
+                                tags$span(style = "color:#52525B; font-weight:400;", t("ai_past_hint"))),
+                accept = c(".xlsx", ".xlsm"), width = "100%"))
   })
   output$translator_delivery_line <- renderUI({
     d <- state$dir_chosen
@@ -1254,6 +1303,7 @@ translator_chat_server <- function(input, output, session) {
       )
     )),
 
+    uiOutput("translator_past_upload"),
     uiOutput("translator_last_error"))
 }
 

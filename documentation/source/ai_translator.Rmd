@@ -100,7 +100,7 @@ The user answers the questions in section D in plain natural-language chat messa
 
 If the user wants to add data that is not in the file (typically national population numbers), the values can be typed directly into the chat. They will be incorporated into the final template alongside the file-derived values.
 
-**Re-uploading a corrected template.** After a template has been produced, the link **Back to the conversation** keeps the answers and the history. A template produced by the tool, corrected in Excel and uploaded there is recognised as such: the checks are run on it at once, a note box carries the user's comments, and the AI is told that its values outrank the original file and the earlier answers. Pressing **Produce template now** then builds the template from the corrected values.
+**Uploading a past translation.** Once a source file has been explored, a third box, **Upload a past translation**, sits at the foot of the panel, in the conversation and after a template has been produced alike. A template produced by the tool, corrected in Excel and uploaded there is read next to the source file, which stays in the conversation: the checks are run on it at once, a note box carries the user's comments, and the AI is told that its values outrank the original file and the earlier answers. Pressing **Produce template now** then builds the template from the corrected values. The link **Back to the conversation** keeps the answers and the history for a change typed as a reply instead.
 
 ### Step 3: Emit
 
