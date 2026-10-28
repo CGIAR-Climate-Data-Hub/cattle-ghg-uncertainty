@@ -1669,6 +1669,14 @@ app_server <- function(input, output, session) {
           # system only.
 
           setProgress(0.92, detail = "Running sensitivity analysis...")
+          # 2026-10-28: the group inputs (per-MMS draw matrices, about 75 MB on
+          # Zambia at 10,000 draws) are needed only by the simulation runs.
+          # Released here when no comparison run follows, and right after the
+          # comparison run otherwise, so they are not held while the
+          # sensitivity regressions run (the memory peak of a run).
+          if (!isTRUE(input$run_comparison)) {
+            rm(systems_data, built); invisible(gc(FALSE))
+          }
           # Sensitivity is a SECONDARY analysis: isolate it so a failure here
           # leaves the main results (Tab 5) and the IPCC report (Tab 7) intact.
           # Before this guard, an error inside aggregate_sensitivity (e.g. the
@@ -1739,6 +1747,7 @@ app_server <- function(input, output, session) {
               keep_sample_rows = 4000L
             )
             rv$comparison_result <- nocorr_result
+            rm(systems_nocorr, systems_data, built); invisible(gc(FALSE))
             if (length(nocorr_result$by_system) > 0) {
               rv$comparison_sensitivity <- tryCatch(
                 aggregate_sensitivity(

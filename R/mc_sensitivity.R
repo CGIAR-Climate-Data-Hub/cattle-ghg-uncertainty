@@ -159,9 +159,25 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   levels_present <- unique(vapply(names(by_system), level_of, character(1)))
   multi_level <- length(setdiff(levels_present, "")) > 1L
 
+  # 2026-10-28: rows are cut to the regression size BEFORE the groups are
+  # joined. The join used to build the full n_iter x (all groups' columns)
+  # matrix first and subsample it only at the end; on Zambia (32 groups,
+  # 10,000 draws) that and the duplicate test below peaked at 1.4 GB per call,
+  # twice per run with the no-correlation comparison, and the server dropped
+  # the session. Every Monte Carlo row is an independent draw, so the first
+  # rows are the same subsample the end of this function took before.
+  n_keep <- length(output)
+  if (is.finite(max_rows)) n_keep <- min(n_keep, max_rows)
+  full_rows <- list(); full_means <- list()
   label_samples <- function(sn) {
     samp <- by_system[[sn]]$samples
     if (is.null(samp) || ncol(samp) == 0) return(NULL)
+    # The full-length row count and column means are kept for the
+    # subsample note and the "= value (shared by N groups)" labels, so both
+    # read exactly as they did when the whole matrix was joined.
+    full_rows[[sn]] <<- nrow(samp)
+    full_means[[sn]] <<- colMeans(samp)
+    if (nrow(samp) > n_keep) samp <- samp[seq_len(n_keep), , drop = FALSE]
     sc <- sub_category_of(sn)
     lv <- level_of(sn)
     tag <- if (multi_level && nzchar(lv)) paste0(sc, ", ", lv) else sc
@@ -172,6 +188,8 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   blocks <- Filter(Negate(is.null), lapply(names(by_system), label_samples))
   if (length(blocks) == 0) return(NULL)
   combined <- if (length(blocks) == 1) blocks[[1]] else do.call(cbind, blocks)
+  full_means <- unname(unlist(full_means[names(full_rows)]))
+  n_full     <- max(unlist(full_rows))
 
   # Cross-group sharing (2026-09) makes the per-group columns of a shared
   # coefficient NUMERICALLY IDENTICAL. Left alone that is a silent failure,
@@ -185,11 +203,20 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   # coefficient shared by 251 groups is one driver of the uncertainty, and
   # belongs in the tornado once, not 251 times.
   if (ncol(combined) > 1L) {
-    sig  <- apply(combined, 2L, function(col) paste0(col, collapse = "\r"))
-    dups <- duplicated(sig)
+    # Identical columns are found from a numeric fingerprint (sum, sum of
+    # squares, first and last value), and every candidate pair is confirmed
+    # with identical(). The previous test pasted every column into one long
+    # string, which held a text copy of the whole matrix in memory.
+    cs  <- colSums(combined); cs2 <- colSums(combined * combined)
+    fp  <- paste(cs, cs2, unlist(combined[1L, ]), unlist(combined[nrow(combined), ]), sep = "|")
+    grp <- match(fp, fp)
+    for (j in which(grp != seq_along(grp))) {
+      if (!identical(unname(combined[, j]), unname(combined[, grp[j]]))) grp[j] <- j
+    }
+    dups <- duplicated(grp)
     if (any(dups)) {
       keep_i <- which(!dups)
-      n_share <- vapply(sig[keep_i], function(s) sum(sig == s), integer(1))
+      n_share <- vapply(grp[keep_i], function(g) sum(grp == g), integer(1))
       nm <- colnames(combined)[keep_i]
       base <- sub("\\s*\\(.*\\)$", "", nm)
       # "DE (cows)" shared by several groups becomes
@@ -205,7 +232,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
       # Formatted one value at a time. format() on a vector picks a single
       # layout for all of it, so a column of body weights next to a column of
       # Ym values would render both in scientific notation ("6.31e+00").
-      val <- vapply(colMeans(combined[, keep_i, drop = FALSE]),
+      val <- vapply(full_means[keep_i],
                     function(v) format(signif(v, 3L), trim = TRUE,
                                        scientific = FALSE, drop0trailing = TRUE),
                     character(1))
@@ -241,7 +268,6 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   #      still full length. Aligning to the minimum keeps lm() inputs matched
   #      and avoids a "differing number of rows" error. The first k MC rows
   #      are an i.i.d. subsample, so rows line up across both.
-  n_full <- nrow(combined)
   m <- min(n_full, length(output))
   if (is.finite(max_rows)) m <- min(m, max_rows)
   if (m < n_full || m < length(output)) {
