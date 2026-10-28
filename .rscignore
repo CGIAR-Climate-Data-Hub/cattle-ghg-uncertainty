@@ -77,3 +77,8 @@ auth_tokens.csv
 # Keep .Renviron OUT of this .rscignore.
 
 # defaults/ is READ AT STARTUP (R/load_defaults.R) and must stay in the bundle.
+
+# 2026-10-28: this file is NOT honoured by rsconnect 1.8 (every folder above
+# was still bundled). scripts/deploy.R now passes an explicit appFiles list;
+# this file stays as documentation of what is not needed by the running app.
+workshop/

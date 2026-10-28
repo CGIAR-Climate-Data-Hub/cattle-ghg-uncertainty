@@ -66,8 +66,27 @@ tryCatch(source("scripts/notify_approved.R"),
          error = function(e) message("notify_approved skipped: ",
                                        conditionMessage(e)))
 
+# 2026-10-28: an explicit file list. rsconnect 1.8 does not honour the
+# .rscignore in this folder: every top-level folder was bundled, 341 MB,
+# of which 306 MB were the workshop videos, uploaded on every deploy and
+# once cut off by the network. The running app reads only what is listed
+# here (R/, www/ incl. www/docs, defaults/, config/, translator_prompts/
+# incl. its .manifest.json, app.R and the .Renviron with the secrets).
+app_files <- c(
+  "app.R", ".Renviron",
+  list.files("R", pattern = "[.]R$", full.names = TRUE),
+  list.files("www", recursive = TRUE, full.names = TRUE),
+  list.files("defaults", recursive = TRUE, full.names = TRUE),
+  list.files("config", recursive = TRUE, full.names = TRUE),
+  list.files("translator_prompts", recursive = TRUE, full.names = TRUE, all.files = TRUE)
+)
+app_files <- unique(app_files[file.exists(app_files) & !grepl("^www/docs/_cache/", app_files)])
+message(sprintf("deploy: bundling %d files, %.1f MB", length(app_files),
+                sum(file.size(app_files), na.rm = TRUE) / 1048576))
+
 rsconnect::deployApp(
   appDir      = ".",
+  appFiles    = app_files,
   appName     = "cattle-ghg-uncertainty",
   account     = "mlolita26",
   forceUpdate = TRUE,
