@@ -155,6 +155,21 @@ trend_df_from_population <- function(population, base_specs,
   lapply(by_system, function(s) list(samples = s$samples))
 }
 
+# Seed of year `yi` in a trend run. Within one year, run_inventory_simulation()
+# seeds group i with year_seed + i, the shared coefficient draws use
+# year_seed, and the per-MMS draws use year_seed + 1000003. Until 2026-10-28
+# the year seed was seed + yi, so year y group g + 1 and year y + 1 group g
+# both drew from seed + y + g + 1: their animal numbers had a rank
+# correlation of 1.000 (31 of 32 groups on Zambia, every pair of
+# consecutive years), a year-to-year correlation nobody chose. A stride of
+# 10007 per year keeps every stream of every year apart for up to 9,300
+# groups; the partial-correlation generator (seed + 1 .. seed + n_years) and
+# the full coefficient blocks (seed) stay below the first year's streams.
+.trend_year_seed <- function(seed, yi) {
+  if (is.null(seed)) return(NULL)
+  as.integer(seed) + 10007L * as.integer(yi)
+}
+
 run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
                                 gwp = "AR5", seed = 42,
                                 # Year-to-year correlation mode per IPCC Vol.1
@@ -268,8 +283,9 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
               else if (year_corr == "partial") next_partial()
               else NULL
 
+    year_seed <- .trend_year_seed(seed, yi)
     built <- build_systems_data(ps, manure = manure, n_iter = n_iter,
-                                seed = seed + yi, crossgroup = crossgroup,
+                                seed = year_seed, crossgroup = crossgroup,
                                 corr_matrix = corr_matrix, sg_to_mm = sg_to_mm,
                                 pre_sampled_blocks = blocks)
     if (is.null(shared_summary) && !is.null(built$shared$summary))
@@ -277,7 +293,7 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
 
     sim <- run_inventory_simulation(
       built$systems, n_iter = n_iter, gwp = gwp,
-      seed = seed + yi,
+      seed = year_seed,
       keep_sample_rows = keep_sample_rows
     )
 
