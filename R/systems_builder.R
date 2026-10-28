@@ -82,6 +82,16 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
     build_shared_coefficient_draws(specs, n_iter, seed = seed, group_keys = group_key)
   } else list(blocks = list(), summary = NULL)
 
+  # 2026-10-28: the per-MMS draws below (MCF, EF3, Frac_GasMS,
+  # Frac_LeachMS, MMS allocation) used whatever random state was left, so a
+  # fixed seed did not reproduce the manure figures (two Zambia runs at seed
+  # 42 differed by about 5% on manure CH4). They now come from one stream
+  # started here. The offset keeps it apart from the other seeded streams:
+  # the shared coefficient draws use `seed` and each group's parameter draws
+  # use `seed + group index` (run_inventory_simulation), so reusing either
+  # would tie a manure draw to a parameter draw and create a correlation
+  # nobody asked for. Trend mode passes seed + year, so years still differ.
+  if (!is.null(seed)) set.seed(as.integer(seed) + 1000003L)
   for (sg in sys_groups) {
     sys_specs <- specs[group_key == sg, ]
 
