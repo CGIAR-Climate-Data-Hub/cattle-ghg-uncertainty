@@ -210,21 +210,37 @@ app_ui <- function(request = NULL) {
          // removes the ordering question: retry until the nav link is in
          // the DOM, click it, then bring the card into view. The attribute
          // value is unquoted on purpose, so this stays inside the R string.
-         Shiny.addCustomMessageHandler('openTranslator', function(_unused) {
-           var attempt = function(tries) {
-             var link = document.querySelector('a[data-value=Resources]');
-             if (link) {
-               link.click();
-               setTimeout(function() {
-                 var el = document.getElementById('ai-translator-card');
-                 if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
-               }, 250);
-             } else if (tries > 0) {
-               setTimeout(function() { attempt(tries - 1); }, 100);
-             }
+         // 2026-10-28: one function for every way in: the sign-in link (the
+         // server message, and the page load itself when the URL carries a
+         // token), and the promo link on the Data Input tab. The Resources
+         // tab is found by its data-value, which is the same in both
+         // languages; the card is scrolled to once it is laid out, and once
+         // more after late layout (fonts, images), which used to leave the
+         // page above the card.
+         window.translatorOpen = function() {
+           var tries = 40;
+           var go = function() {
+             var link = document.querySelector('a[data-value=Resources], button[data-value=Resources]');
+             if (!link) { if (tries-- > 0) setTimeout(go, 100); return; }
+             link.click();
+             var wait = 30;
+             var show = function() {
+               var el = document.getElementById('ai-translator-card');
+               if (el && el.offsetParent !== null) {
+                 el.scrollIntoView({behavior: 'smooth', block: 'start'});
+                 setTimeout(function() { el.scrollIntoView({block: 'start'}); }, 700);
+               } else if (wait-- > 0) {
+                 setTimeout(show, 100);
+               }
+             };
+             setTimeout(show, 150);
            };
-           attempt(25);
-         });
+           go();
+         };
+         Shiny.addCustomMessageHandler('openTranslator', function(_unused) { window.translatorOpen(); });
+         if (/[?&]token=/.test(window.location.search)) {
+           document.addEventListener('shiny:connected', function() { setTimeout(window.translatorOpen, 300); });
+         }
          // 2026-06: in-app AI translator, Server-Sent-Events streaming.
          // server -> client message protocol:
          //   translatorStreamStart : create a fresh assistant bubble,
@@ -420,10 +436,21 @@ app_ui <- function(request = NULL) {
              if (!box || box._translatorPinned) return;
              box._translatorPinned = true;
              pin(box, true);
-             new MutationObserver(function () { pin(box, false); })
-               .observe(box, { childList: true, subtree: true, characterData: true });
+             // 2026-10-28: a new message always brings the box to its end.
+             // Shiny replaces the whole list, which reset scrollTop before
+             // the at-the-bottom check ran, so after every answer the next
+             // question sat out of view. shiny:value fires before the
+             // replacement; the flag it sets forces the pin that follows.
+             new MutationObserver(function () {
+               pin(box, !!box._translatorPinNext);
+               box._translatorPinNext = false;
+             }).observe(box, { childList: true, subtree: true, characterData: true });
            }
            document.addEventListener('shiny:value', function (e) {
+             if (e.name === 'translator_messages') {
+               var box = document.querySelector('[data-translator-scroller]');
+               if (box) box._translatorPinNext = true;
+             }
              if (e.name === 'translator_panel' || e.name === 'translator_messages')
                setTimeout(watch, 0);
            });
@@ -1696,24 +1723,10 @@ app_ui <- function(request = NULL) {
               tags$br(),
               t("ai_inline_promo_body_pre"),
               tags$a(href = "#",
-                     onclick = paste0(
-                       # Click the actual Resources nav-tab. Shiny.setInputValue
-                       # alone only updates the input value, it does not trigger
-                       # the tab switch. bslib renders nav-links and the Resources
-                       # one is identified by text content. Find it and click.
-                       "var tab = null; ",
-                       "var anchors = document.querySelectorAll('a.nav-link, button.nav-link'); ",
-                       "for (var i = 0; i < anchors.length; i++) { ",
-                       "  if (anchors[i].textContent.trim() === 'Resources') { ",
-                       "    tab = anchors[i]; break; ",
-                       "  } ",
-                       "} ",
-                       "if (tab) tab.click(); ",
-                       "setTimeout(function() { ",
-                       "  var el = document.getElementById('ai-translator-card'); ",
-                       "  if (el) el.scrollIntoView({behavior:'smooth', block:'start'}); ",
-                       "}, 300); ",
-                       "return false;"),
+                     # 2026-10-28: the shared opener (app_ui.R, translatorOpen),
+                     # which finds the tab by data-value in both languages and
+                     # waits for the card before scrolling.
+                     onclick = "window.translatorOpen(); return false;",
                      t("ai_inline_promo_body_link")),
               t("ai_inline_promo_body_post")),
             hr(),
