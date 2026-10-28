@@ -1833,35 +1833,25 @@ app_ui <- function(request = NULL) {
               bslib::card_body(uiOutput("imputed_params_card"))
             ))
       ),
-      bslib::layout_columns(
-        col_widths = c(3, 9),
-        bslib::card(
-          bslib::card_header(t("qa_summary_h")),
-          bslib::card_body(
-            uiOutput("qaqc_summary_ui"),
-            hr(),
-            p(style = "font-size:0.83rem; color:#555;",
-              t("qa_checks_run"))
-          )
-        ),
-        bslib::card(
-          bslib::card_header(t("qa_results_h")),
-          bslib::card_body(
-            # 2026-10-28 (Nairobi review): an overview by parameter and check
-            # first; a click on one of its rows narrows the details below to
-            # that pair, a second click shows everything again; the status
-            # filter applies to both.
-            div(style = "display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:6px;",
-                tags$span(style = "font-weight:600;", t("qa_filter_label")),
-                selectInput("qa_status_filter", NULL,
-                            choices = setNames(c("all", "fail", "warn", "info", "pass"),
-                                               c(t("qa_filter_all"), t("qa_badge_fail"), t("qa_badge_warn"),
-                                                 t("qa_badge_info"), t("qa_badge_pass"))),
-                            selected = "all", width = "180px")),
-            tags$p(style = "font-size:0.83rem; color:#555; margin:0 0 4px 0;", t("qa_overview_hint")),
-            DT::DTOutput("qaqc_overview"),
-            tags$h6(style = "margin-top:14px;", t("qa_details_h")),
-            DT::DTOutput("qaqc_table"))
+      # 2026-10-28 (Nairobi review, second pass): one card, one table. The
+      # status tiles carry the counts and filter the table; each row is a
+      # parameter that opens to its findings (app_server.R, qa_parents).
+      bslib::card(
+        style = "margin: 0 16px 16px 16px;",
+        bslib::card_header(t("qa_results_h")),
+        bslib::card_body(
+          tags$style(HTML("tr.qa-open > td { background:#F1F5F9; } td.details-control { cursor:pointer; }")),
+          uiOutput("qa_tiles"),
+          tags$p(style = "font-size:0.83rem; color:#555; margin:10px 0 4px 0;",
+                 t("qa_table_hint"), " ",
+                 tags$a(href = "#", onclick = "if (window.qaToggleAll) window.qaToggleAll(true); return false;",
+                        t("qa_expand_all")),
+                 " / ",
+                 tags$a(href = "#", onclick = "if (window.qaToggleAll) window.qaToggleAll(false); return false;",
+                        t("qa_collapse_all"))),
+          DT::DTOutput("qaqc_table"),
+          hr(),
+          p(style = "font-size:0.83rem; color:#555; margin:0;", t("qa_checks_run"))
         )
       )
     ),

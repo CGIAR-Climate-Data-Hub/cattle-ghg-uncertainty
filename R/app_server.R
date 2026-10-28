@@ -694,109 +694,145 @@ app_server <- function(input, output, session) {
   })
   outputOptions(output, "imputed_params_notice_tab1", suspendWhenHidden = FALSE)
 
-  output$qaqc_summary_ui <- renderUI({
+  # 2026-10-28 (Nairobi review, second pass): one table. The status tiles
+  # above it carry the counts and filter it: click Fail and only the
+  # parameters with a failure remain, open, with every finding of theirs
+  # that needs attention (a failing parameter's warnings are read with its
+  # failure). One row per parameter with its worst status and the counts;
+  # the row expands to the findings (status, check, group, message), kept
+  # in an HTML column hidden from view but open to the search box. The
+  # Ignore column is gone: a failure blocks the run until the value is
+  # corrected in the user's Excel file (rv$qa_ignored stays empty).
+  .qa_status_rank <- c(fail = 4L, warn = 3L, missing = 3L, info = 2L, pass = 1L)
+  .qa_single <- c("fail", "warn", "info", "missing")
+  qa_filter <- reactive(input$qa_status_filter %||% "all")
+
+  output$qa_tiles <- renderUI({
     df <- qaqc_result()
-    s  <- qaqc_summary(df)
-    if (nrow(df) == 0)
-      return(tags$p(t("imputed_load_data_first"), style = "color:#888;"))
+    if (nrow(df) == 0) return(tags$p(t("imputed_load_data_first"), style = "color:#888;"))
+    s <- qaqc_summary(df); cur <- qa_filter()
+    tile <- function(key, n, label, bg, fg, border) {
+      active <- identical(cur, key)
+      tags$button(
+        type = "button", class = "qa-tile",
+        style = sprintf(paste0("min-width:96px; padding:8px 14px; border-radius:6px; cursor:pointer; ",
+                               "text-align:center; font-size:0.85rem; background:%s; color:%s; ",
+                               "border:2px solid %s; %s"),
+                        bg, fg, border,
+                        if (active) "box-shadow:0 0 0 3px rgba(17,24,39,0.35); font-weight:700;"
+                        else "opacity:0.9;"),
+        onclick = sprintf("Shiny.setInputValue('qa_status_filter', '%s', {priority: 'event'});", key),
+        tags$span(style = "font-size:1.35rem; font-weight:700; display:block; line-height:1.2;", n),
+        label)
+    }
     tags$div(
-      style = "display:flex; gap:8px; flex-wrap:wrap;",
-      if ((s$n_missing %||% 0) > 0)
-        tags$span(
-          style = "font-size:1rem; padding:6px 14px; background-color:#FEF3C7; color:#92400E; border-radius:4px; font-weight:600;",
-          paste(s$n_missing, t("qa_badge_autofilled"))),
-      tags$span(class = "badge bg-success",
-                style = "font-size:1rem; padding:6px 14px;",
-                paste(s$n_pass, t("qa_badge_pass"))),
-      if ((s$n_info %||% 0) > 0)
-        tags$span(class = "badge",
-                  style = "font-size:1rem; padding:6px 14px; background-color:#1565C0; color:#fff;",
-                  paste(s$n_info, t("qa_badge_info"))),
-      tags$span(class = "badge bg-warning text-dark",
-                style = "font-size:1rem; padding:6px 14px;",
-                paste(s$n_warn, t("qa_badge_warn"))),
-      tags$span(class = "badge bg-danger",
-                style = "font-size:1rem; padding:6px 14px;",
-                paste(s$n_fail, t("qa_badge_fail")))
-    )
+      style = "display:flex; gap:10px; flex-wrap:wrap; align-items:stretch;",
+      tile("fail", s$n_fail, t("qa_status_fail"), "#FEE2E2", "#991B1B", "#EF4444"),
+      tile("warn", s$n_warn, t("qa_status_warn"), "#FEF3C7", "#92400E", "#F59E0B"),
+      tile("info", s$n_info, t("qa_status_info"), "#DBEAFE", "#1E40AF", "#3B82F6"),
+      tile("pass", s$n_pass, t("qa_status_pass"), "#DCFCE7", "#166534", "#22C55E"),
+      if (s$n_missing > 0)
+        tile("missing", s$n_missing, t("qa_status_missing"), "#FEF3C7", "#92400E", "#B45309"),
+      tile("all", nrow(df), t("qa_tile_all"), "#F3F4F6", "#111827", "#9CA3AF"))
   })
 
-  # 2026-10-28 (Nairobi review): the Ignore column is gone. Warnings never
-  # blocked a run; a failure now blocks it until the value is corrected in
-  # the user's Excel file and uploaded again (rv$qa_ignored stays empty).
-  # An overview by parameter and check comes first; a click on one of its
-  # rows narrows the details to that pair; the status filter applies to
-  # both tables.
-  .qa_status_rank <- c(fail = 4L, warn = 3L, info = 2L, pass = 1L, missing = 3L)
-  qa_filtered <- reactive({
+  # The findings of one parameter as a small table, worst first.
+  .qa_child_html <- function(d) {
+    d <- d[order(-.qa_status_rank[d$status], d$group, d$check), , drop = FALSE]
+    esc <- function(x) htmltools::htmlEscape(as.character(x))
+    rows <- sprintf("<tr><td style='white-space:nowrap;'>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+                    vapply(d$status, qaqc_icon, ""), esc(d$check), esc(d$group), esc(d$message))
+    sprintf(paste0("<table class='table table-sm' style='margin:4px 0 6px 26px; width:calc(100%% - 26px); ",
+                   "font-size:0.84rem; background:#FAFAFA;'>",
+                   "<thead><tr><th>%s</th><th>%s</th><th>%s</th><th>%s</th></tr></thead><tbody>%s</tbody></table>"),
+            t("qa_col_status"), t("qa_col_check"), t("qa_col_group"), t("qa_col_message"),
+            paste(rows, collapse = ""))
+  }
+
+  # One row per parameter for the current filter: the counts over all of
+  # its findings, its worst status, and the findings shown when the row is
+  # open (every finding for All, the passes for Pass, otherwise everything
+  # that is not a pass).
+  qa_parents <- reactive({
     df <- qaqc_result()
-    if (nrow(df) == 0) return(df)
-    f <- input$qa_status_filter %||% "all"
-    if (!identical(f, "all")) df <- df[df$status == f, , drop = FALSE]
-    df
+    if (nrow(df) == 0) return(NULL)
+    f <- qa_filter()
+    df$parameter[!nzchar(df$parameter)] <- t("qa_par_sheet")
+    keep <- if (identical(f, "all")) unique(df$parameter) else unique(df$parameter[df$status == f])
+    shown <- if (f %in% .qa_single) df[df$status != "pass", , drop = FALSE]
+             else if (identical(f, "pass")) df[df$status == "pass", , drop = FALSE]
+             else df
+    if (!length(keep))
+      return(data.frame(parameter = character(), worst = character(), n_fail = integer(),
+                        n_warn = integer(), n_info = integer(), n_pass = integer(),
+                        child = character(), stringsAsFactors = FALSE))
+    out <- do.call(rbind, lapply(keep, function(par) {
+      d <- df[df$parameter == par, , drop = FALSE]
+      data.frame(parameter = par,
+                 worst  = d$status[which.max(.qa_status_rank[d$status])],
+                 n_fail = sum(d$status == "fail"),
+                 n_warn = sum(d$status %in% c("warn", "missing")),
+                 n_info = sum(d$status == "info"),
+                 n_pass = sum(d$status == "pass"),
+                 child  = .qa_child_html(shown[shown$parameter == par, , drop = FALSE]),
+                 stringsAsFactors = FALSE)
+    }))
+    rownames(out) <- NULL
+    out[order(-.qa_status_rank[out$worst], -out$n_fail, -out$n_warn, out$parameter), , drop = FALSE]
   })
-  qa_overview <- reactive({
-    df <- qa_filtered()
-    if (nrow(df) == 0) return(df[0, c("parameter", "check"), drop = FALSE])
-    key <- paste(df$parameter, df$check, sep = "\r")
-    agg <- do.call(rbind, lapply(split(df, key), function(d) data.frame(
-      parameter = d$parameter[1], check = d$check[1],
-      n_fail = sum(d$status == "fail"), n_warn = sum(d$status %in% c("warn", "missing")),
-      n_info = sum(d$status == "info"), n_pass = sum(d$status == "pass"),
-      worst = c("pass", "info", "warn", "fail")[max(c(1L, .qa_status_rank[d$status]), na.rm = TRUE)],
-      stringsAsFactors = FALSE)))
-    rownames(agg) <- NULL
-    agg[order(-.qa_status_rank[agg$worst], agg$parameter, agg$check), , drop = FALSE]
-  })
-  output$qaqc_overview <- DT::renderDT({
-    ov <- qa_overview()
-    if (nrow(ov) == 0) {
-      empty <- data.frame(message = t("qa_no_data")); names(empty) <- t("qa_col_message")
-      return(DT::datatable(empty, rownames = FALSE, options = list(dom = "t")))
-    }
-    ov$status_icon <- sapply(ov$worst, qaqc_icon)
-    display <- ov[, c("parameter", "check", "status_icon", "n_fail", "n_warn", "n_info", "n_pass")]
-    DT::datatable(
-      display, escape = FALSE, rownames = FALSE, selection = "single",
-      colnames = c(t("qa_col_parameter"), t("qa_col_check"), t("qa_col_status"),
-                   t("qa_badge_fail"), t("qa_badge_warn"), t("qa_badge_info"), t("qa_badge_pass")),
-      options = list(pageLength = 10, dom = "tp", columnDefs = list(list(targets = 2, orderData = 0))))
-  })
-  qa_details <- reactive({
-    df <- qa_filtered()
-    if (nrow(df) == 0) return(df)
-    sel <- input$qaqc_overview_rows_selected
-    ov  <- qa_overview()
-    if (length(sel) == 1L && sel <= nrow(ov))
-      df <- df[df$parameter == ov$parameter[sel] & df$check == ov$check[sel], , drop = FALSE]
-    df
-  })
+
+  # The open/close behaviour of the rows. A click on a parameter row opens
+  # its findings; in a single-status view every row opens by itself, on
+  # every redraw (paging, search). window.qaToggleAll serves the two links
+  # above the table.
+  .qa_table_js <- function(auto) {
+    sprintf(paste0(
+      "var childIdx = 7;",
+      "var openRow = function(row, tr) { row.child(row.data()[childIdx]).show(); tr.addClass('qa-open'); tr.find('.qa-expander').html('&#9662;'); };",
+      "var closeRow = function(row, tr) { row.child.hide(); tr.removeClass('qa-open'); tr.find('.qa-expander').html('&#9656;'); };",
+      "table.on('click', 'tbody tr', function() {",
+      "  var tr = $(this); if (!tr.find('td.details-control').length) return;",
+      "  var row = table.row(tr);",
+      "  if (row.child.isShown()) closeRow(row, tr); else openRow(row, tr);",
+      "});",
+      "window.qaToggleAll = function(open) {",
+      "  table.rows({page: 'current'}).every(function() {",
+      "    var tr = $(this.node());",
+      "    if (open && !this.child.isShown()) openRow(this, tr);",
+      "    if (!open && this.child.isShown()) closeRow(this, tr);",
+      "  });",
+      "};",
+      "if (%s) { window.qaToggleAll(true); table.on('draw', function() { window.qaToggleAll(true); }); }"),
+      if (isTRUE(auto)) "true" else "false")
+  }
+
   output$qaqc_table <- DT::renderDT({
-    df <- qa_details()
-    if (nrow(df) == 0) {
-      empty <- data.frame(message = t("qa_no_data"))
+    p <- qa_parents()
+    if (is.null(p) || nrow(p) == 0) {
+      empty <- data.frame(message = if (is.null(p)) t("qa_no_data") else t("qa_none_for_status"))
       names(empty) <- t("qa_col_message")
       return(DT::datatable(empty, rownames = FALSE, options = list(dom = "t")))
     }
     rv$qa_render_bump
-    df$status_icon <- sapply(df$status, qaqc_icon)
-    display <- df[, c("group", "parameter", "check", "status_icon", "message")]
+    display <- data.frame(
+      expander  = "<span class='qa-expander' style='font-size:1.05rem;'>&#9656;</span>",
+      parameter = p$parameter,
+      status    = vapply(p$worst, qaqc_icon, ""),
+      n_fail = p$n_fail, n_warn = p$n_warn, n_info = p$n_info, n_pass = p$n_pass,
+      child  = p$child,
+      rank   = unname(.qa_status_rank[p$worst]),
+      stringsAsFactors = FALSE)
     DT::datatable(
-      display,
-      escape    = FALSE,
-      rownames  = FALSE,
-      colnames  = c(t("qa_col_group"), t("qa_col_parameter"),
-                     t("qa_col_check"), t("qa_col_status"), t("qa_col_message")),
-      options   = list(
-        pageLength = 50,
-        dom        = "ftp",
+      display, escape = FALSE, rownames = FALSE, selection = "none",
+      colnames = c("", t("qa_col_parameter"), t("qa_col_status"), t("qa_badge_fail"),
+                   t("qa_badge_warn"), t("qa_badge_info"), t("qa_badge_pass"), "child", "rank"),
+      options = list(
+        pageLength = 25, dom = "ftp", order = list(),
         columnDefs = list(
-          list(targets = 3, orderData = 0),  # sort by status_icon uses its text
-          list(width = "90px", targets = 2),
-          list(width = "80px", targets = 3)
-        )
-      )
-    )
+          list(targets = 0, orderable = FALSE, className = "details-control", width = "26px"),
+          list(targets = 2, orderData = 8),
+          list(targets = c(7, 8), visible = FALSE))),
+      callback = DT::JS(.qa_table_js(qa_filter() %in% .qa_single)))
   })
 
   # Template downloads. Round 7.1: filename and MMS dropdown reflect the

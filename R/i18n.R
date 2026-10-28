@@ -971,8 +971,8 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_qaqc = list(
-    en = "After loading data, review these automated quality checks. Each row flags a specific check for one parameter.",
-    fr = "Après le chargement des données, examinez ces vérifications de qualité automatiques. Chaque ligne signale une vérification pour un paramètre."
+    en = "After loading data, review these automated quality checks. The tiles count the findings by status and filter the table: click Fail to see every parameter with a failure, open, with the findings that need attention. One row per parameter; open a row to read each finding and its message.",
+    fr = "Après le chargement des données, examinez ces vérifications de qualité automatiques. Les vignettes comptent les constats par statut et filtrent le tableau : cliquez sur Échec pour voir chaque paramètre en échec, ouvert, avec les constats à traiter. Une ligne par paramètre ; ouvrez-la pour lire chaque constat et son message."
   ),
   qa_status_missing = list(en = "Missing", fr = "Manquant"),
   qa_status_fail = list(en = "Fail", fr = "Échec"),
@@ -996,11 +996,14 @@ lang_state_take <- function(token) {
   qa_fix_or_ignore_post = list(
     en = " before running: correct the value in your Excel file and upload it again. ",
     fr = " avant de lancer : corrigez la valeur dans votre fichier Excel et téléversez-le de nouveau. "),
-  qa_filter_label = list(en = "Show", fr = "Afficher"),
-  qa_filter_all = list(en = "All", fr = "Tout"),
-  qa_overview_hint = list(en = "One row per parameter and check. Click a row to see its details below; click it again to show everything.",
-                          fr = "Une ligne par paramètre et contrôle. Cliquez sur une ligne pour voir ses détails ci-dessous ; cliquez de nouveau pour tout afficher."),
-  qa_details_h = list(en = "Details", fr = "Détails"),
+  qa_tile_all = list(en = "All checks", fr = "Toutes"),
+  qa_table_hint = list(
+    en = "Click a status to keep only the parameters concerned. One row per parameter: open it to read each finding with its message.",
+    fr = "Cliquez sur un statut pour ne garder que les paramètres concernés. Une ligne par paramètre : ouvrez-la pour lire chaque constat avec son message."),
+  qa_expand_all = list(en = "Open all", fr = "Tout ouvrir"),
+  qa_collapse_all = list(en = "Close all", fr = "Tout fermer"),
+  qa_par_sheet = list(en = "Sub-category keys (manure sheet)", fr = "Clés de sous-catégorie (feuille fumier)"),
+  qa_none_for_status = list(en = "No finding with this status.", fr = "Aucun constat avec ce statut."),
   qa_col_ignore = list(en = "Ignore", fr = "Ignorer"),
   qa_ignore_label = list(en = "Ignore", fr = "Ignorer"),
   qa_not_ignorable = list(en = "Cannot be ignored", fr = "Ne peut pas être ignoré"),
@@ -1030,7 +1033,6 @@ lang_state_take <- function(token) {
                                       fr = "Paramètres remplis automatiquement"),
   qa_autofilled_outro = list(en = " panel appears above the results table showing which values were substituted from IPCC defaults. Review these and replace with country-specific data in your template where possible.",
                                 fr = " apparaît au-dessus de la table de résultats indiquant quelles valeurs ont été substituées par les valeurs IPCC par défaut. Examinez-les et remplacez-les par des données nationales lorsque possible."),
-  qa_summary_h = list(en = "Summary", fr = "Résumé"),
   qa_checks_run = list(
     en = "Checks run: bounds order, non-negative bounds, valid ranges (DE_pct, Ym_pct, fractions), distribution suitability (beta/lognormal/tnorm_0_1), benchmark deviation vs. IPCC defaults (>50% = warn, >200% = fail), and asymmetric-distribution warning for EF3/EF4/EF5/Frac_LEACH.",
     fr = "Vérifications : ordre des bornes, bornes non négatives, plages valides (DE_pct, Ym_pct, fractions), adéquation des distributions (beta/lognormal/tnorm_0_1), écart par rapport aux valeurs IPCC par défaut (>50 % = avertissement, >200 % = échec), et avertissement de distribution asymétrique pour EF3/EF4/EF5/Frac_LEACH."
