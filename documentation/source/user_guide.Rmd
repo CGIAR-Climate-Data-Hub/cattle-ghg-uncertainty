@@ -468,8 +468,8 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
 \textbf{Status} & \textbf{Colour} & \textbf{Meaning} \\
 \midrule
 \textbf{Pass} & \textcolor{cgiargreen}{Green} & All structural checks pass; for \texttt{BW}, the mean is also within ±50\% of the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3). \\
-\textbf{Warn} & \textcolor{amber}{Amber} & For \texttt{BW}: the value deviates more than 50\% from the continental IPCC default, check and document (above 200\% the message is stronger, but it is still advisory). For any parameter: a non-fatal structural condition fired (e.g.\ implausible bounds $BW > 1500$ kg or $Y_m > 12\%$, fractional parameter with an unbounded distribution, asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match). \\
-\textbf{Fail} & \textcolor{red}{Red} & $DE_\% \leq 0$ or $\geq 100$; bounds that do not bracket the mean; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. A fail blocks the run until it is fixed or explicitly ignored (see below). \\
+\textbf{Warn} & \textcolor{amber}{Amber} & The value is outside its usual range (the message names the IPCC table or the typical values); for \texttt{BW}, it deviates more than 50\% from the IPCC Annex 10A weight of its animal class (above 200\% the message is stronger, still advisory); a row that is not a constant has no bounds and no uncertainty, so it would be sampled as a constant; a negative lower bound; a fraction under a normal or log-normal distribution whose range would send more than 0.5\% of the draws outside 0 to 1; a sub-category auto-matched to the Manure\_Management sheet. \\
+\textbf{Fail} & \textcolor{red}{Red} & Bounds that do not enclose the mean; a percentage entered as a fraction or a fraction entered as a percentage (the message gives the converted value); DE outside 0 to 100; a fraction outside 0 to 1; a beta whose bounds do not enclose the mean strictly; a log-normal with a mean or a lower bound at or below zero; an ambiguous sub-category match. A fail blocks the run until the value is corrected in your Excel file. \\
 \textbf{Missing} & \textit{Grey} & Parameter not found in upload; auto-filled with the IPCC default from PARAM\_CATALOGUE (Vol.4 Ch.10 / Ch.11). Applies to every parameter. \\
 \bottomrule
 \end{tabular}
@@ -483,7 +483,7 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
 
 \textbf{Pass}: No action needed. All structural checks passed; for \texttt{BW} the mean is also within ±50\% of the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3).
 
-\textbf{Warn}: Either the \texttt{BW} mean deviates more than 50\% from the continental IPCC default, or a non-fatal structural condition fired (asymmetric-bounds reminder for EF\textsubscript{3,PRP} / Frac\_GASM\_PRP / Frac\_LEACH\_PRP, sub-category auto-match, implausible bounds, fractional parameter on an unbounded distribution). Possible actions:
+\textbf{Warn}: Either the value is outside its usual range (the message names the IPCC table or the typical values, for example DE 45 to 85\% from Table 10.2, Ym 3 to 7\% from Table 10.12, Cfi 0.322 to 0.386 from Table 10.4), or the \texttt{BW} mean deviates more than 50\% from the IPCC Annex 10A weight of its animal class, or a row has no uncertainty, a negative lower bound, or a fraction under an unbounded distribution with a range that leaves 0 to 1.
 \begin{itemize}
   \item Confirm the value matches your country context.
   \item If it is country-specific and well-justified, document the source in your inventory report.
@@ -491,7 +491,7 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
   \item If it is an error, correct it in your Excel file and re-upload.
 \end{itemize}
 
-\textbf{Fail}: A structural validation failed: $DE_\% \leq 0$ or $\geq 100$; bounds that do not bracket the mean; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. The Run button stays blocked while any fail remains. Correct the value in your Excel file and upload it again; failures cannot be waved through inside the tool, because the sampler would not know what to draw.
+\textbf{Fail}: The value, its unit or its bounds would break or distort the simulation: bounds that do not enclose the mean; a percentage given as a fraction (DE = 0.65, Ym = 0.065) or a fraction given as a percentage (pct\_pregnant = 52); DE outside 0 to 100; a beta whose bounds do not enclose the mean; a log-normal with a lower bound at or below zero. The Run button stays blocked while any fail remains. Correct the value in your Excel file and upload it again.
 
 \textit{Reading the table.} The status tiles above the table count the findings (Fail, Warn, Info, Pass, and Auto-filled when any) and filter it: click \textbf{Fail} and only the parameters with a failure remain, open, with every finding of theirs that needs attention, so a failing parameter's warnings are read with its failure. Each row of the table is one parameter with its worst status and its counts; click the row to open its findings (status, check, group and message). \textit{Open all} and \textit{Close all} act on the current page, and the search box also looks inside the findings.
 

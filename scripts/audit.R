@@ -1389,7 +1389,8 @@ section_F <- function() {
 
   # F13c: EF4 asymmetric-bounds warning no longer fires on symmetric IPCC
   # Table 11.3 range; EF5 similarly. EF3_PRP stays in ASYMMETRIC_PARAMS, so
-  # an actually-symmetric range there should still trigger warn.
+  # an actually-symmetric range there is still noted (an info since
+  # 2026-10-28: symmetric national bounds are a choice, not an error).
   ef4_spec <- mk_qa_spec("EF4", 0.010, 0.002, 0.018)
   qa_ef4 <- run_qaqc(ef4_spec, region = "global")
   ef4_rows <- qa_ef4[qa_ef4$parameter == "EF4" &
@@ -1403,10 +1404,10 @@ section_F <- function() {
   ef3p_rows <- qa_ef3p[qa_ef3p$parameter == "EF3_PRP" &
                         qa_ef3p$check == "asymmetric_bounds", ]
   check_bool("F13c", "F",
-             "EF4 / EF5 no longer flagged asymmetric; EF3_PRP still IS",
+             "EF4 / EF5 no longer flagged asymmetric; EF3_PRP still IS (info)",
              nrow(ef4_rows) == 0 && nrow(ef5_rows) == 0 &&
                nrow(ef3p_rows) >= 1 &&
-               any(ef3p_rows$status == "warn"),
+               any(ef3p_rows$status == "info"),
              notes = sprintf("EF4 rows=%d; EF5 rows=%d; EF3_PRP rows=%d",
                              nrow(ef4_rows), nrow(ef5_rows), nrow(ef3p_rows)))
 
@@ -3378,12 +3379,22 @@ section_F <- function() {
       spec <- data.frame(
         cattle_type = "non_dairy", aggregation_level = c("a", "a", "a", "a"),
         sub_category = c("calves_male", "calves_female", "other_cows", "other_cows"),
-        parameter = c("MW", "MW", "Fat", "BW"), mean = c(338, 434, 3.4, 5000),
-        uncertainty_pct = c(10, 10, 10, 10), lower = c(300, 380, 3, 4900),
-        upper = c(380, 480, 3.8, 5100),
-        distribution = c("normal", "normal", "beta", "normal"),
+        parameter = c("MW", "MW", "Bo", "BW"), mean = c(338, 434, 0.13, 5000),
+        uncertainty_pct = c(10, 10, 10, 10), lower = c(300, 380, 0, 4900),
+        upper = c(380, 480, 0.2, 5100),
+        distribution = c("normal", "normal", "lognormal", "normal"),
         stringsAsFactors = FALSE)
       spec$lower[1] <- 350   # lower > mean: bounds_order fail
+      # 2026-10-28: the fixture used to be a beta on Fat at 3.4 %, which the
+      # old rule (mean in (0,1)) failed; the sampler draws a beta between
+      # lower and upper on any scale, so that row passes now and the
+      # unusable distribution here is a log-normal with a lower bound of 0.
+      beta_ok <- run_qaqc(data.frame(cattle_type = "non_dairy", aggregation_level = "a",
+                                     sub_category = "other_cows", parameter = "Fat", mean = 3.4,
+                                     uncertainty_pct = 10, lower = 3, upper = 3.8, distribution = "beta",
+                                     stringsAsFactors = FALSE), region = "africa")
+      if (!any(beta_ok$check == "dist_suitability" & beta_ok$status == "pass"))
+        f <- c(f, "a beta on Fat 3.4 % with bounds 3 to 3.8 should pass")
       q <- run_qaqc(spec, region = "africa")
       if (!all(c("id", "level") %in% names(q))) f <- c(f, "run_qaqc lacks id/level columns")
       if (anyDuplicated(q$id)) f <- c(f, "duplicate QA row ids")
@@ -3400,7 +3411,7 @@ section_F <- function() {
           f <- c(f, "bounds_order repair touched a row of another sub-category")
       }
       ds <- q[q$check == "dist_suitability" & q$status == "fail", ][1, ]
-      if (is.na(ds$id)) f <- c(f, "beta-on-3.4 fixture did not fail") else {
+      if (is.na(ds$id)) f <- c(f, "lognormal-with-lower-0 fixture did not fail") else {
         r <- qaqc_repair(spec, ds)
         if (!isTRUE(r$changed) || r$param_specs$distribution[3] != "normal")
           f <- c(f, "dist_suitability repair did not switch to normal")
@@ -3417,7 +3428,7 @@ section_F <- function() {
         stringsAsFactors = FALSE)
       notes <- translator_consistency_checks(spec, mm)
       want <- c("calves carry different values for MW", "shares sum to 111.2",
-                "MCF_pct takes 2 different values", "beta distribution was assigned to a value of 3.4",
+                "MCF_pct takes 2 different values", "log-normal distribution was assigned with a lower bound of 0",
                 "do not bracket the mean")
       for (w in want) if (!any(grepl(w, notes$issue, fixed = TRUE)))
         f <- c(f, paste("consistency check missing:", w))
@@ -3426,7 +3437,7 @@ section_F <- function() {
     }, error = function(e) conditionMessage(e))
     f49_ok <- length(f49_fail) == 0L
     check_bool("F49", "F",
-               "QA/QC ignore + repair: row ids, benchmark advisory, bounds/beta repairs, non-ignorable ambiguity; translator consistency checks catch calf split, 111 % shares, coefficient split, beta on 3.4, bounds",
+               "QA/QC ignore + repair: row ids, benchmark advisory, bounds/beta repairs, non-ignorable ambiguity; translator consistency checks catch calf split, 111 % shares, coefficient split, log-normal with lower 0, bounds",
                f49_ok,
                notes = if (f49_ok) "all fixtures behaved" else paste(utils::head(f49_fail, 4), collapse = "; "))
   }

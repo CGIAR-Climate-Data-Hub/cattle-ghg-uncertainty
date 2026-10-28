@@ -360,18 +360,29 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       }
     }
 
-    # 3. A distribution that cannot represent the value it was given. The
-    #    app's QA/QC also fails this row; naming it here lets the compiler
-    #    fix it in the source before upload.
+    # 3. A distribution that cannot represent the value it was given, as
+    #    the app's sampler reads it (utils_distributions.R): a beta is drawn
+    #    between lower and upper on any scale, so it needs bounds that
+    #    enclose the value strictly (until 2026-10-28 this rule wanted the
+    #    value in (0, 1) and failed a valid beta on milk fat at 3.4 %); a
+    #    log-normal reads its spread on the log scale, so its lower bound
+    #    must be above 0. The app's QA/QC fails the same rows; naming them
+    #    here lets the compiler fix the source before upload.
     if ("distribution" %in% names(ps)) {
       d <- tolower(as.character(ps$distribution))
-      bad_beta <- which(d == "beta" & !is.na(mu) & (mu <= 0 | mu >= 1))
+      lo <- if ("lower" %in% names(ps)) suppressWarnings(as.numeric(ps$lower)) else rep(NA_real_, nrow(ps))
+      hi <- if ("upper" %in% names(ps)) suppressWarnings(as.numeric(ps$upper)) else rep(NA_real_, nrow(ps))
+      bad_beta <- which(d == "beta" & !is.na(mu) & (is.na(lo) | is.na(hi) | !(lo < mu & mu < hi)))
       for (i in bad_beta)
         add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),
-            sprintf("A beta distribution was assigned to a value of %s. Beta only fits values between 0 and 1; the source most likely meant a normal or triangular distribution.", fmt(mu[i])),
+            sprintf("A beta distribution was assigned to a value of %s with bounds that do not enclose it (lower %s, upper %s). The app draws a beta between the bounds; give bounds around the value, or use a normal or triangular distribution.", fmt(mu[i]), fmt(lo[i]), fmt(hi[i])),
+            sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "distribution fit")
+      bad_ln <- which(d == "lognormal" & !is.na(mu) & (mu <= 0 | (!is.na(lo) & lo <= 0)))
+      for (i in bad_ln)
+        add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),
+            sprintf("A log-normal distribution was assigned with a lower bound of %s (value %s). The app reads the spread on the log scale, so the value and the lower bound must be above 0.", fmt(lo[i]), fmt(mu[i])),
             sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "distribution fit")
       if (all(c("lower", "upper") %in% names(ps))) {
-        lo <- suppressWarnings(as.numeric(ps$lower)); hi <- suppressWarnings(as.numeric(ps$upper))
         bad_b <- which(!is.na(mu) & !is.na(lo) & !is.na(hi) & d != "constant" & (lo > mu | mu > hi))
         for (i in bad_b)
           add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),

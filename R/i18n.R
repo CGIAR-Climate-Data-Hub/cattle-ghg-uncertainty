@@ -981,12 +981,12 @@ lang_state_take <- function(token) {
   qa_status_pass = list(en = "Pass", fr = "OK"),
   qa_missing_desc = list(en = ": the parameter was not in your upload and was auto-filled from the IPCC default. Verify or replace with country-specific data.",
                             fr = " : le paramètre n'était pas dans votre téléversement et a été rempli automatiquement avec la valeur IPCC par défaut. Vérifiez ou remplacez par des données nationales."),
-  qa_fail_desc = list(en = ": the value or bounds will likely cause an error in the simulation.",
-                        fr = " : la valeur ou les bornes provoqueront probablement une erreur dans la simulation."),
-  qa_warn_desc = list(en = ": the value is unusual compared with IPCC defaults or Penman/Monni uncertainty references. Investigate, and document your justification in your own inventory QA/QC records (the tool does not store notes).",
-                        fr = " : la valeur est inhabituelle par rapport aux valeurs IPCC par défaut ou aux références d'incertitude Penman/Monni. À investiguer, en documentant votre justification dans vos propres dossiers QA/QC d'inventaire (l'outil ne conserve pas de notes)."),
-  qa_info_desc = list(en = ": informational only. Typically for emission factor parameters (EF3, EF4, EF5, Frac_*) where country-specific overrides are expected and the IPCC benchmark is a Monni-2007 / Penman-2000 mid-point, not a fixed table value. No action required unless the deviation is very large.",
-                        fr = " : informatif seulement. Typiquement pour les facteurs d'émission (EF3, EF4, EF5, Frac_*) où des valeurs nationales spécifiques sont attendues et la référence IPCC est un point moyen Monni-2007 / Penman-2000, pas une valeur de tableau fixe. Aucune action requise sauf écart très important."),
+  qa_fail_desc = list(en = ": the value, its unit or its bounds would break or distort the simulation. Correct it in your Excel file.",
+                        fr = " : la valeur, son unité ou ses bornes casseraient ou fausseraient la simulation. Corrigez-la dans votre fichier Excel."),
+  qa_warn_desc = list(en = ": the value is outside its usual range or far from the IPCC default, or the row has no uncertainty. Check it; if it is right, document the source in your inventory QA/QC records (the tool does not store notes).",
+                        fr = " : la valeur est hors de sa plage usuelle ou loin de la valeur IPCC par défaut, ou la ligne n'a pas d'incertitude. Vérifiez-la ; si elle est juste, documentez la source dans vos dossiers QA/QC d'inventaire (l'outil ne conserve pas de notes)."),
+  qa_info_desc = list(en = ": a note, nothing to correct: a row sampled as a constant because its bounds equal its mean, symmetric bounds where IPCC gives a skewed range, or no Manure_Management sheet.",
+                        fr = " : une note, rien à corriger : une ligne tirée comme constante parce que ses bornes égalent sa moyenne, des bornes symétriques là où l'IPCC donne une plage asymétrique, ou pas de feuille Manure_Management."),
   qa_pass_desc = list(en = ": check satisfied.", fr = ", vérification satisfaite."),
   qa_fix_fails = list(en = "Fix any ", fr = "Corrigez tous les "),
   qa_before_sim = list(en = " before running the simulation. ",
@@ -1034,8 +1034,8 @@ lang_state_take <- function(token) {
   qa_autofilled_outro = list(en = " panel appears above the results table showing which values were substituted from IPCC defaults. Review these and replace with country-specific data in your template where possible.",
                                 fr = " apparaît au-dessus de la table de résultats indiquant quelles valeurs ont été substituées par les valeurs IPCC par défaut. Examinez-les et remplacez-les par des données nationales lorsque possible."),
   qa_checks_run = list(
-    en = "Checks run: bounds order, non-negative bounds, valid ranges (DE_pct, Ym_pct, fractions), distribution suitability (beta/lognormal/tnorm_0_1), benchmark deviation vs. IPCC defaults (>50% = warn, >200% = fail), and asymmetric-distribution warning for EF3/EF4/EF5/Frac_LEACH.",
-    fr = "Vérifications : ordre des bornes, bornes non négatives, plages valides (DE_pct, Ym_pct, fractions), adéquation des distributions (beta/lognormal/tnorm_0_1), écart par rapport aux valeurs IPCC par défaut (>50 % = avertissement, >200 % = échec), et avertissement de distribution asymétrique pour EF3/EF4/EF5/Frac_LEACH."
+    en = "Checks run on every row: bounds enclose the mean and give a spread; lower bound not negative; percentage or fraction unit (DE, Ym, Fat, CP, MilkPR in %%; pct_pregnant, ASH, UE, Frac_* as fractions); usual range with its IPCC source; distribution usable as the sampler reads it (beta, lognormal, tnorm_0_1); fractions under an unbounded distribution; body weight against the IPCC Annex 10A weight of the animal class (above 50%% = warn); symmetric bounds where IPCC gives a skewed range (EF3_PRP, Frac_LEACH_PRP, info); Parameters sub-categories against the Manure_Management sheet.",
+    fr = "Vérifications sur chaque ligne : les bornes encadrent la moyenne et donnent une dispersion ; borne inférieure non négative ; unité pourcentage ou fraction (DE, Ym, Fat, CP, MilkPR en %% ; pct_pregnant, ASH, UE, Frac_* en fractions) ; plage usuelle avec sa source IPCC ; distribution utilisable telle que lue par l'échantillonneur (beta, lognormal, tnorm_0_1) ; fractions sous une distribution non bornée ; poids vif contre le poids IPCC Annexe 10A de la classe animale (au-delà de 50 %% = attention) ; bornes symétriques là où l'IPCC donne une plage asymétrique (EF3_PRP, Frac_LEACH_PRP, info) ; sous-catégories Parameters contre la feuille Manure_Management."
   ),
   qa_results_h = list(en = "QA/QC Results", fr = "Résultats QA/QC"),
 
@@ -1764,36 +1764,54 @@ lang_state_take <- function(token) {
   ),
   qa_msg_nonneg_pass = list(en = "Lower bound >= 0",
                               fr = "Borne inférieure ≥ 0"),
-  qa_msg_range_de_fail = list(en = "DE_pct = %.1f%%. Must be in [1, 100].",
-                                fr = "DE_pct = %.1f %%. Doit être dans [1, 100]."),
-  qa_msg_range_de_pass = list(en = "DE_pct = %.1f%% (valid range 1-100%%)",
-                                fr = "DE_pct = %.1f %% (plage valide 1-100 %%)"),
-  qa_msg_range_ym_warn = list(
-    en = "Ym_pct = %.1f%%. Typical IPCC range is 3-12%%; values outside 1-15%% are unusual.",
-    fr = "Ym_pct = %.1f %%. La plage typique IPCC est 3-12 %% ; les valeurs hors 1-15 %% sont inhabituelles."
+  qa_msg_zero_spread_info = list(
+    en = "lower = upper = mean: no uncertainty, %s is sampled as a constant.",
+    fr = "inférieure = supérieure = moyenne : aucune incertitude, %s est tiré comme une constante."
   ),
-  qa_msg_range_ym_pass = list(en = "Ym_pct = %.1f%% (within typical IPCC range)",
-                                fr = "Ym_pct = %.1f %% (dans la plage IPCC typique)"),
+  qa_msg_unc_missing_warn = list(
+    en = "No lower/upper bounds and no uncertainty_pct: %s is sampled as a constant (%.4g). Give a range, or set the distribution to constant.",
+    fr = "Aucune borne inférieure/supérieure ni uncertainty_pct : %s est tiré comme une constante (%.4g). Donnez une plage, ou mettez la distribution à constant."
+  ),
+  qa_msg_unit_fraction_fail = list(
+    en = "%s = %.4g. The template expects a percentage (%s); this looks like a fraction. If it is one, enter %.4g.",
+    fr = "%s = %.4g. Le modèle attend un pourcentage (%s) ; ceci ressemble à une fraction. Si c'en est une, saisissez %.4g."
+  ),
+  qa_msg_unit_percent_fail = list(
+    en = "%s = %.4g. The template expects a fraction between 0 and 1 (%s); this looks like a percentage. If it is one, enter %.4g.",
+    fr = "%s = %.4g. Le modèle attend une fraction entre 0 et 1 (%s) ; ceci ressemble à un pourcentage. Si c'en est un, saisissez %.4g."
+  ),
+  qa_msg_range_de_fail = list(en = "DE = %.1f%%. Must be above 0 and at most 100.",
+                                fr = "DE = %.1f %%. Doit être supérieur à 0 et au plus 100."),
+  qa_msg_range_de_pass = list(en = "DE = %.1f%% (0 to 100)",
+                                fr = "DE = %.1f %% (0 à 100)"),
+  qa_msg_range_pct_fail = list(en = "%s = %.4g%%. A percentage must be between 0 and 100.",
+                                 fr = "%s = %.4g %%. Un pourcentage doit être entre 0 et 100."),
+  qa_msg_range_pct_pass = list(en = "%s = %.4g%% (0 to 100)",
+                                 fr = "%s = %.4g %% (0 à 100)"),
   qa_msg_frac_fail = list(en = "%s = %.4g. Must be a fraction in [0, 1].",
                             fr = "%s = %.4g. Doit être une fraction dans [0, 1]."),
   qa_msg_frac_pass = list(en = "%s = %.4g (valid fraction in [0, 1])",
                             fr = "%s = %.4g (fraction valide dans [0, 1])"),
-  qa_msg_beta_mean_fail = list(
-    en = "Beta distribution requires mean in (0,1). Got %.4g.",
-    fr = "La distribution beta requiert une moyenne dans (0,1). Reçu %.4g."
+  qa_msg_plaus_warn = list(
+    en = "%s = %.4g %s is outside the usual range %.4g to %.4g (%s). Check the value and its unit.",
+    fr = "%s = %.4g %s est hors de la plage usuelle %.4g à %.4g (%s). Vérifiez la valeur et son unité."
   ),
-  qa_msg_beta_bounds_fail = list(
-    en = "Beta distribution requires bounds in [0,1]. Got [%.4g, %.4g].",
-    fr = "La distribution beta requiert des bornes dans [0,1]. Reçu [%.4g, %.4g]."
+  qa_msg_plaus_zero_pass = list(en = "%s = 0: not used for this group",
+                                  fr = "%s = 0 : non utilisé pour ce groupe"),
+  qa_msg_plaus_pass = list(en = "%s = %.4g %s (usual range %.4g to %.4g)",
+                             fr = "%s = %.4g %s (plage usuelle %.4g à %.4g)"),
+  qa_msg_beta_fail = list(
+    en = "Beta is drawn between lower and upper around the mean, so the bounds must enclose the mean strictly. Got lower %.4g, mean %.4g, upper %.4g.",
+    fr = "La loi beta est tirée entre les bornes autour de la moyenne ; les bornes doivent donc encadrer strictement la moyenne. Reçu inférieure %.4g, moyenne %.4g, supérieure %.4g."
   ),
-  qa_msg_beta_pass = list(en = "Beta: mean in (0,1) and bounds in [0,1]",
-                            fr = "Beta : moyenne dans (0,1) et bornes dans [0,1]"),
+  qa_msg_beta_pass = list(en = "Beta between %.4g and %.4g, mean inside",
+                            fr = "Beta entre %.4g et %.4g, moyenne à l'intérieur"),
   qa_msg_lognorm_fail = list(
-    en = "Log-normal requires a strictly positive mean. Got %.4g.",
-    fr = "La loi log-normale requiert une moyenne strictement positive. Reçu %.4g."
+    en = "Log-normal needs a positive mean and a positive lower bound (the spread is read on the log scale). Got mean %.4g, lower %.4g; with a lower bound at or below 0 every draw equals the mean.",
+    fr = "La loi log-normale requiert une moyenne et une borne inférieure positives (la dispersion est lue en échelle log). Reçu moyenne %.4g, inférieure %.4g ; avec une borne inférieure nulle ou négative, chaque tirage vaut la moyenne."
   ),
-  qa_msg_lognorm_pass = list(en = "Log-normal: mean > 0",
-                               fr = "Log-normale : moyenne > 0"),
+  qa_msg_lognorm_pass = list(en = "Log-normal: mean and bounds > 0",
+                               fr = "Log-normale : moyenne et bornes > 0"),
   qa_msg_tnorm_warn = list(
     en = "tnorm_0_1 clips to [0,1]; bounds [%.4g, %.4g] extend beyond this.",
     fr = "tnorm_0_1 tronque à [0,1] ; les bornes [%.4g, %.4g] dépassent cette plage."
@@ -1821,14 +1839,14 @@ lang_state_take <- function(token) {
     fr = "%s non fourni dans le téléversement : rempli automatiquement avec la valeur IPCC par défaut %.4g %s (%s). Remplacez dans le modèle si des données locales sont disponibles."
   ),
   qa_msg_frac_dist_warn = list(
-    en = "%s must lie in [0,1] but uses '%s' which can produce out-of-range samples. Use 'tnorm_0_1' or 'beta' instead.",
-    fr = "%s doit être dans [0,1] mais utilise « %s » qui peut produire des échantillons hors plage. Utilisez plutôt « tnorm_0_1 » ou « beta »."
+    en = "%s uses '%s' with bounds %.4g to %.4g: about %.1f%% of the draws would fall outside [0, 1]. Use a bounded distribution (beta, pert, triangular, tnorm_0_1) or narrow the range.",
+    fr = "%s utilise « %s » avec les bornes %.4g à %.4g : environ %.1f %% des tirages sortiraient de [0, 1]. Utilisez une distribution bornée (beta, pert, triangular, tnorm_0_1) ou resserrez la plage."
   ),
-  qa_msg_frac_dist_pass = list(en = "%s: bounded distribution '%s' used",
-                                  fr = "%s : distribution bornée « %s » utilisée"),
-  qa_msg_asym_warn = list(
-    en = "%s has right-skewed uncertainty (IPCC 2006/2019 guideline tables). Detected near-symmetric bounds (upper span / lower span = %.1f). Consider using the IPCC-recommended asymmetric bounds from the blank template.",
-    fr = "%s a une incertitude asymétrique à droite (tableaux IPCC 2006/2019). Bornes quasi symétriques détectées (étendue sup. / étendue inf. = %.1f). Envisagez les bornes asymétriques recommandées par l'IPCC depuis le modèle vierge."
+  qa_msg_frac_dist_pass = list(en = "%s: '%s' keeps the draws within [0, 1]",
+                                  fr = "%s : « %s » garde les tirages dans [0, 1]"),
+  qa_msg_asym_info = list(
+    en = "%s: bounds nearly symmetric around the mean (upper span / lower span = %.1f). IPCC gives a right-skewed range, %.4g to %.4g around %.4g (%s). Keep yours if it is a national estimate; otherwise use the IPCC range from the blank template.",
+    fr = "%s : bornes presque symétriques autour de la moyenne (étendue sup. / étendue inf. = %.1f). L'IPCC donne une plage asymétrique à droite, %.4g à %.4g autour de %.4g (%s). Gardez les vôtres s'il s'agit d'une estimation nationale ; sinon utilisez la plage IPCC du modèle vierge."
   ),
   qa_msg_asym_pass = list(
     en = "%s: asymmetric bounds applied (upper/lower span ratio = %.1f)",

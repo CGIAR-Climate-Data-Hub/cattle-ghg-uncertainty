@@ -10,12 +10,57 @@
 ## The IPCC 2019 R Vol.4 Ch.11 Table 11.3 published ranges for these two
 ## parameters are roughly symmetric (EF4 ratio = 1.0, EF5 ratio = 0.82),
 ## so the `ratio < 1.5 → warn` rule was firing against IPCC's own values.
-## EF3_PRP / Frac_GASM_PRP / Frac_LEACH_PRP DO have right-skewed ranges in
-## Table 11.3 and stay in the list.
-ASYMMETRIC_PARAMS <- c("EF3_PRP",
-                        "Frac_GASM_PRP", "Frac_LEACH_PRP")
+## 2026-10-28: Frac_GASM_PRP dropped too. Its IPCC range (2019 Refinement
+## Table 11.3: 0.21, 0.00 to 0.31) is LEFT-skewed, so the "right-skewed"
+## rule fired 27 times on the Zambia file against the tool's own default
+## bounds (upper span / lower span = 0.5). Only EF3_PRP (Table 11.1,
+## 0.0005 to 0.027 around 0.004 or 0.006) and Frac_LEACH_PRP (Table 11.3,
+## 0.01 to 0.73 around 0.24) are right-skewed. The finding is an info,
+## never a warning: symmetric bounds are a legitimate national choice.
+ASYMMETRIC_PARAMS <- c("EF3_PRP", "Frac_LEACH_PRP")
+.ASYM_SOURCE <- c(EF3_PRP = "IPCC 2019 Refinement Vol.4 Ch.11 Table 11.1",
+                  Frac_LEACH_PRP = "IPCC 2019 Refinement Vol.4 Ch.11 Table 11.3")
 FRACTION_PARAMS   <- c("pct_pregnant", "ASH", "UE",
                         "Frac_GASM_PRP", "Frac_LEACH_PRP")
+## Parameters the template takes as a percentage (catalogue unit "%"). A
+## value at or below 1 is almost surely a fraction entered by mistake.
+PERCENT_PARAMS <- c("Ym", "Ym_pct", "Fat", "CP", "CP_pct", "MilkPR")
+## Parameters whose zero means "not used for this group" (milk fat and
+## protein on bulls and calves, measured intake not supplied, no work, no
+## growth, no pregnancy): a zero there is not checked against the usual
+## range. The Zambia file carried 98 such zeros.
+.QA_ZERO_OK <- c("Fat", "MilkPR", "GE", "DMI", "Milk", "WG", "hours", "Cp", "Ca", "pct_pregnant")
+
+## Plausible ranges (2026-10-28). A value outside is a warning that names
+## the source a reader can open; nothing here changes a value. DE is also
+## the range the sampler clamps draws to (.PHYSICAL_BOUNDS, mc_sampling.R).
+.QA_PLAUSIBLE <- list(
+  DE     = list(lo = 45,  hi = 85,  src = "IPCC Vol.4 Ch.10 Table 10.2, feed classes 45 to 85 %; the simulation keeps DE draws within this range"),
+  Ym     = list(lo = 2,   hi = 10,  src = "IPCC 2006 Table 10.12: 3.0 and 6.5 plus or minus 1.0 %; 2019 Refinement Table 10.12: 3.0 to 7.0 %"),
+  Fat    = list(lo = 1.5, hi = 9,   src = "cow milk 3 to 5 %, buffalo milk up to 8 %"),
+  CP     = list(lo = 4,   hi = 30,  src = "cattle diets 6 to 20 % of dry matter"),
+  MilkPR = list(lo = 2,   hi = 6,   src = "milk protein 3.0 to 3.6 %"),
+  Cfi    = list(lo = 0.28, hi = 0.45, src = "IPCC Vol.4 Ch.10 Table 10.4: 0.322 non-lactating, 0.386 lactating, 0.370 bulls"),
+  Ca     = list(lo = 0,   hi = 0.5, src = "IPCC Vol.4 Ch.10 Table 10.5: 0 stall, 0.17 pasture, 0.36 grazing large areas"),
+  C      = list(lo = 0.6, hi = 1.4, src = "IPCC Vol.4 Ch.10 Table 10.7: 0.8 females, 1.0 castrates, 1.2 bulls"),
+  Cp     = list(lo = 0,   hi = 0.15, src = "IPCC Vol.4 Ch.10 Table 10.7: 0.10 for cattle"),
+  Bo     = list(lo = 0.05, hi = 0.35, src = "IPCC 2006 Tables 10A-4 to 10A-9 and 2019 Refinement Table 10.16: 0.10 to 0.24 m3 CH4 per kg VS"),
+  ASH    = list(lo = 0.02, hi = 0.2, src = "IPCC Vol.4 Ch.10 Eq. 10.24: 0.08"),
+  UE     = list(lo = 0.01, hi = 0.1, src = "IPCC Vol.4 Ch.10 Eq. 10.24: 0.04, 0.02 for feedlot diets with 85 % grain or more"),
+  BW     = list(lo = 20,  hi = 1500, src = "live weight of cattle"),
+  MW     = list(lo = 100, hi = 1500, src = "mature weight of cattle"),
+  WG     = list(lo = 0,   hi = 2.5, src = "daily weight gain of cattle"),
+  Milk   = list(lo = 0,   hi = 60,  src = "daily milk yield per cow"),
+  hours  = list(lo = 0,   hi = 12,  src = "hours of work per day"),
+  Tw     = list(lo = -20, hi = 45,  src = "mean annual temperature in degrees Celsius"),
+  GE     = list(lo = 20,  hi = 600, src = "gross energy intake of cattle, MJ per head per day"),
+  DMI    = list(lo = 0.5, hi = 35,  src = "dry matter intake of cattle, kg per head per day"),
+  EF3_PRP = list(lo = 0.0002, hi = 0.08, src = "IPCC 2006 Table 11.1: 0.02 (0.007 to 0.06); 2019 Refinement Table 11.1: 0.004 (0.0005 to 0.027), 0.006 wet and 0.002 dry climate"),
+  EF4    = list(lo = 0.001, hi = 0.05, src = "IPCC 2006 Table 11.3: 0.010 (0.002 to 0.05); 2019 Refinement: 0.014 wet, 0.005 dry climate"),
+  EF5    = list(lo = 0.0002, hi = 0.03, src = "IPCC 2006 Table 11.3: 0.0075 (0.0005 to 0.025); 2019 Refinement: 0.011 (0.0005 to 0.02)"),
+  Frac_GASM_PRP  = list(lo = 0, hi = 0.5, src = "IPCC 2019 Refinement Table 11.3: 0.21 (0.00 to 0.31); 2006: 0.20 (0.05 to 0.50)"),
+  Frac_LEACH_PRP = list(lo = 0, hi = 0.8, src = "IPCC 2019 Refinement Table 11.3: 0.24 (0.01 to 0.73); 2006: 0.30 (0.10 to 0.80)")
+)
 
 ## Andreas 28/5/26 #3: only parameters with a defensible direct IPCC table
 ## lookup get the benchmark_deviation check. BW is the only one we currently
@@ -287,9 +332,12 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     ipcc_def <- ps$ipcc_default[i]
 
     # ------------------------------------------------------------------
-    # Check 1: bounds order, lower < mean < upper
+    # Check 1: bounds order, lower <= mean <= upper. 2026-10-28: a row
+    # that is not a constant but carries no bounds, or whose bounds equal
+    # its mean, is sampled as a constant without a word (sample_distribution
+    # returns the mean); say so here.
     # ------------------------------------------------------------------
-    is_constant <- !is.na(d) && d %in% c("constant", "const")
+    is_constant <- !is.na(d) && tolower(d) %in% c("constant", "const")
     # Zero-mean parameters (hours=0 when no work, weight_gain=0 for adults, etc.)
     # are degenerate constants: pass silently rather than flagging as failure.
     is_zero_mean <- !is.na(mu) && mu == 0 && !is.na(lo) && lo == 0 &&
@@ -301,17 +349,22 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       } else if (mu > hi) {
         add(grp, p, "bounds_order", "fail",
             qa_msg("bounds_order_fail_hi", mu, hi))
+      } else if (lo == hi) {
+        add(grp, p, "bounds_order", "info", qa_msg("zero_spread_info", p))
       } else {
         add(grp, p, "bounds_order", "pass", t("qa_msg_bounds_order_pass"))
       }
     } else if (is_zero_mean) {
       add(grp, p, "bounds_order", "pass", t("qa_msg_bounds_order_zero"))
+    } else if (!is_constant && !is.na(mu) && (is.na(lo) || is.na(hi))) {
+      add(grp, p, "bounds_order", "warn", qa_msg("unc_missing_warn", p, mu))
     }
 
     # ------------------------------------------------------------------
-    # Check 2: non-negative lower bound
+    # Check 2: non-negative lower bound (not for the temperature, which is
+    # legitimately below zero in cold climates)
     # ------------------------------------------------------------------
-    if (!is.na(lo)) {
+    if (!is.na(lo) && p != "Tw") {
       if (lo < 0) {
         add(grp, p, "non_negative", "warn",
             qa_msg("nonneg_warn", lo))
@@ -321,60 +374,90 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     }
 
     # ------------------------------------------------------------------
-    # Check 3: known range constraints
+    # Check 3: range and unit. The template takes DE, Ym, Fat, CP and
+    # MilkPR as percentages and pct_pregnant, ASH, UE, Frac_GASM_PRP and
+    # Frac_LEACH_PRP as fractions; the usual error is the other unit (a
+    # 0.65 for DE, a 52 for pct_pregnant), which the message names with
+    # the converted value. Until 2026-10-28 the DE and Ym checks looked
+    # for "DE_pct" and "Ym_pct", names the upload renames on the way in,
+    # so they never ran.
     # ------------------------------------------------------------------
+    unit_cat <- if (!is.na(ps$unit_cat[i])) ps$unit_cat[i] else ""
+    range_failed <- FALSE
     if (!is.na(mu)) {
-      if (p == "DE_pct") {
-        if (mu < 1 || mu > 100) {
-          add(grp, p, "range_check", "fail",
-              qa_msg("range_de_fail", mu))
+      if (p %in% c("DE", "DE_pct")) {
+        if (mu > 0 && mu <= 1) {
+          range_failed <- TRUE
+          add(grp, p, "range_check", "fail", qa_msg("unit_fraction_fail", p, mu, unit_cat, mu * 100))
+        } else if (mu <= 0 || mu > 100) {
+          range_failed <- TRUE
+          add(grp, p, "range_check", "fail", qa_msg("range_de_fail", mu))
         } else {
-          add(grp, p, "range_check", "pass",
-              qa_msg("range_de_pass", mu))
+          add(grp, p, "range_check", "pass", qa_msg("range_de_pass", mu))
+        }
+      } else if (p %in% PERCENT_PARAMS) {
+        if (mu > 0 && mu <= 1) {
+          range_failed <- TRUE
+          add(grp, p, "range_check", "fail", qa_msg("unit_fraction_fail", p, mu, unit_cat, mu * 100))
+        } else if (mu < 0 || mu > 100) {
+          range_failed <- TRUE
+          add(grp, p, "range_check", "fail", qa_msg("range_pct_fail", p, mu))
+        } else {
+          add(grp, p, "range_check", "pass", qa_msg("range_pct_pass", p, mu))
+        }
+      } else if (p %in% FRACTION_PARAMS) {
+        if (mu > 1 && mu <= 100) {
+          range_failed <- TRUE
+          add(grp, p, "range_check", "fail", qa_msg("unit_percent_fail", p, mu, unit_cat, mu / 100))
+        } else if (mu < 0 || mu > 1) {
+          range_failed <- TRUE
+          add(grp, p, "range_check", "fail", qa_msg("frac_fail", p, mu))
+        } else {
+          add(grp, p, "range_check", "pass", qa_msg("frac_pass", p, mu))
         }
       }
-      if (p == "Ym_pct") {
-        if (mu < 1 || mu > 15) {
-          add(grp, p, "range_check", "warn",
-              qa_msg("range_ym_warn", mu))
+      # Plausible range (warning only, with its source). Skipped when the
+      # unit or range check already failed, which says more.
+      pl <- .QA_PLAUSIBLE[[p]]
+      if (!is.null(pl) && !range_failed) {
+        if (mu == 0 && p %in% .QA_ZERO_OK) {
+          add(grp, p, "plausibility", "pass", qa_msg("plaus_zero_pass", p))
+        } else if (mu < pl$lo || mu > pl$hi) {
+          add(grp, p, "plausibility", "warn",
+              qa_msg("plaus_warn", p, mu, unit_cat, pl$lo, pl$hi, pl$src))
         } else {
-          add(grp, p, "range_check", "pass",
-              qa_msg("range_ym_pass", mu))
-        }
-      }
-      if (p %in% FRACTION_PARAMS) {
-        if (mu < 0 || mu > 1) {
-          add(grp, p, "range_check", "fail",
-              qa_msg("frac_fail", p, mu))
-        } else {
-          add(grp, p, "range_check", "pass",
-              qa_msg("frac_pass", p, mu))
+          add(grp, p, "plausibility", "pass",
+              qa_msg("plaus_pass", p, mu, unit_cat, pl$lo, pl$hi))
         }
       }
     }
 
     # ------------------------------------------------------------------
-    # Check 4: distribution suitability
+    # Check 4: distribution suitability, as the sampler reads the row
+    # (utils_distributions.R). Beta is drawn between lower and upper around
+    # the mean, on any scale, so it needs the bounds to enclose the mean
+    # strictly and nothing else (the old rule, mean in (0,1), failed a
+    # valid beta on milk fat at 3.4 % and blocked the run). Log-normal
+    # reads the spread on the log scale, so a lower bound at or below
+    # zero turns the draws into the mean.
     # ------------------------------------------------------------------
     if (!is.na(d) && !is.na(mu)) {
-      if (d == "beta") {
-        if (mu <= 0 || mu >= 1) {
+      dl <- tolower(d)
+      if (dl == "beta") {
+        if (is.na(lo) || is.na(hi) || !(lo < mu && mu < hi)) {
           add(grp, p, "dist_suitability", "fail",
-              qa_msg("beta_mean_fail", mu))
-        } else if (!is.na(lo) && !is.na(hi) && (lo < 0 || hi > 1)) {
-          add(grp, p, "dist_suitability", "fail",
-              qa_msg("beta_bounds_fail", lo, hi))
+              qa_msg("beta_fail", lo, mu, hi))
         } else {
-          add(grp, p, "dist_suitability", "pass", t("qa_msg_beta_pass"))
+          add(grp, p, "dist_suitability", "pass", qa_msg("beta_pass", lo, hi))
         }
-      } else if (d == "lognormal") {
-        if (mu <= 0) {
+      } else if (dl == "lognormal") {
+        if (mu <= 0 || (!is.na(lo) && lo <= 0)) {
           add(grp, p, "dist_suitability", "fail",
-              qa_msg("lognorm_fail", mu))
+              qa_msg("lognorm_fail", mu, lo))
         } else {
           add(grp, p, "dist_suitability", "pass", t("qa_msg_lognorm_pass"))
         }
-      } else if (d == "tnorm_0_1") {
+      } else if (dl == "tnorm_0_1") {
         if (!is.na(lo) && !is.na(hi) && (lo < 0 || hi > 1)) {
           add(grp, p, "dist_suitability", "warn",
               qa_msg("tnorm_warn", lo, hi))
@@ -464,19 +547,40 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     }
 
     # ------------------------------------------------------------------
-    # Check 5b (T2.3): fractional parameter with unbounded distribution
+    # Check 5b (T2.3): a fraction with an unbounded distribution. 2026-10-28:
+    # the warning used to fire on the name of the distribution alone; a
+    # normal with a 95 % interval of 0.4 to 0.6 never leaves [0, 1]. Now the
+    # share of draws outside [0, 1] is computed as the sampler would draw
+    # them (sd = range / 3.92; log scale for lognormal) and the warning
+    # names it; above 0.5 % it is a warning.
     # ------------------------------------------------------------------
-    UNBOUNDED_DISTS <- c("normal", "lognormal", "posnorm")
-    if (p %in% FRACTION_PARAMS && !is.na(d) && tolower(d) %in% UNBOUNDED_DISTS) {
-      add(grp, p, "fraction_distribution", "warn",
-          qa_msg("frac_dist_warn", p, d))
-    } else if (p %in% FRACTION_PARAMS && !is.na(d)) {
-      add(grp, p, "fraction_distribution", "pass",
-          qa_msg("frac_dist_pass", p, d))
+    if (p %in% FRACTION_PARAMS && !is.na(d)) {
+      dl <- tolower(d)
+      p_out <- NA_real_
+      if (dl %in% c("normal", "posnorm", "lognormal") && !is.na(mu) &&
+          !is.na(lo) && !is.na(hi) && hi > lo) {
+        if (dl == "lognormal") {
+          if (mu > 0 && lo > 0)
+            p_out <- 1 - stats::plnorm(1, log(mu), (log(hi) - log(lo)) / 3.92)
+        } else {
+          sd_est <- (hi - lo) / 3.92
+          p_out <- (if (dl == "normal") stats::pnorm(0, mu, sd_est) else 0) +
+                   (1 - stats::pnorm(1, mu, sd_est))
+        }
+      }
+      if (!is.na(p_out) && p_out > 0.005) {
+        add(grp, p, "fraction_distribution", "warn",
+            qa_msg("frac_dist_warn", p, d, lo, hi, 100 * p_out))
+      } else {
+        add(grp, p, "fraction_distribution", "pass",
+            qa_msg("frac_dist_pass", p, d))
+      }
     }
 
     # ------------------------------------------------------------------
-    # Check 6: asymmetric bound check for right-skewed IPCC parameters
+    # Check 6: symmetric bounds where IPCC gives a right-skewed range
+    # (EF3_PRP, Frac_LEACH_PRP). An info with the IPCC range, never a
+    # warning: a symmetric national range is a choice, not an error.
     # ------------------------------------------------------------------
     if (p %in% ASYMMETRIC_PARAMS && !is.na(lo) && !is.na(hi) && !is.na(mu) && mu > 0) {
       lower_span <- mu - lo
@@ -484,8 +588,11 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       if (lower_span > 0 && upper_span > 0) {
         ratio <- upper_span / lower_span
         if (ratio < 1.5) {
-          add(grp, p, "asymmetric_bounds", "warn",
-              qa_msg("asym_warn", p, ratio))
+          cat_i <- match(p, catalogue$parameter)
+          add(grp, p, "asymmetric_bounds", "info",
+              qa_msg("asym_info", p, ratio,
+                     catalogue$suggested_lower_bound[cat_i], catalogue$suggested_upper_bound[cat_i],
+                     catalogue$ipcc_default[cat_i], .ASYM_SOURCE[[p]]))
         } else {
           add(grp, p, "asymmetric_bounds", "pass",
               qa_msg("asym_pass", p, ratio))

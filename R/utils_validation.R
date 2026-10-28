@@ -56,9 +56,11 @@ validate_param_specs <- function(param_specs) {
   if (any(param_specs$mean[pop_rows] < 0, na.rm = TRUE))
     errors <- c(errors, "Cattle population (N) cannot be negative")
 
-  de_rows <- param_specs$parameter == "DE_pct"
+  # 2026-10-28: the upload renames DE_pct to DE before this runs, so the
+  # check looked for a name that never occurs. Both spellings now.
+  de_rows <- param_specs$parameter %in% c("DE", "DE_pct")
   if (any(param_specs$mean[de_rows] > 100 | param_specs$mean[de_rows] < 0, na.rm = TRUE))
-    errors <- c(errors, "Digestible energy must be between 0 and 100%")
+    errors <- c(errors, "Digestible energy (DE) must be between 0 and 100%")
 
   # Hours bug fix: allow lower == upper when the parameter is effectively zero
   # (e.g. hours = 0 when animals do no work; weight_gain = 0 for adult non-growing;
