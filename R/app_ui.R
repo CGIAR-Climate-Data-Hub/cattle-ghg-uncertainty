@@ -1839,7 +1839,10 @@ app_ui <- function(request = NULL) {
       bslib::card(
         style = "margin: 0 16px 16px 16px;",
         bslib::card_header(t("qa_results_h")),
+        # fillable = FALSE: in a fillable body the table is a flex item and
+        # its rows spilled over the text placed after it (2026-10-28).
         bslib::card_body(
+          fillable = FALSE,
           tags$style(HTML("tr.qa-open > td { background:#F1F5F9; } td.details-control { cursor:pointer; }")),
           uiOutput("qa_tiles"),
           tags$p(style = "font-size:0.83rem; color:#555; margin:10px 0 4px 0;",
@@ -1849,9 +1852,10 @@ app_ui <- function(request = NULL) {
                  " / ",
                  tags$a(href = "#", onclick = "if (window.qaToggleAll) window.qaToggleAll(false); return false;",
                         t("qa_collapse_all"))),
-          DT::DTOutput("qaqc_table"),
-          hr(),
-          p(style = "font-size:0.83rem; color:#555; margin:0;", t("qa_checks_run"))
+          tags$details(style = "font-size:0.8rem; color:#555; margin:0 0 8px 0;",
+                       tags$summary(style = "cursor:pointer;", t("qa_checks_run_label")),
+                       tags$p(style = "margin:4px 0 0 0;", t("qa_checks_run"))),
+          DT::DTOutput("qaqc_table")
         )
       )
     ),
