@@ -117,22 +117,16 @@ app_ui <- function(request = NULL) {
     header = tagList(
       tags$head(tags$link(rel = "stylesheet", href = "custom.css")),
       # ---- SEO / social head block (2026-09) -------------------------------
-      # The canonical deliberately points at the org-owned website, not this
-      # personal shinyapps URL: the app page has no crawlable content of its
-      # own (JS/websocket rendered), so the cross-domain canonical consolidates
-      # any signal onto the URL the project controls. Worst case Google
-      # ignores the hint, which is neutral. The og_image lives on the website
-      # so the app, the repo social preview and the site share one file.
-      # When a custom domain replaces the github.io URL, update .SEO_SITE_URL
-      # here and the matching constants in docs/.
+      # 2026-10-28: the GitHub Pages website was dropped on request; the app
+      # URL is the canonical address and serves the social preview image
+      # itself (www/og_image.png).
       tags$head({
-        .SEO_SITE_URL <- "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/"
         .SEO_APP_URL  <- "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/"
         .SEO_REPO_URL <- "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty"
-        .SEO_IMG_URL  <- paste0(.SEO_SITE_URL, "assets/og_image.png")
+        .SEO_IMG_URL  <- paste0(.SEO_APP_URL, "og_image.png")
         tagList(
           tags$meta(name = "description", content = t("seo_meta_description")),
-          tags$link(rel = "canonical", href = .SEO_SITE_URL),
+          tags$link(rel = "canonical", href = .SEO_APP_URL),
           tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
           tags$meta(property = "og:title",
                     content = t("seo_window_title")),
@@ -154,7 +148,7 @@ app_ui <- function(request = NULL) {
               "@type" = "SoftwareApplication",
               name = "IPCC Tier 2 Cattle GHG Uncertainty Calculator",
               url = .SEO_APP_URL,
-              sameAs = c(.SEO_REPO_URL, .SEO_SITE_URL),
+              sameAs = .SEO_REPO_URL,
               description = t("seo_meta_description"),
               applicationCategory = "Scientific/Engineering",
               operatingSystem = "Web browser",
@@ -1404,9 +1398,26 @@ app_ui <- function(request = NULL) {
     ),
 
     # ==================== DEFINITIONS TAB (T1.4 + R1.7 + R1.8) ====================
+    # 2026-10-28 (review): no tab of its own. The panel stays (same page,
+    # same content) but its link in the menu is hidden by custom.css; it is
+    # opened from the Resources tab (window.openDefinitions) and offers a
+    # way back.
     bslib::nav_panel(
       title = t("tab_definitions"),
+      value = "Definitions",
       icon = icon("book"),
+      div(style = "margin: 14px 16px 0 16px;",
+          tags$a(href = "#", onclick = "window.openResourcesTab(); return false;",
+                 icon("arrow-left"), " ", t("def_back_to_resources"))),
+      tags$script(HTML(paste0(
+        "window.openDefinitions = function() {",
+        "  var a = document.querySelector('.navbar-nav a[data-value=\"Definitions\"]');",
+        "  if (a) { a.click(); window.scrollTo(0, 0); }",
+        "};",
+        "window.openResourcesTab = function() {",
+        "  var a = document.querySelector('.navbar-nav a[data-value=\"Resources\"]');",
+        "  if (a) { a.click(); window.scrollTo(0, 0); }",
+        "};"))),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("info_definitions_label"), " ")),
           t("info_definitions_body"),
@@ -1497,17 +1508,12 @@ app_ui <- function(request = NULL) {
                 class = "btn btn-outline-success",
                 icon("book"), " ", t("btn_open_userguide")
               ),
-              # SEO round 2026-09: the project website is the canonical public
-              # entry point (see the canonical link in the head block). Linking
-              # it from here gives users who arrive straight at the app a route
-              # to the topic pages and the citation, and gives the site an
-              # inbound link. Keep the URL in step with .SEO_SITE_URL above.
+              # 2026-10-28 (review): the parameter and statistical glossaries
+              # open from here; the Definitions page has no tab of its own.
               tags$a(
-                href = "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/",
-                target = "_blank",
-                rel = "noopener",
-                class = "btn btn-outline-success",
-                icon("globe"), " ", t("btn_open_website")
+                href = "#", class = "btn btn-outline-success",
+                onclick = "window.openDefinitions(); return false;",
+                icon("book-open"), " ", t("btn_open_definitions")
               )
             )
           )

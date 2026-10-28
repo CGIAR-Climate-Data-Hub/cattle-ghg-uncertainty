@@ -33,7 +33,7 @@ keywords:
   - national inventory
 license: MIT
 repository-code: "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty"
-url: "https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/"
+url: "https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/"
 # identifiers:
 #   - type: doi
 #     value: 10.5281/zenodo.XXXXXXX   # concept DOI: fill in after the first Zenodo release

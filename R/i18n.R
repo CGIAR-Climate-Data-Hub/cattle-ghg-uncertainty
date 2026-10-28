@@ -374,8 +374,9 @@ lang_state_take <- function(token) {
                                 fr = "Ouvrir la méthodologie complète (PDF)"),
   btn_open_userguide = list(en = "Open user guide (PDF)",
                               fr = "Ouvrir le guide utilisateur (PDF)"),
-  btn_open_website = list(en = "Project website",
-                            fr = "Site web du projet"),
+  btn_open_definitions = list(en = "Definitions and glossary",
+                               fr = "Définitions et glossaire"),
+  def_back_to_resources = list(en = "Back to Resources", fr = "Retour aux ressources"),
 
   card_useful_resources = list(en = "Useful resources",
                                  fr = "Ressources utiles"),
@@ -1321,8 +1322,8 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_sens_what = list(
-    en = "This page shows which input parameters contribute most to the overall emission uncertainty. The tornado chart on the left ranks parameters by their influence: longer bars mean more influential parameters. Colour shows whether better data could help: green and red bars are user-reducible parameters (better local data would narrow them), while grey bars are fixed IPCC coefficients you cannot improve locally. Green and grey bars indicate a positive relationship (higher value = higher emissions); red and light grey bars indicate a negative relationship. Use the dropdown on the right to switch between SRC (linear influence) and PRCC (rank-based, more robust).",
-    fr = "Cette page montre quels paramètres d'entrée contribuent le plus à l'incertitude globale des émissions. Le graphique tornade à gauche classe les paramètres par leur influence : des barres plus longues indiquent des paramètres plus influents. La couleur indique si de meilleures données peuvent aider : les barres vertes et rouges sont des paramètres réductibles par l'utilisateur (de meilleures données locales les réduiraient), tandis que les barres grises sont des coefficients IPCC fixes, non améliorables localement. Les barres vertes et grises indiquent une relation positive (valeur plus élevée = émissions plus élevées) ; les barres rouges et gris clair une relation négative. Utilisez le menu à droite pour basculer entre SRC (influence linéaire) et PRCC (rang, plus robuste)."
+    en = "This page shows which input parameters contribute most to the overall emission uncertainty. The tornado chart (Figure 5.1) ranks parameters by their influence: longer bars mean more influential parameters. Bars to the right mean a higher value gives higher emissions; bars to the left mean a higher value gives lower emissions. Colour shows whether better data could help: green bars are inputs you can improve with better national data, blue bars are IPCC coefficients you cannot improve locally. Use the dropdown on the right to switch between SRC (linear influence) and PRCC (rank-based, more robust).",
+    fr = "Cette page montre quels paramètres d'entrée contribuent le plus à l'incertitude globale des émissions. Le graphique tornade (Figure 5.1) classe les paramètres par leur influence : des barres plus longues indiquent des paramètres plus influents. Une barre à droite signifie qu'une valeur plus élevée donne des émissions plus élevées ; une barre à gauche, des émissions plus faibles. La couleur indique si de meilleures données peuvent aider : les barres vertes sont des entrées améliorables par de meilleures données nationales, les barres bleues des coefficients IPCC non améliorables localement. Utilisez le menu à droite pour basculer entre SRC (influence linéaire) et PRCC (rang, plus robuste)."
   ),
   info_sens_note_label = list(en = "Note:", fr = "Note :"),
   info_sens_note_body = list(en = "These rankings show which parameters drive the ",

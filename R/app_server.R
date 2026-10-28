@@ -2610,6 +2610,7 @@ app_server <- function(input, output, session) {
   }
 
   output$tornado_chart <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     sens_data <- active_sensitivity()
     req(sens_data)
     # Surface the zero-variance message from sensitivity_analysis() when the
@@ -2650,6 +2651,7 @@ app_server <- function(input, output, session) {
   # Caption above the tornado: PRCC-skipped / subsample notes, rendered as HTML
   # so they never collide with the chart title or the plotly toolbar.
   output$tornado_note <- renderUI({
+    req(isTRUE(rv$prerender_ok))
     sd <- active_sensitivity()
     if (is.null(sd)) return(NULL)
     notes <- c(attr(sd, "prcc_note"), attr(sd, "subsampled_note"))
@@ -2662,6 +2664,7 @@ app_server <- function(input, output, session) {
   })
 
   output$sensitivity_table <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
     sens_data <- active_sensitivity()
     req(sens_data)
     sens <- if (input$sens_method == "prcc" && !is.null(sens_data$prcc)) {
@@ -2679,6 +2682,7 @@ app_server <- function(input, output, session) {
   # --- IPCC REPORT ---
 
   output$ipcc_table_notice <- renderUI({
+    req(isTRUE(rv$prerender_ok))
     if (!is.null(rv$mc_results) && is.null(rv$ipcc_table)) {
       div(class = "alert alert-warning", role = "alert",
           style = "margin-bottom:12px;",
@@ -2690,6 +2694,7 @@ app_server <- function(input, output, session) {
   })
 
   output$ipcc_table <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
     req(rv$ipcc_table)
     DT::datatable(rv$ipcc_table, rownames = FALSE,
                   options = list(pageLength = 10, dom = 't'))
@@ -2815,6 +2820,7 @@ app_server <- function(input, output, session) {
   # are skipped with a placeholder annotation rather than rendered as a flat
   # bar at zero.
   output$report_source_histograms <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     req(rv$mc_results)
     by_sys <- rv$mc_results$by_system
     if (length(by_sys) == 0)
@@ -2882,6 +2888,7 @@ app_server <- function(input, output, session) {
   # `top10[[val_col]]`. We now defend against an empty sensitivity object,
   # missing column, or zero rows with friendly placeholder annotations.
   output$report_tornado <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     placeholder <- function(msg) {
       plotly::plot_ly() |>
         plotly::layout(
@@ -2922,6 +2929,7 @@ app_server <- function(input, output, session) {
 
   # Tx.1: input distribution density plots for QA review
   output$report_input_densities <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     req(rv$mc_results)
     if (length(rv$mc_results$by_system) == 0) return(plotly::plot_ly())
     samples <- rv$mc_results$by_system[[1]]$samples
@@ -2945,6 +2953,7 @@ app_server <- function(input, output, session) {
 
   # T8.3: input documentation table for IPCC inventory submission / QA
   output$inputs_doc_table <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
     req(rv$param_specs)
     ps <- rv$param_specs
     keep <- intersect(c("cattle_type", "aggregation_level", "sub_category",
@@ -3721,11 +3730,13 @@ app_server <- function(input, output, session) {
   # output IDs per UI element, so the same chart shown in two places needs two
   # render calls. Both delegate to the same reactive sources.
   output$trend_table_report <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
     req(rv_trend$results)
     DT::datatable(rv_trend$results, rownames = FALSE,
                   options = list(pageLength = 25, dom = "t"))
   })
   output$trend_plot_report <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     req(rv_trend$results)
     df <- rv_trend$results
     sub <- if (!is.null(rv_trend$slope) && !is.null(rv_trend$delta_total)) {
@@ -3754,10 +3765,12 @@ app_server <- function(input, output, session) {
       )
   })
   output$trend_tornado_per_year_report <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     .trend_tornado_plot(trend_sens_per_year(),
                          "Top 10 drivers: latest year")
   })
   output$trend_tornado_delta_report <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     .trend_tornado_plot(trend_sens_delta(),
                          "Top 10 drivers of the change between first and last year")
   })
@@ -3765,10 +3778,12 @@ app_server <- function(input, output, session) {
   # since each Shiny output ID can render in only one UI element. All three
   # copies (Tab 5 results, Tab 6, Tab 7 report) read from the same reactives.
   output$trend_tornado_per_year_sens <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     .trend_tornado_plot(trend_sens_per_year(),
                          "Top 10 drivers: latest year")
   })
   output$trend_tornado_delta_sens <- plotly::renderPlotly({
+    req(isTRUE(rv$prerender_ok))
     .trend_tornado_plot(trend_sens_delta(),
                          "Top 10 drivers of the change between first and last year")
   })
@@ -3777,9 +3792,11 @@ app_server <- function(input, output, session) {
   # surfaced together; Class column is colour-coded (green = user-reducible,
   # grey = IPCC coefficient) to match the tornado bar palette.
   output$trend_sens_per_year_table <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
     .trend_sens_table(trend_sens_per_year())
   })
   output$trend_sens_delta_table <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
     .trend_sens_table(trend_sens_delta())
   })
 
@@ -3857,4 +3874,34 @@ app_server <- function(input, output, session) {
   # outputs. The translator UI is inserted into the Resources tab via
   # translator_chat_ui() in R/app_ui.R.
   translator_chat_server(input, output, session)
+
+  # 2026-10-28 (review): the Sensitivity and IPCC Report tabs are drawn in
+  # the background after a run, so they are ready when the user opens them.
+  # Shiny sends every output of one flush in a single message, so drawing
+  # them in the run's own flush would delay the Simulate results by the
+  # drawing time. They are held back (req(prerender_ok)) during the run's
+  # flush and released by a later() callback, which fires once the results
+  # have been sent; the drawing then happens in a flush of its own.
+  rv$prerender_ok <- TRUE
+  observeEvent(list(input$run_sim, input$run_trend), {
+    rv$prerender_ok <- FALSE
+    later::later(function() shiny::withReactiveDomain(session, rv$prerender_ok <- TRUE), 0.5)
+  }, priority = 100, ignoreInit = TRUE)
+  outputOptions(output, "tornado_chart", suspendWhenHidden = FALSE)
+  outputOptions(output, "tornado_note", suspendWhenHidden = FALSE)
+  outputOptions(output, "sensitivity_table", suspendWhenHidden = FALSE)
+  outputOptions(output, "ipcc_table", suspendWhenHidden = FALSE)
+  outputOptions(output, "ipcc_table_notice", suspendWhenHidden = FALSE)
+  outputOptions(output, "report_source_histograms", suspendWhenHidden = FALSE)
+  outputOptions(output, "report_tornado", suspendWhenHidden = FALSE)
+  outputOptions(output, "report_input_densities", suspendWhenHidden = FALSE)
+  outputOptions(output, "inputs_doc_table", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_tornado_per_year_sens", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_tornado_delta_sens", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_sens_per_year_table", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_sens_delta_table", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_plot_report", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_table_report", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_tornado_per_year_report", suspendWhenHidden = FALSE)
+  outputOptions(output, "trend_tornado_delta_report", suspendWhenHidden = FALSE)
 }

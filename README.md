@@ -1,7 +1,6 @@
 # IPCC Tier 2 Cattle GHG Uncertainty Calculator
 
 [![Launch App](https://img.shields.io/badge/Launch%20App-shinyapps.io-2D6A4F?style=for-the-badge&logo=r)](https://mlolita26.shinyapps.io/cattle-ghg-uncertainty/)
-[![Website](https://img.shields.io/badge/Website-cattle--ghg--uncertainty-1B4332?style=for-the-badge)](https://cgiar-climate-data-hub.github.io/cattle-ghg-uncertainty/)
 [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/HEAD?urlpath=shiny)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![R](https://img.shields.io/badge/R-%3E%3D4.3-276DC3?logo=r)](https://www.r-project.org/)
@@ -61,7 +60,7 @@ When a country reports cattle greenhouse-gas emissions under the Paris Agreement
 | Tab | Purpose |
 |---|---|
 | **Home** | Overview, quick-start guide, funding logos |
-| **Definitions** | Plain-language glossary of every IPCC parameter, plus a glossary of the statistical terms (Monte Carlo, confidence interval, margin of error, SRC/PRCC) used across the tabs |
+| **Resources** (Definitions and glossary button) | Plain-language glossary of every IPCC parameter, plus a glossary of the statistical terms (Monte Carlo, confidence interval, margin of error, SRC/PRCC) used across the tabs |
 | **Resources** | Methodology PDF, user-guide PDF, **AI Translator chat panel**, and links to the IPCC chapters |
 | **1. Data Input** | Pick an example or upload your filled Excel template; the parameter table shows every value with its distribution, uncertainty and bounds, read-only |
 | **2. QA/QC** | Automated traffic-light checks (bounds, IPCC defaults, fractions, units) |

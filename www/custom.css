@@ -91,11 +91,18 @@ body { background: var(--bg); color: var(--text); }
 .navbar-nav {
   padding: 0 !important;
 }
+/* 2026-10-28 (review): the Definitions page has no tab of its own; it is
+   opened from the Resources tab. Its menu link stays in the page (the
+   opener clicks it) but is not shown. */
+.navbar-nav .nav-link[data-value="Definitions"] { display: none !important; }
+.navbar-nav li:has(> a[data-value="Definitions"]) { display: none !important; }
+
 .navbar-nav .nav-link {
   color: rgba(255,255,255,0.85) !important;
   font-size: 0.92rem;
   font-weight: 500;
-  padding: 11px 18px !important;
+  white-space: nowrap;
+  padding: 11px 14px !important;
   border-bottom: 3px solid transparent;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
