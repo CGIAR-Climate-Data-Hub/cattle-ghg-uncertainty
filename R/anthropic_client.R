@@ -414,10 +414,12 @@ anthropic_chat <- function(messages,
 # calculator without waiting.
 #
 # Differences from the synchronous call, stated rather than hidden:
-#   * No retry loop yet. The synchronous path retries 429 and 5xx up to
-#     max_retries before any text has arrived. Async retry means re-issuing
-#     from the completion callback; it is listed as follow-up work in the
-#     plan and is not implemented here.
+#   * Retries (2026-10-28): a rate limit (429), a server error (5xx, 529
+#     overloaded), an "error" event inside a 200 stream, or a dropped
+#     connection is re-issued up to .ANTHROPIC_ASYNC_RETRY_DELAYS times,
+#     only while nothing has reached the user, after the server's
+#     Retry-After or 5, 15, 30, 60 s. The wait is a later() timer, so the
+#     process stays free, and Stop is honoured during it.
 #   * Cancellation is by $cancel() on the returned handle, which the caller
 #     normally drives from should_stop().
 anthropic_chat_stream_async <- function(messages,
@@ -431,7 +433,8 @@ anthropic_chat_stream_async <- function(messages,
                                         timeout_sec = 900,
                                         tools = NULL,
                                         tool_choice = NULL,
-                                        cache_ttl = "auto") {
+                                        cache_ttl = "auto",
+                                        on_retry = function(attempt, delay, why) {}) {
   api_key <- .anthropic_api_key_for(model)
   if (!nzchar(api_key)) {
     on_result(list(reply = NULL,
@@ -467,6 +470,18 @@ anthropic_chat_stream_async <- function(messages,
     # (a third of the real speed).
     if (is.list(res) && is.null(res$latency_sec))
       res$latency_sec <- as.numeric(difftime(Sys.time(), st$t0, units = "secs"))
+    # 2026-10-28: the background result carried no cost, so every async
+    # call was logged at $0 and the monthly budget guard saw no spending
+    # (found by the six-user run). Same formula as the synchronous path.
+    if (is.list(res) && is.null(res$cost_usd) && is.list(res$usage))
+      res$cost_usd <- tryCatch(anthropic_cost_usd(
+        input_tokens          = res$usage$prompt_tokens,
+        output_tokens         = res$usage$completion_tokens,
+        model                 = res$model %||% model,
+        cache_read_tokens     = res$usage$cached_tokens %||% 0L,
+        cache_write_tokens    = res$usage$cache_write_tokens %||% 0L,
+        cache_write_1h_tokens = res$usage$cache_write_1h_tokens %||% 0L),
+        error = function(e) NA_real_)
     tryCatch(on_result(res), error = function(e)
       message("translator async: on_result failed: ", conditionMessage(e)))
     invisible(NULL)
@@ -475,43 +490,91 @@ anthropic_chat_stream_async <- function(messages,
     list(reply = NULL, stopped = TRUE,
          error = "Stopped at your request. Nothing was produced from this call.")
 
-  st$handle <- .anthropic_stream_async(
-    url = .ANTHROPIC_ENDPOINT, headers = headers, body_json = body_json,
-    timeout_sec = timeout_sec,
-    on_data = function(raw) {
-      # Checked per chunk, exactly as the synchronous on_data does, but the
-      # abort is a cancel on the handle rather than returning FALSE.
+  # Nothing has reached the user yet, so the call can be issued again.
+  untouched <- function() !nzchar(consumer$state$accumulated) && !nzchar(consumer$state$tool_json_acc)
+  retry_after <- function(res) {
+    v <- tryCatch({
+      h <- curl::parse_headers_list(res$headers)
+      suppressWarnings(as.numeric(h[["retry-after"]]))
+    }, error = function(e) NA_real_)
+    if (length(v) == 1L && is.finite(v) && v > 0) min(v, 60) else NA_real_
+  }
+  st$attempt <- 1L
+  # Returns TRUE when a new attempt was scheduled.
+  try_again <- function(why, wait = NA_real_) {
+    delays <- .ANTHROPIC_ASYNC_RETRY_DELAYS
+    if (st$stopped || st$attempt > length(delays) || !untouched()) return(FALSE)
+    delay <- if (is.finite(wait)) wait else delays[st$attempt]
+    message(sprintf("translator async: %s; retrying in %.0f s (attempt %d of %d)",
+                    why, delay, st$attempt + 1L, length(delays) + 1L))
+    tryCatch(on_retry(st$attempt, delay, why), error = function(e) NULL)
+    st$attempt <- st$attempt + 1L
+    later::later(function() {
       if (isTRUE(tryCatch(should_stop(), error = function(e) FALSE))) {
-        if (!st$stopped) {
-          st$stopped <- TRUE
-          tryCatch(st$handle$cancel(), error = function(e) NULL)
-          report(stopped_result())
+        st$stopped <- TRUE
+        return(report(stopped_result()))
+      }
+      consumer$reset()
+      start()
+    }, delay)
+    TRUE
+  }
+
+  start <- function() {
+    st$handle <- .anthropic_stream_async(
+      url = .ANTHROPIC_ENDPOINT, headers = headers, body_json = body_json,
+      timeout_sec = timeout_sec,
+      on_data = function(raw) {
+        # Checked per chunk, exactly as the synchronous on_data does, but the
+        # abort is a cancel on the handle rather than returning FALSE.
+        if (isTRUE(tryCatch(should_stop(), error = function(e) FALSE))) {
+          if (!st$stopped) {
+            st$stopped <- TRUE
+            tryCatch(st$handle$cancel(), error = function(e) NULL)
+            report(stopped_result())
+          }
+          return(invisible(NULL))
         }
-        return(invisible(NULL))
-      }
-      consumer$feed(raw)
-    },
-    on_done = function(res) {
-      if (st$stopped) return(report(stopped_result()))
-      status <- res$status_code %||% NA_integer_
-      if (!is.na(status) && status >= 300) {
-        body_msg <- tryCatch({
-          b <- jsonlite::fromJSON(rawToChar(res$content), simplifyVector = FALSE)
-          b$error$message %||% ""
-        }, error = function(e) "")
+        consumer$feed(raw)
+      },
+      on_done = function(res) {
+        if (st$stopped) return(report(stopped_result()))
+        status <- res$status_code %||% NA_integer_
+        if (!is.na(status) && status >= 300) {
+          if ((status == 429 || status >= 500) &&
+              try_again(sprintf("status %d", status), retry_after(res)))
+            return(invisible(NULL))
+          body_msg <- tryCatch({
+            b <- jsonlite::fromJSON(rawToChar(res$content), simplifyVector = FALSE)
+            b$error$message %||% ""
+          }, error = function(e) "")
+          acc <- consumer$state$accumulated
+          return(report(list(reply = if (nzchar(acc)) acc else NULL,
+                             error = .anthropic_status_msg(status, body_msg))))
+        }
+        se <- consumer$state$stream_error
+        if (!is.null(se)) {
+          if (se$type %in% c("overloaded_error", "api_error", "rate_limit_error") &&
+              try_again(paste("stream error", se$type)))
+            return(invisible(NULL))
+          acc <- consumer$state$accumulated
+          return(report(list(reply = if (nzchar(acc)) acc else NULL,
+                             error = .anthropic_status_msg(
+                               if (identical(se$type, "overloaded_error")) 529L else 500L,
+                               se$message %||% ""))))
+        }
+        report(consumer$result(model))
+      },
+      on_error = function(msg) {
+        if (st$stopped) return(report(stopped_result()))
+        if (try_again(paste("connection failed:", msg))) return(invisible(NULL))
         acc <- consumer$state$accumulated
-        return(report(list(reply = if (nzchar(acc)) acc else NULL,
-                           error = .anthropic_status_msg(status, body_msg))))
-      }
-      report(consumer$result(model))
-    },
-    on_error = function(msg) {
-      if (st$stopped) return(report(stopped_result()))
-      acc <- consumer$state$accumulated
-      report(list(reply = if (nzchar(acc)) acc else NULL,
-                  error = paste0("Streaming failed (", msg,
-                                 "). Try again in a minute.")))
-    })
+        report(list(reply = if (nzchar(acc)) acc else NULL,
+                    error = paste0("Streaming failed (", msg,
+                                   "). Try again in a minute.")))
+      })
+  }
+  start()
 
   invisible(st$handle)
 }
@@ -619,6 +682,7 @@ anthropic_chat_stream_async <- function(messages,
     st$cache_write   <- 0L
     st$cache_write1h <- 0L
     st$buf           <- raw(0)
+    st$stream_error  <- NULL
     invisible(NULL)
   }
   reset()
@@ -698,6 +762,13 @@ anthropic_chat_stream_async <- function(messages,
             message("translator stream on_tick error: ", conditionMessage(e)))
         }
       }
+      # An "error" event inside a 200 stream (overloaded_error, api_error):
+      # recorded so the caller can retry or report it, instead of taking
+      # an empty reply for a finished one.
+      if (identical(parsed$type, "error") || identical(event_type, "error")) {
+        er <- parsed$error %||% list()
+        st$stream_error <- list(type = er$type %||% "error", message = er$message %||% "")
+      }
       if (identical(parsed$type, "message_delta")) {
         u <- parsed$usage %||% list()
         if (!is.null(u$output_tokens)) st$usage_out <- u$output_tokens
@@ -755,6 +826,9 @@ anthropic_chat_stream_async <- function(messages,
 #
 # Cancellation is by calling $cancel() on the returned handle, not by
 # returning FALSE from the data callback the way httr2 allows.
+# Waits before each new attempt of a background call (2026-10-28).
+.ANTHROPIC_ASYNC_RETRY_DELAYS <- c(5, 15, 30, 60)
+
 .anthropic_stream_async <- function(url, headers, body_json,
                                     timeout_sec = 900,
                                     on_data  = function(raw) NULL,

@@ -215,5 +215,21 @@ cat("scenario 4: session closed; job", jb4$status, "; delivery", jb4$delivery$mo
 stopifnot(identical(jb4$status, "done"), identical(jb4$delivery$mode, "email"), length(mails) == 1L,
           mails[[1]]$n_att == 3L, identical(mails[[1]]$to, "dryrun@local"))
 
+# ---- scenario 5: one and two production systems take the same path -----------
+# 2026-10-28: until now a file with two systems or fewer went to the
+# single-request path, which is synchronous and held the process for every
+# user. The synchronous client stops this script if it is ever called.
+all_levels <- levels
+for (n_lv in 1:2) {
+  levels <- all_levels[seq_len(n_lv)]
+  calls <- character(); state$last_template_json <- NULL; state$batch_parts <- list(); state$batch_parts_key <- NULL
+  state$messages[[length(state$messages) + 1]] <- list(role = "user", content = sprintf("Only %d system(s) this time.", n_lv), display = "answer")
+  .translator_force_template(state, session); settle()
+  cat(sprintf("scenario 5 (%d system(s)): %s; error: %s\n", n_lv, paste(calls, collapse = " -> "), state$last_error %||% "none"))
+  stopifnot(is.null(state$last_error), sum(grepl("^batch:", calls)) == n_lv, !is.null(state$last_template_json),
+            !is.null(state$template_file), file.exists(state$template_file))
+}
+levels <- all_levels
+
 cat(sprintf("dry run finished in %.0f s\n", as.numeric(Sys.time() - t0, units = "secs")))
 cat("DRY RUN PASSED\n")

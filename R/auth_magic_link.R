@@ -373,7 +373,11 @@ auth_notify_admin_of_request <- function(requesting_email,
 auth_session_cookie_issue <- function(email,
                                       ttl_days = 36500L) {
   email <- tolower(trimws(email))
-  expires_at <- as.integer(Sys.time()) + ttl_days * 86400L
+  # 2026-10-28: in seconds, as a double. now + 36 500 days is past the
+  # integer limit (2^31, January 2038), so the integer product was NA, the
+  # cookie carried "NA" as its expiry and the check below rejected it on
+  # every visit: nobody ever stayed signed in.
+  expires_at <- format(floor(as.numeric(Sys.time()) + as.numeric(ttl_days) * 86400), scientific = FALSE)
   payload    <- paste(email, expires_at, sep = "|")
   paste(payload, .auth_hmac(payload), sep = "|")
 }
@@ -386,10 +390,10 @@ auth_session_cookie_verify <- function(cookie_value) {
   parts <- strsplit(cookie_value, "|", fixed = TRUE)[[1]]
   if (length(parts) != 3) return(NULL)
   email      <- parts[1]
-  expires_at <- suppressWarnings(as.integer(parts[2]))
+  expires_at <- suppressWarnings(as.numeric(parts[2]))
   hmac_seen  <- parts[3]
-  if (is.na(expires_at) || expires_at < as.integer(Sys.time())) return(NULL)
-  payload <- paste(email, expires_at, sep = "|")
+  if (is.na(expires_at) || expires_at < as.numeric(Sys.time())) return(NULL)
+  payload <- paste(email, parts[2], sep = "|")
   hmac_expected <- tryCatch(.auth_hmac(payload), error = function(e) NULL)
   if (is.null(hmac_expected)) return(NULL)
   if (!identical(hmac_expected, hmac_seen)) return(NULL)

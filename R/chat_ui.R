@@ -3266,11 +3266,13 @@ translator_cancel_clear <- function(tok) {
       if (isTRUE(enum_resp$stopped) || translator_cancelled(tok))
         return(fail(enum_resp$error %||%
           "Stopped at your request. Nothing was produced from this call."))
+      # 2026-10-28: one path for every file. A failed discovery (after the
+      # transport's own retries) ends the run with the error instead of
+      # switching to the single-request path, which held the process for
+      # everyone until it finished.
       if (!is.null(enum_resp$error)) {
-        message("translator: discovery call failed (", enum_resp$error,
-                "), falling back to monolithic emission")
-        done()
-        return(.translator_force_template_single(state, session))
+        message("translator: discovery call failed (", enum_resp$error, ")")
+        return(fail(enum_resp$error))
       }
       if (!isTRUE(enum_resp$memo_hit))
         .translator_log_usage(state, enum_resp, stage = "enumerate", expect_warm = TRUE)
@@ -3279,12 +3281,14 @@ translator_cancel_clear <- function(tok) {
                               error = function(e) NULL)
       bad <- .translator_validate_piece(enum_parsed, "enumerate")
       if (!is.null(bad)) {
-        message("translator: discovery reply incomplete (", bad, "); using single-call path")
-        done()
-        return(.translator_force_template_single(state, session))
+        message("translator: discovery reply incomplete (", bad, ")")
+        return(fail(paste0("The first step (reading the structure of the inventory) came back incomplete: ",
+                           bad, ". Please click Produce again.")))
       }
       agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
       agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
+      # A file with no named production system is one system.
+      if (!length(agg_levels)) agg_levels <- "national"
       # 2026-10-22 (WP1 step 4): year, species and edition come from the
       # register when the user decided them; corrected here, no re-call.
       fix <- tryCatch(translator_register_apply_metadata(ctx$register, enum_parsed$inventory_metadata),
@@ -3304,13 +3308,6 @@ translator_cancel_clear <- function(tok) {
                                                 n_years = length(ctx$source_fp$year_sums %||% list())),
                         error = function(e) NULL)
       translator_job_update(job_id, levels = as.list(agg_levels), estimate = jest, stage = "batch")
-      if (length(agg_levels) <= 2L) {
-        message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
-                        length(agg_levels)))
-        translator_job_update(job_id, stage = "full", stage_label = "Producing the template in one piece")
-        done()
-        return(.translator_force_template_single(state, session, job_id = job_id))
-      }
       cached_levels <- intersect(agg_levels, names(ctx$batch_parts))
       fresh_levels  <- setdiff(agg_levels, cached_levels)
       if (length(cached_levels) > 0)
