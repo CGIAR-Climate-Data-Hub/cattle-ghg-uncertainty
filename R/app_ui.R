@@ -72,6 +72,18 @@ tutorial_video_link <- function(tab) {
     pills)
 }
 
+# 2026-10-28 (review): every graph carries a number for reference, a title
+# and a caption. Numbers are per tab ("Figure 4.2" is the second figure on
+# tab 4) so they stay the same in single-year and trend mode.
+fig_title <- function(num, txt) {
+  tagList(tags$span(style = "color:#1B4332; font-weight:700;",
+                    paste0(t("fig_word"), " ", num, ". ")), txt)
+}
+fig_caption <- function(key) {
+  tags$p(style = "font-size:0.82rem; color:#4B5563; margin:6px 2px 0 2px; line-height:1.35;",
+         t(key))
+}
+
 app_ui <- function(request = NULL) {
   lang <- i18n_lang_from_request(request)
   i18n_set_lang(lang)
@@ -1401,6 +1413,14 @@ app_ui <- function(request = NULL) {
           tags$strong(t("info_definitions_software")),
           t("info_definitions_tail"))
       ,
+      # 2026-10-28 (review): one search over both glossaries, and links to
+      # each; secondary columns open under a row (click the row).
+      div(style = "margin: 0 16px 12px 16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;",
+          div(style = "flex: 1 1 320px; max-width:520px;",
+              textInput("def_search", NULL, width = "100%",
+                        placeholder = t("def_search_placeholder"))),
+          tags$a(href = "#def-params", t("def_jump_params")),
+          tags$a(href = "#def-stats", t("def_jump_stats"))),
       # 2026-10-15: the declared-basis table is withheld from the app
       # and its outputs for now, on request. Nothing that builds it was
       # removed: basis_tool_wide(), basis_dimension_label() and
@@ -1409,14 +1429,18 @@ app_ui <- function(request = NULL) {
       # defaults/DEFAULTS_MASTER.md. Restoring the display means putting
       # these call sites back.
       bslib::card(
+        id = "def-params",
         bslib::card_header(t("card_param_definitions")),
-        bslib::card_body(DT::DTOutput("definitions_table"))
+        bslib::card_body(
+          tags$p(style = "font-size:0.83rem; color:#555; margin:0 0 4px 0;", t("def_more_hint")),
+          DT::DTOutput("definitions_table"))
       ),
       # Beta feedback 2026-09 (APickering): the app leans on statistical
       # vocabulary the target user (an Excel-fluent inventory compiler, not
       # a statistician) may not have. Plain-language glossary of every
       # statistical term used across the tabs, below the parameter glossary.
       bslib::card(
+        id = "def-stats",
         bslib::card_header(t("card_stat_glossary")),
         bslib::card_body(
           tags$p(t("info_stat_glossary")),
@@ -1961,7 +1985,9 @@ app_ui <- function(request = NULL) {
               fileInput("corr_matrix_upload", "Upload correlation matrix (.csv)",
                         accept = ".csv")
             ),
+            tags$h6(style = "margin-top:12px;", fig_title("3.1", t("corr_heatmap_title_ad"))),
             plotly::plotlyOutput("corr_heatmap", height = "350px"),
+            fig_caption("fig_cap_corr"),
             # Cross-group sharing (2026-09). Placed in the activity-data card
             # because it is the setting that decides the headline number: when
             # groups reuse one estimate, sampling them independently makes the
@@ -1969,15 +1995,18 @@ app_ui <- function(request = NULL) {
             tags$hr(),
             tags$strong(t("crossgroup_label")),
             radioButtons(
-              inputId = "crossgroup_mode", label = NULL, selected = "shared",
-              choiceValues = c("shared", "independent"),
+              # 2026-10-28 (review): independent is the default and comes
+              # first, so the sensitivity results are at the level of each
+              # group unless the user chooses otherwise.
+              inputId = "crossgroup_mode", label = NULL, selected = "independent",
+              choiceValues = c("independent", "shared"),
               choiceNames = list(
-                tagList(tags$strong(t("crossgroup_shared")), tags$br(),
-                        tags$span(style = "font-size:0.85rem; color:#5f6b63;",
-                                  t("crossgroup_shared_help"))),
                 tagList(tags$strong(t("crossgroup_independent")), tags$br(),
                         tags$span(style = "font-size:0.85rem; color:#5f6b63;",
-                                  t("crossgroup_independent_help")))
+                                  t("crossgroup_independent_help"))),
+                tagList(tags$strong(t("crossgroup_shared")), tags$br(),
+                        tags$span(style = "font-size:0.85rem; color:#5f6b63;",
+                                  t("crossgroup_shared_help")))
               )
             ),
             # v1 limitation, stated rather than hidden: a shared coefficient's
@@ -2184,6 +2213,81 @@ app_ui <- function(request = NULL) {
 
         conditionalPanel(
           condition = "input.analysis_mode != 'trend'",
+          # 2026-10-28 (review): diagnostics first.
+          # ---- Diagnostic trigger button (appears after simulation runs) ----
+          conditionalPanel(
+            condition = "output.has_diagnostics == true",
+            div(style = "text-align:center; margin: 12px 0 4px 0;",
+              actionButton("toggle_diagnostics",
+                           label = tagList(icon("magnifying-glass"), " Run Diagnostic"),
+                           class = "btn btn-danger",
+                           style = "font-weight:600; padding:8px 28px; font-size:0.95rem;")
+            )
+          ),
+
+          # ---- Collapsible diagnostic panel ----
+          conditionalPanel(
+            condition = "output.show_diagnostics == true",
+            bslib::card(
+              style = "border:2px solid #EF4444; margin-bottom:4px;",
+              bslib::card_header(
+                div(style = "display:flex; align-items:center; gap:8px;",
+                    icon("magnifying-glass", style = "color:#EF4444;"),
+                    tags$strong("Simulation Diagnostics"),
+                    tags$span(
+                      style = paste0("font-size:0.75rem; color:#6B6B6B; background:#F3F4F6;",
+                                     "border:1px solid #E0DDD5; border-radius:4px; padding:1px 8px;"),
+                      "Monte Carlo quality checks"
+                    )
+                )
+              ),
+              bslib::card_body(
+                div(class = "info-panel",
+                    icon("circle-info"),
+                    " These checks tell you whether your simulation ran long enough to produce trustworthy results. ",
+                    "All three quality checks should be ", tags$strong("green (Pass)"),
+                    " before submitting results. If any show ",
+                    tags$strong("Warn"), " or ", tags$strong("Fail"),
+                    ", go back to the Simulate tab, increase the number of iterations, and re-run.",
+                    tags$br(),
+                    tags$em(style = "color:#555; font-size:0.85rem;",
+                            icon("circle-info", style = "font-size:0.8rem;"),
+                            " Note: this tool uses ", tags$strong("independent Monte Carlo"), ", not MCMC. ",
+                            "Each iteration is drawn independently, so there are no chains, no warmup, and no burn-in. ",
+                            "The diagnostics above replace the multi-chain Gelman-Rubin checks used in Bayesian MCMC.")),
+                div(style = "margin-top:14px;",
+                    uiOutput("diag_badges")),
+                bslib::card(
+                  style = "margin-top:18px; border:1px solid #E0DDD5;",
+                  bslib::card_header(
+                    div(style = "display:flex; align-items:center; gap:6px;",
+                        fig_title("4.1", t("fig_conv_title")),
+                        bslib::tooltip(
+                          span(icon("circle-question"), style = "color:#6B6B6B; cursor:help;"),
+                          paste0("This plot shows how the running mean (dark green) and the 95% confidence interval bounds (blue dashes) ",
+                                 "evolve as more iterations are added. If the lines flatten out well before the last iteration, ",
+                                 "the simulation has converged. If the lines are still changing near the right edge of the plot, ",
+                                 "you need more iterations."),
+                          placement = "right"
+                        )
+                    )
+                  ),
+                  bslib::card_body(
+                    plotly::plotlyOutput("convergence_plot", height = "260px"),
+                    fig_caption("fig_cap_conv")
+                  )
+                )
+              )
+            )
+          ),
+
+          # 2026-10-28 (review): results in gigagrams with 3 decimals by
+          # default; tonnes, or both, on request.
+          div(style = "padding: 4px 16px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap;",
+              tags$strong(t("res_units_label")),
+              radioButtons("res_units", NULL, inline = TRUE, selected = "gg",
+                           choices = setNames(c("gg", "t", "both"),
+                                              c(t("res_units_gg"), t("res_units_t"), t("res_units_both"))))),
           bslib::layout_columns(
             col_widths = NULL,
             bslib::value_box(title = t("res_vb_enteric_ch4_t"),
@@ -2232,79 +2336,15 @@ app_ui <- function(request = NULL) {
           bslib::layout_columns(
             col_widths = c(6, 6),
             bslib::card(
-              bslib::card_header(t("res_emission_dist_h")),
-              bslib::card_body(plotly::plotlyOutput("results_histogram"))
+              bslib::card_header(fig_title("4.2", t("res_emission_dist_h"))),
+              bslib::card_body(plotly::plotlyOutput("results_histogram"),
+                               fig_caption("fig_cap_hist"))
             ),
             bslib::card(
-              bslib::card_header(t("res_decomp_h")),
+              bslib::card_header(fig_title("4.3", t("res_decomp_h"))),
               bslib::card_body(
-                plotly::plotlyOutput("decomposition_plot")
-              )
-            )
-          ),
-
-          # ---- Diagnostic trigger button (appears after simulation runs) ----
-          conditionalPanel(
-            condition = "output.has_diagnostics == true",
-            div(style = "text-align:center; margin: 12px 0 4px 0;",
-              actionButton("toggle_diagnostics",
-                           label = tagList(icon("magnifying-glass"), " Run Diagnostic"),
-                           class = "btn btn-danger",
-                           style = "font-weight:600; padding:8px 28px; font-size:0.95rem;")
-            )
-          ),
-
-          # ---- Collapsible diagnostic panel ----
-          conditionalPanel(
-            condition = "output.show_diagnostics == true",
-            bslib::card(
-              style = "border:2px solid #EF4444; margin-bottom:4px;",
-              bslib::card_header(
-                div(style = "display:flex; align-items:center; gap:8px;",
-                    icon("magnifying-glass", style = "color:#EF4444;"),
-                    tags$strong("Simulation Diagnostics"),
-                    tags$span(
-                      style = paste0("font-size:0.75rem; color:#6B6B6B; background:#F3F4F6;",
-                                     "border:1px solid #E0DDD5; border-radius:4px; padding:1px 8px;"),
-                      "Monte Carlo quality checks"
-                    )
-                )
-              ),
-              bslib::card_body(
-                div(class = "info-panel",
-                    icon("circle-info"),
-                    " These checks tell you whether your simulation ran long enough to produce trustworthy results. ",
-                    "All three quality checks should be ", tags$strong("green (Pass)"),
-                    " before submitting results. If any show ",
-                    tags$strong("Warn"), " or ", tags$strong("Fail"),
-                    ", go back to the Simulate tab, increase the number of iterations, and re-run.",
-                    tags$br(),
-                    tags$em(style = "color:#555; font-size:0.85rem;",
-                            icon("circle-info", style = "font-size:0.8rem;"),
-                            " Note: this tool uses ", tags$strong("independent Monte Carlo"), ", not MCMC. ",
-                            "Each iteration is drawn independently, so there are no chains, no warmup, and no burn-in. ",
-                            "The diagnostics above replace the multi-chain Gelman-Rubin checks used in Bayesian MCMC.")),
-                div(style = "margin-top:14px;",
-                    uiOutput("diag_badges")),
-                bslib::card(
-                  style = "margin-top:18px; border:1px solid #E0DDD5;",
-                  bslib::card_header(
-                    div(style = "display:flex; align-items:center; gap:6px;",
-                        "Convergence trace",
-                        bslib::tooltip(
-                          span(icon("circle-question"), style = "color:#6B6B6B; cursor:help;"),
-                          paste0("This plot shows how the running mean (dark green) and the 95% confidence interval bounds (blue dashes) ",
-                                 "evolve as more iterations are added. If the lines flatten out well before the last iteration, ",
-                                 "the simulation has converged. If the lines are still changing near the right edge of the plot, ",
-                                 "you need more iterations."),
-                          placement = "right"
-                        )
-                    )
-                  ),
-                  bslib::card_body(
-                    plotly::plotlyOutput("convergence_plot", height = "260px")
-                  )
-                )
+                plotly::plotlyOutput("decomposition_plot"),
+                fig_caption("fig_cap_decomp")
               )
             )
           ),
@@ -2385,19 +2425,22 @@ app_ui <- function(request = NULL) {
           bslib::layout_columns(
             col_widths = c(7, 5),
             bslib::card(
-              bslib::card_header(t("card_trend_chart_h")),
-              bslib::card_body(plotly::plotlyOutput("trend_plot", height = "360px"))
+              bslib::card_header(fig_title("4.1", t("card_trend_chart_h"))),
+              bslib::card_body(plotly::plotlyOutput("trend_plot", height = "360px"),
+                               fig_caption("fig_cap_trend"))
             ),
             bslib::card(
-              bslib::card_header(t("res_trend_yoy_h")),
-              bslib::card_body(plotly::plotlyOutput("trend_yoy_chart", height = "360px"))
+              bslib::card_header(fig_title("4.2", t("res_trend_yoy_h"))),
+              bslib::card_body(plotly::plotlyOutput("trend_yoy_chart", height = "360px"),
+                               fig_caption("fig_cap_yoy"))
             )
           ),
           bslib::card(
-            bslib::card_header(t("res_trend_delta_hist_h")),
+            bslib::card_header(fig_title("4.3", t("res_trend_delta_hist_h"))),
             bslib::card_body(
               p(tags$em(t("res_trend_delta_hist_note"))),
-              plotly::plotlyOutput("trend_delta_histogram", height = "300px")
+              plotly::plotlyOutput("trend_delta_histogram", height = "300px"),
+              fig_caption("fig_cap_delta")
             )
           ),
           bslib::card(
@@ -2470,10 +2513,11 @@ app_ui <- function(request = NULL) {
         bslib::layout_columns(
           col_widths = c(6, 6),
           bslib::card(
-            bslib::card_header(t("card_tornado_h")),
+            bslib::card_header(fig_title("5.1", t("card_tornado_h"))),
             bslib::card_body(
               uiOutput("tornado_note"),
-              plotly::plotlyOutput("tornado_chart"))
+              plotly::plotlyOutput("tornado_chart"),
+              fig_caption("fig_cap_tornado"))
           ),
           bslib::card(
             bslib::card_header(t("card_sens_rankings")),
@@ -2518,9 +2562,10 @@ app_ui <- function(request = NULL) {
         bslib::layout_columns(
           col_widths = c(7, 5),
           bslib::card(
-            bslib::card_header(t("tornado_top10")),
+            bslib::card_header(fig_title("5.1", t("fig_tornado_year_title"))),
             bslib::card_body(plotly::plotlyOutput("trend_tornado_per_year_sens",
-                                                   height = "420px"))
+                                                   height = "420px"),
+                             fig_caption("fig_cap_tornado_year"))
           ),
           bslib::card(
             bslib::card_header(t("trend_rankings_top15")),
@@ -2534,9 +2579,10 @@ app_ui <- function(request = NULL) {
         bslib::layout_columns(
           col_widths = c(7, 5),
           bslib::card(
-            bslib::card_header(t("tornado_top10")),
+            bslib::card_header(fig_title("5.2", t("fig_tornado_delta_title"))),
             bslib::card_body(plotly::plotlyOutput("trend_tornado_delta_sens",
-                                                   height = "420px"))
+                                                   height = "420px"),
+                             fig_caption("fig_cap_tornado_delta"))
           ),
           bslib::card(
             bslib::card_header(t("trend_rankings_top15")),
@@ -2618,28 +2664,31 @@ app_ui <- function(request = NULL) {
           )
         ),
         bslib::card(
-          bslib::card_header(t("card_dist_per_source")),
+          bslib::card_header(fig_title("6.1", t("card_dist_per_source"))),
           bslib::card_body(
             p(t("body_dist_per_source"),
               tags$strong(t("xrange_label")),
               t("body_dist_per_source_mid"),
               tags$strong(t("count_label")),
               t("body_dist_per_source_tail")),
-            plotly::plotlyOutput("report_source_histograms", height = "420px")
+            plotly::plotlyOutput("report_source_histograms", height = "420px"),
+            fig_caption("fig_cap_src_hist")
           )
         ),
         bslib::card(
-          bslib::card_header(t("card_top_drivers")),
+          bslib::card_header(fig_title("6.2", t("card_top_drivers"))),
           bslib::card_body(
             p(t("body_top_drivers")),
-            plotly::plotlyOutput("report_tornado", height = "380px")
+            plotly::plotlyOutput("report_tornado", height = "380px"),
+            fig_caption("fig_cap_report_tornado")
           )
         ),
         bslib::card(
-          bslib::card_header(t("card_input_dists")),
+          bslib::card_header(fig_title("6.3", t("card_input_dists"))),
           bslib::card_body(
             p(t("body_input_dists")),
-            plotly::plotlyOutput("report_input_densities", height = "780px")
+            plotly::plotlyOutput("report_input_densities", height = "780px"),
+            fig_caption("fig_cap_input_dens")
           )
         ),
         bslib::card(
@@ -2695,8 +2744,9 @@ app_ui <- function(request = NULL) {
           )
         ),
         bslib::card(
-          bslib::card_header(t("card_trend_chart_h")),
-          bslib::card_body(plotly::plotlyOutput("trend_plot_report", height = "400px"))
+          bslib::card_header(fig_title("6.1", t("card_trend_chart_h"))),
+          bslib::card_body(plotly::plotlyOutput("trend_plot_report", height = "400px"),
+                           fig_caption("fig_cap_trend"))
         ),
         bslib::card(
           bslib::card_header(t("card_trend_table_h")),
@@ -2712,12 +2762,14 @@ app_ui <- function(request = NULL) {
             bslib::layout_columns(
               col_widths = c(6, 6),
               div(
-                h6(t("info_trend_sens_per_year_label"), style = "color:#1B4332;"),
-                plotly::plotlyOutput("trend_tornado_per_year_report", height = "320px")
+                h6(fig_title("6.2", t("fig_tornado_year_title")), style = "color:#1B4332;"),
+                plotly::plotlyOutput("trend_tornado_per_year_report", height = "320px"),
+                fig_caption("fig_cap_tornado_year")
               ),
               div(
-                h6(t("info_trend_sens_delta_label"), style = "color:#1B4332;"),
-                plotly::plotlyOutput("trend_tornado_delta_report", height = "320px")
+                h6(fig_title("6.3", t("fig_tornado_delta_title")), style = "color:#1B4332;"),
+                plotly::plotlyOutput("trend_tornado_delta_report", height = "320px"),
+                fig_caption("fig_cap_tornado_delta")
               )
             )
           )

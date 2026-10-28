@@ -1358,7 +1358,7 @@ app_server <- function(input, output, session) {
     rv$sim_log <- paste0(rv$sim_log, "Activity-data correlation: ",
                          input$corr_mode %||% "none", "\n")
     rv$sim_log <- paste0(rv$sim_log, "Shared inputs across groups: ",
-                         input$crossgroup_mode %||% "shared", "\n")
+                         input$crossgroup_mode %||% "independent", "\n")
     rv$sim_log <- paste0(rv$sim_log,
                          "Coefficient correlation: independent (IPCC default)\n")
 
@@ -1451,7 +1451,7 @@ app_server <- function(input, output, session) {
           # trend ran the whole sheet as one system. knowledge/22-trend-capacity.md
           built <- build_systems_data(
             specs, manure = manure, n_iter = n_iter_val, seed = input$seed,
-            crossgroup  = if (identical(input$crossgroup_mode %||% "shared", "shared"))
+            crossgroup  = if (identical(input$crossgroup_mode %||% "independent", "shared"))
                             "shared" else "independent",
             corr_matrix = if (isTRUE(input$corr_mode != "none")) effective_corr_matrix() else NULL,
             sg_to_mm    = sg_to_mm)
@@ -1880,16 +1880,25 @@ app_server <- function(input, output, session) {
 
   # --- RESULTS ---
 
+  # 2026-10-28 (review): masses in gigagrams with 3 decimals by default,
+  # in tonnes, or both, as the user picks above the result cards.
+  .fmt_mass <- function(x_t, suffix = "") {
+    if (length(x_t) == 0 || is.na(x_t)) return("---")
+    gg <- paste0(formatC(x_t / 1000, format = "f", digits = 3, big.mark = ","), " Gg", suffix)
+    tt <- paste0(formatC(x_t, format = "f", digits = if (abs(x_t) < 10) 3 else 1, big.mark = ","), " t", suffix)
+    switch(input$res_units %||% "gg", t = tt, both = paste0(gg, " (", tt, ")"), gg)
+  }
+
   output$vb_ch4 <- renderText({
     req(rv$uncertainty)
     row <- rv$uncertainty[rv$uncertainty$variable == "total_ch4", ]
-    if (nrow(row) > 0) paste0(round(row$mean, 1), " t") else "---"
+    if (nrow(row) > 0) .fmt_mass(row$mean) else "---"
   })
 
   output$vb_n2o <- renderText({
     req(rv$uncertainty)
     row <- rv$uncertainty[rv$uncertainty$variable == "total_n2o", ]
-    if (nrow(row) > 0) paste0(round(row$mean, 3), " t") else "---"
+    if (nrow(row) > 0) .fmt_mass(row$mean) else "---"
   })
 
   # Andreas 2026-05 C1: per-IPCC-source value boxes, mirrors the IPCC
@@ -1909,8 +1918,7 @@ app_server <- function(input, output, session) {
   .vb_mean <- function(var) {
     row <- rv$uncertainty[rv$uncertainty$variable == var, ]
     if (nrow(row) == 0) return("---")
-    paste0(round(row$mean, if (row$mean < 10) 3 else 1), " t",
-           .moe_suffix(row))
+    paste0(.fmt_mass(row$mean), .moe_suffix(row))
   }
   .vb_sum_means <- function(vars) {
     rows <- rv$uncertainty[rv$uncertainty$variable %in% vars, ]
@@ -1934,7 +1942,7 @@ app_server <- function(input, output, session) {
         }
       }
     }
-    paste0(round(s, if (s < 10) 3 else 1), " t", moe_str)
+    paste0(.fmt_mass(s), moe_str)
   }
   output$vb_enteric_ch4 <- renderText({ req(rv$uncertainty); .vb_mean("total_enteric_ch4") })
   output$vb_manure_ch4  <- renderText({ req(rv$uncertainty); .vb_mean("total_manure_ch4") })
@@ -1950,16 +1958,16 @@ app_server <- function(input, output, session) {
   output$vb_co2e <- renderText({
     req(rv$uncertainty)
     row <- rv$uncertainty[rv$uncertainty$variable == "total_co2e", ]
-    if (nrow(row) > 0) paste0(round(row$mean, 1), " t CO2eq") else "---"
+    if (nrow(row) > 0) .fmt_mass(row$mean, " CO2eq") else "---"
   })
 
   # T6.3: secondary inline display of CO2eq (kept for sensitivity)
   output$vb_co2e_inline <- renderText({
     req(rv$uncertainty)
     row <- rv$uncertainty[rv$uncertainty$variable == "total_co2e", ]
-    if (nrow(row) > 0) paste0(round(row$mean, 1), " t (95% CI ",
-                              round(row$ci_lower, 1), "–",
-                              round(row$ci_upper, 1), ")") else "---"
+    if (nrow(row) > 0) paste0(.fmt_mass(row$mean), " (95% CI ",
+                              .fmt_mass(row$ci_lower), " to ",
+                              .fmt_mass(row$ci_upper), ")") else "---"
   })
 
   # Andreas 28/5/26 #6: the value box previously titled "Total CV (%)" now
@@ -2586,6 +2594,37 @@ app_server <- function(input, output, session) {
     )
   })
 
+  # 2026-10-28 (review): every tornado in the app draws through this one
+  # function: green for inputs the user can improve with better national
+  # data, blue for IPCC coefficients, no red; the direction of the bar
+  # carries the sign; a legend below the chart in a larger font.
+  .tornado_bars <- function(params, vals, reducible, title_text, x_title) {
+    lev <- params
+    p <- plotly::plot_ly()
+    for (grp in c(TRUE, FALSE)) {
+      k <- which(reducible == grp)
+      if (!length(k)) next
+      p <- plotly::add_bars(p, y = factor(params[k], levels = lev), x = vals[k],
+                            orientation = "h",
+                            name = if (grp) t("sens_leg_reducible") else t("sens_leg_ipcc"),
+                            marker = list(color = if (grp) "#2D6A4F" else "#1565C0"),
+                            hovertemplate = "%{y}: %{x:.2f}<extra>%{fullData.name}</extra>")
+    }
+    plotly::layout(p,
+      title = list(text = title_text, font = list(size = 13)),
+      barmode = "overlay", margin = list(t = 48, l = 130),
+      xaxis = list(title = x_title, zeroline = TRUE),
+      yaxis = list(title = "", categoryorder = "array", categoryarray = lev),
+      legend = list(orientation = "h", x = 0, y = -0.18, font = list(size = 14)))
+  }
+  .reducible_of <- function(params) {
+    bare <- sub(" \\([^()]+\\)\\s*$", "", params)
+    bare <- gsub("_(y1|yN)$", "", bare)
+    lut <- setNames(PARAM_CATALOGUE$user_reducible, PARAM_CATALOGUE$parameter)
+    r <- lut[bare]; r[is.na(r)] <- TRUE
+    as.logical(r)
+  }
+
   output$tornado_chart <- plotly::renderPlotly({
     sens_data <- active_sensitivity()
     req(sens_data)
@@ -2617,40 +2656,11 @@ app_server <- function(input, output, session) {
     val_col <- if ("src" %in% names(top10)) "src" else "prcc"
     top10 <- top10[order(top10[[val_col]]), ]
 
-    # Colour by user_reducible: green = user can improve with better data; grey = IPCC coefficient
-    # Andreas 28/5/26 follow-up: tornado labels now include the
-    # sub-category in parentheses (e.g. "Ym (DINT_cow)"). Strip that
-    # suffix before the catalogue lookup, otherwise every row falls back
-    # to NA → TRUE and every bar shows as user-reducible.
-    reducible_lut <- setNames(PARAM_CATALOGUE$user_reducible, PARAM_CATALOGUE$parameter)
-    bare_name <- sub(" \\([^()]+\\)\\s*$", "", top10$parameter)
-    top10$reducible <- reducible_lut[bare_name]
-    top10$reducible[is.na(top10$reducible)] <- TRUE
-    bar_colours <- ifelse(top10[[val_col]] > 0,
-      ifelse(top10$reducible, "#2D6A4F", "#78909C"),
-      ifelse(top10$reducible, "#C1121F", "#90A4AE")
-    )
-
     view_label <- if (!is.null(input$sens_view) && input$sens_view == "without")
-      " (without correlations)" else ""
-
-    plotly::plot_ly(y = factor(top10$parameter, levels = top10$parameter),
-                    x = top10[[val_col]], type = "bar", orientation = "h",
-                    marker = list(color = bar_colours),
-                    # hovertext (not text) so the label shows only on hover,
-                    # instead of being printed on top of every bar.
-                    hovertext = ifelse(top10$reducible, "User-reducible", "IPCC coefficient"),
-                    hoverinfo = "x+y+text") %>%
-      plotly::layout(
-        title = paste0("Top Parameters: ", toupper(val_col), view_label),
-        margin = list(t = 48),  # room so the title clears the plotly toolbar
-        xaxis = list(title = val_col), yaxis = list(title = ""),
-        annotations = list(list(
-          x = 0.99, y = 0.01, xref = "paper", yref = "paper", showarrow = FALSE, align = "right",
-          text = "<span style='color:#2D6A4F'>■</span> User-reducible &nbsp; <span style='color:#78909C'>■</span> IPCC coefficient",
-          font = list(size = 10)
-        ))
-      )
+      t("sens_view_without_suffix") else ""
+    .tornado_bars(as.character(top10$parameter), top10[[val_col]], .reducible_of(top10$parameter),
+                  paste0(t("sens_tornado_title"), " (", toupper(val_col), ")", view_label),
+                  toupper(val_col))
   })
 
   # Caption above the tornado: PRCC-skipped / subsample notes, rendered as HTML
@@ -2675,7 +2685,11 @@ app_server <- function(input, output, session) {
     } else if (!is.null(sens_data$src)) {
       sens_data$src
     } else req(FALSE)
-    DT::datatable(sens, rownames = FALSE, options = list(pageLength = 20))
+    # 2026-10-28 (review): two decimals.
+    dec <- names(sens)[vapply(sens, function(v) is.numeric(v) && any(abs(v - round(v)) > 1e-9, na.rm = TRUE), logical(1))]
+    dt <- DT::datatable(sens, rownames = FALSE, options = list(pageLength = 20))
+    if (length(dec)) dt <- DT::formatRound(dt, dec, digits = 2)
+    dt
   })
 
   # --- IPCC REPORT ---
@@ -2730,6 +2744,9 @@ app_server <- function(input, output, session) {
     # the number without the basis leaves a user unable to judge whether it
     # applies to their herd, or what to change if it does not.
     cat$ipcc_basis <- vapply(cat$parameter, basis_label, character(1))
+    cat <- .def_filter(cat[, c("parameter", "definition", "unit",
+                               "ipcc_default", "ipcc_basis", "suggested_distribution",
+                               "param_tier", "ipcc_framing", "ipcc_ref")])
     DT::datatable(
       cat[, c("parameter", "definition", "unit",
               "ipcc_default", "ipcc_basis", "suggested_distribution",
@@ -2743,13 +2760,26 @@ app_server <- function(input, output, session) {
           t("def_col_ipcc_default"), t("def_col_basis"), t("def_col_dist"),
           t("def_col_level"),
           t("def_col_ipcc_framing"), t("def_col_ipcc_ref"))),
-      # Sticky column names. scrollY gives the
-      # table its own scroll area with the header row pinned above it.
-      options = list(pageLength = -1, dom = "t", scrollX = TRUE,
-                     scrollY = "65vh", scrollCollapse = TRUE),
-      class = "compact stripe"
+      # 2026-10-28 (review): readable at a glance. Variable, definition,
+      # unit and IPCC default show; the basis, distribution, level,
+      # framing and reference open under the row (Responsive child row).
+      extensions = "Responsive",
+      options = list(pageLength = -1, dom = "t",
+                     columnDefs = list(list(className = "none", targets = 4:8),
+                                       list(width = "45%", targets = 1))),
+      class = "compact stripe hover"
     )
   })
+  # The search box above both glossaries keeps the rows that contain the
+  # typed text in any column (case-insensitive); filtered here, on the
+  # server, so it works whatever the table options.
+  def_query <- shiny::debounce(reactive(trimws(input$def_search %||% "")), 300)
+  .def_filter <- function(df) {
+    q <- def_query()
+    if (!nzchar(q)) return(df)
+    hit <- Reduce(`|`, lapply(df, function(col) grepl(tolower(q), tolower(as.character(col)), fixed = TRUE)))
+    df[hit %in% TRUE, , drop = FALSE]
+  }
   # Render eagerly at startup so the table is cached in the browser and
   # visible even when the server is busy running a simulation.
   outputOptions(output, "definitions_table", suspendWhenHidden = FALSE)
@@ -2767,13 +2797,13 @@ app_server <- function(input, output, session) {
                           character(1)),
       stringsAsFactors = FALSE
     )
+    gl <- .def_filter(gl)
     DT::datatable(
       gl,
       rownames = FALSE,
       colnames = setNames(c("term", "definition"),
                           c(t("stat_col_term"), t("stat_col_def"))),
-      options = list(pageLength = -1, dom = "t", scrollX = TRUE,
-                     scrollY = "60vh", scrollCollapse = TRUE),
+      options = list(pageLength = -1, dom = "t", columnDefs = list(list(width = "22%", targets = 0))),
       class = "compact stripe"
     )
   })
@@ -2902,13 +2932,8 @@ app_server <- function(input, output, session) {
 
     top10 <- utils::head(sens, 10)
     top10 <- top10[order(top10[[val_col]]), , drop = FALSE]
-    plotly::plot_ly(y = factor(top10$parameter, levels = top10$parameter),
-                    x = top10[[val_col]], type = "bar", orientation = "h",
-                    marker = list(color = ifelse(top10[[val_col]] > 0,
-                                                 "#2D6A4F", "#C1121F"))) |>
-      plotly::layout(title = paste0("Top 10, ", toupper(val_col)),
-                     xaxis = list(title = val_col),
-                     yaxis = list(title = ""))
+    .tornado_bars(as.character(top10$parameter), top10[[val_col]], .reducible_of(top10$parameter),
+                  paste0(t("sens_tornado_title"), " (", toupper(val_col), ")"), toupper(val_col))
   })
 
   # Tx.1: input distribution density plots for QA review
@@ -3191,7 +3216,7 @@ app_server <- function(input, output, session) {
           # correlation matrix and the resolved sub-category matches.
           sgm <- tryCatch(resolve_sub_category_matches(rv$param_specs, rv$manure_data)$matched,
                           error = function(e) list())
-          cg <- if (identical(input$crossgroup_mode %||% "shared", "shared")) "shared" else "independent"
+          cg <- if (identical(input$crossgroup_mode %||% "independent", "shared")) "shared" else "independent"
           cm <- if (isTRUE(input$corr_mode != "none")) rv$corr_matrix else NULL
           res <- run_trend_analysis(
             df, base_specs = rv$param_specs, n_iter = n_iter,
@@ -3632,40 +3657,8 @@ app_server <- function(input, output, session) {
     top10 <- utils::head(base[order(-abs(base[[val_col]])), , drop = FALSE], 10)
     top10 <- top10[order(top10[[val_col]]), , drop = FALSE]
 
-    # Map parameter -> user_reducible. For trend-driver names like "W_y1" or
-    # "Cfi_yN" strip the year suffix; for multi-system labels with the
-    # sub-category in parentheses (e.g. "Ym (DINT_cow)") strip the
-    # parenthesised suffix too: both must be stripped before the
-    # catalogue lookup.
-    bare_name <- sub(" \\([^()]+\\)\\s*$", "", top10$parameter)
-    bare_name <- gsub("_(y1|yN)$", "", bare_name)
-    reducible_lut <- setNames(PARAM_CATALOGUE$user_reducible,
-                                PARAM_CATALOGUE$parameter)
-    top10$reducible <- reducible_lut[bare_name]
-    top10$reducible[is.na(top10$reducible)] <- TRUE
-
-    bar_colours <- ifelse(top10[[val_col]] > 0,
-      ifelse(top10$reducible, "#2D6A4F", "#78909C"),
-      ifelse(top10$reducible, "#C1121F", "#90A4AE")
-    )
-    hover_txt <- ifelse(top10$reducible, "User-reducible", "IPCC coefficient")
-
-    plotly::plot_ly(y = factor(top10$parameter, levels = top10$parameter),
-                    x = top10[[val_col]], type = "bar", orientation = "h",
-                    marker = list(color = bar_colours),
-                    text = hover_txt, hoverinfo = "x+y+text") |>
-      plotly::layout(
-        title = list(text = title_text, font = list(size = 12)),
-        xaxis = list(title = toupper(val_col)),
-        yaxis = list(title = ""),
-        margin = list(l = 130, b = 40),
-        annotations = list(list(
-          x = 0.99, y = -0.18, xref = "paper", yref = "paper",
-          showarrow = FALSE, align = "right",
-          text = "<span style='color:#2D6A4F'>■</span> User-reducible &nbsp; <span style='color:#78909C'>■</span> IPCC coefficient",
-          font = list(size = 10)
-        ))
-      )
+    .tornado_bars(as.character(top10$parameter), top10[[val_col]], .reducible_of(top10$parameter),
+                  title_text, toupper(val_col))
   }
 
   # Round 9 follow-up: trend rankings table (per-year + Δ). Mirrors the
@@ -3702,10 +3695,10 @@ app_server <- function(input, output, session) {
     reducible[is.na(reducible)] <- TRUE
 
     src_disp  <- if ("src" %in% names(base))
-                   formatC(base$src,  digits = 3, format = "f") else NA_character_
+                   formatC(base$src,  digits = 2, format = "f") else NA_character_
     prcc_disp <- if (!is.null(prcc) && "prcc" %in% names(prcc))
                    formatC(prcc$prcc[match(base$parameter, prcc$parameter)],
-                           digits = 3, format = "f") else NA_character_
+                           digits = 2, format = "f") else NA_character_
 
     df <- data.frame(
       Parameter = base$parameter,
@@ -3723,10 +3716,10 @@ app_server <- function(input, output, session) {
     DT::formatStyle(dt, "Class",
       backgroundColor = DT::styleEqual(
         c("User-reducible", "IPCC coefficient"),
-        c("#D8F3DC", "#ECEFF1")),
+        c("#D8F3DC", "#DBEAFE")),
       color = DT::styleEqual(
         c("User-reducible", "IPCC coefficient"),
-        c("#1B4332", "#37474F")),
+        c("#1B4332", "#1E3A8A")),
       fontWeight = "600")
   }
 

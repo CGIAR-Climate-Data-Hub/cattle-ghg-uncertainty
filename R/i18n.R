@@ -172,14 +172,14 @@ lang_state_take <- function(token) {
     en = "Inputs shared between groups",
     fr = "Entrées partagées entre groupes"),
   crossgroup_shared = list(
-    en = "Treat a shared value as one estimate (recommended)",
-    fr = "Traiter une valeur partagée comme une seule estimation (recommandé)"),
+    en = "Treat a shared value as one estimate",
+    fr = "Traiter une valeur partagée comme une seule estimation"),
   crossgroup_shared_help = list(
     en = "Where several groups carry the same number for a coefficient, it is one estimate applied several times, so its error moves every group in the same direction at once. This is the IPCC treatment and it keeps the reported uncertainty independent of how finely you split the inventory.",
     fr = "Lorsque plusieurs groupes portent le même nombre pour un coefficient, il s'agit d'une seule estimation appliquée plusieurs fois : son erreur déplace donc tous les groupes dans le même sens en même temps. C'est le traitement IPCC, et il rend l'incertitude rapportée indépendante de la finesse du découpage de l'inventaire."),
   crossgroup_independent = list(
-    en = "Treat every group independently",
-    fr = "Traiter chaque groupe indépendamment"),
+    en = "Treat every group independently (default)",
+    fr = "Traiter chaque groupe indépendamment (par défaut)"),
   crossgroup_independent_help = list(
     en = "Each group redraws every coefficient on its own. Correct only if each group's values were estimated separately. On a shared estimate this understates the uncertainty, and increasingly so the more groups there are.",
     fr = "Chaque groupe retire lui-même chaque coefficient. Correct uniquement si les valeurs de chaque groupe ont été estimées séparément. Sur une estimation partagée, cela sous-estime l'incertitude, d'autant plus que les groupes sont nombreux."),
@@ -2101,6 +2101,64 @@ lang_state_take <- function(token) {
   res_col_ci_lower_t     = list(en = "CI lower (t CO₂eq)", fr = "Borne inf. IC (t CO₂éq)"),
   res_col_ci_upper_t     = list(en = "CI upper (t CO₂eq)", fr = "Borne sup. IC (t CO₂éq)"),
 
+  # 2026-10-28 (review): figure numbers, captions, units, tornado legend,
+  # Definitions search.
+  fig_word = list(en = "Figure", fr = "Figure"),
+  fig_conv_title = list(en = "Convergence of the simulation", fr = "Convergence de la simulation"),
+  fig_tornado_year_title = list(en = "Top 10 drivers of the latest year", fr = "Les 10 principaux facteurs de la dernière année"),
+  fig_tornado_delta_title = list(en = "Top 10 drivers of the change between the first and the last year", fr = "Les 10 principaux facteurs de la variation entre la première et la dernière année"),
+  fig_cap_corr = list(
+    en = "Correlation used in the run between each pair of activity-data inputs, from -1 to +1. Green cells move together, red cells move in opposite directions, white cells are independent.",
+    fr = "Corrélation utilisée dans l'exécution entre chaque paire de données d'activité, de -1 à +1. Les cellules vertes varient ensemble, les rouges en sens opposé, les blanches sont indépendantes."),
+  fig_cap_conv = list(
+    en = "Running mean of total CO2eq (solid line) and running 2.5th and 97.5th percentiles (dashed lines) as iterations are added. Lines that are flat at the right edge show that the simulation ran long enough.",
+    fr = "Moyenne cumulée du CO₂éq total (trait plein) et 2,5e et 97,5e percentiles cumulés (tirets) au fil des itérations. Des courbes plates à droite indiquent que la simulation a été assez longue."),
+  fig_cap_hist = list(
+    en = "Each bar counts the iterations whose total CO2eq fell in that range. The dashed lines are the 2.5th and 97.5th percentiles, the bounds of the 95% confidence interval.",
+    fr = "Chaque barre compte les itérations dont le CO₂éq total tombe dans cet intervalle. Les tirets sont les 2,5e et 97,5e percentiles, bornes de l'intervalle de confiance à 95 %."),
+  fig_cap_decomp = list(
+    en = "Margin of error (MoE: half the width of the 95% confidence interval, as a percentage of the mean) of total CO2eq when only the activity data vary, when only the coefficients vary, and when both vary. The combined bar is the reported uncertainty.",
+    fr = "Marge d'erreur (MoE : demi-largeur de l'intervalle de confiance à 95 %, en pourcentage de la moyenne) du CO₂éq total lorsque seules les données d'activité varient, lorsque seuls les coefficients varient, et lorsque les deux varient. La barre combinée est l'incertitude rapportée."),
+  fig_cap_trend = list(
+    en = "Mean total CO2eq for each year (line) with its 95% confidence interval (shaded band).",
+    fr = "CO₂éq total moyen pour chaque année (courbe) avec son intervalle de confiance à 95 % (bande)."),
+  fig_cap_yoy = list(
+    en = "Change in mean total CO2eq from one year to the next, in percent. Bars above zero are increases.",
+    fr = "Variation du CO₂éq total moyen d'une année à l'autre, en pourcentage. Les barres au-dessus de zéro sont des hausses."),
+  fig_cap_delta = list(
+    en = "Distribution, across iterations, of the difference between the last and the first year. The dashed lines bound the 95% confidence interval; when it does not include zero, the trend is distinguishable from no change.",
+    fr = "Distribution, sur les itérations, de la différence entre la dernière et la première année. Les tirets bornent l'intervalle de confiance à 95 % ; s'il n'inclut pas zéro, la tendance se distingue d'une absence de changement."),
+  fig_cap_tornado = list(
+    en = "The ten inputs with the largest influence on the selected output. Bar length is the sensitivity coefficient (SRC or PRCC); bars to the right raise the output, bars to the left lower it. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+    fr = "Les dix entrées qui influencent le plus la sortie choisie. La longueur de la barre est le coefficient de sensibilité (SRC ou PRCC) ; les barres à droite augmentent la sortie, celles à gauche la diminuent. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),
+  fig_cap_tornado_year = list(
+    en = "The ten inputs with the largest influence on total CO2eq in the latest year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+    fr = "Les dix entrées qui influencent le plus le CO₂éq total de la dernière année. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),
+  fig_cap_tornado_delta = list(
+    en = "The ten inputs with the largest influence on the change between the first and the last year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+    fr = "Les dix entrées qui influencent le plus la variation entre la première et la dernière année. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),
+  fig_cap_src_hist = list(
+    en = "Simulated distribution of the emissions of each source, one panel per source.",
+    fr = "Distribution simulée des émissions de chaque source, un panneau par source."),
+  fig_cap_report_tornado = list(
+    en = "The ten inputs with the largest influence on total CO2eq. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+    fr = "Les dix entrées qui influencent le plus le CO₂éq total. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),
+  fig_cap_input_dens = list(
+    en = "Distribution of up to twelve inputs of the first production system, as drawn in the simulation. Use it to check that each input has the shape and range you intended.",
+    fr = "Distribution d'au plus douze entrées du premier système de production, telles que tirées dans la simulation. Vérifiez que chaque entrée a la forme et la plage voulues."),
+  sens_leg_reducible = list(en = "Input you can improve with national data", fr = "Entrée améliorable par des données nationales"),
+  sens_leg_ipcc = list(en = "IPCC coefficient", fr = "Coefficient IPCC"),
+  sens_tornado_title = list(en = "Top 10 drivers", fr = "Les 10 principaux facteurs"),
+  sens_view_without_suffix = list(en = ", without correlations", fr = ", sans corrélations"),
+  res_units_label = list(en = "Show results in", fr = "Afficher les résultats en"),
+  res_units_gg = list(en = "Gigagrams (Gg)", fr = "Gigagrammes (Gg)"),
+  res_units_t = list(en = "Tonnes (t)", fr = "Tonnes (t)"),
+  res_units_both = list(en = "Both", fr = "Les deux"),
+  def_search_placeholder = list(en = "Search the definitions (e.g. Ym, margin of error)", fr = "Rechercher dans les définitions (ex. Ym, marge d'erreur)"),
+  def_jump_params = list(en = "Parameter definitions", fr = "Définitions des paramètres"),
+  def_jump_stats = list(en = "Statistical terms", fr = "Termes statistiques"),
+  def_more_hint = list(en = "Click a row to see its IPCC basis, distribution, level, framing and reference.", fr = "Cliquez sur une ligne pour voir sa base IPCC, sa distribution, son niveau, son cadrage et sa référence."),
+
   res_hist_chart_title = list(en = "Distribution of Total CO2eq Emissions",
                                 fr = "Distribution des émissions totales CO₂éq"),
   res_hist_xaxis = list(en = "Total CO2eq (tonnes)", fr = "CO₂éq total (tonnes)"),
@@ -2109,10 +2167,10 @@ lang_state_take <- function(token) {
     en = "%d of %d iterations beyond chart range",
     fr = "%d itérations sur %d au-delà de la plage du graphique"),
   res_decomp_chart_title = list(
-    en = "Uncertainty Decomposition (95% MoE, total CO2eq)",
-    fr = "Décomposition de l'incertitude (MoE 95 %, CO₂éq total)"
+    en = "Uncertainty decomposition (MoE, total CO2eq)",
+    fr = "Décomposition de l'incertitude (MoE, CO₂éq total)"
   ),
-  res_decomp_yaxis = list(en = "95% MoE (%)", fr = "MoE 95 % (%)"),
+  res_decomp_yaxis = list(en = "MoE (%)", fr = "MoE (%)"),
 
   res_cmp_total_co2e = list(en = "Total CO2eq", fr = "CO₂éq total"),
   res_cmp_total_ch4  = list(en = "Total CH4", fr = "CH₄ total"),

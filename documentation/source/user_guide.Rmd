@@ -523,13 +523,13 @@ The size of this effect is easy to underestimate. On a test inventory where the 
 
 This setting sits below the correlation heatmap and has two options.
 
-\textbf{Treat a shared value as one estimate} (the default, and the right answer for nearly every inventory). Where several groups carry the same number for a coefficient, the tool draws it once and applies that draw to all of them. Their errors then move together, which is what actually happens when one estimate is reused.
+\textbf{Treat every group independently} (the default). Each group draws every coefficient on its own, so the sensitivity results are at the level of each group.
 
-\textbf{Treat every group independently}. Each group redraws every coefficient on its own. This is correct only when each group's values really were estimated separately, which is unusual. It is kept so you can reproduce a previous run or see the size of the effect on your own data.
+\textbf{Treat a shared value as one estimate}. Where several groups carry the same number for a coefficient, the tool draws it once and applies that draw to all of them. Their errors then move together, which is what happens when one estimate is reused; the methodology document explains why this keeps the reported uncertainty independent of how finely the inventory is split.
 
 Underneath the control, the tool tells you what it found, for example \textit{"14 coefficients are used identically across groups in this inventory (Ym, Bo, EF3, ...)"}. If that list is empty, nothing in your inventory is shared and the setting changes nothing.
 
-Two things to expect. First, the reported margin of error will usually be \textbf{larger} with the default than with independent groups. That is the correction, not a regression: the smaller figure was an artefact of splitting the inventory. Second, the tool decides what is shared by looking for identical values, so if you genuinely have a separate estimate per group, enter your own numbers and those groups will be treated independently automatically.
+Two things to expect. First, the reported margin of error will usually be \textbf{larger} with shared estimates than with independent groups. That is the correction, not a regression: the smaller figure was an artefact of splitting the inventory. Second, the tool decides what is shared by looking for identical values, so if you genuinely have a separate estimate per group, enter your own numbers and those groups will be treated independently automatically.
 
 ## Quick guide: which option do I pick?
 
@@ -663,13 +663,13 @@ When complete, results appear in the lower section of the same tab.
 
 ## Convergence diagnostics
 
-Click "Run Diagnostic" (magnifying glass button) after a simulation to assess whether enough iterations were run for stable results:
+The diagnostics come first in the results. Click "Run Diagnostic" (magnifying glass button) after a simulation to assess whether enough iterations were run for stable results:
 
 \begin{itemize}
   \item \textbf{MCSE\%} (Monte Carlo Standard Error \%): Pass $< 0.5\%$, Warn $0.5{-}1\%$, Fail $\geq 1\%$
   \item \textbf{Mean drift \%}: How much the mean from the first half of iterations differs from the second half. Pass $< 2\%$
   \item \textbf{CI drift \%}: How much the 95\% CI bounds shift between the two halves. Pass $< 5\%$
-  \item \textbf{Convergence trace}: Running mean and 95\% CI plotted against iteration count, should stabilise before the end of the run
+  \item \textbf{Convergence trace} (Figure 4.1): Running mean and 95\% CI plotted against iteration count, should stabilise before the end of the run
 \end{itemize}
 
 Note: this tool uses \textbf{independent Monte Carlo}, not MCMC. Each iteration is drawn independently, there are no chains, no warmup, and no burn-in.
@@ -678,9 +678,11 @@ Note: this tool uses \textbf{independent Monte Carlo}, not MCMC. Each iteration 
 
 # Understanding results (Tab 4: Results)
 
+Every graph in the app carries a number for reference, a title and a caption. The number names the tab and the position on it: Figure 4.2 is the second figure on tab 4.
+
 ## Headline metrics
 
-After a successful run, five value boxes show:
+After a successful run, the results open with the simulation diagnostics (see the previous section), then five value boxes. The boxes show masses in gigagrams with three decimals by default; the \textit{Show results in} choice above them switches to tonnes, or shows both. The boxes show:
 
 \begin{itemize}
   \item \textbf{Total CO\textsubscript{2}eq (t)}: The mean of the simulated total emission estimate, in tonnes CO\textsubscript{2}-equivalent
@@ -694,7 +696,7 @@ After a successful run, five value boxes show:
 
 ## Uncertainty decomposition (AD vs EF)
 
-If "Run uncertainty decomposition (AD/EF/Combined)" was checked, the results include a bar chart with the 95\% MoE on the y-axis (IPCC reporting convention) under three configurations:
+If "Run uncertainty decomposition (AD/EF/Combined)" was checked, the results include a bar chart (Figure 4.3) with the margin of error (MoE, the half-width of the 95\% confidence interval as a percentage of the mean, the IPCC reporting convention) on the y-axis under three configurations:
 \begin{itemize}
   \item \textbf{AD uncertainty}: Driven by activity data only (N, BW, Milk, WG) with all emission factors fixed at their means
   \item \textbf{EF uncertainty}: Driven by emission factors and coefficients only with activity data fixed at means
@@ -716,7 +718,7 @@ If AD uncertainty dominates, improving livestock population surveys would most e
 
 ## Reading the tornado chart
 
-The tornado chart ranks parameters by their contribution to total uncertainty. The longest bars indicate the parameters that, if better constrained, would most reduce the 95\% CI.
+The tornado chart (Figure 5.1) ranks parameters by their contribution to total uncertainty. The longest bars indicate the parameters that, if better constrained, would most reduce the 95\% CI.
 
 Each bar is labelled as \texttt{<parameter> (<sub\_category>)}: for example \texttt{Ym (DINT\_cow)} vs \texttt{Ym (DINT\_heif)}. The sub-category in parentheses identifies which animal group the influential parameter belongs to, so you can target research at the specific sub-category driving uncertainty rather than at the parameter in general. The same labels appear in the rank-correlation table, the Excel SRC / PRCC sheets, and the Word report's sensitivity section. Per-MMS sampled parameters carry their MMS in the parameter name and the sub-category in parentheses, e.g. \texttt{MCF\_solid\_storage (DINT\_cow)} or \texttt{fraction\_pasture (DINT\_heif)}.
 
@@ -725,7 +727,7 @@ Each bar is labelled as \texttt{<parameter> (<sub\_category>)}: for example \tex
 Bars are coloured by reducibility:
 \begin{itemize}
   \item \textcolor{cgiargreen}{\textbf{Green}}: Uncertainty can be reduced with better local data (surveys or measurement studies)
-  \item \textbf{Grey}: Uncertainty is largely irreducible with national-level data (e.g. fundamental biochemical constants or IPCC defaults that are rarely measured)
+  \item \textcolor{blue}{\textbf{Blue}}: IPCC coefficients, whose uncertainty is largely irreducible with national-level data (e.g. fundamental biochemical constants or IPCC defaults that are rarely measured)
 \end{itemize}
 
 ## SRC vs PRCC
