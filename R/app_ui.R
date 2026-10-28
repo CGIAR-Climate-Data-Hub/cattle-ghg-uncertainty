@@ -1831,7 +1831,22 @@ app_ui <- function(request = NULL) {
         ),
         bslib::card(
           bslib::card_header(t("qa_results_h")),
-          bslib::card_body(DT::DTOutput("qaqc_table"))
+          bslib::card_body(
+            # 2026-10-28 (Nairobi review): an overview by parameter and check
+            # first; a click on one of its rows narrows the details below to
+            # that pair, a second click shows everything again; the status
+            # filter applies to both.
+            div(style = "display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:6px;",
+                tags$span(style = "font-weight:600;", t("qa_filter_label")),
+                selectInput("qa_status_filter", NULL,
+                            choices = setNames(c("all", "fail", "warn", "info", "pass"),
+                                               c(t("qa_filter_all"), t("qa_badge_fail"), t("qa_badge_warn"),
+                                                 t("qa_badge_info"), t("qa_badge_pass"))),
+                            selected = "all", width = "180px")),
+            tags$p(style = "font-size:0.83rem; color:#555; margin:0 0 4px 0;", t("qa_overview_hint")),
+            DT::DTOutput("qaqc_overview"),
+            tags$h6(style = "margin-top:14px;", t("qa_details_h")),
+            DT::DTOutput("qaqc_table"))
         )
       )
     ),
@@ -1860,31 +1875,14 @@ app_ui <- function(request = NULL) {
             tags$strong(paste0(t("info_unc_triangular_label"), " ")),
             tags$em(t("info_unc_triangular_body"))
           ),
+          # 2026-10-28 (Nairobi review): the editable table and the quick-set
+          # buttons that stood here are gone. Users change their data in their
+          # Excel file only; the distributions and ranges are shown, read-only,
+          # in the Data Input tab's parameter table.
           tags$p(
-            tags$strong(t("info_unc_quickset_label")),
-            t("info_unc_quickset_body")
-          )),
-      bslib::card(
-        bslib::card_header(t("unc_table_h")),
-        bslib::card_body(DT::DTOutput("uncertainty_table")),
-        # R2.1: quick-set buttons moved into card_footer so they remain visible
-        # regardless of how tall the DT grows (pageLength = 20 was pushing them
-        # below the fold). Labels rewritten in IPCC-aligned wording.
-        bslib::card_footer(
-          fluidRow(
-            column(5, actionButton(
-              "set_all_normal",
-              label = textOutput("quickset_normal_label", inline = TRUE),
-              class = "btn-outline-success btn-sm w-100")),
-            column(5, actionButton(
-              "set_all_pert",
-              label = textOutput("quickset_pert_label", inline = TRUE),
-              class = "btn-outline-primary btn-sm w-100"))
-          ),
-          tags$p(style = "font-size:0.78rem; color:#666; margin-top:6px;",
-                 tags$em(t("quickset_undo_note")))
-        )
-      )
+            tags$strong(paste0(t("info_unc_where_label"), " ")),
+            t("info_unc_where_body")
+          ))
     ),
 
     # ==================== TAB 4: CORRELATIONS ====================

@@ -999,8 +999,13 @@ lang_state_take <- function(token) {
   # QA ignore / repair (2026-09-18)
   qa_fix_or_ignore_pre = list(en = "Fix any ", fr = "Corrigez tous les "),
   qa_fix_or_ignore_post = list(
-    en = " before running, or tick Ignore next to a failure you have checked and accept. Ignored checks are listed on the results page and in every export. ",
-    fr = " avant de lancer, ou cochez Ignorer à côté d'un échec que vous avez vérifié et acceptez. Les contrôles ignorés figurent sur la page des résultats et dans chaque export. "),
+    en = " before running: correct the value in your Excel file and upload it again. ",
+    fr = " avant de lancer : corrigez la valeur dans votre fichier Excel et téléversez-le de nouveau. "),
+  qa_filter_label = list(en = "Show", fr = "Afficher"),
+  qa_filter_all = list(en = "All", fr = "Tout"),
+  qa_overview_hint = list(en = "One row per parameter and check. Click a row to see its details below; click it again to show everything.",
+                          fr = "Une ligne par paramètre et contrôle. Cliquez sur une ligne pour voir ses détails ci-dessous ; cliquez de nouveau pour tout afficher."),
+  qa_details_h = list(en = "Details", fr = "Détails"),
   qa_col_ignore = list(en = "Ignore", fr = "Ignorer"),
   qa_ignore_label = list(en = "Ignore", fr = "Ignorer"),
   qa_not_ignorable = list(en = "Cannot be ignored", fr = "Ne peut pas être ignoré"),
@@ -1012,8 +1017,8 @@ lang_state_take <- function(token) {
   qa_ignore_confirm = list(en = "Ignore and continue", fr = "Ignorer et continuer"),
   qa_ignore_cancel = list(en = "Cancel", fr = "Annuler"),
   qa_gate_blocked = list(
-    en = "Cannot run: %d QA/QC failure(s) remain. Fix them on the Data Input tab, or tick Ignore next to each one on the QA/QC tab.",
-    fr = "Impossible de lancer : %d échec(s) QA/QC subsistent. Corrigez-les dans l'onglet Saisie des données, ou cochez Ignorer à côté de chacun dans l'onglet QA/QC."),
+    en = "Cannot run: %d QA/QC failure(s) remain. Correct the values in your Excel file and upload it again.",
+    fr = "Impossible de lancer : %d échec(s) QA/QC subsistent. Corrigez les valeurs dans votre fichier Excel et téléversez-le de nouveau."),
   qa_banner = list(en = "%d QA/QC check(s) ignored or repaired.", fr = "%d contrôle(s) QA/QC ignoré(s) ou réparé(s)."),
   qa_banner_detail = list(
     en = "Results may be unreliable. This list is included in every export.",
@@ -1042,9 +1047,12 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_unc_what = list(
-    en = "Review and adjust each parameter's probability distribution and uncertainty range. Double-click any cell in the table below to edit the distribution type (normal, lognormal, beta, triangular, pert, uniform, constant), the uncertainty percentage, or the lower/upper bounds. Distribution and parameter-type cells only accept the valid options; a typo is rejected with a message listing them.",
-    fr = "Examinez et ajustez la distribution de probabilité et la plage d'incertitude de chaque paramètre. Double-cliquez sur n'importe quelle cellule du tableau ci-dessous pour modifier le type de distribution (normal, lognormal, beta, triangulaire, pert, uniforme, constant), le pourcentage d'incertitude ou les bornes inférieure/supérieure. Les cellules distribution et param_type n'acceptent que les options valides ; une faute de frappe est rejetée avec un message listant les valeurs permises."
+    en = "Each parameter's probability distribution (normal, lognormal, beta, triangular, pert, uniform, constant), uncertainty percentage and lower/upper bounds come from your file. They are listed, read-only, in the parameter table of the Data Input tab. To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.",
+    fr = "La distribution de probabilité de chaque paramètre (normal, lognormal, beta, triangulaire, pert, uniforme, constant), son pourcentage d'incertitude et ses bornes inférieure/supérieure viennent de votre fichier. Ils sont listés, en lecture seule, dans le tableau des paramètres de l'onglet Saisie des données. Pour en changer, modifiez votre modèle Excel et téléversez-le de nouveau ; rien n'est modifié dans l'outil."
   ),
+  info_unc_where_label = list(en = "Where to see them:", fr = "Où les voir :"),
+  info_unc_where_body = list(en = "Data Input tab, parameter table (columns distribution, uncertainty_pct, lower, upper, param_type).",
+                             fr = "Onglet Saisie des données, tableau des paramètres (colonnes distribution, uncertainty_pct, lower, upper, param_type)."),
   info_unc_triangular_label = list(en = "Note on triangular distributions:",
                                       fr = "Note sur les distributions triangulaires :"),
   info_unc_triangular_body = list(

@@ -378,9 +378,18 @@ app_server <- function(input, output, session) {
         imputed_col, imputed_col, imputed_col))
     }
 
+    # 2026-10-28 (Nairobi review): read-only, and the columns the
+    # Uncertainty tab's table used to show (distribution, uncertainty,
+    # bounds, parameter type) next to the group columns. Users change
+    # values in their Excel file and upload it again.
+    show_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category", "parameter",
+                             "mean", "uncertainty_pct", "distribution", "lower", "upper",
+                             "param_type", "data_source", "imputed"), names(ps))
+    ps <- ps[, show_cols, drop = FALSE]
+    options_list$columnDefs <- list(list(targets = which(names(ps) == "imputed") - 1, visible = FALSE))
     dt <- DT::datatable(ps,
                         options = options_list,
-                        editable = TRUE, rownames = FALSE)
+                        editable = FALSE, rownames = FALSE)
     if (has_imputed) {
       # Highlight imputed rows in red bold
       dt <- DT::formatStyle(dt, "imputed",
@@ -910,54 +919,79 @@ app_server <- function(input, output, session) {
     )
   })
 
-  output$qaqc_table <- DT::renderDT({
+  # 2026-10-28 (Nairobi review): the Ignore column is gone. Warnings never
+  # blocked a run; a failure now blocks it until the value is corrected in
+  # the user's Excel file and uploaded again (rv$qa_ignored stays empty).
+  # An overview by parameter and check comes first; a click on one of its
+  # rows narrows the details to that pair; the status filter applies to
+  # both tables.
+  .qa_status_rank <- c(fail = 4L, warn = 3L, info = 2L, pass = 1L, missing = 3L)
+  qa_filtered <- reactive({
     df <- qaqc_result()
+    if (nrow(df) == 0) return(df)
+    f <- input$qa_status_filter %||% "all"
+    if (!identical(f, "all")) df <- df[df$status == f, , drop = FALSE]
+    df
+  })
+  qa_overview <- reactive({
+    df <- qa_filtered()
+    if (nrow(df) == 0) return(df[0, c("parameter", "check"), drop = FALSE])
+    key <- paste(df$parameter, df$check, sep = "\r")
+    agg <- do.call(rbind, lapply(split(df, key), function(d) data.frame(
+      parameter = d$parameter[1], check = d$check[1],
+      n_fail = sum(d$status == "fail"), n_warn = sum(d$status %in% c("warn", "missing")),
+      n_info = sum(d$status == "info"), n_pass = sum(d$status == "pass"),
+      worst = c("pass", "info", "warn", "fail")[max(c(1L, .qa_status_rank[d$status]), na.rm = TRUE)],
+      stringsAsFactors = FALSE)))
+    rownames(agg) <- NULL
+    agg[order(-.qa_status_rank[agg$worst], agg$parameter, agg$check), , drop = FALSE]
+  })
+  output$qaqc_overview <- DT::renderDT({
+    ov <- qa_overview()
+    if (nrow(ov) == 0) {
+      empty <- data.frame(message = t("qa_no_data")); names(empty) <- t("qa_col_message")
+      return(DT::datatable(empty, rownames = FALSE, options = list(dom = "t")))
+    }
+    ov$status_icon <- sapply(ov$worst, qaqc_icon)
+    display <- ov[, c("parameter", "check", "status_icon", "n_fail", "n_warn", "n_info", "n_pass")]
+    DT::datatable(
+      display, escape = FALSE, rownames = FALSE, selection = "single",
+      colnames = c(t("qa_col_parameter"), t("qa_col_check"), t("qa_col_status"),
+                   t("qa_badge_fail"), t("qa_badge_warn"), t("qa_badge_info"), t("qa_badge_pass")),
+      options = list(pageLength = 10, dom = "tp", columnDefs = list(list(targets = 2, orderData = 0))))
+  })
+  qa_details <- reactive({
+    df <- qa_filtered()
+    if (nrow(df) == 0) return(df)
+    sel <- input$qaqc_overview_rows_selected
+    ov  <- qa_overview()
+    if (length(sel) == 1L && sel <= nrow(ov))
+      df <- df[df$parameter == ov$parameter[sel] & df$check == ov$check[sel], , drop = FALSE]
+    df
+  })
+  output$qaqc_table <- DT::renderDT({
+    df <- qa_details()
     if (nrow(df) == 0) {
       empty <- data.frame(message = t("qa_no_data"))
       names(empty) <- t("qa_col_message")
       return(DT::datatable(empty, rownames = FALSE, options = list(dom = "t")))
     }
     rv$qa_render_bump
-    ignored  <- rv$qa_ignored
-    repaired <- if (!is.null(rv$qa_repairs)) rv$qa_repairs$id else character()
     df$status_icon <- sapply(df$status, qaqc_icon)
-    df$ignore_ui <- vapply(seq_len(nrow(df)), function(i) {
-      id <- df$id[i]
-      if (id %in% repaired)
-        return(sprintf('<span style="color:#B45309;font-size:0.8rem;font-weight:600;">%s</span>',
-                       htmltools::htmlEscape(t("qa_repaired_tag"))))
-      if (df$status[i] != "fail") return("")
-      if (!qaqc_ignorable(df$check[i]))
-        return(sprintf('<span style="color:#888;font-size:0.8rem;">%s</span>',
-                       htmltools::htmlEscape(t("qa_not_ignorable"))))
-      sprintf('<label style="white-space:nowrap;cursor:pointer;margin:0;"><input type="checkbox" class="qa-ignore" data-id="%s"%s> %s</label>',
-              htmltools::htmlEscape(id, attribute = TRUE),
-              if (id %in% ignored) " checked" else "",
-              htmltools::htmlEscape(t("qa_ignore_label")))
-    }, character(1))
-    display <- df[, c("group", "parameter", "check", "status_icon", "ignore_ui", "message")]
+    display <- df[, c("group", "parameter", "check", "status_icon", "message")]
     DT::datatable(
       display,
       escape    = FALSE,
       rownames  = FALSE,
       colnames  = c(t("qa_col_group"), t("qa_col_parameter"),
-                     t("qa_col_check"), t("qa_col_status"), t("qa_col_ignore"),
-                     t("qa_col_message")),
-      # Delegated change handler on the table node survives paging redraws.
-      callback  = DT::JS(
-        "$(table.table().node()).on('change', 'input.qa-ignore', function() {",
-        "  Shiny.setInputValue('qa_ignore_toggle',",
-        "    {id: $(this).attr('data-id'), checked: this.checked, nonce: Math.random()},",
-        "    {priority: 'event'});",
-        "});"),
+                     t("qa_col_check"), t("qa_col_status"), t("qa_col_message")),
       options   = list(
         pageLength = 50,
         dom        = "ftp",
         columnDefs = list(
           list(targets = 3, orderData = 0),  # sort by status_icon uses its text
           list(width = "90px", targets = 2),
-          list(width = "80px", targets = 3),
-          list(width = "80px", targets = 4, orderable = FALSE)
+          list(width = "80px", targets = 3)
         )
       )
     )

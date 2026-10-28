@@ -487,13 +487,13 @@ The QA/QC tab runs automated checks on your parameter values and flags any that 
   \item If it is an error, correct it in your Excel file and re-upload.
 \end{itemize}
 
-\textbf{Fail}: A structural validation failed: $DE_\% \leq 0$ or $\geq 100$; bounds that do not bracket the mean; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. The Run button stays blocked while any fail remains. Correct the value in your Excel file and re-upload, or, if you have checked the value and accept it, tick \textbf{Ignore} next to the row.
+\textbf{Fail}: A structural validation failed: $DE_\% \leq 0$ or $\geq 100$; bounds that do not bracket the mean; an MMS fraction-sum more than 1\% off 100\%; or a Beta configured with mean outside $(0,1)$. The Run button stays blocked while any fail remains. Correct the value in your Excel file and upload it again; failures cannot be waved through inside the tool, because the sampler would not know what to draw.
 
-\textit{Ignoring a failure.} Each failing row has an Ignore checkbox. The first tick opens a warning: running with ignored checks may produce unreliable results. Two failures cannot simply be waved through because the sampler would return NaN, so ignoring them applies the smallest repair instead and marks the row \textit{Repaired}: bounds that do not bracket the mean are widened around it, and a Beta or log-normal distribution on a value outside its valid range is replaced by a normal distribution. An ambiguous sub-category key cannot be ignored. Every ignored or repaired check is shown in a red banner above the results and listed in the Excel report (sheet \texttt{QA\_Caveats}), at the end of the CSV, and in section 2b of the Word summary, so a reviewer always sees them next to the numbers.
+\textit{Reading the table.} The QA/QC results open with an overview, one row per parameter and check, with the number of failures, warnings and passes. Click a row to see the detailed findings for that pair below; click it again to show everything. The \textit{Show} filter limits both tables to one status.
 
 \textbf{Missing}: A required parameter was not found in the upload. The tool auto-filled it with the IPCC default value from PARAM\_CATALOGUE; the value and the IPCC equation / table source are shown in the Tab 1 notification. Applies to every parameter, not just \texttt{BW}. Review whether the default is appropriate for your country context and, where possible, replace it with country-specific data.
 
-\textbf{Tip:} You can make any necessary corrections by editing in Tab 3 (`Uncertainty'). The final values used in the simulation runs will be documented in the reports output by the tool, but will not be updated in your data input file. Alternatively, if you edit the values in your data input file and re-upload in Tab 1 (`Data input'), the values used will be documented in the final reports and stored in your data input file.
+\textbf{Tip:} Make corrections in your data input file and upload it again in Tab 1 (`Data input'). The values used in the simulation are then the ones in your file, and the reports document them as such.
 
 ## Documenting deviations
 
@@ -505,25 +505,7 @@ For any Warn or Info flags where you are deliberately using a country-specific v
 
 ## The parameter table
 
-Tab 3 shows all parameters loaded from your data as an editable table. Each row shows:
-\begin{itemize}
-  \item The parameter name, unit, and current mean value
-  \item The distribution type currently assigned
-  \item The uncertainty\_pct or lower/upper bounds
-  \item A visual preview of the distribution shape
-\end{itemize}
-
-You can edit values directly in the table. Clicking a cell opens an edit field.
-
-## Quick-set buttons
-
-Two quick-set buttons are available for rapid exploration:
-\begin{itemize}
-  \item \textbf{Set all activity data to Normal ±15\%}: Sets N, BW, and other activity data parameters to a Normal distribution with ±15\% uncertainty. Click again to undo.
-  \item \textbf{Set all coefficients to PERT}: Sets emission factors and other coefficients to PERT distribution. Click again to undo.
-\end{itemize}
-
-These are useful for a first exploratory run. Refine individual parameters before your final analysis.
+Tab 3 explains how the tool reads distributions and uncertainty ranges. The values themselves (distribution type, uncertainty percentage, lower and upper bounds, parameter type) are listed, read-only, in the parameter table of Tab 1 (`Data input'). To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.
 
 \newpage
 
