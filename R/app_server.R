@@ -1139,22 +1139,6 @@ app_server <- function(input, output, session) {
   # judgement the user can check rather than a black box. Runs off the loaded
   # parameter table, so it updates as soon as an inventory is loaded and does
   # not wait for a simulation.
-  output$crossgroup_detected <- renderUI({
-    ps <- rv$param_specs
-    if (is.null(ps) || !nrow(ps)) return(NULL)
-    sh <- tryCatch(detect_shared_parameters(ps), error = function(e) list())
-    box <- function(...) div(
-      style = paste("font-size:0.85rem; margin-top:8px; padding:8px 10px;",
-                    "border-left:3px solid #2D6A4F; background:#D8F3DC;",
-                    "border-radius:4px; color:#1B4332;"), ...)
-    if (!length(sh)) return(box(t("crossgroup_detected_none")))
-    nm <- names(sh)
-    shown <- paste(utils::head(nm, 6), collapse = ", ")
-    if (length(nm) > 6) shown <- paste0(shown, ", ...")
-    box(tags$strong(t("crossgroup_detected_pre")),
-        sprintf(t("crossgroup_detected_body"), length(nm), shown))
-  })
-
   output$corr_ts_status <- renderUI({
     if (is.null(rv$corr_matrix)) {
       div(style = "font-size:0.85rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px;",

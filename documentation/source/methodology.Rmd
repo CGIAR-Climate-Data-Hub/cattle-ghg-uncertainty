@@ -673,7 +673,9 @@ The magnitude is large. Holding the herd, the parameters and the uncertainty inp
 
 IPCC 2019 Refinement Vol.1 Ch.3 addresses this directly. It warns that subcategories ``can be highly correlated, because either the AD are derived from the same source or the EFs have parameters in common''; it states that ``in the case of full correlation among categories, aggregation of these categories is the recommended procedure''; and it recommends Approach 2 ``where partial correlations are known to exist and are relevant''. It also gives the general rule, in the context of the time dimension: ``emission factors (and other estimation parameters) uncertainties will tend to be correlated between years while activity data will tend to be uncorrelated between years.''
 
-\textbf{The rule the tool applies.} Groups carrying an identical estimate for a coefficient share a single draw; activity data stays independent. Formally, for each coefficient the groups are partitioned by their (mean, lower bound, upper bound, distribution) tuple; every group within a partition receives the same per-iteration draw, and separate partitions are drawn independently. Population $N$ is never shared.
+\textit{Status in the app (October 2026).} After the Nairobi review the app samples every group independently and no longer offers the shared-draw option on the Correlations tab; the treatment described in the rest of this section is implemented in the code but not used in runs from the interface.
+
+\textbf{The rule the tool applies when shared draws are used.} Groups carrying an identical estimate for a coefficient share a single draw; activity data stays independent. Formally, for each coefficient the groups are partitioned by their (mean, lower bound, upper bound, distribution) tuple; every group within a partition receives the same per-iteration draw, and separate partitions are drawn independently. Population $N$ is never shared.
 
 Three properties follow:
 

@@ -17,13 +17,12 @@ ok(length(nums) == 16L, sprintf("16 numbered figures on the page (found %d)", le
 ok(all(vapply(c("fig_cap_corr", "fig_cap_conv", "fig_cap_hist", "fig_cap_decomp", "fig_cap_tornado", "fig_cap_trend",
                 "fig_cap_delta", "fig_cap_input_dens"), function(k) grepl(t(k), html, fixed = TRUE), logical(1))), "every figure has its caption")
 ok(regexpr("toggle_diagnostics", html) < regexpr("vb_enteric_ch4", html), "diagnostics come before the result cards")
-ok(grepl('value="independent" checked', html, fixed = TRUE) || grepl('checked="checked" value="independent"', html, fixed = TRUE) ||
-   grepl("independent\" checked", html, fixed = TRUE), "cross-group setting: independent is selected by default")
+ok(!grepl("crossgroup_mode", html, fixed = TRUE), "cross-group setting: not on the page (every run independent)")
 ok(grepl('id="def_search"', html, fixed = TRUE), "Definitions: one search box")
 
 shiny::testServer(app_server, {
   rv$param_specs <- fill_bounds(generate_country_y_example())
-  session$setInputs(analysis_mode = "single", n_iter = 2000, seed = 42, gwp_version = "AR6", corr_mode = "none", crossgroup_mode = "independent",
+  session$setInputs(analysis_mode = "single", n_iter = 2000, seed = 42, gwp_version = "AR6", corr_mode = "none",
                     emission_sources = c("enteric_ch4", "manure_ch4", "manure_n2o_direct", "manure_n2o_indirect", "pasture_n2o_direct", "pasture_n2o_indirect"),
                     run_decomposition = TRUE, sens_method = "src", res_units = "gg")
   session$setInputs(run_sim = 1)

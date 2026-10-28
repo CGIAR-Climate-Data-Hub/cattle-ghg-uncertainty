@@ -1987,34 +1987,11 @@ app_ui <- function(request = NULL) {
             ),
             tags$h6(style = "margin-top:12px;", fig_title("3.1", t("corr_heatmap_title_ad"))),
             plotly::plotlyOutput("corr_heatmap", height = "350px"),
-            fig_caption("fig_cap_corr"),
-            # Cross-group sharing (2026-09). Placed in the activity-data card
-            # because it is the setting that decides the headline number: when
-            # groups reuse one estimate, sampling them independently makes the
-            # reported MoE fall as 1/sqrt(number of groups).
-            tags$hr(),
-            tags$strong(t("crossgroup_label")),
-            radioButtons(
-              # 2026-10-28 (review): independent is the default and comes
-              # first, so the sensitivity results are at the level of each
-              # group unless the user chooses otherwise.
-              inputId = "crossgroup_mode", label = NULL, selected = "independent",
-              choiceValues = c("independent", "shared"),
-              choiceNames = list(
-                tagList(tags$strong(t("crossgroup_independent")), tags$br(),
-                        tags$span(style = "font-size:0.85rem; color:#5f6b63;",
-                                  t("crossgroup_independent_help"))),
-                tagList(tags$strong(t("crossgroup_shared")), tags$br(),
-                        tags$span(style = "font-size:0.85rem; color:#5f6b63;",
-                                  t("crossgroup_shared_help")))
-              )
-            ),
-            # v1 limitation, stated rather than hidden: a shared coefficient's
-            # column is overwritten after the Iman-Conover reordering, so the
-            # within-group matrix no longer applies to it.
-            tags$div(style = "font-size:0.85rem; color:#5f6b63; margin-bottom:8px;",
-                     t("crossgroup_exclusive")),
-            uiOutput("crossgroup_detected")
+            fig_caption("fig_cap_corr")
+            # 2026-10-28 (review): the "Inputs shared between groups" setting
+            # was removed from the page; every run treats each group
+            # independently (the server falls back to "independent" when the
+            # input is absent). The shared-draw code stays in mc_sampling.R.
           )
         )
         # Coefficient correlations: the card that stood here was removed on
