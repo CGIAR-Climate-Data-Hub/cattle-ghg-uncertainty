@@ -135,16 +135,14 @@ lang_state_take <- function(token) {
                             fr = "1. Données"),
   tab_qaqc          = list(en = "2. QA/QC",
                             fr = "2. QA/QC"),
-  tab_uncertainty   = list(en = "3. Uncertainty",
-                            fr = "3. Incertitude"),
-  tab_correlations  = list(en = "4. Correlations",
-                            fr = "4. Corrélations"),
-  tab_simulate      = list(en = "5. Simulate & Results",
-                            fr = "5. Simuler & Résultats"),
-  tab_sensitivity   = list(en = "6. Sensitivity",
-                            fr = "6. Sensibilité"),
-  tab_ipcc_report   = list(en = "7. IPCC Report",
-                            fr = "7. Rapport IPCC"),
+  tab_correlations  = list(en = "3. Correlations",
+                            fr = "3. Corrélations"),
+  tab_simulate      = list(en = "4. Simulate & Results",
+                            fr = "4. Simuler & Résultats"),
+  tab_sensitivity   = list(en = "5. Sensitivity",
+                            fr = "5. Sensibilité"),
+  tab_ipcc_report   = list(en = "6. IPCC Report",
+                            fr = "6. Rapport IPCC"),
   tab_contact       = list(en = "Contact / Feedback",
                             fr = "Contact"),
 
@@ -306,26 +304,23 @@ lang_state_take <- function(token) {
   workflow_row2_tab  = list(en = "QA/QC", fr = "QA/QC"),
   workflow_row2_what = list(en = "Review automated quality checks -- fix any fails and document large deviations from IPCC defaults",
                               fr = "Examiner les vérifications de qualité automatiques : corriger les échecs et documenter les écarts importants par rapport aux valeurs par défaut IPCC"),
-  workflow_row3_tab  = list(en = "Uncertainty", fr = "Incertitude"),
-  workflow_row3_what = list(en = "Review and adjust probability distributions and uncertainty ranges for each parameter",
-                              fr = "Examiner et ajuster les distributions de probabilité et les plages d'incertitude de chaque paramètre"),
-  workflow_row4_tab  = list(en = "Correlations", fr = "Corrélations"),
-  workflow_row4_what = list(en = "(Optional) Upload population time series or manually define correlations between activity data",
+  workflow_row3_tab  = list(en = "Correlations", fr = "Corrélations"),
+  workflow_row3_what = list(en = "(Optional) Upload population time series or manually define correlations between activity data",
                               fr = "(Facultatif) Téléverser des séries temporelles de populations ou définir manuellement les corrélations entre données d'activité"),
-  workflow_row5_tab  = list(en = "Simulate", fr = "Simulation"),
-  workflow_row5_what = list(en = "Choose number of iterations, GWP version, and click Run: results (emission distributions, 95% CI, decomposition) appear in the same tab",
+  workflow_row4_tab  = list(en = "Simulate", fr = "Simulation"),
+  workflow_row4_what = list(en = "Choose number of iterations, GWP version, and click Run: results (emission distributions, 95% CI, decomposition) appear in the same tab",
                               fr = "Choisir le nombre d'itérations, la version de GWP, puis cliquer sur Lancer : les résultats (distributions d'émissions, IC à 95 %, décomposition) apparaissent dans le même onglet"),
-  workflow_row6_tab  = list(en = "Sensitivity", fr = "Sensibilité"),
-  workflow_row6_what = list(en = "Identify which parameters contribute most to uncertainty (tornado chart)",
+  workflow_row5_tab  = list(en = "Sensitivity", fr = "Sensibilité"),
+  workflow_row5_what = list(en = "Identify which parameters contribute most to uncertainty (tornado chart)",
                               fr = "Identifier les paramètres qui contribuent le plus à l'incertitude (graphique tornade)"),
-  workflow_row7_tab  = list(en = "IPCC Report", fr = "Rapport IPCC"),
-  workflow_row7_what = list(en = "Download results formatted as IPCC Table 3.3 for your inventory submission",
+  workflow_row6_tab  = list(en = "IPCC Report", fr = "Rapport IPCC"),
+  workflow_row6_what = list(en = "Download results formatted as IPCC Table 3.3 for your inventory submission",
                               fr = "Télécharger les résultats au format IPCC Tableau 3.3 pour votre soumission d'inventaire"),
 
   # Quick-start info panel (HTML with embedded <strong> for tab references)
   quick_start_html = list(
-    en = "<strong>Quick start: </strong>To try the tool immediately, go to <strong>1. Data Input</strong>, select 'Country X (hypothetical dairy)', then go to <strong>5. Simulate</strong> and click 'Run Monte Carlo Simulation'.",
-    fr = "<strong>Démarrage rapide : </strong>Pour essayer l'outil immédiatement, allez dans <strong>1. Données</strong>, sélectionnez « Pays X (laitier hypothétique) », puis allez dans <strong>5. Simulation</strong> et cliquez sur « Lancer la simulation Monte Carlo »."
+    en = "<strong>Quick start: </strong>To try the tool immediately, go to <strong>1. Data Input</strong>, select 'Country X (hypothetical dairy)', then go to <strong>4. Simulate</strong> and click 'Run Monte Carlo Simulation'.",
+    fr = "<strong>Démarrage rapide : </strong>Pour essayer l'outil immédiatement, allez dans <strong>1. Données</strong>, sélectionnez « Pays X (laitier hypothétique) », puis allez dans <strong>4. Simulation</strong> et cliquez sur « Lancer la simulation Monte Carlo »."
   ),
 
   btn_goto_resources = list(en = "Methodology, user guide & downloads →",
@@ -557,8 +552,8 @@ lang_state_take <- function(token) {
     fr = "Chargez l'un des exemples fournis, ou votre propre inventaire via le modèle Excel. L'outil vérifie chaque paramètre et signale ce qui est manquant, inhabituel ou invalide."),
   step2_title = list(en = "Describe the uncertainty and run", fr = "Décrire l'incertitude et lancer"),
   step2_body = list(
-    en = "Give each input a distribution and a range, state any correlations between inputs, and run the Monte Carlo simulation.",
-    fr = "Attribuez à chaque entrée une distribution et une plage, indiquez les corrélations éventuelles entre entrées, puis lancez la simulation de Monte-Carlo."),
+    en = "Each input carries a distribution and a range from the template. State any correlations between inputs, then run the Monte Carlo simulation.",
+    fr = "Chaque entrée porte une distribution et une plage issues du modèle. Indiquez les corrélations éventuelles entre entrées, puis lancez la simulation de Monte-Carlo."),
   step3_title = list(en = "Read and report the results", fr = "Lire et rapporter les résultats"),
   step3_body = list(
     en = "Read the confidence interval for each emission source and the ranking of influential inputs, then download the results in IPCC Table 3.3 format as Excel, CSV or Word.",
@@ -904,8 +899,8 @@ lang_state_take <- function(token) {
     fr = "Mode quand vous disposez de données d'activité pour plusieurs années et voulez évaluer si la tendance est statistiquement distinguable de zéro. IPCC Vol 1 Ch 3 §3.7 recommande de rapporter l'incertitude de tendance pour les séries d'inventaire. Nécessite une feuille Parameter_TimeSeries dans votre modèle, ou utilisez un jeu d'exemple intégré."
   ),
   analysis_mode_warning = list(
-    en = "Selection required: pick Single year or Trend before moving on. The Run button on Tab 5 will block until a mode is chosen.",
-    fr = "Sélection requise : choisissez Année unique ou Tendance avant de continuer. Le bouton Lancer de l'onglet 5 sera bloqué tant qu'un mode n'est pas choisi."
+    en = "Selection required: pick Single year or Trend before moving on. The Run button on Tab 4 will block until a mode is chosen.",
+    fr = "Sélection requise : choisissez Année unique ou Tendance avant de continuer. Le bouton Lancer de l'onglet 4 sera bloqué tant qu'un mode n'est pas choisi."
   ),
   trend_explanation = list(
     en = "What 'Trend' does in this tool: a full Monte Carlo uncertainty run is performed independently for every year present in your time-series upload, and the uncertainty on the trend itself is taken as the distribution of (Year_N − Year_1), the absolute change in CO₂eq between the last and first year.",
@@ -923,8 +918,8 @@ lang_state_take <- function(token) {
   ),
 
   info_data_input = list(
-    en = "Select an example country dataset from the dropdown, or upload your own data using the Excel template. The parameter table on the right shows the loaded data: you can double-click any cell to edit values directly. Check the validation panel at the bottom left to ensure your data is complete and valid before proceeding to the next tab.",
-    fr = "Sélectionnez un jeu de données d'exemple dans le menu déroulant, ou téléversez vos propres données avec le modèle Excel. La table des paramètres à droite montre les données chargées : vous pouvez double-cliquer sur n'importe quelle cellule pour modifier directement. Vérifiez le panneau de validation en bas à gauche pour vous assurer que vos données sont complètes et valides avant de passer à l'onglet suivant."
+    en = "Select an example country dataset from the dropdown, or upload your own data using the Excel template. The parameter table on the right shows the loaded data, read-only: each parameter's mean, distribution, uncertainty percentage, bounds and parameter type. To change a value, edit your Excel template and upload it again. Check the validation panel at the bottom left to ensure your data is complete and valid before proceeding to the next tab.",
+    fr = "Sélectionnez un jeu de données d'exemple dans le menu déroulant, ou téléversez vos propres données avec le modèle Excel. La table des paramètres à droite montre les données chargées, en lecture seule : la moyenne, la distribution, le pourcentage d'incertitude, les bornes et le type de chaque paramètre. Pour changer une valeur, modifiez votre modèle Excel et téléversez-le de nouveau. Vérifiez le panneau de validation en bas à gauche pour vous assurer que vos données sont complètes et valides avant de passer à l'onglet suivant."
   ),
   what_to_do_label = list(en = "What to do:", fr = "Marche à suivre :"),
 
@@ -1043,32 +1038,21 @@ lang_state_take <- function(token) {
   qa_results_h = list(en = "QA/QC Results", fr = "Résultats QA/QC"),
 
   # =====================================================================
-  # UNCERTAINTY TAB
+  # DISTRIBUTION NOTES (Data Input tab; the Uncertainty tab was removed
+  # on 2026-10-28 after the Nairobi review)
   # =====================================================================
 
+  info_unc_what_label = list(en = "Distributions and uncertainty ranges:",
+                             fr = "Distributions et plages d'incertitude :"),
   info_unc_what = list(
-    en = "Each parameter's probability distribution (normal, lognormal, beta, triangular, pert, uniform, constant), uncertainty percentage and lower/upper bounds come from your file. They are listed, read-only, in the parameter table of the Data Input tab. To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.",
-    fr = "La distribution de probabilité de chaque paramètre (normal, lognormal, beta, triangulaire, pert, uniforme, constant), son pourcentage d'incertitude et ses bornes inférieure/supérieure viennent de votre fichier. Ils sont listés, en lecture seule, dans le tableau des paramètres de l'onglet Saisie des données. Pour en changer, modifiez votre modèle Excel et téléversez-le de nouveau ; rien n'est modifié dans l'outil."
+    en = "Each parameter's probability distribution (normal, lognormal, beta, triangular, pert, uniform, constant), uncertainty percentage and lower/upper bounds come from your file and are shown in the parameter table. To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.",
+    fr = "La distribution de probabilité de chaque paramètre (normal, lognormal, beta, triangulaire, pert, uniforme, constant), son pourcentage d'incertitude et ses bornes inférieure/supérieure viennent de votre fichier et figurent dans le tableau des paramètres. Pour en changer, modifiez votre modèle Excel et téléversez-le de nouveau ; rien n'est modifié dans l'outil."
   ),
-  info_unc_where_label = list(en = "Where to see them:", fr = "Où les voir :"),
-  info_unc_where_body = list(en = "Data Input tab, parameter table (columns distribution, uncertainty_pct, lower, upper, param_type).",
-                             fr = "Onglet Saisie des données, tableau des paramètres (colonnes distribution, uncertainty_pct, lower, upper, param_type)."),
   info_unc_triangular_label = list(en = "Note on triangular distributions:",
                                       fr = "Note sur les distributions triangulaires :"),
   info_unc_triangular_body = list(
     en = "triangular is most often used when only the minimum, most-likely (mode), and maximum are known. The tool treats lower/upper as absolute min/max, not 95% CI bounds: for triangular, those are usually the same. If you have a 95% CI but want a triangular shape, use PERT instead (PERT uses the 95% bounds and a most-likely value).",
     fr = "La distribution triangulaire est utilisée lorsque seuls le minimum, le mode et le maximum sont connus. L'outil traite lower/upper comme min/max absolus, pas comme bornes IC 95 % : pour la triangulaire, ces valeurs sont en général identiques. Si vous avez un IC 95 % mais voulez une forme triangulaire, utilisez plutôt PERT (PERT utilise les bornes 95 % et un mode)."
-  ),
-  info_unc_quickset_label = list(en = "Quick-set buttons", fr = "Boutons d'application rapide"),
-  info_unc_quickset_body = list(
-    en = " at the bottom of the table apply common settings to all parameters of one type (e.g. 'Set all activity data to Normal ±15%').",
-    fr = " en bas du tableau appliquent des réglages communs à tous les paramètres d'un même type (par exemple « Mettre toutes les données d'activité en Normal ±15 % »)."
-  ),
-  unc_table_h = list(en = "Distribution & Uncertainty Specification",
-                       fr = "Spécification de distribution et d'incertitude"),
-  quickset_undo_note = list(
-    en = "Click a preset to apply; click the same button again to undo and restore your previous values.",
-    fr = "Cliquez sur un préréglage pour l'appliquer ; cliquez à nouveau sur le même bouton pour annuler et restaurer vos valeurs précédentes."
   ),
 
   # =====================================================================
@@ -1170,8 +1154,8 @@ lang_state_take <- function(token) {
   ),
   info_simulate_back = list(en = "Back to settings", fr = "Retour aux paramètres"),
   info_simulate_back_body = list(
-    en = " button at the top of the results to change inputs and re-run; the next run will switch back to results when it finishes. Tab 6 (Sensitivity) and Tab 7 (IPCC Report) provide deeper drill-downs.",
-    fr = " en haut des résultats pour modifier les entrées et relancer ; la prochaine exécution rebasculera vers les résultats à la fin. L'onglet 6 (Sensibilité) et l'onglet 7 (Rapport IPCC) offrent des analyses plus approfondies."
+    en = " button at the top of the results to change inputs and re-run; the next run will switch back to results when it finishes. Tab 5 (Sensitivity) and Tab 6 (IPCC Report) provide deeper drill-downs.",
+    fr = " en haut des résultats pour modifier les entrées et relancer ; la prochaine exécution rebasculera vers les résultats à la fin. L'onglet 5 (Sensibilité) et l'onglet 6 (Rapport IPCC) offrent des analyses plus approfondies."
   ),
   info_simulate_n_label = list(en = "How many iterations to use:",
                                   fr = "Combien d'itérations utiliser :"),
@@ -1248,8 +1232,8 @@ lang_state_take <- function(token) {
   card_stat_glossary = list(en = "Statistical terms in plain language",
                               fr = "Termes statistiques en langage clair"),
   info_stat_glossary = list(
-    en = "The terms used across the Uncertainty, Simulate, Sensitivity and IPCC Report tabs, explained without assuming a statistics background. For a fuller treatment, see the Methodology document on the Resources tab and IPCC 2006 Vol. 1 Ch. 3.",
-    fr = "Les termes utilisés dans les onglets Incertitude, Simulation, Sensibilité et Rapport IPCC, expliqués sans supposer de bagage statistique. Pour un traitement plus complet, voir le document de méthodologie dans l'onglet Ressources et IPCC 2006 Vol. 1 Ch. 3."
+    en = "The terms used across the Simulate, Sensitivity and IPCC Report tabs, explained without assuming a statistics background. For a fuller treatment, see the Methodology document on the Resources tab and IPCC 2006 Vol. 1 Ch. 3.",
+    fr = "Les termes utilisés dans les onglets Simulation, Sensibilité et Rapport IPCC, expliqués sans supposer de bagage statistique. Pour un traitement plus complet, voir le document de méthodologie dans l'onglet Ressources et IPCC 2006 Vol. 1 Ch. 3."
   ),
   stat_col_term = list(en = "Term", fr = "Terme"),
   stat_col_def  = list(en = "Plain-language definition", fr = "Définition en langage clair"),
@@ -1975,8 +1959,8 @@ lang_state_take <- function(token) {
 
   # Compare-with-without-correlations
   cmp_disabled_long = list(
-    en = " No correlations selected on Tab 4: comparison would be identical to the main run, so this option is disabled. Enable a correlation mode to activate it.",
-    fr = " Aucune corrélation sélectionnée sur l'onglet 4 : la comparaison serait identique à l'exécution principale, cette option est donc désactivée. Activez un mode de corrélation pour l'activer."
+    en = " No correlations selected on Tab 3: comparison would be identical to the main run, so this option is disabled. Enable a correlation mode to activate it.",
+    fr = " Aucune corrélation sélectionnée sur l'onglet 3 : la comparaison serait identique à l'exécution principale, cette option est donc désactivée. Activez un mode de corrélation pour l'activer."
   ),
 
   # Correlation heatmap labels

@@ -189,19 +189,7 @@ app_server <- function(input, output, session) {
     comp <- ensure_completeness(rv$param_specs, region = region)
     if (isTRUE(comp$valid) && length(comp$auto_filled) > 0) {
       rv$param_specs <- comp$param_specs
-      .bump_unc_token()
     }
-  }
-
-  # Bump rv$param_specs_bulk_token to force a full re-render of the
-  # uncertainty table (Tab 3). Call this AFTER every BULK replacement of
-  # rv$param_specs (file load, example load, quickset apply/undo, etc.).
-  # Do NOT call from cell-edit observers: those go through the
-  # proxy_unc / replaceData path which preserves the user's search filter
-  # and paging across edits.
-  .bump_unc_token <- function() {
-    rv$param_specs_bulk_token <-
-      (isolate(rv$param_specs_bulk_token) %||% 0L) + 1L
   }
 
   # A new upload starts with a clean QA slate: ignores and repairs referred
@@ -229,7 +217,6 @@ app_server <- function(input, output, session) {
     # smallholder vs pastoral non-dairy). No real-country attribution.
     if (name == "country_x") {
       rv$param_specs <- fill_bounds(generate_country_x_example())
-      .bump_unc_token()
       .qa_reset_caveats()
       # R2.2: built-in example now ships with synthetic 5-year time-series so
       # that Tab 4's "From template (auto)" correlation mode works without
@@ -244,7 +231,6 @@ app_server <- function(input, output, session) {
       rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded: 12 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
-      .bump_unc_token()
       .qa_reset_caveats()
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
@@ -285,7 +271,6 @@ app_server <- function(input, output, session) {
              "(see the Vocab sheet of the template).")
 
       rv$param_specs    <- parsed$param_specs
-      .bump_unc_token()
       .qa_reset_caveats()
       rv$inv_metadata   <- parsed$metadata
       rv$manure_data    <- parsed$manure
@@ -378,9 +363,9 @@ app_server <- function(input, output, session) {
         imputed_col, imputed_col, imputed_col))
     }
 
-    # 2026-10-28 (Nairobi review): read-only, and the columns the
-    # Uncertainty tab's table used to show (distribution, uncertainty,
-    # bounds, parameter type) next to the group columns. Users change
+    # 2026-10-28 (Nairobi review): read-only, with the distribution,
+    # uncertainty, bounds and parameter type columns next to the group
+    # columns (they stood on a tab of their own before). Users change
     # values in their Excel file and upload it again.
     show_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category", "parameter",
                              "mean", "uncertainty_pct", "distribution", "lower", "upper",
@@ -399,188 +384,6 @@ app_server <- function(input, output, session) {
                             fontWeight = DT::styleEqual(c(TRUE), c("bold")))
     }
     dt
-  })
-
-  # T3.2 / Round 6a #2: quick-set buttons toggle on / undo on second click.
-  # On first click, snapshot current rows then apply the preset.
-  # On second click, restore the snapshot and clear it. The button label flips
-  # between the apply/undo wording in `quickset_normal_label` /
-  # `quickset_pert_label` so the user can see which state it is in.
-  observeEvent(input$set_all_normal, {
-    req(rv$param_specs)
-    if (!is.null(rv$quickset_normal_snapshot)) {
-      rv$param_specs <- rv$quickset_normal_snapshot
-      rv$quickset_normal_snapshot <- NULL
-      showNotification("Reverted activity-data preset (restored previous values).",
-                       type = "message", duration = 4)
-    } else {
-      rv$quickset_normal_snapshot <- rv$param_specs
-      ad <- rv$param_specs$param_type == "activity_data"
-      rv$param_specs$distribution[ad]    <- "normal"
-      rv$param_specs$uncertainty_pct[ad] <- 15
-      rv$param_specs <- fill_bounds(.recompute_bounds(rv$param_specs, which(ad)))
-      showNotification("Set all activity-data parameters to Normal ±15% (click again to undo).",
-                       type = "message", duration = 4)
-    }
-    .bump_unc_token()
-  })
-  observeEvent(input$set_all_pert, {
-    req(rv$param_specs)
-    if (!is.null(rv$quickset_pert_snapshot)) {
-      rv$param_specs <- rv$quickset_pert_snapshot
-      rv$quickset_pert_snapshot <- NULL
-      showNotification("Reverted coefficient PERT preset (restored previous values).",
-                       type = "message", duration = 4)
-    } else {
-      rv$quickset_pert_snapshot <- rv$param_specs
-      ef <- rv$param_specs$param_type == "coefficient"
-      rv$param_specs$distribution[ef] <- "pert"
-      showNotification("Set all coefficients to PERT (click again to undo).",
-                       type = "message", duration = 4)
-    }
-    .bump_unc_token()
-  })
-
-  # If the user edits the parameter table directly after applying a preset,
-  # clear the snapshot so the next click is a fresh apply rather than an
-  # accidental revert that would discard their edits.
-  observeEvent(input$param_table_cell_edit, {
-    rv$quickset_normal_snapshot <- NULL
-    rv$quickset_pert_snapshot   <- NULL
-  })
-  observeEvent(input$uncertainty_table_cell_edit, {
-    rv$quickset_normal_snapshot <- NULL
-    rv$quickset_pert_snapshot   <- NULL
-  })
-
-  # Dynamic button labels (apply / undo) for the quick-set actions.
-  output$quickset_normal_label <- renderText({
-    if (!is.null(rv$quickset_normal_snapshot))
-      "Undo: restore previous activity-data settings"
-    else
-      "Set all activity-data params to Normal ±15%"
-  })
-  outputOptions(output, "quickset_normal_label", suspendWhenHidden = FALSE)
-  output$quickset_pert_label <- renderText({
-    if (!is.null(rv$quickset_pert_snapshot))
-      "Undo: restore previous coefficient settings"
-    else
-      "Set all coefficients to PERT"
-  })
-  outputOptions(output, "quickset_pert_label", suspendWhenHidden = FALSE)
-  # Helper: recompute lower/upper from mean and uncertainty_pct for given rows
-  .recompute_bounds <- function(ps, rows) {
-    for (i in rows) {
-      m   <- suppressWarnings(as.numeric(ps$mean[i]))
-      pct <- suppressWarnings(as.numeric(ps$uncertainty_pct[i]))
-      if (!is.na(m) && !is.na(pct)) {
-        ps$lower[i] <- m * (1 - pct / 100)
-        ps$upper[i] <- m * (1 + pct / 100)
-      }
-    }
-    ps
-  }
-
-  # Beta feedback 2026-09 (APickering #6/#8): shared validator for the two
-  # categorical columns of the editable parameter tables (Tab 1 and Tab 3).
-  # Returns list(ok, value): ok = FALSE means the edit was rejected (a
-  # notification has already been shown); value carries the normalised
-  # replacement (lower-cased, legacy aliases resolved), NULL for columns
-  # this validator does not cover.
-  .validate_categorical_edit <- function(edit_col, new_value) {
-    if (!edit_col %in% c("distribution", "param_type"))
-      return(list(ok = TRUE, value = NULL))
-    v <- tolower(trimws(as.character(new_value)))
-    if (edit_col == "distribution") {
-      valid <- c("normal", "posnorm", "lognormal", "beta", "triangular",
-                 "pert", "uniform", "constant", "tnorm_0_1")
-      if (v == "const") v <- "constant"  # legacy alias
-      if (!v %in% valid) {
-        showNotification(
-          sprintf("distribution must be one of: %s. Got '%s'; edit ignored.",
-                  paste(valid, collapse = ", "), new_value),
-          type = "error", duration = 8)
-        return(list(ok = FALSE, value = NULL))
-      }
-      return(list(ok = TRUE, value = v))
-    }
-    # param_type (Round 7 R1.16 validation, now shared by both tables)
-    if (v == "emission_factor") v <- "coefficient"  # legacy alias
-    if (!v %in% c("activity_data", "coefficient")) {
-      showNotification(
-        sprintf("param_type must be 'activity_data' or 'coefficient'; got '%s'. Edit ignored.",
-                new_value),
-        type = "error", duration = 6)
-      return(list(ok = FALSE, value = NULL))
-    }
-    list(ok = TRUE, value = v)
-  }
-
-  # Edit parameter table in place: with bidirectional cascade (T1.8, T1.11a)
-  # Edits to uncertainty_pct  -> recompute lower/upper from mean
-  # Edits to lower or upper   -> recompute uncertainty_pct from the symmetric half-width
-  # Edits to mean             -> recompute lower/upper from existing uncertainty_pct
-  # Edits to distribution=constant -> zero uncertainty_pct, set lower=upper=mean
-  observeEvent(input$param_table_cell_edit, {
-    info     <- input$param_table_cell_edit
-    cols     <- names(rv$param_specs)
-    edit_col <- cols[info$col + 1]
-    row      <- info$row
-
-    # Beta feedback 2026-09 (APickering #6/#8): free-text edits to the two
-    # categorical columns caused typos ("nromal") that only surfaced as an
-    # upload/run failure much later. Validate here and snap back invalid
-    # values with a message listing the accepted options.
-    checked <- .validate_categorical_edit(edit_col, info$value)
-    if (isFALSE(checked$ok)) return()
-    if (!is.null(checked$value)) info$value <- checked$value
-
-    # Apply the edit
-    rv$param_specs[row, edit_col] <- DT::coerceValue(
-      info$value, rv$param_specs[row, edit_col])
-
-    ps   <- rv$param_specs
-    mean <- suppressWarnings(as.numeric(ps$mean[row]))
-
-    # Cascade rules
-    if (edit_col == "distribution" && identical(ps$distribution[row], "constant")) {
-      if ("uncertainty_pct" %in% cols) ps$uncertainty_pct[row] <- 0
-      if ("lower" %in% cols)            ps$lower[row]            <- mean
-      if ("upper" %in% cols)            ps$upper[row]            <- mean
-    } else if (edit_col %in% c("uncertainty_pct", "mean") &&
-               "uncertainty_pct" %in% cols && !is.na(mean)) {
-      pct <- suppressWarnings(as.numeric(ps$uncertainty_pct[row]))
-      if (!is.na(pct)) {
-        if ("lower" %in% cols) ps$lower[row] <- mean * (1 - pct / 100)
-        if ("upper" %in% cols) ps$upper[row] <- mean * (1 + pct / 100)
-      }
-    } else if (edit_col %in% c("lower", "upper") && !is.na(mean) && mean != 0 &&
-               "uncertainty_pct" %in% cols) {
-      lo <- suppressWarnings(as.numeric(ps$lower[row]))
-      up <- suppressWarnings(as.numeric(ps$upper[row]))
-      if (!is.na(lo) && !is.na(up)) {
-        # Use symmetric half-width as the implied uncertainty_pct
-        half <- ((up - lo) / 2) / mean * 100
-        ps$uncertainty_pct[row] <- round(half, 2)
-      }
-    }
-
-    rv$param_specs <- ps
-
-    # Cross-tab sync: a Tab 1 edit should be reflected on Tab 3 the next
-    # time the user looks at it, but WITHOUT discarding Tab 3's filter
-    # state. Push the update via the Tab 3 proxy. (proxy_unc is defined
-    # below where the Tab 3 renderDT lives: Shiny is fine with the
-    # late binding because this observer fires after the session has
-    # finished initialising.)
-    if (exists("proxy_unc", inherits = TRUE)) {
-      tryCatch(
-        DT::replaceData(proxy_unc,
-                         rv$param_specs[, .unc_visible_cols],
-                         resetPaging = FALSE,
-                         rownames    = FALSE),
-        error = function(e) NULL)
-    }
   })
 
   # Validation: surfaces upload status (success/failure) AND data validation errors
@@ -706,7 +509,6 @@ app_server <- function(input, output, session) {
       fix <- qaqc_repair(isolate(rv$param_specs), row)
       if (isTRUE(fix$changed)) {
         rv$param_specs <- fix$param_specs
-        .bump_unc_token()
         rec <- data.frame(action = "repaired", id = id, group = row$group,
                           level = row$level, parameter = row$parameter,
                           check = row$check, detail = fix$note,
@@ -995,116 +797,6 @@ app_server <- function(input, output, session) {
         )
       )
     )
-  })
-
-  # Uncertainty table.
-  # Andreas 2026-06-02 review (round 1): when a user searched the table for
-  # a parameter (e.g. "MW") and edited a cell, the whole DT re-rendered from
-  # scratch and the search filter was cleared: forcing a fresh search for
-  # every edit on large inventories. stateSave = TRUE alone wasn't enough
-  # because Shiny's reactivity tears down the DataTable instance on every
-  # rv$param_specs change, and the saved-state restore races with the
-  # re-init.
-  #
-  # 2026-06-08 follow-up (Lolita): users still seeing the filter reset.
-  # Switched to a dataTableProxy: the initial render only fires on bulk
-  # data changes (file load, example load, quickset apply, reset). Cell
-  # edits go through DT::replaceData(proxy, ...) which mutates the live
-  # DataTable instance in-place: search filter, paging, and ordering
-  # are preserved natively. rv$unc_render_token is bumped at every
-  # bulk-replacement of rv$param_specs to force the initial render path.
-  .unc_visible_cols <- c("parameter", "mean", "uncertainty_pct",
-                          "distribution", "lower", "upper", "param_type")
-
-  output$uncertainty_table <- DT::renderDT({
-    # Take a reactive dependency ONLY on the render token, not on the
-    # per-cell contents of rv$param_specs. Cell edits use the proxy.
-    rv$unc_render_token
-    isolate({
-      req(rv$param_specs)
-      DT::datatable(
-        rv$param_specs[, .unc_visible_cols],
-        options = list(
-          pageLength    = 20,
-          stateSave     = TRUE,
-          stateDuration = -1
-        ),
-        editable = TRUE, rownames = FALSE
-      )
-    })
-  })
-
-  proxy_unc <- DT::dataTableProxy("uncertainty_table")
-
-  # Initialise the render token, and bump it whenever rv$param_specs is
-  # BULK-replaced (file upload, example load, quickset apply / undo,
-  # post-import update). Single-cell edits do NOT bump the token; they
-  # update via the proxy. Triggered by `rv$param_specs_bulk_token`
-  # which the bulk-replacement code paths bump explicitly.
-  if (is.null(isolate(rv$unc_render_token))) rv$unc_render_token <- 0L
-  observeEvent(rv$param_specs_bulk_token, {
-    rv$unc_render_token <- isolate(rv$unc_render_token) + 1L
-  }, ignoreInit = FALSE, ignoreNULL = TRUE)
-
-  # Round 7 R1.16: persist Tab 3 cell edits (including param_type override)
-  # back into rv$param_specs and cascade bounds the same way the Tab 1 DT does.
-  # Validates that param_type is one of activity_data/coefficient.
-  observeEvent(input$uncertainty_table_cell_edit, {
-    info <- input$uncertainty_table_cell_edit
-    visible_cols <- c("parameter", "mean", "uncertainty_pct", "distribution",
-                      "lower", "upper", "param_type")
-    edit_col <- visible_cols[info$col + 1]
-    row      <- info$row
-    if (is.na(edit_col)) return()
-
-    # Categorical-column validation shared with the Tab 1 table (beta
-    # feedback 2026-09, APickering #6/#8): covers param_type (Round 7
-    # R1.16) and distribution.
-    new_value <- info$value
-    checked <- .validate_categorical_edit(edit_col, new_value)
-    if (isFALSE(checked$ok)) return()
-    if (!is.null(checked$value)) new_value <- checked$value
-
-    rv$param_specs[row, edit_col] <- DT::coerceValue(
-      new_value, rv$param_specs[row, edit_col])
-
-    ps   <- rv$param_specs
-    mean <- suppressWarnings(as.numeric(ps$mean[row]))
-    cols <- names(ps)
-
-    # Same cascade rules as the Tab 1 DT (param_table)
-    if (edit_col == "distribution" && identical(ps$distribution[row], "constant")) {
-      if ("uncertainty_pct" %in% cols) ps$uncertainty_pct[row] <- 0
-      if ("lower" %in% cols)            ps$lower[row]            <- mean
-      if ("upper" %in% cols)            ps$upper[row]            <- mean
-    } else if (edit_col %in% c("uncertainty_pct", "mean") &&
-               "uncertainty_pct" %in% cols && !is.na(mean)) {
-      pct <- suppressWarnings(as.numeric(ps$uncertainty_pct[row]))
-      if (!is.na(pct)) {
-        if ("lower" %in% cols) ps$lower[row] <- mean * (1 - pct / 100)
-        if ("upper" %in% cols) ps$upper[row] <- mean * (1 + pct / 100)
-      }
-    } else if (edit_col %in% c("lower", "upper") && !is.na(mean) && mean != 0 &&
-               "uncertainty_pct" %in% cols) {
-      lo <- suppressWarnings(as.numeric(ps$lower[row]))
-      up <- suppressWarnings(as.numeric(ps$upper[row]))
-      if (!is.na(lo) && !is.na(up)) {
-        half <- ((up - lo) / 2) / mean * 100
-        ps$uncertainty_pct[row] <- round(half, 2)
-      }
-    }
-
-    rv$param_specs <- ps
-
-    # Push the updated data to the live DT instance via the proxy. This
-    # preserves the user's search filter, page, and ordering: they don't
-    # get bounced back to the top of the table after every edit. The
-    # output$uncertainty_table render path is gated on rv$unc_render_token
-    # which we deliberately do NOT bump here.
-    DT::replaceData(proxy_unc,
-                    rv$param_specs[, .unc_visible_cols],
-                    resetPaging = FALSE,
-                    rownames    = FALSE)
   })
 
   # Template downloads. Round 7.1: filename and MMS dropdown reflect the
@@ -1536,7 +1228,6 @@ app_server <- function(input, output, session) {
     }
     if (length(comp$auto_filled) > 0) {
       rv$param_specs <- comp$param_specs
-      .bump_unc_token()
       showNotification(comp$message, type = "warning", duration = 6)
       rv$sim_log <- paste0(rv$sim_log,
                            "Auto-fill: ", comp$message, "\n")

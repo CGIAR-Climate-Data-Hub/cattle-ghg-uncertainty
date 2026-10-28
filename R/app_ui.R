@@ -38,7 +38,6 @@
 .TUTORIAL_VIDEO_CHAPTERS <- list(
   data_input   = list(start =  165, len = "5 min"),
   qaqc         = list(start =  501, len = "1 min"),
-  uncertainty  = list(start =  584, len = "2 min"),
   correlations = list(start =  702, len = "4 min"),
   simulate     = list(start =  934, len = "4 min"),
   sensitivity  = list(start = 1158, len = "2 min"),
@@ -1656,8 +1655,24 @@ app_ui <- function(request = NULL) {
         )
       ),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong(paste0(t("what_to_do_label"), " ")),
-          t("info_data_input")),
+          tags$p(style = "margin:0;",
+                 tags$strong(paste0(t("what_to_do_label"), " ")),
+                 t("info_data_input")),
+          # 2026-10-28 (Nairobi review): the Uncertainty tab is gone. Its
+          # notes (where the distributions come from, measured intake,
+          # triangular bounds) sit here, beside the table they describe.
+          tags$p(style = "margin:10px 0 0 0;",
+                 tags$strong(paste0(t("info_unc_what_label"), " ")),
+                 t("info_unc_what")),
+          tags$p(style = "margin:10px 0 0 0;",
+                 tags$strong(paste0(t("info_measured_intake_label"), " ")),
+                 t("info_measured_intake_body"),
+                 tags$br(), tags$br(),
+                 tags$strong(paste0(t("info_why_perf_still_needed_label"), " ")),
+                 t("info_why_perf_still_needed_body")),
+          tags$p(style = "margin:10px 0 0 0;",
+                 tags$strong(paste0(t("info_unc_triangular_label"), " ")),
+                 tags$em(t("info_unc_triangular_body")))),
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 320,
@@ -1851,41 +1866,7 @@ app_ui <- function(request = NULL) {
       )
     ),
 
-    # ==================== TAB 3: UNCERTAINTY ====================
-    bslib::nav_panel(
-      title = t("tab_uncertainty"),
-      icon = icon("sliders-h"),
-      tutorial_video_link("uncertainty"),
-      div(class = "info-panel", style = "margin: 16px;",
-          tags$p(
-            tags$strong(paste0(t("what_to_do_label"), " ")),
-            t("info_unc_what"),
-            # Measured-intake route (2026-09). Placed here because this is the
-            # tab where a user actually sees the GE and DMI rows, and the
-            # second paragraph pre-empts the obvious question: if GE is
-            # supplied, why does the tool still want milk and weight gain?
-            tags$br(), tags$br(),
-            tags$strong(paste0(t("info_measured_intake_label"), " ")),
-            t("info_measured_intake_body"),
-            tags$br(), tags$br(),
-            tags$strong(paste0(t("info_why_perf_still_needed_label"), " ")),
-            t("info_why_perf_still_needed_body")
-          ),
-          tags$p(
-            tags$strong(paste0(t("info_unc_triangular_label"), " ")),
-            tags$em(t("info_unc_triangular_body"))
-          ),
-          # 2026-10-28 (Nairobi review): the editable table and the quick-set
-          # buttons that stood here are gone. Users change their data in their
-          # Excel file only; the distributions and ranges are shown, read-only,
-          # in the Data Input tab's parameter table.
-          tags$p(
-            tags$strong(paste0(t("info_unc_where_label"), " ")),
-            t("info_unc_where_body")
-          ))
-    ),
-
-    # ==================== TAB 4: CORRELATIONS ====================
+    # ==================== TAB 3: CORRELATIONS ====================
     bslib::nav_panel(
       title = t("tab_correlations"),
       icon = icon("th"),
@@ -2022,12 +2003,12 @@ app_ui <- function(request = NULL) {
       )
     ),
 
-    # ==================== TAB 5: SIMULATE & RESULTS (merged, B2) ====================
+    # ==================== TAB 4: SIMULATE & RESULTS (merged, B2) ====================
     bslib::nav_panel(
       title = t("tab_simulate"),
       icon = icon("play"),
       tutorial_video_link("simulate"),
-      value = "5. Simulate & Results",
+      value = "4. Simulate & Results",
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
           t("info_simulate"),
@@ -2448,7 +2429,7 @@ app_ui <- function(request = NULL) {
       # R1.5: placeholder removed, settings panel itself shows when sim_view is settings
     ),
 
-    # ==================== TAB 6: SENSITIVITY ====================
+    # ==================== TAB 5: SENSITIVITY ====================
     # Round 9 follow-up: branches by analysis_mode like Tab 5 / Tab 7.
     # Single mode shows the existing single-year sensitivity (tornado +
     # rankings table); trend mode shows the per-year + Δ tornadoes
@@ -2571,7 +2552,7 @@ app_ui <- function(request = NULL) {
       )
     ),
 
-    # ==================== TAB 7: IPCC REPORT (last app tab) ====================
+    # ==================== TAB 6: IPCC REPORT (last app tab) ====================
     # Round 8 moved this to last position. Round 9 collapses the standalone
     # Trend tab into here: content swaps based on input$analysis_mode, so the
     # report a user sees matches the route they picked on Home (single year vs

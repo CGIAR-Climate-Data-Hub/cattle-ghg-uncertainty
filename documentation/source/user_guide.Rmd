@@ -412,6 +412,10 @@ Two built-in example datasets are included to let you explore the tool without u
 
 Select either from the "Country / Example Data" dropdown. The tool loads the data immediately and you can proceed directly to Tab 2.
 
+## The parameter table
+
+The table on the right lists every loaded parameter with its mean, distribution type, uncertainty percentage, lower and upper bounds and parameter type. It is read-only: the values come from your file. To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.
+
 ## Uploading your own data
 
 **Step 1: Choose an IPCC Guidelines version.** Before downloading the template, select the IPCC version your inventory follows:
@@ -435,7 +439,7 @@ After a successful upload, a green notification confirms how many parameters wer
 
 \textbf{Missing parameters and auto-fill:} If your upload does not include all required parameters, the tool will:
 \begin{itemize}
-  \item Still load and display all parameters that \textit{were} supplied: you can review them immediately in Tab 2 and Tab 3.
+  \item Still load and display all parameters that \textit{were} supplied: you can review them immediately in Tab 1 and Tab 2.
   \item Automatically fill in missing parameters using IPCC default values (see the "IPCC default" column in Table \ref{tab:params}).
   \item Show a \textbf{yellow warning notification} listing exactly which parameters were auto-filled and with what values (e.g. "\textit{3 parameters auto-filled from IPCC defaults: Ym = 6.5, Bo = 0.13, DE = 51.0}").
   \item Flag those parameters as \textbf{Missing} (purple/grey) in the QA/QC tab (Tab 2).
@@ -501,17 +505,9 @@ For any Warn or Info flags where you are deliberately using a country-specific v
 
 \newpage
 
-# Reviewing uncertainty distributions (Tab 3: Uncertainty)
+# Correlations (Tab 3: Correlations)
 
-## The parameter table
-
-Tab 3 explains how the tool reads distributions and uncertainty ranges. The values themselves (distribution type, uncertainty percentage, lower and upper bounds, parameter type) are listed, read-only, in the parameter table of Tab 1 (`Data input'). To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.
-
-\newpage
-
-# Correlations (Tab 4: Correlations)
-
-\textit{Deeper dive.} For a side-by-side worked comparison of all four correlation modes applied to the Country X / Country Y built-in examples (including how each mode changes the 95\% confidence interval on total CO$_2$eq, the structural-defaults heatmap with per-pair sources, and the common mistakes to avoid), click the green \emph{Find out more} link at the top of the Activity Data Correlations card on Tab 4. It opens a focused topic page in a new browser tab.
+\textit{Deeper dive.} For a side-by-side worked comparison of all four correlation modes applied to the Country X / Country Y built-in examples (including how each mode changes the 95\% confidence interval on total CO$_2$eq, the structural-defaults heatmap with per-pair sources, and the common mistakes to avoid), click the green \emph{Find out more} link at the top of the Activity Data Correlations card on Tab 3. It opens a focused topic page in a new browser tab.
 
 ## Why correlations matter
 
@@ -559,14 +555,14 @@ The central emission estimate is essentially unchanged regardless of which mode 
 
 If you select correlations and the result barely changes, that is usually expected, not a bug: the IPCC equation chain multiplies around 13 parameters together, which dilutes the effect of any single correlated pair. See the Methodology document for the underlying mathematics.
 
-\textit{Note:} Before running your simulation, Tab 5 (`Simulate \& Results') lets you select \textit{compare with/without correlations}. Selecting this lets you inspect the influence of the correlation options you chose.
+\textit{Note:} Before running your simulation, Tab 4 (`Simulate \& Results') lets you select \textit{compare with/without correlations}. Selecting this lets you inspect the influence of the correlation options you chose.
 
 ## Automatic correlations from time-series data
 
 If you included a Parameter\_TimeSeries sheet in your upload, the tool can compute historical correlations automatically:
 
 \begin{enumerate}
-  \item On Tab 4, select \textbf{From template (auto, time-series)} under Activity Data Correlations.
+  \item On Tab 3, select \textbf{From template (auto, time-series)} under Activity Data Correlations.
   \item The tool computes the \textbf{Spearman} rank correlation matrix of the historical parameter data after first-difference detrending (year-on-year changes, which strips out shared long-run growth) and samples using \textbf{Iman--Conover restricted pairing}: the method explicitly cited by IPCC Vol.1 Ch.3 §3.2.3.2 (p.~26). Iman--Conover is distribution-free and reproduces the target rank correlation exactly, regardless of the marginal shapes.
   \item Inspect the heatmap that appears below the controls to confirm correlations are plausible.
 \end{enumerate}
@@ -618,7 +614,7 @@ All other pairs are set to zero. Four of the values can reasonably be changed th
 
 \newpage
 
-# Running the simulation (Tab 5: Simulate)
+# Running the simulation (Tab 4: Simulate)
 
 ## Settings
 
@@ -641,7 +637,7 @@ Before clicking Run, configure:
 
 ## Trend mode: year-to-year coefficient correlation
 
-If you picked \textbf{Trend} analysis mode on Tab 1, an extra control appears on Tab 5: \textbf{Year-to-year correlation}. It governs how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next \emph{within a single Monte Carlo iteration}. Activity data (N, BW, Milk, \ldots) is always re-sampled fresh each year, this setting only affects the per-head coefficients.
+If you picked \textbf{Trend} analysis mode on Tab 1, an extra control appears on Tab 4: \textbf{Year-to-year correlation}. It governs how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, \ldots) move from one year to the next \emph{within a single Monte Carlo iteration}. Activity data (N, BW, Milk, \ldots) is always re-sampled fresh each year, this setting only affects the per-head coefficients.
 
 \textbf{Why does this matter?} If your country uses the same emission factors for the whole inventory time series (e.g.\ when Tier 2 EFs were estimated using one dataset and applied to all inventory years), then a high-Ym draw in your base year should also be a high-Ym draw in the current year. The coefficient uncertainty then cancels when you compare the two years, so the trend uncertainty reflects only the activity-data changes. This is what IPCC Vol.1 Ch.3 §3.2.3 calls a ``Type A'' sensitivity. If you instead treated EFs as independent across years, you would artificially inflate the trend uncertainty.
 
@@ -663,7 +659,7 @@ Click \textbf{Run Monte Carlo Simulation}. A progress bar shows the simulation s
 
 When complete, results appear in the lower section of the same tab.
 
-\textbf{If something is missing or not working}: All settings (iterations, GWP, seed, emission sources) remain active in the upper section of Tab 5, simply adjust any setting and click \textbf{Run Monte Carlo Simulation} again. The previous results are replaced automatically. If you need to change your input data (parameters, distributions, or correlations), go back to the relevant tab (Tab 1–4), make the change, then return to Tab 5 and re-run.
+\textbf{If something is missing or not working}: All settings (iterations, GWP, seed, emission sources) remain active in the upper section of Tab 4, simply adjust any setting and click \textbf{Run Monte Carlo Simulation} again. The previous results are replaced automatically. If you need to change your input data (parameters, distributions, or correlations), go back to the relevant tab (Tab 1 to 3), make the change, then return to Tab 4 and re-run.
 
 ## Convergence diagnostics
 
@@ -680,7 +676,7 @@ Note: this tool uses \textbf{independent Monte Carlo}, not MCMC. Each iteration 
 
 \newpage
 
-# Understanding results (Tab 5: Results)
+# Understanding results (Tab 4: Results)
 
 ## Headline metrics
 
@@ -716,7 +712,7 @@ If AD uncertainty dominates, improving livestock population surveys would most e
 
 \newpage
 
-# Sensitivity analysis (Tab 6)
+# Sensitivity analysis (Tab 5)
 
 ## Reading the tornado chart
 
@@ -744,7 +740,7 @@ Both are shown; they typically agree on the top-ranked parameters. If they disag
 
 \newpage
 
-# Generating the IPCC report (Tab 7: IPCC Report)
+# Generating the IPCC report (Tab 6: IPCC Report)
 
 ## IPCC Table 3.3
 
@@ -803,21 +799,19 @@ Based on experience with IPCC expert reviews, reviewers typically focus on:
 
 To illustrate the workflow, the following example uses the Country X built-in dataset.
 
-**Step 1: Load data**: Select "Country X (hypothetical dairy)" from the dropdown on Tab 1. The data loads automatically (12 parameters, dairy smallholder system).
+**Step 1: Load data**: Select "Country X (hypothetical dairy)" from the dropdown on Tab 1. The data loads automatically (12 parameters, dairy smallholder system). In the parameter table, note that activity data (N, BW, Milk, WG, Fat) use Normal distributions and coefficients (Ym, DE, Bo, etc.) use PERT or lognormal distributions.
 
 **Step 2: QA/QC**: Go to Tab 2. All parameters should pass; any Warn flags on \texttt{BW} would compare against the continental IPCC default (Annex Tables 10A.1 / 10A.2 / 10A.3), and Warn flags on other parameters reflect non-fatal structural conditions (asymmetric-bounds reminder, sub-category auto-match, etc.), a deliberate country-specific value can be documented in the inventory report rather than corrected.
 
-**Step 3: Uncertainty**: Go to Tab 3. Note that activity data (N, BW, Milk, WG, Fat) use Normal distributions and coefficients (Ym, DE, Bo, etc.) use PERT or lognormal distributions.
+**Step 3: Correlations**: Go to Tab 3. Select "From template (auto, time-series)", the example dataset includes a 5-year time series from which a Spearman rank correlation matrix is computed automatically (first-difference detrending is applied internally to strip shared long-run growth). The matrix is sampled using Iman--Conover restricted pairing.
 
-**Step 4: Correlations**: Go to Tab 4. Select "From template (auto, time-series)", the example dataset includes a 5-year time series from which a Spearman rank correlation matrix is computed automatically (first-difference detrending is applied internally to strip shared long-run growth). The matrix is sampled using Iman--Conover restricted pairing.
+**Step 4: Simulate**: Go to Tab 4. Set iterations to 10,000, GWP to AR6, seed to 42. Click "Run Monte Carlo Simulation".
 
-**Step 5: Simulate**: Go to Tab 5. Set iterations to 10,000, GWP to AR6, seed to 42. Click "Run Monte Carlo Simulation".
+**Step 5: Results**: After about 30 seconds, results appear. Note the 95\% CI and MoE\%. Click "Run Diagnostic" to confirm convergence.
 
-**Step 6: Results**: After about 30 seconds, results appear. Note the 95\% CI and MoE\%. Click "Run Diagnostic" to confirm convergence.
+**Step 6: Sensitivity**: Go to Tab 5. The tornado chart shows which parameters drive most uncertainty. In this example, Ym and BW for cows are typically the dominant contributors.
 
-**Step 7: Sensitivity**: Go to Tab 6. The tornado chart shows which parameters drive most uncertainty. In this example, Ym and BW for cows are typically the dominant contributors.
-
-**Step 8: Report**: Go to Tab 7. Download the Excel report to see the full IPCC Table 3.3 output.
+**Step 7: Report**: Go to Tab 6. Download the Excel report to see the full IPCC Table 3.3 output.
 
 \vspace{1cm}
 \hrule

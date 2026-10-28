@@ -63,13 +63,12 @@ When a country reports cattle greenhouse-gas emissions under the Paris Agreement
 | **Home** | Overview, quick-start guide, funding logos |
 | **Definitions** | Plain-language glossary of every IPCC parameter, plus a glossary of the statistical terms (Monte Carlo, confidence interval, margin of error, SRC/PRCC) used across the tabs |
 | **Resources** | Methodology PDF, user-guide PDF, **AI Translator chat panel**, and links to the IPCC chapters |
-| **1. Data Input** | Pick an example or upload your filled Excel template; inline editing |
+| **1. Data Input** | Pick an example or upload your filled Excel template; the parameter table shows every value with its distribution, uncertainty and bounds, read-only |
 | **2. QA/QC** | Automated traffic-light checks (bounds, IPCC defaults, fractions, units) |
-| **3. Uncertainty** | Review and adjust distributions, ±%, and bounds per parameter |
-| **4. Correlations** | Upload a historical time series, pick a preset, or enter a manual correlation matrix |
-| **5. Simulate & Results** | Choose iterations + GWP version, run Monte Carlo, see histogram + 95 % CI + decomposition + per-system table |
-| **6. Sensitivity** | Tornado chart + ranking table (SRC and PRCC) |
-| **7. IPCC Report** | IPCC Table 3.3 output ready to paste into UNFCCC reporting; XLSX / CSV / Word download |
+| **3. Correlations** | Upload a historical time series, pick a preset, or enter a manual correlation matrix |
+| **4. Simulate & Results** | Choose iterations + GWP version, run Monte Carlo, see histogram + 95 % CI + decomposition + per-system table |
+| **5. Sensitivity** | Tornado chart + ranking table (SRC and PRCC) |
+| **6. IPCC Report** | IPCC Table 3.3 output ready to paste into UNFCCC reporting; XLSX / CSV / Word download |
 | **Contact / Feedback** | Pre-filled email link + feedback form |
 
 ---

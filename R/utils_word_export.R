@@ -356,7 +356,7 @@ build_run_summary_docx <- function(path,
   if (!is.null(comp_plot)) {
     doc <- .add_h2(doc, "7. Effect of correlations on uncertainty")
     doc <- .add_p(doc,
-      "Comparison of the main run (with the parameter correlations set on the Uncertainty tab) against an otherwise-identical run that ignores correlations. A larger 'with-correlations' 95% MoE indicates that the correlation structure compounds parameter uncertainty; similar MoE in both cases indicates the correlations have little effect for this inventory.")
+      "Comparison of the main run (with the parameter correlations set on the Correlations tab) against an otherwise-identical run that ignores correlations. A larger 'with-correlations' 95% MoE indicates that the correlation structure compounds parameter uncertainty; similar MoE in both cases indicates the correlations have little effect for this inventory.")
     doc <- officer::body_add_gg(doc, value = comp_plot, width = 5.5, height = 3.0)
   }
 
@@ -472,7 +472,7 @@ build_run_summary_docx <- function(path,
   doc <- .add_p(doc,
     "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo) for combined uncertainty estimation. The headline 95% MoE values in section 4 are the per-source combined-uncertainty figures used to populate the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (the % uncertainty column, which is the half-width of the 95% confidence interval divided by the mean, per IPCC's own definition). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; coefficient (EF) = the IPCC equation parameters that combine into the per-head emission factor. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance, including the CRT category map and the three-level disaggregation scheme this tool produces.")
   doc <- .add_p(doc,
-    "Where parameters were auto-filled (section 2), the IPCC default carries the uncertainty bounds suggested by Penman et al. (2000) and Monni et al. (2007). For parameters with country-specific values, the uncertainty bounds entered on the Uncertainty tab of the app drive the Monte Carlo distribution.")
+    "Where parameters were auto-filled (section 2), the IPCC default carries the uncertainty bounds suggested by Penman et al. (2000) and Monni et al. (2007). For parameters with country-specific values, the uncertainty bounds given in the uploaded template drive the Monte Carlo distribution.")
 
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")
