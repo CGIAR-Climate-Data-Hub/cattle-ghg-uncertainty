@@ -885,12 +885,12 @@ lang_state_take <- function(token) {
     en = "Several years. Gives the uncertainty of each year and of the change between the base year and the year you report (IPCC Vol. 1, Ch. 3, §3.7). Needs a Parameter_TimeSeries sheet, or an example dataset.",
     fr = "Plusieurs années. Donne l'incertitude de chaque année et du changement entre l'année de base et l'année déclarée (GIEC Vol. 1, Ch. 3, §3.7). Nécessite une feuille Parameter_TimeSeries, ou un jeu d'exemple."
   ),
-  analysis_mode_warning = list(
-    en = "Selection required: pick Single year or Trend before moving on. The Run button on Tab 4 will block until a mode is chosen.",
-    fr = "Sélection requise : choisissez Année unique ou Tendance avant de continuer. Le bouton Lancer de l'onglet 4 sera bloqué tant qu'un mode n'est pas choisi."
-  ),
   trend_base_year = list(en = "base year", fr = "année de base"),
 
+  info_data_input_first = list(
+    en = "First choose whether the analysis is for a single year or a trend, depending on your data.",
+    fr = "Choisissez d'abord si l'analyse porte sur une année unique ou sur une tendance, selon vos données."
+  ),
   info_data_input = list(
     en = "Pick an example country, or upload your own filled Excel template. The table on the right shows what was loaded. To change a value, edit the Excel file and upload it again.",
     fr = "Choisissez un pays d'exemple, ou téléversez votre modèle Excel rempli. La table à droite montre ce qui a été chargé. Pour changer une valeur, modifiez le fichier Excel et téléversez-le de nouveau."
@@ -1105,16 +1105,11 @@ lang_state_take <- function(token) {
     en = "Set the options on the left and click 'Run Monte Carlo simulation'. The results open on this tab when the run finishes. Use 'Back to settings' to change something and run again. Tabs 5 and 6 go deeper.",
     fr = "Réglez les options à gauche et cliquez sur « Lancer la simulation Monte Carlo ». Les résultats s'ouvrent sur cet onglet à la fin du calcul. Utilisez « Retour aux réglages » pour changer quelque chose et relancer. Les onglets 5 et 6 vont plus loin."
   ),
-  info_simulate_repro_label = list(en = "If you get disconnected:", fr = "En cas de déconnexion :"),
-  info_simulate_repro_body = list(
-    en = "with the same file, settings and seed, the results are identical. If the session drops, upload the file again and run with the same seed.",
-    fr = "avec le même fichier, les mêmes réglages et la même graine, les résultats sont identiques. Si la session se coupe, téléversez le fichier de nouveau et relancez avec la même graine."
-  ),
   info_simulate_n_label = list(en = "How many iterations to use:",
                                   fr = "Combien d'itérations utiliser :"),
   info_simulate_n_body = list(
-    en = "1,000 for a quick test. 10,000 or more for any result you use. To check convergence, run again with another seed: if the 95% margin changes by more than 2 points, increase the number.",
-    fr = "1 000 pour un test rapide. 10 000 ou plus pour tout résultat que vous utilisez. Pour vérifier la convergence, relancez avec une autre graine : si la marge à 95 % change de plus de 2 points, augmentez le nombre."
+    en = "1,000 for a quick test. 10,000 or more for reporting results. With the same settings and the same seed, the tool gives the same results every time, so any run can be reproduced.",
+    fr = "1 000 pour un test rapide. 10 000 ou plus pour des résultats à déclarer. Avec les mêmes réglages et la même graine, l'outil donne les mêmes résultats à chaque fois, donc tout calcul peut être reproduit."
   ),
   card_sim_settings = list(en = "Simulation Settings", fr = "Paramètres de simulation"),
   sim_n_iter_label = list(en = "Number of Iterations", fr = "Nombre d'itérations"),

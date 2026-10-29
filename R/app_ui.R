@@ -1638,6 +1638,18 @@ app_ui <- function(request = NULL) {
       title = t("tab_data_input"),
       icon = icon("upload"),
       tutorial_video_link("data_input"),
+      # 2026-10-29 (Lolita): the What-to-do box sits above the mode card and
+      # opens with the mode choice; the other notes live in the user guide.
+      div(class = "info-panel", style = "margin: 16px;",
+          tags$p(style = "margin:0;",
+                 tags$strong(paste0(t("what_to_do_label"), " ")),
+                 t("info_data_input_first"), " ",
+                 t("info_data_input"), " ",
+                 t("info_data_input_ai_pre"),
+                 tags$a(href = "#",
+                        onclick = "window.translatorOpen(); return false;",
+                        t("info_data_input_ai_link")),
+                 t("info_data_input_ai_post"))),
       # Andreas 2026-05 #3: analysis-mode toggle moved here from Home page.
       bslib::card(
         style = "margin: 16px;",
@@ -1666,29 +1678,9 @@ app_ui <- function(request = NULL) {
               )
             ),
             choiceValues = c("single", "trend"),
-            selected = character(0)),
-          # 2026-10-29 (Lolita): the yellow box was never hidden, even after
-          # a mode was picked. It now shows only while nothing is selected.
-          conditionalPanel(
-            condition = "!input.analysis_mode",
-            div(id = "analysis_mode_warning",
-                style = "background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; margin-top:8px; font-size:0.85rem; color:#92400E; border-radius:4px;",
-                icon("exclamation-triangle"),
-                tags$strong(paste0(" ", t("what_to_do_label"), " ")),
-                t("analysis_mode_warning")))
+            selected = character(0))
         )
       ),
-      # 2026-10-29 (Lolita): every info box cut to a few short sentences;
-      # the distribution / intake / triangular notes live in the user guide.
-      div(class = "info-panel", style = "margin: 16px;",
-          tags$p(style = "margin:0;",
-                 tags$strong(paste0(t("what_to_do_label"), " ")),
-                 t("info_data_input"), " ",
-                 t("info_data_input_ai_pre"),
-                 tags$a(href = "#",
-                        onclick = "window.translatorOpen(); return false;",
-                        t("info_data_input_ai_link")),
-                 t("info_data_input_ai_post"))),
       # 2026-10-29 (Lolita): nothing is selected at the start and the page
       # is one column (the controls); the parameter table appears beside
       # them once a dataset is loaded (output$data_loaded).
@@ -1984,10 +1976,7 @@ app_ui <- function(request = NULL) {
           t("info_simulate"),
           tags$br(), tags$br(),
           tags$strong(paste0(t("info_simulate_n_label"), " ")),
-          t("info_simulate_n_body"),
-          tags$br(), tags$br(),
-          tags$strong(paste0(t("info_simulate_repro_label"), " ")),
-          t("info_simulate_repro_body")),
+          t("info_simulate_n_body")),
       # R1.5: view toggle, output.sim_view is "settings" or "results"
       conditionalPanel(
         condition = "output.sim_view != 'results'",
