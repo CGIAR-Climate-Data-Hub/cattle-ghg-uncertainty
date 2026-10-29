@@ -1,7 +1,6 @@
 ---
 title: "IPCC Tier 2 Cattle GHG Uncertainty Calculator"
 subtitle: "Technical Methodology: Equations, Monte Carlo Procedure, and Uncertainty Reporting"
-author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
   pdf_document:
     toc: false
@@ -921,7 +920,6 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 \vspace{12pt}
 \begin{center}
 \textcolor{cgiargreen}{\rule{14cm}{0.5pt}}\\[4pt]
-\textcolor{darkgrey}{\small\textit{This document was prepared by CIAT / CGIAR Alliance: ClimateActionNetZero.}}\\
 \textcolor{darkgrey}{\small\textit{Funded by the Global Methane Hub. Version 1.0.}}\\
 \textcolor{cgiargreen}{\rule{14cm}{0.5pt}}
 \end{center}

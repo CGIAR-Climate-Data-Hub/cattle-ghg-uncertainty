@@ -1,7 +1,6 @@
 ---
 title: "IPCC Tier 2 Cattle GHG Uncertainty Calculator"
 subtitle: "User Guide"
-author: "CIAT / CGIAR Alliance, ClimateActionNetZero"
 output:
   pdf_document:
     toc: true
