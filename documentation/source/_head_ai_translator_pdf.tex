@@ -30,3 +30,14 @@
 \usepackage{titlesec}
 \titleformat{\section}{\normalfont\Large\bfseries\color{cgiargreen}}{\thesection}{1em}{}
 \titleformat{\subsection}{\normalfont\large\bfseries\color{cgiargreen}}{\thesubsection}{1em}{}
+
+% 2026-10-29: the three logos above the title (as user_guide.Rmd and
+% methodology.Rmd do in their title block); no author line. The paths are
+% relative to documentation/source, where the PDF is built.
+\usepackage{titling}
+\pretitle{\begin{center}%
+\includegraphics[height=1.6cm]{../../www/alliance_logo.png}\hspace{1.8cm}%
+\includegraphics[height=1.6cm]{../../www/climate_action_logo.png}\hspace{1.8cm}%
+\includegraphics[height=1.6cm]{../../www/gmh_logo.png}\par\vspace{12pt}%
+\LARGE\bfseries\color{cgiargreen}}
+\posttitle{\par\end{center}}

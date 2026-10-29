@@ -214,7 +214,9 @@ pdf_ok <- tryCatch({
   rmarkdown::render(
     "documentation/source/ai_translator.Rmd",
     output_format = rmarkdown::pdf_document(
-      toc = TRUE, toc_depth = 3, number_sections = TRUE,
+      # 2026-10-29: the step headings carry their own numbers ("1. Accessing
+      # the AI translator"), so the automatic section numbers are off.
+      toc = TRUE, toc_depth = 3, number_sections = FALSE,
       latex_engine = "pdflatex",
       includes = rmarkdown::includes(in_header = pdf_head),
       # These go here, not in render()'s output_options: that argument is
@@ -227,8 +229,9 @@ pdf_ok <- tryCatch({
         # The HTML build takes its title from pandoc_args in the YAML, and
         # those belong to html_document, so the title block is set here.
         "--metadata=title:AI Translator Guide",
-        "--metadata=subtitle:Converting raw country livestock data into the input template",
-        "--metadata=author:CIAT / CGIAR Alliance, ClimateActionNetZero")),
+        # 2026-10-29: no author line; the three logos sit at the top of the
+        # body instead, as in the user guide and the methodology.
+        "--metadata=subtitle:Turn your raw cattle data into the tool's template")),
     output_file = "ai_translator_guide.pdf",
     output_dir  = abs_www,
     params = list(cache_dir = abs_cache),
