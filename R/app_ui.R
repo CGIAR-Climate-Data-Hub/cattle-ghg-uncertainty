@@ -1811,7 +1811,15 @@ app_ui <- function(request = NULL) {
       tutorial_video_link("qaqc"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
-          t("info_qaqc")),
+          t("info_qaqc"),
+          # 2026-10-30 (Lolita): one line per status: why it appears and
+          # what it means for the run.
+          tags$ul(style = "margin:8px 0 0 0;",
+            tags$li(tags$strong(t("qa_status_pass")), t("qa_li_pass")),
+            tags$li(tags$strong(t("qa_status_info")), t("qa_li_info")),
+            tags$li(tags$strong(t("qa_status_warn")), t("qa_li_warn")),
+            tags$li(tags$strong(t("qa_status_fail")), t("qa_li_fail")),
+            tags$li(tags$strong(t("qa_status_missing")), t("qa_li_missing")))),
       # 2026-10-29 (Lolita): the auto-filled card is gone; the Missing status
       # in the table already lists those parameters.
       # 2026-10-28 (Nairobi review, second pass): one card, one table. The

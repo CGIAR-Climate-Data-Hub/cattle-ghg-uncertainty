@@ -966,6 +966,26 @@ lang_state_take <- function(token) {
     fr = "Lisez les vérifications de vos données. Cliquez sur une vignette de statut pour filtrer le tableau. Corrigez chaque Échec dans votre fichier Excel et téléversez-le de nouveau. Attention signifie vérifier la valeur ; Manquant signifie qu'une valeur GIEC par défaut a été utilisée."
   ),
   qa_status_missing = list(en = "Missing", fr = "Manquant"),
+  qa_li_pass = list(
+    en = ": the value, its unit and its bounds are fine. Nothing to do.",
+    fr = " : la valeur, son unité et ses bornes sont correctes. Rien à faire."
+  ),
+  qa_li_info = list(
+    en = ": a note, nothing to correct. Example: bounds equal to the mean, so the value is treated as fixed. The simulation can run.",
+    fr = " : une note, rien à corriger. Exemple : des bornes égales à la moyenne, la valeur est donc traitée comme fixe. La simulation peut tourner."
+  ),
+  qa_li_warn = list(
+    en = ": the value is unusual, or something is missing that the tool can work around. Example: a body weight far from the IPCC default, or a row without uncertainty. The simulation can run. Check the value; if it is right for your country, keep it and note the source in your report.",
+    fr = " : la valeur est inhabituelle, ou il manque quelque chose que l'outil peut contourner. Exemple : un poids vif loin de la valeur GIEC par défaut, ou une ligne sans incertitude. La simulation peut tourner. Vérifiez la valeur ; si elle est juste pour votre pays, gardez-la et notez la source dans votre rapport."
+  ),
+  qa_li_fail = list(
+    en = ": the value would break or distort the calculation. Example: bounds that do not contain the mean, or a percentage entered as a fraction (DE = 0.65 instead of 65). The simulation cannot run until it is corrected in your Excel file.",
+    fr = " : la valeur casserait ou fausserait le calcul. Exemple : des bornes qui ne contiennent pas la moyenne, ou un pourcentage saisi en fraction (DE = 0,65 au lieu de 65). La simulation ne peut pas tourner tant que ce n'est pas corrigé dans votre fichier Excel."
+  ),
+  qa_li_missing = list(
+    en = ": the parameter was not in your file. The tool filled it with the IPCC default and shows which value it used. The simulation can run. If you have a national value, add it to your file.",
+    fr = " : le paramètre n'était pas dans votre fichier. L'outil l'a rempli avec la valeur GIEC par défaut et montre la valeur utilisée. La simulation peut tourner. Si vous avez une valeur nationale, ajoutez-la à votre fichier."
+  ),
   qa_status_fail = list(en = "Fail", fr = "Échec"),
   qa_status_warn = list(en = "Warn", fr = "Attention"),
   qa_status_info = list(en = "Info", fr = "Info"),
