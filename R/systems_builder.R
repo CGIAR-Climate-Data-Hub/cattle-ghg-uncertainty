@@ -27,6 +27,102 @@ make_group_key <- function(df) {
   }
 }
 
+# The random stream's state, creating one if nothing has been drawn yet
+# (set.seed(NULL) seeds from the clock, as the first draw would have).
+.rng_state <- function() {
+  if (!exists(".Random.seed", envir = globalenv(), inherits = FALSE)) set.seed(NULL)
+  get(".Random.seed", envir = globalenv(), inherits = FALSE)
+}
+
+# One group's per-MMS draws, in the order they have always been made: MCF,
+# EF3, Frac_GasMS, Frac_LeachMS from the lower / upper / distribution
+# columns of the manure sheet (percent columns scaled to fractions first),
+# then the allocation when the sheet carries bounds for it. Each matrix is
+# n_iter x n_mms, or NULL when the sheet has no bounds for that quantity.
+#
+# Was previously dropped: only central values were used as deterministic
+# per-iteration constants, so MCF never showed up in the MM-CH4 tornado
+# despite huge bounds in real data (Andreas 2026-05, C4 / C6). The
+# allocation rows are divided by 100 and renormalised so each iteration
+# sums to 1: keeps the values on the simplex (Option A from the design Q:
+# independent sample + renormalise).
+.draw_per_mms_samples <- function(mms_rows, n_iter) {
+  mr_mcf_scaled <- mms_rows
+  for (col in c("MCF_pct", "lower_mcf", "upper_mcf")) {
+    if (col %in% names(mr_mcf_scaled))
+      mr_mcf_scaled[[col]] <- suppressWarnings(
+        as.numeric(mr_mcf_scaled[[col]])) / 100
+  }
+  mr_fg_scaled <- mms_rows
+  for (col in c("Frac_GasMS_pct", "lower_frac_gas", "upper_frac_gas")) {
+    if (col %in% names(mr_fg_scaled))
+      mr_fg_scaled[[col]] <- suppressWarnings(
+        as.numeric(mr_fg_scaled[[col]])) / 100
+  }
+  mr_fl_scaled <- mms_rows
+  for (col in c("Frac_LeachMS_pct", "lower_frac_leach", "upper_frac_leach")) {
+    if (col %in% names(mr_fl_scaled))
+      mr_fl_scaled[[col]] <- suppressWarnings(
+        as.numeric(mr_fl_scaled[[col]])) / 100
+  }
+  mcf_samples <- sample_per_mms_param(
+    mr_mcf_scaled, "MCF_pct", "lower_mcf", "upper_mcf",
+    "distribution_mcf", n_iter, default_dist = "pert")
+  ef3_samples <- sample_per_mms_param(
+    mms_rows, "EF3", "lower_ef3", "upper_ef3",
+    "distribution_ef3", n_iter, default_dist = "pert")
+  fg_samples <- sample_per_mms_param(
+    mr_fg_scaled, "Frac_GasMS_pct", "lower_frac_gas",
+    "upper_frac_gas", "distribution_frac_gas",
+    n_iter, default_dist = "pert")
+  fl_samples <- sample_per_mms_param(
+    mr_fl_scaled, "Frac_LeachMS_pct", "lower_frac_leach",
+    "upper_frac_leach", "distribution_frac_leach",
+    n_iter, default_dist = "pert")
+
+  fraction_samples <- NULL
+  if (any(c("lower_fraction", "upper_fraction",
+             "distribution_fraction") %in% names(mms_rows))) {
+    fraction_samples <- sample_per_mms_param(
+      mms_rows, "fraction_pct", "lower_fraction",
+      "upper_fraction", "distribution_fraction",
+      n_iter, default_dist = "pert")
+    if (!is.null(fraction_samples)) {
+      # `pmax(0, x)` strips the matrix dim attribute; clamp
+      # in place to keep `fraction_samples` a matrix.
+      fraction_samples[fraction_samples < 0] <- 0
+      fraction_samples <- fraction_samples / 100
+      rs <- rowSums(fraction_samples)
+      rs[rs <= 0] <- 1  # safeguard against degenerate rows
+      fraction_samples <- fraction_samples / rs
+    }
+  }
+  list(mcf = mcf_samples, ef3 = ef3_samples, fg = fg_samples, fl = fl_samples,
+       fraction = fraction_samples)
+}
+
+# Re-draw one group's per-MMS matrices from the recipe build_systems_data()
+# stored, with the columns in the order of its MMS fractions. The random
+# stream is put back where it was afterwards, so a run without a seed
+# continues exactly as it would have with the matrices kept. A group
+# without a recipe (a hand-built system, or the AD-only decomposition run,
+# which drops it) is returned unchanged.
+materialise_mms_samples <- function(sys) {
+  if (is.null(sys$mms_draw)) return(sys)
+  keep <- .rng_state()
+  assign(".Random.seed", sys$mms_draw$state, envir = globalenv())
+  d <- .draw_per_mms_samples(sys$mms_draw$rows, sys$mms_draw$n_iter)
+  assign(".Random.seed", keep, envir = globalenv())
+  ord <- sys$mms_draw$order
+  d <- lapply(d, function(m) if (is.null(m)) NULL else m[, ord, drop = FALSE])
+  sys$mcf_samples          <- d$mcf
+  sys$ef3_samples          <- d$ef3
+  sys$frac_gas_samples     <- d$fg
+  sys$frac_leach_samples   <- d$fl
+  sys$mms_fraction_samples <- d$fraction
+  sys
+}
+
 # Build the per-group systems list.
 #
 #   specs              parameter sheet, every group, QA repairs already applied
@@ -105,7 +201,7 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
     # Andreas 28/5/26 #4: fraction_samples is the new per-MMS sampled
     # allocation matrix (n_iter x n_mms, rows renormalised to sum to 1).
     mcf_samples <- ef3_samples <- fg_samples <- fl_samples <-
-      fraction_samples <- NULL
+      fraction_samples <- mms_draw <- NULL
 
     if (!is.null(manure) && nrow(manure) > 0 &&
         all(c("mms_type", "fraction_pct", "MCF_pct", "EF3") %in% names(manure))) {
@@ -147,80 +243,22 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
           frac_leach_vals <- frac_leach_vals[names(mms_fracs)]
         }
 
-        # Andreas 2026-05 follow-up (C4 / C6): sample per-MMS MCF /
-        # EF3 / Frac_GasMS / Frac_LeachMS uncertainty from the
-        # lower / upper / distribution columns on the manure sheet.
-        # Was previously dropped: only central values were used as
-        # deterministic per-iteration constants, so MCF never showed
-        # up in the MM-CH4 tornado despite huge bounds in real data.
-        # Pre-scale percentage cols to fractions so the sampler works
-        # in the same units the downstream calc expects.
-        mr_mcf_scaled <- mms_rows
-        for (col in c("MCF_pct", "lower_mcf", "upper_mcf")) {
-          if (col %in% names(mr_mcf_scaled))
-            mr_mcf_scaled[[col]] <- suppressWarnings(
-              as.numeric(mr_mcf_scaled[[col]])) / 100
-        }
-        mr_fg_scaled <- mms_rows
-        for (col in c("Frac_GasMS_pct", "lower_frac_gas", "upper_frac_gas")) {
-          if (col %in% names(mr_fg_scaled))
-            mr_fg_scaled[[col]] <- suppressWarnings(
-              as.numeric(mr_fg_scaled[[col]])) / 100
-        }
-        mr_fl_scaled <- mms_rows
-        for (col in c("Frac_LeachMS_pct", "lower_frac_leach", "upper_frac_leach")) {
-          if (col %in% names(mr_fl_scaled))
-            mr_fl_scaled[[col]] <- suppressWarnings(
-              as.numeric(mr_fl_scaled[[col]])) / 100
-        }
-        mcf_samples <- sample_per_mms_param(
-          mr_mcf_scaled, "MCF_pct", "lower_mcf", "upper_mcf",
-          "distribution_mcf", n_iter, default_dist = "pert")
-        ef3_samples <- sample_per_mms_param(
-          mms_rows, "EF3", "lower_ef3", "upper_ef3",
-          "distribution_ef3", n_iter, default_dist = "pert")
-        fg_samples <- sample_per_mms_param(
-          mr_fg_scaled, "Frac_GasMS_pct", "lower_frac_gas",
-          "upper_frac_gas", "distribution_frac_gas",
-          n_iter, default_dist = "pert")
-        fl_samples <- sample_per_mms_param(
-          mr_fl_scaled, "Frac_LeachMS_pct", "lower_frac_leach",
-          "upper_frac_leach", "distribution_frac_leach",
-          n_iter, default_dist = "pert")
-
-        # Andreas 28/5/26 #4: sample fraction_pct per-MMS so MMS
-        # allocation can show up in the tornado / rank-correlation.
-        # If lower_fraction / upper_fraction are absent or equal to
-        # the central value, the sampler degenerates to a constant
-        # row (matching the prior deterministic behaviour). Each
-        # iteration row is then divided by 100 and renormalised so
-        # it sums to 1: keeps the values on the simplex (Option A
-        # from the design Q: independent sample + renormalise).
-        if (any(c("lower_fraction", "upper_fraction",
-                   "distribution_fraction") %in% names(mms_rows))) {
-          fraction_samples <- sample_per_mms_param(
-            mms_rows, "fraction_pct", "lower_fraction",
-            "upper_fraction", "distribution_fraction",
-            n_iter, default_dist = "pert")
-          if (!is.null(fraction_samples)) {
-            # `pmax(0, x)` strips the matrix dim attribute; clamp
-            # in place to keep `fraction_samples` a matrix.
-            fraction_samples[fraction_samples < 0] <- 0
-            fraction_samples <- fraction_samples / 100
-            rs <- rowSums(fraction_samples)
-            rs[rs <= 0] <- 1  # safeguard against degenerate rows
-            fraction_samples <- fraction_samples / rs
-          }
-        }
-
-        # Reorder columns to match mms_fracs ordering.
+        # Andreas 2026-05 follow-up (C4 / C6) and 28/5/26 #4: per-MMS MCF,
+        # EF3, Frac_GasMS, Frac_LeachMS and allocation draws, made by
+        # .draw_per_mms_samples() below.
+        #
+        # 2026-10-29: the matrices are not kept here. The draw still runs,
+        # so the random stream advances exactly as it did, and what is
+        # stored is the state of the stream just before it, the manure rows
+        # and the column order. run_inventory_simulation() re-draws the
+        # matrices for one group at a time from that state, which gives the
+        # same numbers. Kept for all 32 Zambia groups at 10,000 draws they
+        # were 74 MB, held through the main, AD-only, EF-only and comparison
+        # simulations.
         ord_names <- names(mms_fracs)
-        if (!is.null(mcf_samples)) mcf_samples <- mcf_samples[, ord_names, drop = FALSE]
-        if (!is.null(ef3_samples)) ef3_samples <- ef3_samples[, ord_names, drop = FALSE]
-        if (!is.null(fg_samples))  fg_samples  <- fg_samples[, ord_names, drop = FALSE]
-        if (!is.null(fl_samples))  fl_samples  <- fl_samples[, ord_names, drop = FALSE]
-        if (!is.null(fraction_samples))
-          fraction_samples <- fraction_samples[, ord_names, drop = FALSE]
+        mms_draw  <- list(state = .rng_state(), rows = mms_rows,
+                          order = ord_names, n_iter = n_iter)
+        .draw_per_mms_samples(mms_rows, n_iter)
         # Final guard: if all MMS rows were unparsable, use defaults
         if (length(mms_fracs) == 0) {
           mms_fracs <- default_mms_fracs
@@ -276,6 +314,8 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
       frac_gas_samples = fg_samples, frac_leach_samples = fl_samples,
       # Andreas 28/5/26 #4: per-iteration MMS allocation samples
       mms_fraction_samples = fraction_samples,
+      # The recipe the runner re-draws the five matrices above from.
+      mms_draw = mms_draw,
       # Shared coefficient draws for this group (NULL when the group
       # shares nothing, or when the user chose independent groups).
       pre_sampled_coefficients = shared_draws$blocks[[sg]]
@@ -463,6 +503,7 @@ fix_params_for_decomposition <- function(sd, fix_type) {
     sd$frac_gas_samples      <- NULL
     sd$frac_leach_samples    <- NULL
     sd$mms_fraction_samples  <- NULL
+    sd$mms_draw              <- NULL
     # Cross-group shared coefficient draws are pure coefficient
     # variance, exactly like the per-MMS matrices above. Leaving
     # them in the AD-only run would leak that variance into the

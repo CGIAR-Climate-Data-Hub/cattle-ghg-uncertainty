@@ -1,29 +1,60 @@
 # Sensitivity Analysis
 # Standardized Regression Coefficients (SRC) and Partial Rank Correlation (PRCC)
 
-calc_src <- function(inputs, output) {
-  # Andreas 28/5/26 #10: preserve original column names through the lm fit.
-  # When input names contain spaces/parentheses (e.g. "Ym (DINT_cow)" produced
-  # by aggregate_sensitivity), R's formula machinery wraps them in backticks
-  # and the resulting coefficient rownames LITERALLY include the backticks
-  # ("`Ym (DINT_cow)`"). Strip them so the SRC output has clean parameter
-  # names that match the in-app tornado labels.
-  orig_names <- colnames(inputs)
-  inputs_std <- as.data.frame(scale(inputs), check.names = FALSE)
-  colnames(inputs_std) <- orig_names
-  output_std <- scale(output)
-  df <- cbind(inputs_std, y = output_std)
-  fit <- lm(y ~ ., data = df)
-  coefs <- summary(fit)$coefficients
-  coefs <- coefs[rownames(coefs) != "(Intercept)", , drop = FALSE]
+# 2026-10-29: SRC is fitted directly on a numeric matrix. It used scale() on
+# the data frame and lm() on a formula, which between them held about six
+# copies of the design matrix: on Zambia (4,000 rows x 1,250 columns, 38 MB)
+# that added about 300 MB at the memory peak of a run, and with the
+# no-correlation comparison the session was dropped. The arithmetic is the
+# same as before, step for step, and the result is identical to the bit
+# (checked on every emission source of the Zambia run, with and without
+# correlations, and on the audit's examples):
+#   - each column is standardised as scale() does it: colMeans(), then the
+#     root mean square of the centred column with n - 1, then centred / that;
+#   - the fit is the QR decomposition lm() calls (.lm.fit, tolerance 1e-7)
+#     on the same matrix with the intercept column first;
+#   - standard errors and p-values follow summary.lm(): pivoted columns, the
+#     inverse of R from chol2inv(), residual variance on n - rank degrees of
+#     freedom, two-sided t; aliased columns are left out as summary.lm() does.
+.std_cols <- function(inputs, intercept = TRUE) {
+  k <- as.integer(intercept)
+  x <- matrix(1, nrow(inputs), length(inputs) + k)
+  for (j in seq_along(inputs)) {
+    v <- as.double(inputs[[j]])
+    v <- v - colMeans(matrix(v, ncol = 1L), na.rm = TRUE)
+    s <- sqrt(sum(v^2, na.rm = TRUE) / max(1, sum(!is.na(v)) - 1L))
+    x[, j + k] <- v / s
+  }
+  x
+}
 
-  param_names <- gsub("^`|`$", "", rownames(coefs))
+calc_src <- function(inputs, output) {
+  # Andreas 28/5/26 #10: the parameter names are kept exactly as given
+  # ("Ym (DINT_cow)"); no formula is built, so nothing is backticked.
+  orig_names <- colnames(inputs)
+  n <- nrow(inputs)
+  x <- .std_cols(inputs, intercept = TRUE)
+  y <- as.vector(scale(output))
+  z <- .lm.fit(x, y, tol = 1e-07)
+  rm(x)
+  p <- z$rank; p1 <- seq_len(p); p_all <- length(orig_names) + 1L
+  coef <- z$coefficients
+  if (p < p_all) coef[(p + 1L):p_all] <- NA
+  coef[z$pivot] <- coef
+  rdf    <- n - p
+  resvar <- sum(z$residuals^2) / rdf
+  se     <- sqrt(diag(chol2inv(z$qr[p1, p1, drop = FALSE])) * resvar)
+  piv    <- z$pivot[p1]
+  est    <- coef[piv]
+  pval   <- 2 * pt(abs(est / se), rdf, lower.tail = FALSE)
+  nm     <- c("(Intercept)", orig_names)[piv]
+  keep   <- nm != "(Intercept)"
 
   result <- data.frame(
-    parameter = param_names,
-    src = coefs[, "Estimate"],
-    abs_src = abs(coefs[, "Estimate"]),
-    p_value = coefs[, "Pr(>|t|)"],
+    parameter = nm[keep],
+    src = unname(est[keep]),
+    abs_src = unname(abs(est[keep])),
+    p_value = unname(pval[keep]),
     stringsAsFactors = FALSE,
     check.names = FALSE
   )

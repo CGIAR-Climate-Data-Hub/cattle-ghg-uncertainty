@@ -224,18 +224,26 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
   year <- as.integer(year)
   year_df <- trend_df[trend_df$year == year, , drop = FALSE]
   specs <- .trend_year_specs(year_df, base_specs)
+  # 2026-10-29: the year's own random stream, seeded as run_trend_analysis()
+  # seeds it (.trend_year_seed on the year's index), so the AD-only and
+  # EF-only runs of a year draw from the same streams as its combined run,
+  # which is what the single-year path does with its one seed. Until now
+  # they used the run seed itself, so every year's decomposition drew the
+  # same numbers and none of them matched the combined run.
+  yi <- match(year, sort(unique(as.integer(trend_df$year))))
+  year_seed <- .trend_year_seed(seed, yi)
   # the same coefficient draws the trend run used for this year when the
   # blocks are shared across years
   blocks <- if (identical(year_corr, "full"))
     build_full_coefficient_blocks(base_specs, n_iter, seed = seed, crossgroup = crossgroup)
   else NULL
-  built <- build_systems_data(specs, manure = manure, n_iter = n_iter, seed = seed,
+  built <- build_systems_data(specs, manure = manure, n_iter = n_iter, seed = year_seed,
                               crossgroup = crossgroup, corr_matrix = corr_matrix,
                               sg_to_mm = sg_to_mm, pre_sampled_blocks = blocks)
   run_fixed <- function(fix_type, label) {
     if (is.function(progress_fn)) try(progress_fn(label), silent = TRUE)
     sys <- lapply(built$systems, fix_params_for_decomposition, fix_type = fix_type)
-    sim <- run_inventory_simulation(sys, n_iter = n_iter, gwp = gwp, seed = seed,
+    sim <- run_inventory_simulation(sys, n_iter = n_iter, gwp = gwp, seed = year_seed,
                                     keep_sample_rows = keep_sample_rows)
     u <- calc_all_uncertainty(sim$inventory)
     rm(sys, sim); gc(FALSE)

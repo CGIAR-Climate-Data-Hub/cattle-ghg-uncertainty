@@ -224,7 +224,9 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
   n_sys <- length(systems_data)
 
   for (sys_name in names(systems_data)) {
-    sys <- systems_data[[sys_name]]
+    # The per-MMS draw matrices exist for this group only while it runs;
+    # see materialise_mms_samples() in R/systems_builder.R.
+    sys <- materialise_mms_samples(systems_data[[sys_name]])
     sim <- run_mc_simulation(
       param_specs     = sys$param_specs,
       corr_matrix     = sys$corr_matrix,
