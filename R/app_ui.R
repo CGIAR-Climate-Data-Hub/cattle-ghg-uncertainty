@@ -1852,7 +1852,11 @@ app_ui <- function(request = NULL) {
       # reading the bullets.
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(t("info_corr_about_label")), tags$br(),
-          t("info_corr_about_body"),
+          t("info_corr_about_body"), " ",
+          # 2026-10-29 (Lolita): the time-series sentence sits here, not
+          # alone in the card.
+          t("info_ad_corr"), tags$strong("Parameter_TimeSeries"),
+          t("info_ad_corr_post"),
           tags$br(), tags$br(),
           tags$strong(t("info_corr_quickguide")),
           tags$ul(style = "margin-top:6px; margin-bottom:0;",
@@ -1895,9 +1899,6 @@ app_ui <- function(request = NULL) {
             )
           ),
           bslib::card_body(
-            div(class = "info-panel",
-                t("info_ad_corr"), tags$strong("Parameter_TimeSeries"),
-                t("info_ad_corr_post")),
             # 2026-10-29 (Lolita): the settings on the left and the matrix on
             # the right, instead of a narrow radio list over an empty band.
             bslib::layout_columns(
@@ -1945,9 +1946,17 @@ app_ui <- function(request = NULL) {
             ),
               ),
               div(
-                tags$h6(style = "margin-top:0;", fig_title("3.1", t("corr_heatmap_title_ad"))),
-                plotly::plotlyOutput("corr_heatmap", height = "440px"),
-                fig_caption("fig_cap_corr")
+                # 2026-10-29 (Lolita): with "No correlations" the run uses no
+                # matrix, so none is shown; a note says so.
+                conditionalPanel(
+                  condition = "!input.corr_mode || input.corr_mode == 'none'",
+                  div(class = "info-panel", style = "margin-top:0;",
+                      t("corr_none_note"))),
+                conditionalPanel(
+                  condition = "input.corr_mode && input.corr_mode != 'none'",
+                  tags$h6(style = "margin-top:0;", fig_title("3.1", t("corr_heatmap_title_ad"))),
+                  plotly::plotlyOutput("corr_heatmap", height = "440px"),
+                  fig_caption("fig_cap_corr"))
               )
             )
             # 2026-10-28 (review): the "Inputs shared between groups" setting

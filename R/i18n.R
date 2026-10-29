@@ -1832,6 +1832,10 @@ lang_state_take <- function(token) {
   # Correlation heatmap labels
   corr_heatmap_no_matrix = list(en = "No correlation matrix loaded",
                                   fr = "Aucune matrice de corrélation chargée"),
+  corr_none_note = list(
+    en = "No correlations: every input is drawn independently in the run, so there is no matrix to show. Pick another mode to see its matrix here.",
+    fr = "Pas de corrélations : chaque entrée est tirée indépendamment dans le calcul, il n'y a donc pas de matrice à montrer. Choisissez un autre mode pour voir sa matrice ici."
+  ),
   corr_heatmap_title_ad = list(en = "Activity Data Correlation Matrix",
                                   fr = "Matrice de corrélation des données d'activité"),
 

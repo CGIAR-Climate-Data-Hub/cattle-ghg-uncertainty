@@ -1070,6 +1070,9 @@ app_server <- function(input, output, session) {
     }
 
     radio <- radioButtons("corr_mode",
+      # 2026-10-29: Shiny caps an input container at 300 px; the help text
+      # under each option needs the whole column.
+      width = "100%",
       label = tagList(
         paste0(t("corr_mode_label"), " "),
         bslib::tooltip(
