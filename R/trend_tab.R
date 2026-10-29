@@ -433,8 +433,15 @@ trend_sensitivity_delta <- function(res, method = "both", max_rows = 4000L) {
   m <- min(nrow(a), nrow(b), length(res$delta_total$per_iter), max_rows)
   combined <- cbind(a[seq_len(m), , drop = FALSE], b[seq_len(m), , drop = FALSE])
   # identical columns (a coefficient shared across groups, or held across
-  # both years) are regressed once
-  sig <- apply(combined, 2L, function(col) paste0(col, collapse = "\r"))
-  combined <- combined[, !duplicated(sig), drop = FALSE]
+  # both years) are regressed once. 2026-10-29: found from a numeric
+  # fingerprint confirmed with identical(), as aggregate_sensitivity() does;
+  # pasting every column into a string took 37 s on Zambia (2 x 1,250
+  # columns), which was most of the wait before the trend results showed.
+  cm <- as.matrix(combined)
+  fp <- paste(colSums(cm), colSums(cm * cm), cm[1L, ], cm[nrow(cm), ], sep = "|")
+  grp <- match(fp, fp)
+  for (j in which(grp != seq_along(grp)))
+    if (!identical(unname(cm[, j]), unname(cm[, grp[j]]))) grp[j] <- j
+  combined <- combined[, !duplicated(grp), drop = FALSE]
   sensitivity_analysis(combined, res$delta_total$per_iter[seq_len(m)], method = method)
 }

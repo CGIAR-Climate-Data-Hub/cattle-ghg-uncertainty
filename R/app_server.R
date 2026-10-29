@@ -3226,8 +3226,18 @@ app_server <- function(input, output, session) {
             manure = rv$manure_data, crossgroup = cg, corr_matrix = cm, sg_to_mm = sgm,
             progress_fn = function(frac, lbl) setProgress(0.60 + 0.36 * frac, detail = lbl))
 
-          setProgress(0.97, detail = "Computing slope and Δ...")
+          # 2026-10-29: the two sensitivity regressions (latest year, and the
+          # change between first and last year) are run here, under the
+          # progress bar, instead of on first display: on Zambia they took
+          # 40 s after the results view had already opened, which read as
+          # the results "taking a long time to show".
+          setProgress(0.97, detail = "Drawing the sensitivity charts...")
+          sens_year  <- tryCatch(trend_sensitivity_year(res, method = "both"), error = function(e) NULL)
+          sens_delta <- tryCatch(trend_sensitivity_delta(res, method = "both"), error = function(e) NULL)
+          setProgress(0.99, detail = "Computing slope and Δ...")
           # Round 8: res is now a list, not a data frame
+          rv_trend$sens_year       <- sens_year
+          rv_trend$sens_delta      <- sens_delta
           rv_trend$results         <- res$table
           rv_trend$samples_by_year <- res$samples_by_year
           rv_trend$co2e_by_year    <- res$co2e_by_year
@@ -3634,14 +3644,16 @@ app_server <- function(input, output, session) {
   # 2026-10-16: samples_by_year now holds per-system thinned draws for the
   # first and last year, so sensitivity goes through aggregate_sensitivity()
   # exactly as single-year does, with the same group labelling.
+  # Computed in the Run Trend observer (rv_trend$sens_*); the fallback
+  # computes on demand for a result that was restored without them.
   trend_sens_per_year <- reactive({
     req(rv_trend$res)
-    trend_sensitivity_year(rv_trend$res, method = "both")
+    rv_trend$sens_year %||% trend_sensitivity_year(rv_trend$res, method = "both")
   })
 
   trend_sens_delta <- reactive({
     req(rv_trend$res)
-    trend_sensitivity_delta(rv_trend$res, method = "both")
+    rv_trend$sens_delta %||% trend_sensitivity_delta(rv_trend$res, method = "both")
   })
 
   # Round 9 follow-up: trend tornado now matches the single-year tornado
@@ -3904,6 +3916,15 @@ app_server <- function(input, output, session) {
   outputOptions(output, "sensitivity_table", suspendWhenHidden = FALSE)
   outputOptions(output, "ipcc_table", suspendWhenHidden = FALSE)
   outputOptions(output, "ipcc_table_notice", suspendWhenHidden = FALSE)
+  # 2026-10-29: the trend views too, so leaving the tab and coming back
+  # does not redraw them.
+  for (id in c("trend_table_report", "trend_plot_report",
+               "trend_tornado_per_year_report", "trend_tornado_delta_report",
+               "trend_tornado_per_year_sens", "trend_tornado_delta_sens",
+               "trend_sens_per_year_table", "trend_sens_delta_table",
+               "trend_ipcc_table", "trend_compare_table",
+               "trend_report_text", "trend_report_text_report"))
+    tryCatch(outputOptions(output, id, suspendWhenHidden = FALSE), error = function(e) NULL)
   outputOptions(output, "report_source_histograms", suspendWhenHidden = FALSE)
   outputOptions(output, "report_tornado", suspendWhenHidden = FALSE)
   outputOptions(output, "report_input_densities", suspendWhenHidden = FALSE)

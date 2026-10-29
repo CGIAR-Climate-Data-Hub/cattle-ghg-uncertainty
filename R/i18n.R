@@ -1991,7 +1991,8 @@ lang_state_take <- function(token) {
   # RESULTS VIEW (Simulate tab: post-run)
   # =====================================================================
 
-  res_back_to_settings = list(en = "Back to settings", fr = "Retour aux paramètres"),
+  res_back_to_settings = list(en = "Back to settings (run another simulation)",
+                              fr = "Retour aux paramètres (lancer une autre simulation)"),
   res_headline_h = list(en = "Headline results", fr = "Résultats principaux"),
   res_summary_intro = list(
     en = "Mean and 95% confidence interval for each emission source, with the margin of error as a percentage.",
