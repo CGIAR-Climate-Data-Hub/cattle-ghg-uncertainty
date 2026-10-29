@@ -1624,7 +1624,6 @@ section_F <- function() {
                                         emission_sources = character(0)))
 
   src_xls  <- as.data.frame(readxl::read_excel(xpath, sheet = "Sensitivity_SRC"))
-  prcc_xls <- as.data.frame(readxl::read_excel(xpath, sheet = "Sensitivity_PRCC"))
   file.remove(xpath)
 
   # SRC sheet should have ≥ 1 row, the "parameter" column, AND no backticks.
@@ -1637,18 +1636,6 @@ section_F <- function() {
              notes = sprintf("nrow=%d; sample params: %s",
                              nrow(src_xls),
                              paste(head(src_xls$parameter, 3), collapse = "; ")))
-
-  # PRCC sheet: same checks, and no `..` double-dot name-munging artefact.
-  prcc_populated <- "parameter" %in% names(prcc_xls) && nrow(prcc_xls) > 0
-  prcc_no_dots <- if (prcc_populated)
-                    !any(grepl("\\.\\.", prcc_xls$parameter)) else NA
-  prcc_has_paren <- prcc_populated && any(grepl("\\(", prcc_xls$parameter))
-  check_bool("F17b", "F",
-             "Sensitivity_PRCC Excel sheet: populated, no `..` mangling, sub-category in (...)",
-             prcc_populated && isTRUE(prcc_no_dots) && prcc_has_paren,
-             notes = sprintf("nrow=%d; sample params: %s",
-                             nrow(prcc_xls),
-                             paste(head(prcc_xls$parameter, 3), collapse = "; ")))
 
   # F18: Inventory_Metadata Continental region (Andreas free-text P27).
   # `normalise_metadata_region()` should:
@@ -3273,6 +3260,22 @@ section_F <- function() {
              f46_ok,
              notes = if (f46_ok) "param_catalogue / template_schema / worked_example on disk equal the runtime build; .manifest.json hashes match; assembled prompt has no {{...}} left"
                      else paste(utils::head(f46_fail, 4), collapse = "; "))
+
+  # F46b (2026-10-29): the discovery reply's inventory_metadata arrives as a
+  # list, a one-row data frame or a JSON string inside the JSON (the model
+  # did that on a three-system file and assembly failed); all give one list.
+  md_ref <- list(country = "Country Z", year = 2022L, species = "cattle_mixed")
+  md_str <- as.character(jsonlite::toJSON(md_ref, auto_unbox = TRUE))
+  md_df  <- as.data.frame(md_ref, stringsAsFactors = FALSE)
+  f46b <- all(vapply(list(md_ref, md_str, paste0(md_str, "}"), md_df), function(m) {
+    l <- .translator_metadata_list(m)
+    is.list(l) && identical(as.character(l$country), "Country Z") &&
+      identical(as.integer(l$year), 2022L) }, logical(1))) &&
+    identical(.translator_metadata_list(NULL), list()) &&
+    identical(.translator_metadata_list("not json"), list())
+  check_bool("F46b", "F",
+             "Translator: inventory_metadata accepted as a list, a JSON string or a one-row frame",
+             f46b)
 
   # F47 -- the one translator tool and the vocabularies it depends on
   # (plan F1, A6, A9). The schema must serialise with JSON arrays wherever

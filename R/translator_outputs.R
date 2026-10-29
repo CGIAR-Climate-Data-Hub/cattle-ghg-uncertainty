@@ -19,7 +19,7 @@
 translator_output_filename <- function(piece, kind = c("template", "checks", "conversation"),
                                        stamp = Sys.time()) {
   kind <- match.arg(kind)
-  md <- if (is.list(piece)) piece$inventory_metadata %||% list() else list()
+  md <- if (is.list(piece)) .translator_metadata_list(piece$inventory_metadata) else list()
   country <- .translator_safe_name(.translator_scalar(md$country %||% "inventory"))
   year <- .translator_scalar(md$year %||% NA)
   year <- if (!is.na(year) && nzchar(as.character(year))) paste0(gsub("[^0-9]", "", as.character(year)), "_") else ""

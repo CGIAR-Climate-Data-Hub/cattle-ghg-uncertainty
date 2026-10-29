@@ -217,7 +217,7 @@ translator_source_fingerprint <- function(parsed) {
   ps <- piece$parameters; ts <- piece$parameter_timeseries
   if (!is.data.frame(ps) || !nrow(ps) || !is.data.frame(ts) || !nrow(ts)) return(piece)
   if (!all(c("sub_category", "parameter", "mean") %in% names(ps)) || !"year" %in% names(ts)) return(piece)
-  yr <- suppressWarnings(as.integer(.translator_scalar(piece$inventory_metadata$year %||% NA)))
+  yr <- suppressWarnings(as.integer(.translator_scalar(.translator_metadata_list(piece$inventory_metadata)$year %||% NA)))
   if (is.na(yr)) return(piece)
   num <- function(x) suppressWarnings(as.numeric(x))
   key <- function(df, i) paste(df$cattle_type[i] %||% "", df$aggregation_level[i] %||% "", df$sub_category[i] %||% "", sep = "||")

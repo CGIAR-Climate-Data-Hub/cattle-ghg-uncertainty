@@ -1575,7 +1575,7 @@ translator_cancel_clear <- function(tok) {
   # `year` was always NULL, so the Parameters-versus-time-series check
   # never ran and two 2022 populations in a 2024 template went unseen.
   yr <- suppressWarnings(as.integer(.translator_scalar(
-    pu$metadata$inventory_year %||% pu$metadata$year %||% piece$inventory_metadata$year %||% NA)))
+    pu$metadata$inventory_year %||% pu$metadata$year %||% .translator_metadata_list(piece$inventory_metadata)$year %||% NA)))
   if ((is.null(yr) || is.na(yr)) && is.data.frame(pu$population) && "year" %in% names(pu$population))
     yr <- suppressWarnings(max(as.integer(pu$population$year), na.rm = TRUE))
   issues <- tryCatch(translator_consistency_checks(pu$param_specs, pu$manure,
@@ -2628,7 +2628,7 @@ translator_cancel_clear <- function(tok) {
                                     parts, agg_levels, info, model_id = NULL) {
   # ---- Stage 3: merge + validate + store --------------------------------
   info("Assembling final template...")
-  merged <- .translator_merge_batches(inventory_metadata, parts, agg_levels)
+  merged <- .translator_merge_batches(.translator_metadata_list(inventory_metadata), parts, agg_levels)
   merge_warnings <- merged$warnings %||% character(0)
   merged$warnings <- NULL
 
@@ -2839,6 +2839,7 @@ translator_cancel_clear <- function(tok) {
   # cache on "".
   agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
   agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
+  enum_parsed$inventory_metadata <- .translator_metadata_list(enum_parsed$inventory_metadata)
   fix <- tryCatch(translator_register_apply_metadata(state$register, enum_parsed$inventory_metadata),
                   error = function(e) NULL)
   if (!is.null(fix)) { enum_parsed$inventory_metadata <- fix$metadata; state$register <- fix$register }
@@ -3091,11 +3092,25 @@ translator_cancel_clear <- function(tok) {
   finish <- function(inventory_metadata, parts, agg_levels, model_id = NULL) {
     translator_job_update(job_id, stage = "assemble", stage_label = "Assembling the template and running the checks",
                           progress = 0.94)
-    ok <- tryCatch({ .translator_emit_finish(state, session, inventory_metadata,
+    # 2026-10-29: the call stack is kept when assembly fails, in the server
+    # log and in the job record, because "$ operator is invalid for atomic
+    # vectors" on its own said nothing about where (a three-system run).
+    stack_txt <- NULL
+    ok <- tryCatch(withCallingHandlers({
+                     .translator_emit_finish(state, session, inventory_metadata,
                                              parts, agg_levels, info, model_id = model_id); TRUE },
+                     error = function(e) {
+                       sc <- tryCatch(sys.calls(), error = function(.e) NULL)
+                       if (!is.null(sc)) stack_txt <<- paste(utils::tail(vapply(sc, function(cl)
+                         substr(paste(deparse(cl), collapse = " "), 1, 160), character(1)), 25), collapse = "
+  ")
+                     }),
                    error = function(e) {
                      state$last_error <- paste0("Assembling the template failed (",
                                                 conditionMessage(e), ").")
+                     message("translator: assembly failed: ", conditionMessage(e),
+                             if (!is.null(stack_txt)) paste0("
+  ", stack_txt) else "")
                      translator_job_update(job_id, status = "failed", error = state$last_error)
                      FALSE })
     if (ok && !is.null(state$last_template_json)) {
@@ -3291,6 +3306,7 @@ translator_cancel_clear <- function(tok) {
       if (!length(agg_levels)) agg_levels <- "national"
       # 2026-10-22 (WP1 step 4): year, species and edition come from the
       # register when the user decided them; corrected here, no re-call.
+      enum_parsed$inventory_metadata <- .translator_metadata_list(enum_parsed$inventory_metadata)
       fix <- tryCatch(translator_register_apply_metadata(ctx$register, enum_parsed$inventory_metadata),
                       error = function(e) NULL)
       if (!is.null(fix)) {
@@ -3571,7 +3587,7 @@ translator_cancel_clear <- function(tok) {
   # the spurious "skipped dairy_cows" warning (and an unnecessary retry).
   # Same logic as the post-JSON sub-cat strip below.
   declared_species <- if (!is.null(parsed_check))
-    parsed_check$inventory_metadata$species %||% "" else ""
+    .translator_metadata_list(parsed_check$inventory_metadata)$species %||% "" else ""
   if (identical(declared_species, "cattle_non_dairy")) {
     history_subcats <- setdiff(history_subcats, "dairy_cows")
   } else if (identical(declared_species, "cattle_dairy")) {
@@ -3693,7 +3709,7 @@ translator_cancel_clear <- function(tok) {
   NON_DAIRY_SC <- .translator_non_dairy_subcats()
   DAIRY_SC     <- c("dairy_cows")
   if (!is.null(parsed_check) && is.data.frame(parsed_check$parameters)) {
-    species <- parsed_check$inventory_metadata$species %||% ""
+    species <- .translator_metadata_list(parsed_check$inventory_metadata)$species %||% ""
     drop_subcats <- character(0)
     if (identical(species, "cattle_non_dairy")) {
       drop_subcats <- intersect(output_subcats, DAIRY_SC)
@@ -3870,7 +3886,7 @@ translator_cancel_clear <- function(tok) {
   parsed$manure_management    <- .translator_records_to_df(parsed$manure_management)
   parsed$parameter_timeseries <- .translator_records_to_df(parsed$parameter_timeseries)
 
-  ipcc_version <- parsed$inventory_metadata$ipcc_version %||% "2019_refinement"
+  ipcc_version <- .translator_metadata_list(parsed$inventory_metadata)$ipcc_version %||% "2019_refinement"
   ipcc_short <- if (grepl("2019|refinement", ipcc_version, ignore.case = TRUE))
     "2019_refinement" else "2006"
 
@@ -3882,7 +3898,7 @@ translator_cancel_clear <- function(tok) {
   wb <- openxlsx::loadWorkbook(tmp_blank)
 
   # ---------- Inventory_Metadata --------------------------------------------
-  md <- parsed$inventory_metadata %||% list()
+  md <- .translator_metadata_list(parsed$inventory_metadata)
   # Row order matches meta_fields in generate_template_openxlsx:
   #   row 2 Country / row 3 Region / row 4 Year / row 5 Species /
   #   row 6 IPCC version / row 7 Prepared by / row 8 Notes
@@ -4329,7 +4345,7 @@ translator_cancel_clear <- function(tok) {
   parsed$parameter_timeseries <- .translator_records_to_df(parsed$parameter_timeseries)
   sheets <- list()
   if (!is.null(parsed$inventory_metadata)) {
-    md <- parsed$inventory_metadata
+    md <- .translator_metadata_list(parsed$inventory_metadata)
     sheets[["Inventory_Metadata"]] <- data.frame(
       Field = c("Country", "Continental region", "Inventory year",
                 "Livestock species", "IPCC Guidelines version",
@@ -4659,6 +4675,33 @@ translator_cancel_clear <- function(tok) {
     parameter_timeseries  = collect_field("parameter_timeseries"),
     warnings              = warnings_out
   )
+}
+
+# The discovery reply's inventory_metadata as a plain named list. The model
+# has returned it as a JSON string inside the JSON (2026-10-29, a
+# three-system file: "$ operator is invalid for atomic vectors" at
+# assembly), jsonlite can hand back a one-row data frame, and a named
+# character vector is possible; all three are accepted. Anything else is
+# an empty list, which the writer fills from the register and the defaults.
+.translator_metadata_list <- function(md) {
+  if (is.null(md)) return(list())
+  if (is.character(md) && length(md) == 1L) {
+    # The string the model sent ended in "}}" (one brace too many), which
+    # the strict parser calls trailing garbage: stray closing braces are
+    # trimmed one at a time before giving up.
+    txt <- trimws(md); parsed <- NULL
+    for (k in 0:3) {
+      parsed <- tryCatch(jsonlite::fromJSON(txt, simplifyVector = TRUE), error = function(e) NULL)
+      if (is.list(parsed) || !grepl("\\}\\s*$", txt)) break
+      txt <- sub("\\}\\s*$", "", txt)
+    }
+    if (is.list(parsed)) md <- parsed
+    else { message("translator: inventory_metadata string could not be parsed: ", substr(md, 1, 120)); return(list()) }
+  }
+  if (is.data.frame(md)) md <- if (nrow(md)) as.list(md[1L, , drop = FALSE]) else list()
+  if (is.atomic(md)) { if (is.null(names(md))) return(list()); md <- as.list(md) }
+  if (!is.list(md)) return(list())
+  md
 }
 
 # Coerce any JSON-roundtripped value to a length-1 atomic safe to hand
