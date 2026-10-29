@@ -15,13 +15,11 @@ output:
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
-This page describes what the in-app AI translator does, how to use it for a single inventory, and how access is granted. It complements the user guide and the methodology document with a step-by-step walk-through of the translator.
-
 ## What the AI translator is for
 
-The Cattle Uncertainty App expects its data in a specific Excel template, so that it can run the uncertainty analysis. Real national inventory data rarely arrives in that shape. Column names differ. Units differ. Sub-category labels reflect local practice ("Local breed adult cows", "draught oxen").
+The Cattle Uncertainty App expects its data in a specific Excel template, so that it can run the uncertainty analysis. Real national inventory data rarely arrives in that shape. Column names differ. Units differ. Sub-category labels reflect local practices.
 
-The AI translator converts raw inventory data, in whatever shape it arrives, into the exact template the tool needs.
+The AI translator converts raw inventory data, in whatever shape it arrives, into the exact template the tool needs. This will save you a lot of time as converting your data to the right template would be very time consuming.
 
 ## Step by step
 
@@ -33,10 +31,10 @@ In the Resources tab of the app, the first thing you see is that you have to sig
 
 The translator is linked to an AI service and costs money on every run, so we control access. You ask for access with your email address. We review the request and accept your email.
 
-1. Type your email address and click **Send sign-in link**. A confirmation email arrives with a link.
-2. Click the link. The first time, the app tells you that your request has been sent to us for approval.
-3. When your email is accepted, you receive a second email saying so, with a link to the app.
-4. Click that link, or ask for a new sign-in link on the Resources tab. You are redirected to the app with access to the AI translator.
+1.  Type your email address and click **Send sign-in link**. A confirmation email arrives with a link.
+2.  Click the link. The first time, the app tells you that your request has been sent to us for approval.
+3.  When your email is accepted, you receive a second email saying so, with a link to the app.
+4.  Click that link, or ask for a new sign-in link on the Resources tab. You are redirected to the app with access to the AI translator.
 
 The link in the email is valid for 30 days. Once you have clicked it, the browser stays signed in.
 
@@ -68,11 +66,11 @@ If it still has doubts, it asks other questions, and so on until everything is c
 
 ### 4. Template production
 
-Once you are happy with the AI's answers and everything seems clear, click the **Produce template now** button.
+Once you are happy with the AI’s answers and everything seems clear, click the **Produce template now** button.
 
 A pop-up appears.
 
-![](img/translator_08_where_to_save_popup.png){width=100%}
+![](img/translator_08_where_to_save_popup.png){width=60%}
 
 Right now, if nothing happens on the page for about 30 minutes, you are disconnected from the app. The AI is working, but that takes time, so if you are doing something else while the template is being produced, you could be disconnected and lose everything. So you have the option to authorise in advance where the outputs will go: create a folder somewhere, click **Choose a folder and start**, and give the app access to download the files there.
 
@@ -113,8 +111,6 @@ There are three kinds of checks:
 
 You can be happy with the translation and go directly to the **1. Data Input** tab to run the calculator.
 
-![](img/translator_11_data_input_after_upload.png){width=100%}
-
 Or, while checking, you realise that some things are wrong. This can come from the translator, or from the input data itself. Then you can click **Back to the conversation**, give some more information, and the AI produces the template again. You can also start a new conversation from scratch.
 
 Good practice:
@@ -123,31 +119,12 @@ Good practice:
 - If something is wrong and easy to change in the translated file, change it by hand. There is no need to run the translator again.
 - If the problem is more complex, run the translator again, and explain the problem in the context box.
 
-## Privacy and operational cost
+## Privacy
 
-### Where your data goes
+When you upload a file, its contents are sent to the AI service. The connection is encrypted.
 
-When a file is uploaded, its contents are sent to the AI service over an encrypted connection. That is how the translation is done, and it is the main thing to be aware of before uploading anything.
+The app also keeps a copy of your conversation on its server, with the uploaded data and your email address. This is what lets you close the tab and come back later. The copy is deleted when you click Reset conversation, or when the server restarts after a period without use. There is no other automatic deletion, so if you want it gone, click Reset conversation.
 
-A copy of the conversation, including the uploaded data and your email address, is then written to a file on the app server. It is kept so that you can close the tab and resume where you left off. It is removed in two cases: when you click **Reset conversation**, or when the server restarts after a period without use. There is no scheduled deletion beyond that, so **Reset conversation is the reliable way to remove it**.
+The app also keeps a small usage log: the date, your email address, the AI model used and the size of each request. It does not contain your data. It is only there so the administrator can keep an eye on the cost.
 
-Separately, a usage log records the date, your email address, the model and the token count of each call. It holds no file contents and exists so the administrator can monitor spending.
-
-The AI service applies its own terms to the data it receives. Those terms are the service provider's and should be consulted directly rather than summarised here.
-
-### Cost
-
-The translator is hosted by the GMH project on a dedicated AI service account, and you are not billed for usage. A monthly spending cap is in place. If the cap is reached, a "monthly cap reached, contact administrator" message is shown, and translation requests pause until the next cycle.
-
-### Whether to use it at all
-
-The IPCC inventory data the translator handles is generally not sensitive: it is destined for UNFCCC reporting, which is a public process. For ministries with internal policies restricting the upload of pre-publication data to external AI services, the translator should not be used. The template can instead be filled manually, using the IPCC defaults provided in the user guide.
-
-<div class="related">
-### Related material
-
-- [User Guide](../user_guide.pdf), section "AI-assisted data preparation": the same workflow described in the printable user guide.
-- [Methodology document](../methodology.pdf): full equations, parameter definitions, and references for everything the translator outputs.
-- [Find out more: Correlations](correlations.html): the companion page covering the correlation modes on the Simulate tab.
-
-</div>
+The AI service has its own terms for the data it receives.
