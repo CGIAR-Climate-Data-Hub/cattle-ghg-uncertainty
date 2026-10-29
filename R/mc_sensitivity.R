@@ -1,5 +1,10 @@
 # Sensitivity Analysis
-# Standardized Regression Coefficients (SRC) and Partial Rank Correlation (PRCC)
+# Standardised regression coefficients (SRC).
+#
+# 2026-10-29: the partial rank correlation (PRCC) was removed. It needed one
+# regression per parameter, so it was skipped above 40 columns, which on any
+# multi-group inventory meant every tornado carried a note saying so; the two
+# methods agreed on the top drivers wherever both ran. SRC is the one method.
 
 # 2026-10-29: SRC is fitted directly on a numeric matrix. It used scale() on
 # the data frame and lm() on a formula, which between them held about six
@@ -64,42 +69,11 @@ calc_src <- function(inputs, output) {
   result
 }
 
-calc_prcc <- function(inputs, output) {
-  # Andreas 28/5/26 #10: preserve original column names, `as.data.frame()`
-  # default `check.names = TRUE` mangles "Ym (DINT_cow)" into "Ym..DINT_cow.".
-  orig_names <- colnames(inputs)
-  ranked_list <- lapply(inputs, rank)
-  inputs_ranked <- as.data.frame(ranked_list, check.names = FALSE)
-  colnames(inputs_ranked) <- orig_names
-  output_ranked <- rank(output)
-  n_params <- ncol(inputs_ranked)
-  prcc_values <- numeric(n_params)
+# `method` is accepted for the callers that still pass it and ignored: SRC
+# is the one method (see the note at the top of this file).
+sensitivity_analysis <- function(inputs, output, method = "src") {
 
-  for (j in seq_len(n_params)) {
-    other_cols <- setdiff(seq_len(n_params), j)
-    resid_j <- residuals(lm(inputs_ranked[[j]] ~ as.matrix(inputs_ranked[, other_cols])))
-    resid_y <- residuals(lm(output_ranked ~ as.matrix(inputs_ranked[, other_cols])))
-    prcc_values[j] <- cor(resid_j, resid_y)
-  }
-
-  result <- data.frame(
-    parameter = orig_names,
-    prcc = prcc_values,
-    abs_prcc = abs(prcc_values),
-    stringsAsFactors = FALSE,
-    check.names = FALSE
-  )
-  result <- result[order(-result$abs_prcc), ]
-  result$rank <- seq_len(nrow(result))
-  rownames(result) <- NULL
-  result
-}
-
-sensitivity_analysis <- function(inputs, output, method = c("src", "prcc", "both"),
-                                  max_prcc_cols = 40L) {
-  method <- match.arg(method)
-
-  # Output-variance guard: SRC/PRCC on a constant (or near-constant) output
+  # Output-variance guard: SRC on a constant (or near-constant) output
   # returns spurious ranks. This happens when the selected output column is
   # structurally zero: e.g. PRP direct N2O for an intensive-dairy run where
   # pct_pasture = 0 across all iterations. Return an empty list with a
@@ -129,27 +103,7 @@ sensitivity_analysis <- function(inputs, output, method = c("src", "prcc", "both
   inputs_var <- inputs[, var_cols, drop = FALSE]
   if (ncol(inputs_var) == 0) return(list())
 
-  # PRCC is O(p) in lm() fits (one per parameter). For multi-group inventories
-  # the combined parameter matrix can have 80-150 columns, making PRCC take
-  # several minutes. Cap it: if p > max_prcc_cols, compute SRC only and attach
-  # a note so the UI can explain the fallback.
-  prcc_note <- NULL
-  if (method %in% c("prcc", "both") && ncol(inputs_var) > max_prcc_cols) {
-    method <- "src"
-    prcc_note <- paste0(
-      "PRCC was skipped: the combined parameter matrix has ",
-      ncol(inputs_var), " columns (limit: ", max_prcc_cols, "). ",
-      "SRC is shown instead: it requires only one regression fit regardless ",
-      "of the number of parameters. To see PRCC, select a single emission ",
-      "source from the 'Output' dropdown above."
-    )
-  }
-
-  result <- list()
-  if (method %in% c("src", "both")) result$src <- calc_src(inputs_var, output)
-  if (method %in% c("prcc", "both")) result$prcc <- calc_prcc(inputs_var, output)
-  if (!is.null(prcc_note)) attr(result, "prcc_note") <- prcc_note
-  result
+  list(src = calc_src(inputs_var, output))
 }
 
 # Aggregate sensitivity across a multi-system inventory. Each system's
@@ -225,7 +179,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   # Cross-group sharing (2026-09) makes the per-group columns of a shared
   # coefficient NUMERICALLY IDENTICAL. Left alone that is a silent failure,
   # not a loud one: lm() aliases the duplicate columns so calc_src() quietly
-  # returns fewer rows than it was given, and calc_prcc()'s residual
+  # returns fewer rows than it was given, and a rank-based residual
   # regression gets ~zero residuals and returns NaN. The existing zero-variance
   # guard does not catch it, because it tests the OUTPUT.
   #
@@ -284,7 +238,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   # MB and runs twice (main + no-correlation comparison) on top of the 3x
   # decomposition: enough to exhaust a small instance and force a reload during
   # the sensitivity step (the "server needed to reload" failure on the heaviest
-  # all-sources + correlations + decomposition run). SRC/PRCC *rankings* are
+  # all-sources + correlations + decomposition run). SRC *rankings* are
   # stable far below the iteration count the headline percentiles need, so we
   # rank on a capped subsample. Each Monte Carlo row is an independent draw, so
   # the first `max_rows` rows are a valid random subsample. The headline 95% MoE

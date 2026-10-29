@@ -367,8 +367,8 @@ lang_state_take <- function(token) {
     fr = "Monte Carlo : Approche 2 de l'IPCC 2006 Vol 1 Ch 3. Les corrélations sont échantillonnées via la procédure de pairage restreint préservant les corrélations de rang (IPCC Vol 1 Ch 3 §3.2.3.2), la même méthode est utilisée pour chaque voie corrélée (séries temporelles, préréglée, manuelle, valeurs par défaut structurelles)."
   ),
   resources_sensitivity = list(
-    en = "Sensitivity: Standardised regression coefficients (SRC) and partial rank correlation (PRCC) on the sampled inputs vs each output.",
-    fr = "Sensibilité : coefficients de régression standardisés (SRC) et corrélation partielle des rangs (PRCC) sur les entrées échantillonnées par rapport à chaque sortie."
+    en = "Sensitivity: Standardised regression coefficients (SRC) on the sampled inputs vs each output.",
+    fr = "Sensibilité : coefficients de régression standardisés (SRC) sur les entrées échantillonnées par rapport à chaque sortie."
   ),
   btn_open_methodology = list(en = "Open full methodology (PDF)",
                                 fr = "Ouvrir la méthodologie complète (PDF)"),
@@ -1302,11 +1302,6 @@ lang_state_take <- function(token) {
     en = "A sensitivity score from a linear model: how many standard deviations the output moves when the input moves by one standard deviation. Positive means higher input, higher emissions.",
     fr = "Un score de sensibilité issu d'un modèle linéaire : de combien d'écarts-types la sortie bouge quand l'entrée bouge d'un écart-type. Positif : entrée plus élevée, émissions plus élevées."
   ),
-  stat_prcc_term = list(en = "PRCC (Partial Rank Correlation Coefficient)", fr = "PRCC (corrélation partielle des rangs)"),
-  stat_prcc_def = list(
-    en = "A rank-based sensitivity score, more robust than SRC when relationships are non-linear or distributions are skewed. Use it as a cross-check on the SRC ranking.",
-    fr = "Un score de sensibilité basé sur les rangs, plus robuste que le SRC lorsque les relations sont non linéaires ou les distributions asymétriques. À utiliser en validation croisée du classement SRC."
-  ),
   stat_adef_term = list(en = "AD / EF decomposition", fr = "Décomposition AD / FE"),
   stat_adef_def = list(
     en = "Splits the combined uncertainty into the share coming from activity data (AD: the animal population) and the share from emission factors (EF: the per-head coefficients), by re-running the simulation with one group held fixed at a time. This is the AD/EF split IPCC Table 3.3 reports.",
@@ -1328,8 +1323,8 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_sens_what = list(
-    en = "This page shows which input parameters contribute most to the overall emission uncertainty. The tornado chart (Figure 5.1) ranks parameters by their influence: longer bars mean more influential parameters. Bars to the right mean a higher value gives higher emissions; bars to the left mean a higher value gives lower emissions. Colour shows whether better data could help: green bars are inputs you can improve with better national data, blue bars are IPCC coefficients you cannot improve locally. Use the dropdown on the right to switch between SRC (linear influence) and PRCC (rank-based, more robust).",
-    fr = "Cette page montre quels paramètres d'entrée contribuent le plus à l'incertitude globale des émissions. Le graphique tornade (Figure 5.1) classe les paramètres par leur influence : des barres plus longues indiquent des paramètres plus influents. Une barre à droite signifie qu'une valeur plus élevée donne des émissions plus élevées ; une barre à gauche, des émissions plus faibles. La couleur indique si de meilleures données peuvent aider : les barres vertes sont des entrées améliorables par de meilleures données nationales, les barres bleues des coefficients IPCC non améliorables localement. Utilisez le menu à droite pour basculer entre SRC (influence linéaire) et PRCC (rang, plus robuste)."
+    en = "This page shows which input parameters contribute most to the overall emission uncertainty. The tornado chart (Figure 5.1) ranks parameters by their influence: longer bars mean more influential parameters. Bars to the right mean a higher value gives higher emissions; bars to the left mean a higher value gives lower emissions. Colour shows whether better data could help: green bars are inputs you can improve with better national data, blue bars are IPCC coefficients you cannot improve locally.",
+    fr = "Cette page montre quels paramètres d'entrée contribuent le plus à l'incertitude globale des émissions. Le graphique tornade (Figure 5.1) classe les paramètres par leur influence : des barres plus longues indiquent des paramètres plus influents. Une barre à droite signifie qu'une valeur plus élevée donne des émissions plus élevées ; une barre à gauche, des émissions plus faibles. La couleur indique si de meilleures données peuvent aider : les barres vertes sont des entrées améliorables par de meilleures données nationales, les barres bleues des coefficients IPCC non améliorables localement."
   ),
   info_sens_note_label = list(en = "Note:", fr = "Note :"),
   info_sens_note_body = list(en = "These rankings show which parameters drive the ",
@@ -1350,20 +1345,9 @@ lang_state_take <- function(token) {
     en = ": fits a linear model between each input parameter and the output; fast and easy to interpret. A positive SRC means higher values of that input produce higher emissions.",
     fr = " : ajuste un modèle linéaire entre chaque paramètre d'entrée et la sortie ; rapide et facile à interpréter. Un SRC positif signifie que des valeurs plus élevées de cette entrée produisent des émissions plus élevées."
   ),
-  info_sens_prcc_label = list(en = "PRCC (Partial Rank Correlation Coefficients)",
-                                 fr = "PRCC (corrélation partielle des rangs)"),
-  info_sens_prcc_body = list(
-    en = ": rank-based method, more robust when the input-output relationship is non-linear or when the output distribution is skewed. For most livestock inventories both methods give similar rankings. Use PRCC as a cross-check when SRC rankings seem counterintuitive or when distributions are highly asymmetric.",
-    fr = " : méthode basée sur les rangs, plus robuste lorsque la relation entrée-sortie est non linéaire ou que la distribution de sortie est asymétrique. Pour la plupart des inventaires d'élevage, les deux méthodes donnent des classements similaires. Utilisez PRCC en validation croisée lorsque les classements SRC semblent contre-intuitifs ou lorsque les distributions sont fortement asymétriques."
-  ),
   sens_output_var = list(en = "Output variable", fr = "Variable de sortie"),
   sens_total_co2e = list(en = "Total CO₂eq (all sources)",
                            fr = "CO₂éq total (toutes sources)"),
-  sens_method = list(en = "Method", fr = "Méthode"),
-  sens_method_src = list(en = "Standardized Regression (SRC)",
-                            fr = "Régression standardisée (SRC)"),
-  sens_method_prcc = list(en = "Partial Rank Correlation (PRCC)",
-                             fr = "Corrélation partielle des rangs (PRCC)"),
   card_tornado_h = list(en = "Tornado Chart - Top Parameters",
                           fr = "Graphique tornade : paramètres principaux"),
   card_sens_rankings = list(en = "Sensitivity Rankings",
@@ -1407,8 +1391,8 @@ lang_state_take <- function(token) {
   trend_sens_delta_h = list(en = "What drives the change between the first and last year",
                               fr = "Ce qui pilote la variation entre la première et la dernière année"),
   tornado_top10 = list(en = "Tornado: top 10", fr = "Tornado, top 10"),
-  trend_rankings_top15 = list(en = "Rankings: top 15 (SRC + PRCC)",
-                                fr = "Classements : top 15 (SRC + PRCC)"),
+  trend_rankings_top15 = list(en = "Rankings: top 15 (SRC)",
+                                fr = "Classements : top 15 (SRC)"),
   trend_combined_note = list(
     en = "Combined Y_1 + Y_N inputs are sensitivity-tested against the per-iteration ΔCO₂eq. Suffixes _y1 / _yN distinguish the same parameter at different years.",
     fr = "Les entrées combinées Y_1 + Y_N sont testées en sensibilité contre le ΔCO₂éq par itération. Les suffixes _y1 / _yN distinguent le même paramètre à différentes années."
@@ -2142,8 +2126,8 @@ lang_state_take <- function(token) {
     en = "Distribution, across iterations, of the difference between the last and the first year. The dashed lines bound the 95% confidence interval; when it does not include zero, the trend is distinguishable from no change.",
     fr = "Distribution, sur les itérations, de la différence entre la dernière et la première année. Les tirets bornent l'intervalle de confiance à 95 % ; s'il n'inclut pas zéro, la tendance se distingue d'une absence de changement."),
   fig_cap_tornado = list(
-    en = "The ten inputs with the largest influence on the selected output. Bar length is the sensitivity coefficient (SRC or PRCC); bars to the right raise the output, bars to the left lower it. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
-    fr = "Les dix entrées qui influencent le plus la sortie choisie. La longueur de la barre est le coefficient de sensibilité (SRC ou PRCC) ; les barres à droite augmentent la sortie, celles à gauche la diminuent. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),
+    en = "The ten inputs with the largest influence on the selected output. Bar length is the sensitivity coefficient (SRC); bars to the right raise the output, bars to the left lower it. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+    fr = "Les dix entrées qui influencent le plus la sortie choisie. La longueur de la barre est le coefficient de sensibilité (SRC) ; les barres à droite augmentent la sortie, celles à gauche la diminuent. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),
   fig_cap_tornado_year = list(
     en = "The ten inputs with the largest influence on total CO2eq in the latest year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
     fr = "Les dix entrées qui influencent le plus le CO₂éq total de la dernière année. Vert : entrées améliorables par de meilleures données nationales. Bleu : coefficients IPCC."),

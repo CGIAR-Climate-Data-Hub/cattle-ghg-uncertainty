@@ -2482,9 +2482,7 @@ app_ui <- function(request = NULL) {
             tags$br(), tags$br(),
             tags$strong(paste0(t("info_sens_methods_label"), " ")),
             tags$strong(t("info_sens_src_label")),
-            t("info_sens_src_body"), " ",
-            tags$strong(t("info_sens_prcc_label")),
-            t("info_sens_prcc_body")),
+            t("info_sens_src_body")),
         uiOutput("sens_view_toggle"),
         div(style = "margin: 0 16px 12px 16px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;",
             selectInput("sens_source", t("sens_output_var"),
@@ -2511,10 +2509,6 @@ app_ui <- function(request = NULL) {
           bslib::card(
             bslib::card_header(t("card_sens_rankings")),
             bslib::card_body(
-              selectInput("sens_method", t("sens_method"),
-                          choices = setNames(c("src", "prcc"),
-                                              c(t("sens_method_src"),
-                                                t("sens_method_prcc")))),
               DT::DTOutput("sensitivity_table")
             )
           )

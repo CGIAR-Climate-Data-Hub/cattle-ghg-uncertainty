@@ -115,11 +115,6 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   else placeholder(if (!is.null(attr(sensitivity, "message"))) attr(sensitivity, "message")
                     else "Sensitivity (SRC) unavailable for this run.")
 
-  prcc_df <- if (!is.null(sensitivity) && is.data.frame(sensitivity$prcc) && nrow(sensitivity$prcc) > 0)
-    sensitivity$prcc
-  else placeholder(if (!is.null(attr(sensitivity, "message"))) attr(sensitivity, "message")
-                    else "Sensitivity (PRCC) unavailable for this run.")
-
   n_iter <- if (is.data.frame(results)) nrow(results) else NA_integer_
 
   run_settings_df <- if (!is.null(settings)) {
@@ -178,7 +173,6 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     Summary             = summary_df,
     Uncertainty_Metrics = uncertainty_df,
     Sensitivity_SRC     = src_df,
-    Sensitivity_PRCC    = prcc_df,
     Input_Parameters    = inputs_df,
     Metadata = data.frame(
       Field = c("Generated", "Tool", "Iterations"),
@@ -301,9 +295,7 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     Trend_summary    = results_table,
     Slope_and_delta  = slope_delta_summary,
     Sensitivity_per_year_SRC  = pull_df(sensitivity_per_year, "src"),
-    Sensitivity_per_year_PRCC = pull_df(sensitivity_per_year, "prcc"),
     Sensitivity_delta_SRC     = pull_df(sensitivity_delta, "src"),
-    Sensitivity_delta_PRCC    = pull_df(sensitivity_delta, "prcc"),
     Methodology      = methodology
   ))
   writexl::write_xlsx(sheets, path = filepath)

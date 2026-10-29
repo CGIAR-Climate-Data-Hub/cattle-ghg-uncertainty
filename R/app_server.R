@@ -2499,7 +2499,7 @@ app_server <- function(input, output, session) {
     sens <- rv$sensitivity
     if (is.null(sens)) return(NULL)
     df <- if (!is.null(sens$src) && is.data.frame(sens$src) && nrow(sens$src) > 0)
-      sens$src else sens$prcc
+      sens$src else NULL
     if (is.null(df) || !"variable" %in% names(df)) return(NULL)
 
     groups <- unique(sapply(df$variable, .sens_group))
@@ -2528,7 +2528,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$sens_groups_all, {
     sens <- rv$sensitivity
     if (is.null(sens)) return()
-    df <- if (!is.null(sens$src) && is.data.frame(sens$src)) sens$src else sens$prcc
+    df <- if (!is.null(sens$src) && is.data.frame(sens$src)) sens$src else NULL
     if (is.null(df)) return()
     groups <- unique(sapply(df$variable, .sens_group))
     updateSelectizeInput(session, "sens_groups", selected = groups)
@@ -2581,8 +2581,7 @@ app_server <- function(input, output, session) {
       df[keep, , drop = FALSE]
     }
     structure(
-      list(src  = filter_sens_df(raw$src),
-           prcc = filter_sens_df(raw$prcc)),
+      list(src  = filter_sens_df(raw$src)),
       message = attr(raw, "message")
     )
   })
@@ -2633,21 +2632,11 @@ app_server <- function(input, output, session) {
           x = 0.5, y = 0.5, xref = "paper", yref = "paper",
           font = list(size = 13, color = "#555")))))
     }
-    # When PRCC was skipped (too many parameters: multi-group inventory),
-    # fall back to SRC. The reason is shown as a caption above the chart
-    # (output$tornado_note), not as an in-plot annotation: the old top
-    # annotation collided with the chart title and the plotly toolbar.
-    sens <- if (input$sens_method == "prcc" && is.null(sens_data$prcc) &&
-                !is.null(sens_data$src)) {
-      sens_data$src   # fallback: show SRC with note below
-    } else if (input$sens_method == "src" && !is.null(sens_data$src)) {
-      sens_data$src
-    } else if (!is.null(sens_data$prcc)) {
-      sens_data$prcc
-    } else return(plotly::plot_ly())
+    sens <- sens_data$src
+    if (is.null(sens)) return(plotly::plot_ly())
 
     top10 <- head(sens, 10)
-    val_col <- if ("src" %in% names(top10)) "src" else "prcc"
+    val_col <- "src"
     top10 <- top10[order(top10[[val_col]]), ]
 
     view_label <- if (!is.null(input$sens_view) && input$sens_view == "without")
@@ -2657,13 +2646,13 @@ app_server <- function(input, output, session) {
                   toupper(val_col))
   })
 
-  # Caption above the tornado: PRCC-skipped / subsample notes, rendered as HTML
-  # so they never collide with the chart title or the plotly toolbar.
+  # Caption above the tornado: the subsample note, rendered as HTML so it
+  # never collides with the chart title or the plotly toolbar.
   output$tornado_note <- renderUI({
     req(isTRUE(rv$prerender_ok))
     sd <- active_sensitivity()
     if (is.null(sd)) return(NULL)
-    notes <- c(attr(sd, "prcc_note"), attr(sd, "subsampled_note"))
+    notes <- c(attr(sd, "subsampled_note"))
     notes <- Filter(function(x) !is.null(x) && nzchar(x), as.list(notes))
     if (length(notes) == 0) return(NULL)
     tags$div(
@@ -2676,11 +2665,7 @@ app_server <- function(input, output, session) {
     req(isTRUE(rv$prerender_ok))
     sens_data <- active_sensitivity()
     req(sens_data)
-    sens <- if (input$sens_method == "prcc" && !is.null(sens_data$prcc)) {
-      sens_data$prcc
-    } else if (!is.null(sens_data$src)) {
-      sens_data$src
-    } else req(FALSE)
+    sens <- if (!is.null(sens_data$src)) sens_data$src else req(FALSE)
     # 2026-10-28 (review): two decimals.
     dec <- names(sens)[vapply(sens, function(v) is.numeric(v) && any(abs(v - round(v)) > 1e-9, na.rm = TRUE), logical(1))]
     dt <- DT::datatable(sens, rownames = FALSE, options = list(pageLength = 20))
@@ -2917,16 +2902,11 @@ app_server <- function(input, output, session) {
     sens <- if (!is.null(rv$sensitivity$src) &&
                 is.data.frame(rv$sensitivity$src) && nrow(rv$sensitivity$src) > 0) {
       rv$sensitivity$src
-    } else if (!is.null(rv$sensitivity$prcc) &&
-               is.data.frame(rv$sensitivity$prcc) && nrow(rv$sensitivity$prcc) > 0) {
-      rv$sensitivity$prcc
     } else NULL
     if (is.null(sens) || nrow(sens) == 0)
       return(placeholder("No input parameters had variance: tornado chart cannot be built."))
 
-    val_col <- if ("src" %in% names(sens)) "src"
-               else if ("prcc" %in% names(sens)) "prcc"
-               else NULL
+    val_col <- if ("src" %in% names(sens)) "src" else NULL
     if (is.null(val_col) || !"parameter" %in% names(sens))
       return(placeholder("Sensitivity result is missing the expected columns."))
 
@@ -3684,14 +3664,10 @@ app_server <- function(input, output, session) {
       return(placeholder("Run a trend simulation first."))
     base <- if (!is.null(sens$src) && is.data.frame(sens$src) && nrow(sens$src) > 0) {
       sens$src
-    } else if (!is.null(sens$prcc) && is.data.frame(sens$prcc) && nrow(sens$prcc) > 0) {
-      sens$prcc
     } else NULL
     if (is.null(base) || nrow(base) == 0)
       return(placeholder("No input parameters had variance."))
-    val_col <- if ("src" %in% names(base)) "src"
-               else if ("prcc" %in% names(base)) "prcc"
-               else NULL
+    val_col <- if ("src" %in% names(base)) "src" else NULL
     if (is.null(val_col) || !"parameter" %in% names(base))
       return(placeholder("Sensitivity result missing expected columns."))
     top10 <- utils::head(base[order(-abs(base[[val_col]])), , drop = FALSE], 10)
@@ -3702,28 +3678,22 @@ app_server <- function(input, output, session) {
   }
 
   # Round 9 follow-up: trend rankings table (per-year + Δ). Mirrors the
-  # single-year output$sensitivity_table but shows both SRC and PRCC columns
-  # (and the user_reducible flag as a coloured Class column) so the user
-  # doesn't have to flip a method toggle. Used by Tab 6 (Sensitivity) under
-  # the trend mode conditional.
+  # single-year output$sensitivity_table, with the user_reducible flag as a
+  # coloured Class column. Used by Tab 6 (Sensitivity) under the trend mode
+  # conditional.
   .trend_sens_table <- function(sens) {
     if (is.null(sens) || length(sens) == 0) {
       return(DT::datatable(data.frame(Note = "Run a trend simulation first."),
                             rownames = FALSE, options = list(dom = "t")))
     }
     src  <- sens$src
-    prcc <- sens$prcc
-    base <- if (!is.null(src) && nrow(src) > 0) src
-            else if (!is.null(prcc) && nrow(prcc) > 0) prcc
-            else NULL
+    base <- if (!is.null(src) && nrow(src) > 0) src else NULL
     if (is.null(base) || nrow(base) == 0) {
       return(DT::datatable(
         data.frame(Note = "No input parameters had variance."),
         rownames = FALSE, options = list(dom = "t")))
     }
-    val_col <- if ("src" %in% names(base)) "src"
-               else if ("prcc" %in% names(base)) "prcc"
-               else names(base)[2]
+    val_col <- if ("src" %in% names(base)) "src" else names(base)[2]
     base <- base[order(-abs(base[[val_col]])), , drop = FALSE]
     base <- utils::head(base, 15)
 
@@ -3736,19 +3706,14 @@ app_server <- function(input, output, session) {
 
     src_disp  <- if ("src" %in% names(base))
                    formatC(base$src,  digits = 2, format = "f") else NA_character_
-    prcc_disp <- if (!is.null(prcc) && "prcc" %in% names(prcc))
-                   formatC(prcc$prcc[match(base$parameter, prcc$parameter)],
-                           digits = 2, format = "f") else NA_character_
 
     df <- data.frame(
       Parameter = base$parameter,
       Class     = ifelse(reducible, "User-reducible", "IPCC coefficient"),
       SRC       = src_disp,
-      PRCC      = prcc_disp,
       stringsAsFactors = FALSE,
       check.names = FALSE
     )
-    if (all(is.na(df$PRCC))) df$PRCC <- NULL
     if (all(is.na(df$SRC)))  df$SRC  <- NULL
 
     dt <- DT::datatable(df, rownames = FALSE,
@@ -3835,9 +3800,9 @@ app_server <- function(input, output, session) {
                          "Top 10 drivers of the change between first and last year")
   })
   # Round 9 follow-up: rankings tables (Top 15) for trend mode, mirroring
-  # the single-year output$sensitivity_table. Both SRC and PRCC columns
-  # surfaced together; Class column is colour-coded (green = user-reducible,
-  # grey = IPCC coefficient) to match the tornado bar palette.
+  # the single-year output$sensitivity_table. The Class column is
+  # colour-coded (green = user-reducible, grey = IPCC coefficient) to match
+  # the tornado bar palette.
   output$trend_sens_per_year_table <- DT::renderDT({
     req(isTRUE(rv$prerender_ok))
     .trend_sens_table(trend_sens_per_year())

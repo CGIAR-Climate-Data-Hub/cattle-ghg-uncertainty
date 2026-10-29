@@ -542,25 +542,11 @@ Properties:
 - The $R^2$ of the regression indicates what fraction of the total variance in the output is explained by the linear model. High $R^2$ ($>$ 0.9) indicates SRC is a reliable measure; low $R^2$ suggests non-linearity.
 - SRC requires only a single regression fit, making it computationally efficient for any number of parameters.
 
-## Partial Rank Correlation Coefficients (PRCC)
-
-PRCC is a rank-based method that is robust to non-linearity and non-normal distributions:
-
-1. Replace all input columns and the output column with their ranks.
-2. For each parameter $j$:
-   a. Regress $\text{rank}(X_j)$ on all other ranked inputs; compute residuals $e_{X_j}$.
-   b. Regress $\text{rank}(Y)$ on all other ranked inputs; compute residuals $e_Y$.
-   c. $\text{PRCC}_j = \text{cor}(e_{X_j},\ e_Y)$.
-
-PRCC measures the unique rank-correlation between each input and the output after removing the shared linear effect of all other inputs. It is more appropriate than SRC when the relationship between inputs and output is monotone but non-linear, or when input distributions are strongly skewed.
-
-**Computational note:** PRCC requires one regression fit per parameter. For large inventories (more than 40 combined parameters across all sub-categories), PRCC computation can take several minutes. In this case, the tool automatically falls back to SRC for the aggregate sensitivity result; PRCC remains available for individual sub-category analyses.
-
 ## Tornado Chart Interpretation
 
 Each parameter label on the tornado chart is formatted as `<parameter> (<sub_category>)`: for example `Ym (DINT_cow)`, `BW (DINT_heif)`, `MCF_solid_storage (DINT_cow)`. The sub-category in parentheses identifies which animal group each influential parameter belongs to so that reduction efforts can be targeted at the specific sub-category that drives uncertainty rather than at the parameter in aggregate. The same labels appear in the rank-correlation table and the downloadable Word / Excel sensitivity sheets.
 
-The tornado chart displays the top parameters ranked by $|\text{SRC}|$ or $|\text{PRCC}|$:
+The tornado chart displays the top parameters ranked by $|\text{SRC}|$:
 
 - **Green bars** (positive coefficient): increasing this parameter increases total emissions; reduction in uncertainty would directly reduce total emission uncertainty.
 - **Red bars** (negative coefficient): increasing this parameter decreases total emissions.

@@ -365,30 +365,29 @@ build_run_summary_docx <- function(path,
   if (!is.null(sens_ft)) {
     doc <- .add_h2(doc, "8. Sensitivity ranking: top 10 drivers")
     doc <- .add_p(doc,
-      "Standardised regression coefficient (SRC) and partial rank correlation (PRCC) of each input parameter against total CO2eq. Larger absolute values dominate the output uncertainty. Parameter labels include the cattle-type and sub-category they belong to when the inventory has more than one group.")
+      "Standardised regression coefficient (SRC) of each input parameter against total CO2eq. Larger absolute values dominate the output uncertainty. Parameter labels include the cattle-type and sub-category they belong to when the inventory has more than one group.")
     doc <- .add_flextable_safe(doc, .styled_flextable(sens_ft))
   }
 
   # ---- Full sensitivity rankings -----------------------------------------
-  # Round 9b §9: SRC and PRCC side-by-side. Perf (2026-06): capped to the top
-  # WORD_SENS_MAX drivers so the Word doc stays small (officer print.rdocx cost
-  # scales with table size). The complete ranking for every parameter is in the
-  # Sensitivity_SRC / Sensitivity_PRCC sheets of the Excel download.
-  n_sens <- if (!is.null(sensitivity$src)) nrow(sensitivity$src)
-            else if (!is.null(sensitivity$prcc)) nrow(sensitivity$prcc) else 0L
+  # Round 9b §9. Perf (2026-06): capped to the top WORD_SENS_MAX drivers so
+  # the Word doc stays small (officer print.rdocx cost scales with table
+  # size). The complete ranking for every parameter is in the
+  # Sensitivity_SRC sheet of the Excel download.
+  n_sens <- if (!is.null(sensitivity$src)) nrow(sensitivity$src) else 0L
   full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = WORD_SENS_MAX)
   if (!is.null(full_sens_ft)) {
     if (is.finite(n_sens) && n_sens > WORD_SENS_MAX) {
       doc <- .add_h2(doc, sprintf("9. Sensitivity rankings: top %d drivers", WORD_SENS_MAX))
       doc <- .add_p(doc, sprintf(
-        paste0("SRC and PRCC for the %d most influential parameters (of %d), sorted ",
+        paste0("SRC for the %d most influential parameters (of %d), sorted ",
                "by decreasing absolute SRC. The complete ranking for every parameter ",
-               "is in the Sensitivity_SRC / Sensitivity_PRCC sheets of the Excel download."),
+               "is in the Sensitivity_SRC sheet of the Excel download."),
         WORD_SENS_MAX, n_sens))
     } else {
       doc <- .add_h2(doc, "9. Full sensitivity rankings (all parameters)")
       doc <- .add_p(doc,
-        "Complete SRC and PRCC values for every input parameter, sorted by decreasing absolute SRC. Useful for QA and for documenting which parameters were considered in the run.")
+        "Complete SRC values for every input parameter, sorted by decreasing absolute SRC. Useful for QA and for documenting which parameters were considered in the run.")
     }
     doc <- .add_flextable_safe(doc, .styled_flextable(full_sens_ft))
     doc <- .add_landscape_break(doc)
@@ -508,10 +507,9 @@ build_run_summary_docx <- function(path,
   # Top driver from sensitivity (SRC if available)
   driver_text <- ""
   base <- if (!is.null(sensitivity$src) && nrow(sensitivity$src) > 0) sensitivity$src
-          else if (!is.null(sensitivity$prcc) && nrow(sensitivity$prcc) > 0) sensitivity$prcc
           else NULL
   if (!is.null(base) && nrow(base) > 0) {
-    val_col <- if ("src" %in% names(base)) "src" else "prcc"
+    val_col <- "src"
     top <- base[order(-abs(base[[val_col]])), , drop = FALSE][1, ]
     driver_text <- sprintf(
       " The single dominant uncertainty driver is %s (%s = %s).",
@@ -673,7 +671,7 @@ build_trend_summary_docx <- function(path,
   if (!is.null(full_py) || !is.null(full_dl)) {
     doc <- .add_h2(doc, "5a. Full sensitivity rankings (all parameters)")
     doc <- .add_p(doc,
-      "Complete SRC and PRCC values for every input parameter. Per-year is the latest-year analysis; trend driver is the Δ Y_N − Y_1 analysis.")
+      "Complete SRC values for every input parameter. Per-year is the latest-year analysis; trend driver is the Δ Y_N − Y_1 analysis.")
     if (!is.null(full_py)) {
       doc <- .add_h3(doc, "Per-year (latest year): full ranking")
       doc <- .add_flextable_safe(doc, .styled_flextable(full_py))
@@ -748,11 +746,9 @@ build_trend_summary_docx <- function(path,
   driver_text <- ""
   base <- if (!is.null(sensitivity_delta$src) && nrow(sensitivity_delta$src) > 0)
     sensitivity_delta$src
-  else if (!is.null(sensitivity_delta$prcc) && nrow(sensitivity_delta$prcc) > 0)
-    sensitivity_delta$prcc
   else NULL
   if (!is.null(base) && nrow(base) > 0) {
-    val_col <- if ("src" %in% names(base)) "src" else "prcc"
+    val_col <- "src"
     top <- base[order(-abs(base[[val_col]])), , drop = FALSE][1, ]
     driver_text <- sprintf(
       " The dominant trend driver is %s (%s = %s).",
@@ -991,26 +987,18 @@ build_trend_summary_docx <- function(path,
 .sensitivity_flextable <- function(sens, top_n = 10L) {
   if (is.null(sens) || length(sens) == 0) return(NULL)
   src  <- sens$src
-  prcc <- sens$prcc
-  if ((is.null(src)  || nrow(src) == 0) &&
-      (is.null(prcc) || nrow(prcc) == 0)) return(NULL)
+  if (is.null(src) || nrow(src) == 0) return(NULL)
 
-  base <- if (!is.null(src) && nrow(src) > 0) src else prcc
-  val_col <- if ("src" %in% names(base)) "src"
-             else if ("prcc" %in% names(base)) "prcc"
-             else names(base)[2]
+  base <- src
+  val_col <- if ("src" %in% names(base)) "src" else names(base)[2]
   base <- base[order(-abs(base[[val_col]])), , drop = FALSE]
   if (is.finite(top_n)) base <- utils::head(base, as.integer(top_n))
 
   src_disp  <- if ("src" %in% names(base))
                  formatC(base$src,  digits = 3, format = "f") else NULL
-  prcc_disp <- if (!is.null(prcc) && "prcc" %in% names(prcc))
-                 formatC(prcc$prcc[match(base$parameter, prcc$parameter)],
-                         digits = 3, format = "f") else NULL
 
   df <- data.frame(Parameter = base$parameter, stringsAsFactors = FALSE)
   if (!is.null(src_disp))  df$SRC  <- src_disp
-  if (!is.null(prcc_disp)) df$PRCC <- prcc_disp
   flextable::flextable(df)
 }
 

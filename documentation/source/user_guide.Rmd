@@ -708,7 +708,7 @@ If AD uncertainty dominates, improving livestock population surveys would most e
 
 The tornado chart (Figure 5.1) ranks parameters by their contribution to total uncertainty. The longest bars indicate the parameters that, if better constrained, would most reduce the 95\% CI.
 
-Each bar is labelled as \texttt{<parameter> (<sub\_category>)}: for example \texttt{Ym (DINT\_cow)} vs \texttt{Ym (DINT\_heif)}. The sub-category in parentheses identifies which animal group the influential parameter belongs to, so you can target research at the specific sub-category driving uncertainty rather than at the parameter in general. The same labels appear in the rank-correlation table, the Excel SRC / PRCC sheets, and the Word report's sensitivity section. Per-MMS sampled parameters carry their MMS in the parameter name and the sub-category in parentheses, e.g. \texttt{MCF\_solid\_storage (DINT\_cow)} or \texttt{fraction\_pasture (DINT\_heif)}.
+Each bar is labelled as \texttt{<parameter> (<sub\_category>)}: for example \texttt{Ym (DINT\_cow)} vs \texttt{Ym (DINT\_heif)}. The sub-category in parentheses identifies which animal group the influential parameter belongs to, so you can target research at the specific sub-category driving uncertainty rather than at the parameter in general. The same labels appear in the rankings table, the Excel SRC sheet, and the Word report's sensitivity section. Per-MMS sampled parameters carry their MMS in the parameter name and the sub-category in parentheses, e.g. \texttt{MCF\_solid\_storage (DINT\_cow)} or \texttt{fraction\_pasture (DINT\_heif)}.
 
 \textit{Per-source sensitivity.} The "Output" dropdown above the tornado lets you re-rank parameters for a single emission source (Enteric CH\textsubscript{4}, Manure CH\textsubscript{4}, etc.). The per-source view aggregates across ALL sub-categories: earlier versions of the tool silently restricted the per-source view to the first sub-category only, dropping every other sub-category's contribution; that has been fixed.
 
@@ -718,39 +718,9 @@ Bars are coloured by reducibility:
   \item \textcolor{blue}{\textbf{Blue}}: IPCC coefficients, whose uncertainty is largely irreducible with national-level data (e.g. fundamental biochemical constants or IPCC defaults that are rarely measured)
 \end{itemize}
 
-## SRC vs PRCC
-
-Two sensitivity methods are computed:
-\begin{itemize}
-  \item \textbf{SRC} (Standardised Regression Coefficient): Linear sensitivity. Reliable when relationships are approximately linear.
-  \item \textbf{PRCC} (Partial Rank Correlation Coefficient): Rank-based, captures non-linear relationships. More robust but less interpretable.
-\end{itemize}
-
-Both are shown; they typically agree on the top-ranked parameters. If they disagree significantly, the emission pathway may be strongly non-linear.
-
-\newpage
-
-# Generating the IPCC report (Tab 6: IPCC Report)
-
-## IPCC Table 3.3
-
-The IPCC Report tab shows your results formatted as IPCC 2006 Vol. 1 Ch. 3 Table 3.3. The three uncertainty columns in the downloadable Excel sheet are:
-
-\begin{itemize}
-  \item \textbf{AD uncertainty (95\% MoE \%)}: \% uncertainty from activity data alone
-  \item \textbf{EF uncertainty (95\% MoE \%)}: \% uncertainty from emission factors alone
-  \item \textbf{Combined uncertainty (95\% MoE \%)}: Overall \% uncertainty
-\end{itemize}
-
-\textbf{Definition of \% uncertainty}: Following IPCC Table 3.3 conventions, all values are expressed as the half-width of the 95\% confidence interval divided by the mean, multiplied by 100, i.e.\ \texttt{MoE\% = ((CI\_upper - CI\_lower) / 2) / mean * 100}.
-
-\textit{Example: a Combined uncertainty of 35\% means the 95\% CI is approximately ±35\% of the mean emission estimate.}
-
-## Downloads
-
 Three download formats are available:
 \begin{itemize}
-  \item \textbf{Excel report (.xlsx)}: Full workbook with run settings, IPCC summary table, uncertainty metrics, and sensitivity results (SRC and PRCC)
+  \item \textbf{Excel report (.xlsx)}: Full workbook with run settings, IPCC summary table, uncertainty metrics, and sensitivity results (SRC)
   \item \textbf{CSV report}: The IPCC Table 3.3 formatted table only, for easy import into inventory reporting software
   \item \textbf{Word report}: Narrative summary suitable for inclusion in the uncertainty section of your national inventory report
 \end{itemize}

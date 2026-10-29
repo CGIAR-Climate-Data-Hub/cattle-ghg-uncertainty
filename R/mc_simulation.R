@@ -212,7 +212,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
                                       # comparison) stays under the ~1 GB free tier.
                                       # `results` and `inventory` are ALWAYS kept at
                                       # full n_iter: only `samples` is thinned, and
-                                      # it is used solely for the SRC/PRCC ranking
+                                      # it is used solely for the SRC ranking
                                       # (already subsampled to 4000 in
                                       # aggregate_sensitivity) and the first-system
                                       # input-density histograms, both stable far
