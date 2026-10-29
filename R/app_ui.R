@@ -2711,11 +2711,34 @@ app_ui <- function(request = NULL) {
       )
     ),
 
-    # Footer
-    bslib::nav_spacer(),
-    bslib::nav_item(
-      tags$span(style = "color: #6B6B6B; font-size: 0.85rem;",
-                t("footer_credit"))
-    )
+    # 2026-10-29 (Lolita): a page footer (logos, version, licence, GitHub)
+    # instead of the credit line that sat under the tabs.
+    footer = app_footer()
+  )
+}
+
+# The version shown in the footer and sent with feedback mails: the VERSION
+# file at the repo root (one line, bumped at each deploy).
+.app_version <- function() {
+  v <- tryCatch(trimws(readLines("VERSION", warn = FALSE))[1], error = function(e) "")
+  if (is.na(v)) "" else v
+}
+
+app_footer <- function() {
+  v <- .app_version()
+  if (nzchar(v)) Sys.setenv(APP_VERSION = v)
+  tags$footer(
+    class = "app-footer",
+    div(class = "app-footer-logos",
+        tags$img(src = "alliance_logo.png", alt = "Alliance of Bioversity International and CIAT"),
+        tags$img(src = "climate_action_logo.png", alt = "Climate Action"),
+        tags$img(src = "gmh_logo.png", alt = "Global Methane Hub")),
+    div(class = "app-footer-meta",
+        if (nzchar(v)) tags$span(paste(t("footer_version"), v)),
+        tags$a(href = "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty/blob/main/LICENSE",
+               target = "_blank", rel = "noopener", t("footer_licence")),
+        tags$a(href = "https://github.com/CGIAR-Climate-Data-Hub/cattle-ghg-uncertainty",
+               target = "_blank", rel = "noopener", class = "app-footer-github",
+               icon("github"), t("footer_github")))
   )
 }

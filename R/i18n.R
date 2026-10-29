@@ -152,10 +152,9 @@ lang_state_take <- function(token) {
   tip_lang_toggle_fr = list(en = "Switch to French (reloads the page)",
                               fr = "Passer en français (recharge la page)"),
 
-  footer_credit = list(
-    en = "Developed by CIAT/CGIAR Alliance | Funded by Global Methane Hub",
-    fr = "Développé par CIAT/Alliance CGIAR | Financé par Global Methane Hub"
-  ),
+  footer_version = list(en = "Version", fr = "Version"),
+  footer_licence = list(en = "MIT licence", fr = "Licence MIT"),
+  footer_github = list(en = "Source code", fr = "Code source"),
 
   # ---- App-wide title strip (top of navbar) -----------------------------
   app_title = list(

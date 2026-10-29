@@ -331,3 +331,47 @@ h4.card-title { color: var(--primary); font-weight: 600; }
 .sim-settings .shiny-input-container {
   margin-bottom: 4px;
 }
+
+/* 2026-10-29: page footer (logos, version, licence, GitHub). */
+.app-footer {
+  margin-top: 40px;
+  padding: 18px 24px;
+  border-top: 1px solid #D9D4C7;
+  background: #EFEBE2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px 32px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: #555;
+}
+.app-footer-logos {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.app-footer-logos img {
+  height: 52px;
+  width: auto;
+}
+.app-footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.app-footer-meta a {
+  color: #2D6A4F;
+  text-decoration: none;
+}
+.app-footer-meta a:hover {
+  text-decoration: underline;
+}
+.app-footer-github .fa, .app-footer-github svg {
+  font-size: 1.25rem;
+  height: 1.25rem;
+  margin-right: 6px;
+  vertical-align: -0.2em;
+}
