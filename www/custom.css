@@ -311,3 +311,23 @@ h4.card-title { color: var(--primary); font-weight: 600; }
   color: #FFFFFF;
   text-decoration: none;
 }
+
+/* 2026-10-29: Sensitivity and Report before any run (class toggled from
+   the run_done output in app_ui.R). */
+.needs-run.run-missing {
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+}
+.needs-run-msg {
+  font-weight: 600;
+}
+
+/* 2026-10-29: the settings card on Tab 4 is one column; less air between
+   the blocks. */
+.sim-settings hr {
+  margin: 6px 0;
+}
+.sim-settings .shiny-input-container {
+  margin-bottom: 4px;
+}

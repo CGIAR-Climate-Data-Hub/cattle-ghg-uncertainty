@@ -909,9 +909,14 @@ lang_state_take <- function(token) {
     fr = ". Sinon, téléchargez le modèle Excel à gauche, remplissez-le et téléversez-le."
   ),
   what_to_do_label = list(en = "What to do:", fr = "Marche à suivre :"),
+  needs_run_msg = list(
+    en = "No results yet. Run the Monte Carlo simulation on the 'Simulate and results' tab first.",
+    fr = "Pas encore de résultats. Lancez d'abord la simulation Monte Carlo dans l'onglet « Simulation et résultats »."
+  ),
 
   data_source_h = list(en = "Data Source", fr = "Source des données"),
   country_label = list(en = "Country / Example Data", fr = "Pays / données d'exemple"),
+  country_placeholder = list(en = "Select your dataset", fr = "Choisissez votre jeu de données"),
   country_x_label = list(en = "Country X (hypothetical dairy)",
                           fr = "Pays X (laitier hypothétique)"),
   country_y_label = list(en = "Country Y (hypothetical pastoral)",

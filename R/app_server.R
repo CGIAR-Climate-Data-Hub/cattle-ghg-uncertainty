@@ -588,6 +588,9 @@ app_server <- function(input, output, session) {
     !is.null(imputed_rows())
   })
   outputOptions(output, "has_imputed_params", suspendWhenHidden = FALSE)
+  # 2026-10-29: Tab 1 shows the parameter table only once a dataset is in.
+  output$data_loaded <- reactive(!is.null(rv$param_specs))
+  outputOptions(output, "data_loaded", suspendWhenHidden = FALSE)
 
   output$imputed_params_card <- renderUI({
     rows <- imputed_rows()
@@ -1805,13 +1808,18 @@ app_server <- function(input, output, session) {
     )
   })
 
-  output$sim_log <- renderText(rv$sim_log)
 
   # B2: drives the inline results section visibility on the merged Tab 5
   output$sim_complete <- reactive({
     !is.null(rv$mc_results) && !is.null(rv$uncertainty)
   })
   outputOptions(output, "sim_complete", suspendWhenHidden = FALSE)
+  # 2026-10-29: Sensitivity and Report are greyed out until a run exists
+  # (single year or trend).
+  output$run_done <- reactive({
+    !is.null(rv$mc_results) || !is.null(rv_trend$res)
+  })
+  outputOptions(output, "run_done", suspendWhenHidden = FALSE)
 
   # R1.5 / Round 6a #6: switch to results view when the simulation completes.
   # The flip is forced directly in the run handler, so this observer is now

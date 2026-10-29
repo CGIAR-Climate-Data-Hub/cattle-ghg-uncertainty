@@ -166,7 +166,11 @@ app_ui <- function(request = NULL) {
       }),
       # ---- end SEO head block ---------------------------------------------
       tags$head(tags$script(HTML(
-        "Shiny.addCustomMessageHandler('scrollTo', function(id) {
+        "$(document).on('shiny:value', function(e) {
+           if (e.name === 'run_done')
+             $('.needs-run').toggleClass('run-missing', e.value !== true);
+         });
+         Shiny.addCustomMessageHandler('scrollTo', function(id) {
            // setTimeout buffer: when scrollTo follows a nav_select, the target
            // tab needs a tick to render before its child elements become
            // measurable. 150ms is imperceptible to users but reliable.
@@ -1663,11 +1667,15 @@ app_ui <- function(request = NULL) {
             ),
             choiceValues = c("single", "trend"),
             selected = character(0)),
-          div(id = "analysis_mode_warning",
-              style = "background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; margin-top:8px; font-size:0.85rem; color:#92400E; border-radius:4px;",
-              icon("exclamation-triangle"),
-              tags$strong(paste0(" ", t("what_to_do_label"), " ")),
-              t("analysis_mode_warning"))
+          # 2026-10-29 (Lolita): the yellow box was never hidden, even after
+          # a mode was picked. It now shows only while nothing is selected.
+          conditionalPanel(
+            condition = "!input.analysis_mode",
+            div(id = "analysis_mode_warning",
+                style = "background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; margin-top:8px; font-size:0.85rem; color:#92400E; border-radius:4px;",
+                icon("exclamation-triangle"),
+                tags$strong(paste0(" ", t("what_to_do_label"), " ")),
+                t("analysis_mode_warning")))
         )
       ),
       # 2026-10-29 (Lolita): every info box cut to a few short sentences;
@@ -1681,16 +1689,22 @@ app_ui <- function(request = NULL) {
                         onclick = "window.translatorOpen(); return false;",
                         t("info_data_input_ai_link")),
                  t("info_data_input_ai_post"))),
-      bslib::layout_sidebar(
-        sidebar = bslib::sidebar(
-          width = 320,
+      # 2026-10-29 (Lolita): nothing is selected at the start and the page
+      # is one column (the controls); the parameter table appears beside
+      # them once a dataset is loaded (output$data_loaded).
+      div(style = "display:flex; gap:16px; margin:0 16px 16px; align-items:flex-start; flex-wrap:wrap;",
+        bslib::card(
+          style = "flex:1 1 340px; max-width:520px;",
+          bslib::card_body(
           h5(t("data_source_h")),
           selectInput("country", t("country_label"),
                       choices = setNames(
-                        c("country_x", "country_y", "custom"),
-                        c(t("country_x_label"),
+                        c("", "country_x", "country_y", "custom"),
+                        c(t("country_placeholder"),
+                          t("country_x_label"),
                           t("country_y_label"),
-                          t("country_custom_label")))),
+                          t("country_custom_label"))),
+                      selected = ""),
           # B1: explicit hint when "Custom Upload" selected so the user knows the
           # dropdown registered (the example tables don't auto-load for "custom")
           conditionalPanel(
@@ -1779,14 +1793,21 @@ app_ui <- function(request = NULL) {
           hr(),
           h5(t("validation_h")),
           uiOutput("validation_status")
-        ),
-        conditionalPanel(
-          condition = "output.has_imputed_params == true",
-          uiOutput("imputed_params_notice_tab1")
-        ),
-        bslib::card(
-          bslib::card_header(t("param_data_h")),
-          bslib::card_body(DT::DTOutput("param_table"))
+        )),
+        # A plain div is the flex item: conditionalPanel renders with
+        # display:contents, so its children would become flex items.
+        div(style = "flex:1 1 60%; min-width:0;",
+          conditionalPanel(
+            condition = "output.data_loaded == true",
+            conditionalPanel(
+              condition = "output.has_imputed_params == true",
+              uiOutput("imputed_params_notice_tab1")
+            ),
+            bslib::card(
+              bslib::card_header(t("param_data_h")),
+              bslib::card_body(DT::DTOutput("param_table"))
+            )
+          )
         )
       )
     ),
@@ -1799,18 +1820,8 @@ app_ui <- function(request = NULL) {
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
           t("info_qaqc")),
-      conditionalPanel(
-        condition = "output.has_imputed_params == true",
-        div(style = "margin: 0 16px 16px 16px;",
-            bslib::card(
-              style = "border-left: 4px solid #F59E0B;",
-              bslib::card_header(
-                style = "background-color:#FEF3C7; color:#92400E; font-weight:600;",
-                icon("triangle-exclamation"), " ", t("qa_autofilled_panel_label")
-              ),
-              bslib::card_body(uiOutput("imputed_params_card"))
-            ))
-      ),
+      # 2026-10-29 (Lolita): the auto-filled card is gone; the Missing status
+      # in the table already lists those parameters.
       # 2026-10-28 (Nairobi review, second pass): one card, one table. The
       # status tiles carry the counts and filter the table; each row is a
       # parameter that opens to its findings (app_server.R, qa_parents).
@@ -1895,6 +1906,11 @@ app_ui <- function(request = NULL) {
             div(class = "info-panel",
                 t("info_ad_corr"), tags$strong("Parameter_TimeSeries"),
                 t("info_ad_corr_post")),
+            # 2026-10-29 (Lolita): the settings on the left and the matrix on
+            # the right, instead of a narrow radio list over an empty band.
+            bslib::layout_columns(
+              col_widths = c(5, 7),
+              div(
             # 2026-06 Andreas review: the corr_mode radio is now rendered
             # server-side so that modes whose prerequisites are missing (TS
             # sheet empty / no manual CSV uploaded) appear visibly disabled.
@@ -1935,9 +1951,13 @@ app_ui <- function(request = NULL) {
               fileInput("corr_matrix_upload", "Upload correlation matrix (.csv)",
                         accept = ".csv")
             ),
-            tags$h6(style = "margin-top:12px;", fig_title("3.1", t("corr_heatmap_title_ad"))),
-            plotly::plotlyOutput("corr_heatmap", height = "350px"),
-            fig_caption("fig_cap_corr")
+              ),
+              div(
+                tags$h6(style = "margin-top:0;", fig_title("3.1", t("corr_heatmap_title_ad"))),
+                plotly::plotlyOutput("corr_heatmap", height = "440px"),
+                fig_caption("fig_cap_corr")
+              )
+            )
             # 2026-10-28 (review): the "Inputs shared between groups" setting
             # was removed from the page; every run treats each group
             # independently (the server falls back to "independent" when the
@@ -1971,11 +1991,12 @@ app_ui <- function(request = NULL) {
       # R1.5: view toggle, output.sim_view is "settings" or "results"
       conditionalPanel(
         condition = "output.sim_view != 'results'",
-        bslib::layout_columns(
-        col_widths = c(4, 8),
+        # 2026-10-29 (Lolita): one column. The log card is gone; the status
+        # line under the button and the notifications carry the messages.
+        div(class = "sim-settings", style = "max-width:720px; margin:0 16px 16px;",
         bslib::card(
           bslib::card_header(t("card_sim_settings")),
-          bslib::card_body(
+          bslib::card_body(gap = "8px",
             sliderInput("n_iter", t("sim_n_iter_label"),
               min = 1000, max = 50000, step = 1000,
               value = 10000, sep = ","),
@@ -2118,12 +2139,6 @@ app_ui <- function(request = NULL) {
             ),
             hr(),
             uiOutput("sim_status")
-          )
-        ),
-        bslib::card(
-          bslib::card_header("Simulation Log"),
-          bslib::card_body(
-            verbatimTextOutput("sim_log")
           )
         )
       )
@@ -2404,6 +2419,13 @@ app_ui <- function(request = NULL) {
       title = t("tab_sensitivity"),
       icon = icon("bullseye"),
       tutorial_video_link("sensitivity"),
+      # 2026-10-29 (Lolita): before a run the tab is greyed out behind a
+      # message (class toggled by the run_done output, see custom.css).
+      conditionalPanel(
+        condition = "output.run_done != true",
+        div(class = "info-panel needs-run-msg", style = "margin: 16px;",
+            icon("circle-info"), " ", t("needs_run_msg"))),
+      div(class = "needs-run run-missing",
 
       # ---------- Single-year sensitivity ----------
       conditionalPanel(
@@ -2482,6 +2504,7 @@ app_ui <- function(request = NULL) {
           )
         )
       )
+      )
     ),
 
     # ==================== TAB 6: IPCC REPORT (last app tab) ====================
@@ -2493,6 +2516,11 @@ app_ui <- function(request = NULL) {
       title = t("tab_ipcc_report"),
       icon = icon("file-alt"),
       tutorial_video_link("ipcc_report"),
+      conditionalPanel(
+        condition = "output.run_done != true",
+        div(class = "info-panel needs-run-msg", style = "margin: 16px;",
+            icon("circle-info"), " ", t("needs_run_msg"))),
+      div(class = "needs-run run-missing",
 
       # ---------- Single-year report layout ----------
       conditionalPanel(
@@ -2640,6 +2668,7 @@ app_ui <- function(request = NULL) {
             )
           )
         )
+      )
       )
     ),
 
