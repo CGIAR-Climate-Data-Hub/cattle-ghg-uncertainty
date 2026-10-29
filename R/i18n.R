@@ -1102,8 +1102,8 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_simulate = list(
-    en = "Set the options on the left and click 'Run Monte Carlo simulation'. The results open on this tab when the run finishes. Use 'Back to settings' to change something and run again. Tabs 5 and 6 go deeper.",
-    fr = "Réglez les options à gauche et cliquez sur « Lancer la simulation Monte Carlo ». Les résultats s'ouvrent sur cet onglet à la fin du calcul. Utilisez « Retour aux réglages » pour changer quelque chose et relancer. Les onglets 5 et 6 vont plus loin."
+    en = "Set the options below and click 'Run Monte Carlo simulation'. The results open on this tab when the run finishes. Use 'Back to settings' to change something and run again. Tabs 5 and 6 go deeper.",
+    fr = "Réglez les options ci-dessous et cliquez sur « Lancer la simulation Monte Carlo ». Les résultats s'ouvrent sur cet onglet à la fin du calcul. Utilisez « Retour aux réglages » pour changer quelque chose et relancer. Les onglets 5 et 6 vont plus loin."
   ),
   info_simulate_n_label = list(en = "How many iterations to use:",
                                   fr = "Combien d'itérations utiliser :"),

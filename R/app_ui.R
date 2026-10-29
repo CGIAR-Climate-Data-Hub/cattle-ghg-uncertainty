@@ -1991,13 +1991,19 @@ app_ui <- function(request = NULL) {
         condition = "output.sim_view != 'results'",
         # 2026-10-29 (Lolita): one column. The log card is gone; the status
         # line under the button and the notifications carry the messages.
-        div(class = "sim-settings", style = "max-width:720px; margin:0 auto 16px;",
+        div(class = "sim-settings", style = "max-width:1100px; margin:0 auto 16px;",
         bslib::card(
           bslib::card_header(t("card_sim_settings")),
           bslib::card_body(gap = "8px",
+            # 2026-10-29 (Lolita): the run settings on the left and the
+            # emission sources on the right; the mode options and the Run
+            # button below, full width.
+            bslib::layout_columns(
+              col_widths = c(5, 7),
+              div(
             sliderInput("n_iter", t("sim_n_iter_label"),
               min = 1000, max = 50000, step = 1000,
-              value = 10000, sep = ","),
+              value = 10000, sep = ",", width = "100%"),
             numericInput("seed",
               label = tagList(
                 paste0(t("sim_seed_label"), " "),
@@ -2008,7 +2014,7 @@ app_ui <- function(request = NULL) {
                   placement = "right"
                 )
               ),
-              value = 42),
+              value = 42, width = "100%"),
             # Andreas 2026-05 follow-up: Dirichlet MMS-allocation control removed
             # (no IPCC citation). MMS% is now treated deterministically across
             # iterations, matching the IPCC Inventory Software's behaviour.
@@ -2025,7 +2031,9 @@ app_ui <- function(request = NULL) {
               choices = c("AR4 (CH₄=25)" = "AR4",
                           "AR5 (CH₄=28, N₂O=265)" = "AR5",
                           "AR6 (CH₄=27, N₂O=273)" = "AR6"),
-              selected = "AR5"),
+              selected = "AR5", width = "100%")
+              ),
+              div(
             checkboxGroupInput("emission_sources", t("sim_sources_label"),
                                choices = setNames(
                                  c("enteric_ch4", "manure_ch4",
@@ -2034,12 +2042,14 @@ app_ui <- function(request = NULL) {
                                  c(t("src_enteric_ch4"), t("src_manure_ch4"),
                                    t("src_manure_n2o_d"), t("src_manure_n2o_i"),
                                    t("src_pasture_n2o_d"), t("src_pasture_n2o_i"))),
-                               selected = character(0)),
+                               selected = character(0), width = "100%"),
             uiOutput("select_all_btn"),
             div(style = "font-size:0.78rem; color:#92400E; background:#FEF3C7; padding:8px 10px; border-radius:6px; margin-bottom:8px; margin-top:4px;",
                 icon("exclamation-triangle"),
                 tags$strong(paste0(" ", t("sim_must_tick_one"))),
-                t("sim_must_tick_body")),
+                t("sim_must_tick_body"))
+              )
+            ),
             hr(),
             # Round 9: single-year-only options (decomposition + comparison).
             # Trend mode doesn't use these: the trend's IPCC-§3.7 framework
@@ -2068,8 +2078,7 @@ app_ui <- function(request = NULL) {
             # its own tooltip with concrete "when to pick this" guidance.
             conditionalPanel(
               condition = "input.analysis_mode == 'trend'",
-              hr(),
-              radioButtons("year_corr",
+              radioButtons("year_corr", width = "100%",
                             label = tagList(
                               "Year-to-year correlation ",
                               bslib::tooltip(
@@ -2120,16 +2129,23 @@ app_ui <- function(request = NULL) {
               # 2026-10-16: trend used to take the single-year slider's
               # 10,000 iterations for every year. A 95% interval is stable
               # at 2,000, and 35 years at 10,000 did not fit in memory.
-              numericInput("n_iter_trend", t("trend_n_iter_label"),
-                           value = 2000, min = 500, max = 10000, step = 500),
-              div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
-                  t("trend_n_iter_help")),
-              # 2026-10-29: the base year and year t are run again at this
-              # count, as a pair, for the headline figures and Table 3.3.
-              numericInput("n_iter_trend_pair", t("trend_n_iter_pair_label"),
-                           value = 10000, min = 1000, max = 10000, step = 1000),
-              div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
-                  t("trend_n_iter_pair_help")),
+              bslib::layout_columns(
+                col_widths = c(6, 6),
+                div(
+                  numericInput("n_iter_trend", t("trend_n_iter_label"),
+                               value = 2000, min = 500, max = 10000, step = 500,
+                               width = "100%"),
+                  div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
+                      t("trend_n_iter_help"))),
+                # 2026-10-29: the base year and year t are run again at this
+                # count, as a pair, for the headline figures and Table 3.3.
+                div(
+                  numericInput("n_iter_trend_pair", t("trend_n_iter_pair_label"),
+                               value = 10000, min = 1000, max = 10000, step = 1000,
+                               width = "100%"),
+                  div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
+                      t("trend_n_iter_pair_help")))
+              ),
               actionButton("run_trend", t("btn_run_trend"),
                            class = "run-btn w-100", icon = icon("play")),
               hr(),
