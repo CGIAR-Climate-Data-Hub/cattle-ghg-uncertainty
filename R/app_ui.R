@@ -1833,9 +1833,8 @@ app_ui <- function(request = NULL) {
                  " / ",
                  tags$a(href = "#", onclick = "if (window.qaToggleAll) window.qaToggleAll(false); return false;",
                         t("qa_collapse_all"))),
-          tags$details(style = "font-size:0.8rem; color:#555; margin:0 0 8px 0;",
-                       tags$summary(style = "cursor:pointer;", t("qa_checks_run_label")),
-                       tags$p(style = "margin:4px 0 0 0;", t("qa_checks_run"))),
+          # 2026-10-29 (Lolita): the "What is checked" fold-out removed; the
+          # user guide's QA/QC section carries the statuses.
           DT::DTOutput("qaqc_table")
         )
       )

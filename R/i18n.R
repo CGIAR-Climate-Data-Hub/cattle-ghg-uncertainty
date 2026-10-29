@@ -1003,11 +1003,6 @@ lang_state_take <- function(token) {
                             fr = "Entrée réparée pour permettre la simulation :"),
   qa_autofilled_panel_label = list(en = "Auto-filled parameters",
                                       fr = "Paramètres remplis automatiquement"),
-  qa_checks_run_label = list(en = "What is checked", fr = "Ce qui est vérifié"),
-  qa_checks_run = list(
-    en = "For each parameter, the tool checks that: the lower and upper bounds sit around the mean and are not equal to it; the lower bound is not negative; the unit is right (DE, Ym, Fat, CP and MilkPR are percentages; pct_pregnant, ASH, UE and Frac_* are fractions between 0 and 1); the value is in its usual range, with the IPCC source; the distribution works with the bounds given; a fraction does not get a distribution without limits; body weight is close to the IPCC default for that animal class (a warning above 50% difference); where IPCC gives a skewed range (EF3_PRP, Frac_LEACH_PRP), symmetric bounds get a note; the sub-categories in Parameters match those in Manure_Management.",
-    fr = "Pour chaque paramètre, l'outil vérifie que : les bornes inférieure et supérieure encadrent la moyenne sans lui être égales ; la borne inférieure n'est pas négative ; l'unité est la bonne (DE, Ym, Fat, CP et MilkPR en pourcentage ; pct_pregnant, ASH, UE et Frac_* en fractions entre 0 et 1) ; la valeur est dans sa plage usuelle, avec la source GIEC ; la distribution fonctionne avec les bornes données ; une fraction ne reçoit pas une distribution sans limites ; le poids vif est proche de la valeur GIEC par défaut de cette classe animale (attention au-delà de 50 % d'écart) ; là où le GIEC donne une plage asymétrique (EF3_PRP, Frac_LEACH_PRP), des bornes symétriques reçoivent une note ; les sous-catégories de Parameters correspondent à celles de Manure_Management."
-  ),
   qa_results_h = list(en = "QA/QC Results", fr = "Résultats QA/QC"),
 
   # =====================================================================
