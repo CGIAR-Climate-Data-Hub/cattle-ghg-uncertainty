@@ -1901,7 +1901,7 @@ app_ui <- function(request = NULL) {
             # 2026-10-29 (Lolita): the settings on the left and the matrix on
             # the right, instead of a narrow radio list over an empty band.
             bslib::layout_columns(
-              col_widths = c(5, 7),
+              col_widths = c(6, 6),
               div(
             # 2026-06 Andreas review: the corr_mode radio is now rendered
             # server-side so that modes whose prerequisites are missing (TS
@@ -1982,7 +1982,7 @@ app_ui <- function(request = NULL) {
         condition = "output.sim_view != 'results'",
         # 2026-10-29 (Lolita): one column. The log card is gone; the status
         # line under the button and the notifications carry the messages.
-        div(class = "sim-settings", style = "max-width:720px; margin:0 16px 16px;",
+        div(class = "sim-settings", style = "max-width:720px; margin:0 auto 16px;",
         bslib::card(
           bslib::card_header(t("card_sim_settings")),
           bslib::card_body(gap = "8px",
