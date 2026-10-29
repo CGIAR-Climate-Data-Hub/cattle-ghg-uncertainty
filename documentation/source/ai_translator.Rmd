@@ -49,7 +49,7 @@ Two separate limits apply, and they catch different files. One is about the size
 
 ### The upload limit
 
-The panel accepts \texttt{.xlsx}, \texttt{.xlsm}, \texttt{.xls} and \texttt{.csv}, up to \textbf{8 MB}. A larger file is refused by the browser before it reaches the tool, with a message saying so.
+The panel accepts `.xlsx`, `.xlsm`, `.xls` and `.csv`, up to **8 MB**. A larger file is refused by the browser before it reaches the tool, with a message saying so.
 
 National calculator workbooks are often well over this, and usually for reasons that have nothing to do with the inventory: feed composition tables, municipality lookups, macros and embedded charts. The fix is to copy the sheets that actually hold the cattle data into a new workbook and upload that. It is normal for a 20 MB national calculator to become a 200 KB file with two sheets in it.
 
@@ -61,9 +61,9 @@ Nothing is charged until you press send, so a warning at this stage costs nothin
 
 ### The group limit
 
-The tool simulates about \textbf{400 groups}, where a group is one combination of \texttt{cattle\_type}, \texttt{aggregation\_level} and \texttt{sub\_category}. An inventory with 1,121 municipalities and 9 animal sub-categories is roughly 10,000 groups, which no amount of translating will make runnable.
+The tool simulates about **400 groups**, where a group is one combination of `cattle_type`, `aggregation_level` and `sub_category`. An inventory with 1,121 municipalities and 9 animal sub-categories is roughly 10,000 groups, which no amount of translating will make runnable.
 
-\textbf{Decide the geographic level before you translate, not after.} Translating at municipality level and aggregating afterwards wastes the translation, because the aggregation has to happen in the source data and the file then has to be translated again.
+**Decide the geographic level before you translate, not after.** Translating at municipality level and aggregating afterwards wastes the translation, because the aggregation has to happen in the source data and the file then has to be translated again.
 
 The translator is told about this limit and should raise the question itself, as the first item in its list of ambiguities, when your file carries more than one geographic level. If it does not raise it, raise it yourself: tell it which level to use, in the same message where you answer its other questions.
 

@@ -1210,8 +1210,14 @@ lang_state_take <- function(token) {
     en = "Iterations per year (trend)",
     fr = "Itérations par année (tendance)"),
   trend_n_iter_help = list(
-    en = "Each year is a full simulation. 2,000 gives a stable 95% interval; raise it for the final run.",
-    fr = "Chaque année est une simulation complète. 2 000 donne un intervalle à 95 % stable ; augmentez pour l'exécution finale."),
+    en = "Each year is a full simulation. 2,000 is enough for the chart and the slope; the two reported years are run again at the count below.",
+    fr = "Chaque année est une simulation complète. 2 000 suffisent pour le graphique et la pente ; les deux années déclarées sont relancées avec le nombre ci-dessous."),
+  trend_n_iter_pair_label = list(
+    en = "Draws for the base year and year t",
+    fr = "Tirages pour l'année de base et l'année t"),
+  trend_n_iter_pair_help = list(
+    en = "After the series, the base year and year t are simulated again at this count, as a pair, for the headline figures and IPCC Table 3.3. 10,000 matches the single-year run.",
+    fr = "Après la série, l'année de base et l'année t sont simulées à nouveau avec ce nombre, en paire, pour les chiffres principaux et le tableau 3.3 du GIEC. 10 000 correspond à l'exécution d'une seule année."),
   btn_run_trend = list(en = "Run Trend Analysis",
                          fr = "Lancer l'analyse de tendance"),
 
@@ -1531,6 +1537,12 @@ lang_state_take <- function(token) {
   trend_line_where = list(
     en = "The IPCC reporting table for these two years is on the IPCC Report tab and in the downloads. Every other year is in the table further down.",
     fr = "Le tableau de déclaration GIEC pour ces deux années se trouve dans l'onglet Rapport GIEC et dans les téléchargements. Toutes les autres années sont dans le tableau plus bas."),
+  trend_line_draws_pair = list(
+    en = "Base year and year t: %s draws each, paired. The series: %s draws per year.",
+    fr = "Année de base et année t : %s tirages chacune, en paire. La série : %s tirages par année."),
+  trend_line_draws_series = list(
+    en = "Both years from the series at %s draws per year.",
+    fr = "Les deux années proviennent de la série à %s tirages par année."),
   trend_compare_h = list(en = "The two years side by side, by emission source",
                          fr = "Les deux années côte à côte, par source d'émission"),
   trend_compare_note = list(
@@ -1557,16 +1569,16 @@ lang_state_take <- function(token) {
   trend_ipcc_h = list(en = "IPCC reporting table (Table 3.3) for the two years",
                       fr = "Tableau de déclaration GIEC (tableau 3.3) pour les deux années"),
   trend_ipcc_note = list(
-    en = "The general reporting table for uncertainty from IPCC 2006 Vol. 1 Ch. 3, filled with Approach 2 (Monte Carlo). Values are in t CO₂eq; divide by 1,000 for Gg. The activity data and emission factor columns need two extra simulations for year t: use the button to fill them.",
-    fr = "Le tableau général de déclaration de l'incertitude du GIEC 2006 Vol. 1 Ch. 3, rempli avec l'approche 2 (Monte Carlo). Valeurs en t CO₂éq ; diviser par 1 000 pour des Gg. Les colonnes données d'activité et facteurs d'émission nécessitent deux simulations supplémentaires pour l'année t : utilisez le bouton pour les remplir."),
-  trend_adef_btn = list(en = "Fill the activity data and emission factor columns",
-                        fr = "Remplir les colonnes données d'activité et facteurs d'émission"),
-  trend_adef_running = list(en = "Running the two extra simulations for year %d...",
-                            fr = "Exécution des deux simulations supplémentaires pour l'année %d..."),
-  trend_adef_done = list(en = "Activity data and emission factor columns filled for year %d.",
-                         fr = "Colonnes données d'activité et facteurs d'émission remplies pour l'année %d."),
-  trend_adef_empty = list(en = "The activity data and emission factor columns stay empty until you press the button.",
-                          fr = "Les colonnes données d'activité et facteurs d'émission restent vides tant que le bouton n'est pas utilisé."),
+    en = "The general reporting table for uncertainty from IPCC 2006 Vol. 1 Ch. 3, filled with Approach 2 (Monte Carlo). Values are in t CO₂eq; divide by 1,000 for Gg. The base year and year t come from their own paired run at the reporting draw count, which also fills the activity data and emission factor columns. After choosing other years, use the button to run them the same way.",
+    fr = "Le tableau général de déclaration de l'incertitude du GIEC 2006 Vol. 1 Ch. 3, rempli avec l'approche 2 (Monte Carlo). Valeurs en t CO₂éq ; diviser par 1 000 pour des Gg. L'année de base et l'année t proviennent de leur propre exécution en paire avec le nombre de tirages de déclaration, qui remplit aussi les colonnes données d'activité et facteurs d'émission. Après avoir choisi d'autres années, utilisez le bouton pour les exécuter de la même façon."),
+  trend_adef_btn = list(en = "Run these two years at the reporting draw count",
+                        fr = "Lancer ces deux années avec le nombre de tirages de déclaration"),
+  trend_adef_running = list(en = "Running base year %d and year t %d at %s draws...",
+                            fr = "Exécution de l'année de base %d et de l'année t %d avec %s tirages..."),
+  trend_adef_done = list(en = "Base year %d and year t %d: %s draws each, paired; activity data and emission factor columns filled.",
+                         fr = "Année de base %d et année t %d : %s tirages chacune, en paire ; colonnes données d'activité et facteurs d'émission remplies."),
+  trend_adef_empty = list(en = "These two years are shown from the %s-draw series. Press the button to run them at %s draws with the activity data and emission factor columns.",
+                          fr = "Ces deux années proviennent de la série à %s tirages. Utilisez le bouton pour les exécuter avec %s tirages et les colonnes données d'activité et facteurs d'émission."),
   card_trend_downloads = list(en = "Trend report: downloads",
                                 fr = "Rapport de tendance : téléchargements"),
   trend_downloads_note = list(

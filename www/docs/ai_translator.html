@@ -238,8 +238,10 @@ about the size of the file you upload, the other about how many groups
 the inventory describes. A file can pass one and fail the other.</p>
 <div id="the-upload-limit" class="section level3">
 <h3>The upload limit</h3>
-<p>The panel accepts , , and , up to . A larger file is refused by the
-browser before it reaches the tool, with a message saying so.</p>
+<p>The panel accepts <code>.xlsx</code>, <code>.xlsm</code>,
+<code>.xls</code> and <code>.csv</code>, up to <strong>8 MB</strong>. A
+larger file is refused by the browser before it reaches the tool, with a
+message saying so.</p>
 <p>National calculator workbooks are often well over this, and usually
 for reasons that have nothing to do with the inventory: feed composition
 tables, municipality lookups, macros and embedded charts. The fix is to
@@ -259,13 +261,16 @@ costs nothing to act on.</p>
 </div>
 <div id="the-group-limit" class="section level3">
 <h3>The group limit</h3>
-<p>The tool simulates about , where a group is one combination of , and
-. An inventory with 1,121 municipalities and 9 animal sub-categories is
+<p>The tool simulates about <strong>400 groups</strong>, where a group
+is one combination of <code>cattle_type</code>,
+<code>aggregation_level</code> and <code>sub_category</code>. An
+inventory with 1,121 municipalities and 9 animal sub-categories is
 roughly 10,000 groups, which no amount of translating will make
 runnable.</p>
-<p> Translating at municipality level and aggregating afterwards wastes
-the translation, because the aggregation has to happen in the source
-data and the file then has to be translated again.</p>
+<p><strong>Decide the geographic level before you translate, not
+after.</strong> Translating at municipality level and aggregating
+afterwards wastes the translation, because the aggregation has to happen
+in the source data and the file then has to be translated again.</p>
 <p>The translator is told about this limit and should raise the question
 itself, as the first item in its list of ambiguities, when your file
 carries more than one geographic level. If it does not raise it, raise

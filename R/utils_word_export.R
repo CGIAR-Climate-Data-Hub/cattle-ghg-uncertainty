@@ -580,6 +580,11 @@ build_trend_summary_docx <- function(path,
   if (!is.null(headline)) {
     doc <- .add_h2(doc, "What to report")
     for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
+    if (!is.null(headline$n_iter_pair))
+      doc <- .add_p(doc, sprintf(paste(
+        "Base year and year t were simulated at %s draws each, as a pair (the two years",
+        "linked as the series links them under the %s setting); the series was run at %s",
+        "draws per year."), .fmt_int(headline$n_iter_pair), year_corr, .fmt_int(n_iter)))
     if (!is.null(compare)) {
       doc <- .add_h3(doc, sprintf("The two years side by side, by emission source (%d and %d)",
                                   headline$base_year, headline$year_t))
@@ -602,7 +607,7 @@ build_trend_summary_docx <- function(path,
   # ---- Run settings -------------------------------------------------------
   doc <- .add_h2(doc, "1. What was run")
   doc <- .add_flextable_safe(doc,
-    .styled_flextable(.trend_settings_flextable(year_corr, n_iter, yrs, ipcc_meta)))
+    .styled_flextable(.trend_settings_flextable(year_corr, n_iter, yrs, ipcc_meta, headline$n_iter_pair)))
 
   # ---- Trend table (LANDSCAPE) -------------------------------------------
   doc <- .add_h2(doc, "2. Year-by-year trend")
@@ -806,7 +811,7 @@ build_trend_summary_docx <- function(path,
   flextable::flextable(df)
 }
 
-.trend_settings_flextable <- function(year_corr, n_iter, yrs, ipcc_meta) {
+.trend_settings_flextable <- function(year_corr, n_iter, yrs, ipcc_meta, n_iter_pair = NULL) {
   yc_label <- switch(
     year_corr,
     full    = "Full (coefficients reused across years; AD redrawn), IPCC 2019 default",
@@ -816,6 +821,8 @@ build_trend_summary_docx <- function(path,
   rows <- list(
     c("Year range",              sprintf("%d – %d", yrs[1], yrs[2])),
     c("Iterations per year",     .fmt_int(n_iter)),
+    c("Draws for base year and year t",
+      if (is.null(n_iter_pair)) "same as the series" else paste(.fmt_int(n_iter_pair), "(paired run)")),
     c("Year-to-year correlation", yc_label),
     c("IPCC guidelines version",
       if (!is.null(ipcc_meta) && !is.null(ipcc_meta$ipcc_version))

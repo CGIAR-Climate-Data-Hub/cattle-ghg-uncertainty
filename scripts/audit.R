@@ -939,6 +939,31 @@ section_D <- function() {
       record("D6a", "D", "Trend Table 3.3", "9 rows", NA, "FAIL",
              "trend_ipcc_table() failed or returned the wrong shape")
     }
+    # D7 (2026-10-29): the reporting pair. Run at the series' own count it
+    # must reproduce the series' draws for the two years exactly (it is the
+    # same computation), it must be repeatable, and it must carry the AD/EF
+    # split of year t.
+    pr <- tryCatch(trend_reporting_pair(mg_ts, mg, 2020, 2022, n_iter = 400, gwp = "AR5",
+                                        seed = 11, year_corr = "full"),
+                   error = function(e) NULL)
+    if (!is.null(pr)) {
+      pr2 <- trend_reporting_pair(mg_ts, mg, 2020, 2022, n_iter = 400, gwp = "AR5",
+                                  seed = 11, year_corr = "full")
+      check_bool("D7a", "D",
+                 "Reporting pair at the series count reproduces the series' two years exactly",
+                 identical(pr$inventory_by_year[["2020"]], mg_res$inventory_by_year[["2020"]]) &&
+                   identical(pr$inventory_by_year[["2022"]], mg_res$inventory_by_year[["2022"]]))
+      check_bool("D7b", "D", "Reporting pair is repeatable at a fixed seed", identical(pr, pr2))
+      tab2 <- tryCatch(trend_ipcc_table(trend_reporting_res(mg_res, pr, 2020, 2022), 2020, 2022,
+                                        decomp = pr$decomp, year_corr = "full"),
+                       error = function(e) NULL)
+      check_bool("D7c", "D", "Reporting pair fills the AD and EF columns of Table 3.3",
+                 !is.null(tab2) && !any(is.na(tab2[[5]][1:6])) && !any(is.na(tab2[[7]][1:6])) &&
+                   identical(attr(tab2, "n_iter_pair"), 400L))
+    } else {
+      record("D7a", "D", "Reporting pair", "runs", NA, "FAIL",
+             "trend_reporting_pair raised an error on the 3-group fixture")
+    }
   } else {
     record("D5a", "D", "Multi-group trend", "runs", NA, "FAIL",
            "run_trend_analysis raised an error on a 3-group fixture")

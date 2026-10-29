@@ -3207,7 +3207,7 @@ app_server <- function(input, output, session) {
           # Per-year progress callback: fan out the [0.05, 0.95] band across
           # the years so the bar advances as each per-year sim completes.
           prog_fn <- function(yi, n_years, year_label) {
-            frac <- 0.05 + 0.90 * (yi / max(n_years, 1L))
+            frac <- 0.05 + 0.55 * (yi / max(n_years, 1L))
             setProgress(frac, detail = sprintf("Year %s (%d / %d)",
                                                 year_label, yi, n_years))
           }
@@ -3232,6 +3232,20 @@ app_server <- function(input, output, session) {
             keep_samples = "ends",
             keep_sample_rows = 4000L)
 
+          # 2026-10-29: the two reported years again, as a pair, at the
+          # reporting draw count (10,000 by default): the headline figures
+          # and IPCC Table 3.3 read these; the chart and the slope keep the
+          # series. See trend_reporting_pair() in R/trend_report.R.
+          n_iter_pair <- as.integer(input$n_iter_trend_pair %||% 10000)
+          y_first <- res$years[1]; y_last <- res$years[length(res$years)]
+          setProgress(0.60, detail = sprintf("Base year %d and year t %d at %s draws...",
+                                             y_first, y_last, format(n_iter_pair, big.mark = ",")))
+          pair <- trend_reporting_pair(
+            df, rv$param_specs, y_first, y_last,
+            n_iter = n_iter_pair, gwp = gv, seed = sd_, year_corr = yc,
+            manure = rv$manure_data, crossgroup = cg, corr_matrix = cm, sg_to_mm = sgm,
+            progress_fn = function(frac, lbl) setProgress(0.60 + 0.36 * frac, detail = lbl))
+
           setProgress(0.97, detail = "Computing slope and Δ...")
           # Round 8: res is now a list, not a data frame
           rv_trend$results         <- res$table
@@ -3242,8 +3256,10 @@ app_server <- function(input, output, session) {
           rv_trend$trend_df        <- df
           rv_trend$run_args        <- list(n_iter = n_iter, gwp = gv, seed = sd_,
                                            manure = rv$manure_data, crossgroup = cg,
-                                           corr_matrix = cm, sg_to_mm = sgm, year_corr = yc)
-          rv_trend$decomp          <- list()
+                                           corr_matrix = cm, sg_to_mm = sgm, year_corr = yc,
+                                           n_iter_pair = n_iter_pair)
+          rv_trend$pairs           <- setNames(list(pair),
+                                               .trend_pair_key(pair$base_year, pair$year_t))
           # year selectors: base year = first, year t = last, on both tabs
           yrs_chr <- as.character(res$years)
           for (id in c("trend_base_year", "trend_base_year_rep"))
@@ -3510,14 +3526,24 @@ app_server <- function(input, output, session) {
     list(base = b, t = tt)
   })
   trend_gwp  <- reactive(rv_trend$run_args$gwp %||% "AR5")
+  # 2026-10-29: the reporting pair for the chosen years, when one was run
+  # (always for the first and last year after Run Trend; other years on
+  # the button). The headline, the two-year table and Table 3.3 read the
+  # series with those two years replaced by the pair's draws.
+  trend_pair <- reactive({
+    req(rv_trend$res); ys <- trend_sel_years()
+    rv_trend$pairs[[.trend_pair_key(ys$base, ys$t)]]
+  })
+  trend_res_rep <- reactive({ ys <- trend_sel_years()
+                              trend_reporting_res(rv_trend$res, trend_pair(), ys$base, ys$t) })
   trend_cmp  <- reactive({ ys <- trend_sel_years()
-                           trend_compare_years(rv_trend$res, ys$base, ys$t, trend_gwp()) })
+                           trend_compare_years(trend_res_rep(), ys$base, ys$t, trend_gwp()) })
   trend_head <- reactive({ ys <- trend_sel_years()
-                           trend_headline(rv_trend$res, ys$base, ys$t, trend_gwp()) })
+                           trend_headline(trend_res_rep(), ys$base, ys$t, trend_gwp()) })
   trend_ipcc <- reactive({
     ys <- trend_sel_years()
-    trend_ipcc_table(rv_trend$res, ys$base, ys$t, trend_gwp(),
-                     decomp = rv_trend$decomp[[as.character(ys$t)]],
+    trend_ipcc_table(trend_res_rep(), ys$base, ys$t, trend_gwp(),
+                     decomp = trend_pair()$decomp,
                      year_corr = rv_trend$year_corr %||% "full")
   })
 
@@ -3539,9 +3565,13 @@ app_server <- function(input, output, session) {
                   .fs(h$trend_lo_pct), .fs(h$trend_hi_pct),
                   .fs(h$trend_lo_pp), .fs(h$trend_hi_pp))
     s4 <- if (isTRUE(h$zero_inside)) t("trend_line_zero_in") else t("trend_line_zero_out")
+    n_series <- format(rv_trend$run_args$n_iter %||% 2000, big.mark = ",")
+    s5 <- if (!is.null(h$n_iter_pair))
+      sprintf(t("trend_line_draws_pair"), format(h$n_iter_pair, big.mark = ","), n_series)
+    else sprintf(t("trend_line_draws_series"), n_series)
     tags$ul(style = "font-size:1rem; line-height:1.7; margin-bottom:0;",
             tags$li(tags$strong(s1)), tags$li(tags$strong(s2)),
-            tags$li(s3), tags$li(s4),
+            tags$li(s3), tags$li(s4), tags$li(s5),
             tags$li(tags$em(style = "color:#555;", t("trend_line_where"))))
   }
   output$trend_report_text        <- renderUI(.trend_report_ui())
@@ -3593,24 +3623,32 @@ app_server <- function(input, output, session) {
       DT::formatCurrency(c(3, 4), currency = "", digits = 0)
   })
   output$trend_adef_status <- renderText({
-    ys <- trend_sel_years()
-    if (is.null(rv_trend$decomp[[as.character(ys$t)]])) t("trend_adef_empty")
-    else sprintf(t("trend_adef_done"), ys$t)
+    p <- trend_pair()
+    if (is.null(p))
+      sprintf(t("trend_adef_empty"),
+              format(rv_trend$run_args$n_iter %||% 2000, big.mark = ","),
+              format(rv_trend$run_args$n_iter_pair %||% 10000, big.mark = ","))
+    else sprintf(t("trend_adef_done"), p$base_year, p$year_t, format(p$n_iter, big.mark = ","))
   })
+  # The same paired run for two other years the user has chosen.
   observeEvent(input$trend_adef_btn, {
     req(rv_trend$res, rv_trend$trend_df, rv_trend$run_args)
     ys <- trend_sel_years(); a <- rv_trend$run_args
-    d <- withProgress(message = sprintf(t("trend_adef_running"), ys$t), value = 0.1, {
+    n_pair <- as.integer(a$n_iter_pair %||% input$n_iter_trend_pair %||% 10000)
+    d <- withProgress(message = sprintf(t("trend_adef_running"), ys$base, ys$t,
+                                        format(n_pair, big.mark = ",")), value = 0, {
       tryCatch(
-        trend_decompose_year(rv_trend$trend_df, rv$param_specs, ys$t,
-                             n_iter = a$n_iter, gwp = a$gwp, seed = a$seed,
-                             manure = a$manure, crossgroup = a$crossgroup,
-                             corr_matrix = a$corr_matrix, sg_to_mm = a$sg_to_mm,
-                             year_corr = a$year_corr,
-                             progress_fn = function(lbl) incProgress(0.4, detail = lbl)),
+        trend_reporting_pair(rv_trend$trend_df, rv$param_specs, ys$base, ys$t,
+                             n_iter = n_pair, gwp = a$gwp, seed = a$seed,
+                             year_corr = a$year_corr, manure = a$manure,
+                             crossgroup = a$crossgroup, corr_matrix = a$corr_matrix,
+                             sg_to_mm = a$sg_to_mm,
+                             progress_fn = function(frac, lbl) setProgress(frac, detail = lbl)),
         error = function(e) { showNotification(conditionMessage(e), type = "error"); NULL })
     })
-    if (!is.null(d)) { dc <- rv_trend$decomp; dc[[as.character(ys$t)]] <- d; rv_trend$decomp <- dc }
+    if (!is.null(d)) {
+      pr <- rv_trend$pairs; pr[[.trend_pair_key(ys$base, ys$t)]] <- d; rv_trend$pairs <- pr
+    }
   })
 
   # 2026-10-16: samples_by_year now holds per-system thinned draws for the

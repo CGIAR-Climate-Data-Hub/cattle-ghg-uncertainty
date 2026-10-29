@@ -2165,6 +2165,12 @@ app_ui <- function(request = NULL) {
                            value = 2000, min = 500, max = 10000, step = 500),
               div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
                   t("trend_n_iter_help")),
+              # 2026-10-29: the base year and year t are run again at this
+              # count, as a pair, for the headline figures and Table 3.3.
+              numericInput("n_iter_trend_pair", t("trend_n_iter_pair_label"),
+                           value = 10000, min = 1000, max = 10000, step = 1000),
+              div(style = "font-size:0.78rem; color:#5f6b63; margin-top:-6px; margin-bottom:10px;",
+                  t("trend_n_iter_pair_help")),
               actionButton("run_trend", t("btn_run_trend"),
                            class = "run-btn w-100", icon = icon("play")),
               hr(),

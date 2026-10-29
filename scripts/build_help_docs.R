@@ -120,6 +120,11 @@ file.copy("documentation/source/_shared.css", file.path(out_dir, "_shared.css"),
   # how the structural-defaults DE / Ym pair reaches the sampler.
   unified <- ad_unified
 
+  # 2026-10-29: the per-MMS draws in .build_systems_data() above were
+  # unseeded, so every rebuild printed different numbers on the pages (the
+  # same defect the app had until 734c9d7). Seeded as the app seeds them:
+  # the run seed plus the manure offset, see R/systems_builder.R.
+  set.seed(42L + 1000003L)
   systems_data <- .build_systems_data(specs, manure, n_iter, unified_corr = unified)
   sim <- run_inventory_simulation(systems_data, n_iter = n_iter,
                                    gwp = "AR5", seed = 42L, pct_pregnant = 1,

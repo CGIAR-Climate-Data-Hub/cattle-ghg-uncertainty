@@ -246,14 +246,16 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
                "Uncertainty in the trend (-) percentage points",
                "Uncertainty in the trend (+) percentage points",
                "95% range of the change includes zero",
-               "Year-to-year correlation of coefficients"),
+               "Year-to-year correlation of coefficients",
+               "Draws for base year and year t", "Draws per year in the series"),
       Value = c(h$base_year, round(h$base_mean, 1), round(h$base_moe, 1),
                 round(h$base_lo, 1), round(h$base_hi, 1),
                 h$year_t, round(h$t_mean, 1), round(h$t_moe, 1),
                 round(h$t_lo, 1), round(h$t_hi, 1),
                 round(h$trend_pct, 1), round(h$trend_lo_pct, 1), round(h$trend_hi_pct, 1),
                 round(h$trend_lo_pp, 1), round(h$trend_hi_pp, 1),
-                if (isTRUE(h$zero_inside)) "yes" else "no", h$year_corr),
+                if (isTRUE(h$zero_inside)) "yes" else "no", h$year_corr,
+                if (is.null(h$n_iter_pair)) n_iter else h$n_iter_pair, n_iter),
       stringsAsFactors = FALSE)
   }
   if (!is.null(ipcc_table)) report_sheets$IPCC_Table_3_3 <- ipcc_table

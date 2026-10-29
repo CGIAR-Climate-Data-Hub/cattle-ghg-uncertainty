@@ -160,7 +160,9 @@ trend_headline <- function(res, base_year, year_t, gwp = "AR5") {
     zero_inside = isTRUE(tot$trend_pct + tot$trend_lo_pp <= 0 &&
                          tot$trend_pct + tot$trend_hi_pp >= 0),
     n_years = length(res$years),
-    year_corr = res$year_corr
+    year_corr = res$year_corr,
+    # draws behind the two years when they come from a reporting pair
+    n_iter_pair = attr(res, "n_iter_pair")
   )
 }
 
@@ -208,6 +210,7 @@ trend_ipcc_table <- function(res, base_year, year_t, gwp = "AR5",
   attr(out, "base_year") <- as.integer(base_year)
   attr(out, "year_t")    <- as.integer(year_t)
   attr(out, "has_ad_ef") <- !is.null(decomp)
+  attr(out, "n_iter_pair") <- attr(res, "n_iter_pair")
   out
 }
 
@@ -253,4 +256,118 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
   ef <- run_fixed("activity_data", sprintf("EF-only run, year %d", year))
   rm(built, blocks); gc(FALSE)
   list(year = year, ad_only = ad, ef_only = ef)
+}
+
+# ---------------------------------------------------------------------------
+# The two reported years at the reporting draw count (2026-10-29).
+#
+# The series runs every year at the trend count (2,000 by default), which
+# is enough for the chart and the slope. The headline figures and IPCC
+# Table 3.3 come from the base year and year t only, so those two are run
+# again here at the single-year count (10,000 by default), as a PAIR: under
+# year_corr = "full" both years take the same coefficient draws, so a
+# coefficient's error cancels in the change between them exactly as in
+# run_trend_analysis(); under "partial" the AR(1) generator is advanced to
+# each year's index, so the two years carry the lag-k link of the series;
+# under "none" they are independent. Each year keeps the seed the series
+# gives it (.trend_year_seed on its index). The AD-only and EF-only
+# simulations for year t (Table 3.3 columns E and F) run on the same
+# systems at the same count, as trend_decompose_year() did on its own.
+#
+# Monte Carlo error at 2,000 draws against 10,000 on the Zambia total: the
+# standard error of the mean 0.30% against 0.13%; the 95% half-width known
+# to plus or minus 1.2 points against 0.6 (knowledge/22, section 6).
+#
+# Returns the per-source totals of the two years (what trend_compare_years()
+# reads), the AD/EF split of year t (what trend_ipcc_table() reads) and the
+# settings, so the UI can tell whether a stored pair matches the chosen years.
+.trend_pair_key <- function(base_year, year_t) paste(base_year, year_t, sep = "_")
+
+trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
+                                 n_iter = 10000, gwp = "AR5", seed = 42,
+                                 year_corr = "full", ar1_rho = 0.7,
+                                 manure = NULL, crossgroup = "shared",
+                                 corr_matrix = NULL, sg_to_mm = list(),
+                                 # nothing reads the pair's input draws (the
+                                 # trend tornadoes read the series), so one
+                                 # row is kept: about 60 MB less at the peak
+                                 # on Zambia at 10,000
+                                 keep_sample_rows = 1L, progress_fn = NULL) {
+  n_iter <- as.integer(n_iter)
+  trend_df$year <- suppressWarnings(as.integer(trend_df$year))
+  years <- sort(unique(trend_df$year[!is.na(trend_df$year)]))
+  pair  <- unique(as.integer(c(base_year, year_t)))
+  yi    <- match(pair, years)
+  if (anyNA(yi)) stop("trend_reporting_pair: a chosen year is not in the series.")
+  tick <- function(frac, label)
+    if (is.function(progress_fn)) try(progress_fn(frac, label), silent = TRUE)
+
+  # coefficient draws between the two years, linked as the series links them
+  blocks <- list()
+  if (identical(year_corr, "full")) {
+    b <- build_full_coefficient_blocks(base_specs, n_iter, seed = seed, crossgroup = crossgroup)
+    for (y in pair) blocks[[as.character(y)]] <- b
+  } else if (identical(year_corr, "partial")) {
+    next_partial <- make_partial_block_generator(base_specs, n_iter, seed = seed,
+                                                 rho = ar1_rho, crossgroup = crossgroup)
+    for (k in seq_len(max(yi))) {
+      bk <- next_partial()
+      if (k %in% yi) blocks[[as.character(years[k])]] <- bk
+    }
+  }
+
+  inventory_by_year <- list(); decomp <- NULL
+  n_steps <- length(pair) + 2L; step <- 0L
+  fmt <- function(n) format(n, big.mark = ",")
+  for (j in seq_along(pair)) {
+    y  <- pair[j]
+    ps <- .trend_year_specs(trend_df[trend_df$year == y, , drop = FALSE], base_specs)
+    year_seed <- .trend_year_seed(seed, yi[j])
+    built <- build_systems_data(ps, manure = manure, n_iter = n_iter, seed = year_seed,
+                                crossgroup = crossgroup, corr_matrix = corr_matrix,
+                                sg_to_mm = sg_to_mm,
+                                pre_sampled_blocks = blocks[[as.character(y)]])
+    run <- function(systems, label) {
+      lo <- step / n_steps; hi <- (step + 1L) / n_steps
+      tick(lo, label)
+      sim <- run_inventory_simulation(
+        systems, n_iter = n_iter, gwp = gwp, seed = year_seed,
+        keep_sample_rows = keep_sample_rows,
+        progress_cb = function(done, total)
+          tick(lo + (hi - lo) * done / max(total, 1L), label))
+      step <<- step + 1L
+      sim
+    }
+    sim <- run(built$systems, sprintf("Year %d at %s draws", y, fmt(n_iter)))
+    inventory_by_year[[as.character(y)]] <- sim$inventory
+    rm(sim); gc(FALSE)
+    if (y == as.integer(year_t)) {
+      ad <- run(lapply(built$systems, fix_params_for_decomposition, fix_type = "coefficient"),
+                sprintf("AD-only run, year %d", y))
+      u_ad <- calc_all_uncertainty(ad$inventory); rm(ad)
+      ef <- run(lapply(built$systems, fix_params_for_decomposition, fix_type = "activity_data"),
+                sprintf("EF-only run, year %d", y))
+      u_ef <- calc_all_uncertainty(ef$inventory); rm(ef)
+      decomp <- list(year = y, ad_only = u_ad, ef_only = u_ef)
+    }
+    rm(built); gc(FALSE)
+  }
+  tick(1, "Done")
+  list(base_year = as.integer(base_year), year_t = as.integer(year_t),
+       n_iter = n_iter, seed = seed, year_corr = year_corr,
+       inventory_by_year = inventory_by_year, decomp = decomp)
+}
+
+# The series result with the two reported years replaced by the pair's draws,
+# for trend_compare_years(), trend_headline() and trend_ipcc_table(). The
+# result is returned unchanged when there is no pair or it was run for other
+# years, so the table then shows the series' own draws for the two years.
+trend_reporting_res <- function(res, pair, base_year, year_t) {
+  if (is.null(res) || is.null(pair)) return(res)
+  if (!identical(as.integer(pair$base_year), as.integer(base_year)) ||
+      !identical(as.integer(pair$year_t), as.integer(year_t))) return(res)
+  for (y in names(pair$inventory_by_year))
+    res$inventory_by_year[[y]] <- pair$inventory_by_year[[y]]
+  attr(res, "n_iter_pair") <- pair$n_iter
+  res
 }
