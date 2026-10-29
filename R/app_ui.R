@@ -1419,10 +1419,7 @@ app_ui <- function(request = NULL) {
         "  if (a) { a.click(); window.scrollTo(0, 0); }",
         "};"))),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong(paste0(t("info_definitions_label"), " ")),
-          t("info_definitions_body"),
-          tags$strong(t("info_definitions_software")),
-          t("info_definitions_tail"))
+          t("info_definitions_body"))
       ,
       # 2026-10-28 (review): one search over both glossaries, and links to
       # each; secondary columns open under a row (click the row).
@@ -1670,39 +1667,20 @@ app_ui <- function(request = NULL) {
               style = "background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; margin-top:8px; font-size:0.85rem; color:#92400E; border-radius:4px;",
               icon("exclamation-triangle"),
               tags$strong(paste0(" ", t("what_to_do_label"), " ")),
-              t("analysis_mode_warning")),
-          tags$p(tags$em(
-            t("trend_explanation"),
-            tags$br(), tags$br(),
-            t("trend_ipcc_alignment"), " ",
-            tags$strong(t("trend_base_year")),
-            if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
-                                ifnotfound = "en"), "fr"))
-              " et une " else " and a ",
-            tags$strong(t("trend_current_year")),
-            t("trend_explanation_2")),
-            style = "color:#555; font-size:0.85rem; margin-top:8px;")
+              t("analysis_mode_warning"))
         )
       ),
+      # 2026-10-29 (Lolita): every info box cut to a few short sentences;
+      # the distribution / intake / triangular notes live in the user guide.
       div(class = "info-panel", style = "margin: 16px;",
           tags$p(style = "margin:0;",
                  tags$strong(paste0(t("what_to_do_label"), " ")),
-                 t("info_data_input")),
-          # 2026-10-28 (Nairobi review): the Uncertainty tab is gone. Its
-          # notes (where the distributions come from, measured intake,
-          # triangular bounds) sit here, beside the table they describe.
-          tags$p(style = "margin:10px 0 0 0;",
-                 tags$strong(paste0(t("info_unc_what_label"), " ")),
-                 t("info_unc_what")),
-          tags$p(style = "margin:10px 0 0 0;",
-                 tags$strong(paste0(t("info_measured_intake_label"), " ")),
-                 t("info_measured_intake_body"),
-                 tags$br(), tags$br(),
-                 tags$strong(paste0(t("info_why_perf_still_needed_label"), " ")),
-                 t("info_why_perf_still_needed_body")),
-          tags$p(style = "margin:10px 0 0 0;",
-                 tags$strong(paste0(t("info_unc_triangular_label"), " ")),
-                 tags$em(t("info_unc_triangular_body")))),
+                 t("info_data_input"), " ",
+                 t("info_data_input_ai_pre"),
+                 tags$a(href = "#",
+                        onclick = "window.translatorOpen(); return false;",
+                        t("info_data_input_ai_link")),
+                 t("info_data_input_ai_post"))),
       bslib::layout_sidebar(
         sidebar = bslib::sidebar(
           width = 320,
@@ -1820,37 +1798,7 @@ app_ui <- function(request = NULL) {
       tutorial_video_link("qaqc"),
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
-          t("info_qaqc"),
-          tags$br(), tags$br(),
-          div(style = "display:flex; flex-direction:column; gap:7px; margin-bottom:10px;",
-            div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#92400E; background:#FEF3C7; border:1px solid #F59E0B; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_missing")),
-              t("qa_missing_desc")
-            ),
-            div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#991B1B; background:#FEE2E2; border:1px solid #EF4444; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_fail")),
-              t("qa_fail_desc")
-            ),
-            div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#92400E; background:#FEF3C7; border:1px solid #F59E0B; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_warn")),
-              t("qa_warn_desc")
-            ),
-            div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#1E40AF; background:#DBEAFE; border:1px solid #3B82F6; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_info")),
-              t("qa_info_desc")
-            ),
-            div(
-              tags$span(style = "display:inline-block; min-width:74px; font-weight:600; color:#166534; background:#DCFCE7; border:1px solid #22C55E; border-radius:4px; padding:1px 8px; margin-right:8px; text-align:center;", t("qa_status_pass")),
-              t("qa_pass_desc")
-            )
-          ),
-          t("qa_fix_or_ignore_pre"), tags$strong(t("qa_status_fail")), t("qa_fix_or_ignore_post"),
-          tags$strong(t("qa_status_warn")), t("qa_warnings_advisory"),
-          tags$br(), tags$br(),
-          tags$strong(paste0(t("qa_autofilled_label"), " ")),
-          t("qa_autofilled_intro"),
-          tags$strong(t("qa_autofilled_panel_label")),
-          t("qa_autofilled_outro")),
+          t("info_qaqc")),
       conditionalPanel(
         condition = "output.has_imputed_params == true",
         div(style = "margin: 0 16px 16px 16px;",
@@ -1967,17 +1915,13 @@ app_ui <- function(request = NULL) {
               condition = "input.corr_mode == 'preset'",
               div(class = "info-panel",
                   tags$strong(paste0(t("info_struct_defaults_label"), " ")),
-                  t("info_struct_defaults_body"), " ",
-                  tags$em(t("info_struct_defaults_note")),
-                  t("info_struct_defaults_tail"))
+                  t("info_struct_defaults_body"))
             ),
             conditionalPanel(
               condition = "input.corr_mode == 'manual'",
               div(class = "info-panel",
                   tags$strong(paste0(t("info_manual_label"), " ")),
-                  t("info_manual_body"), " ",
-                  tags$strong(paste0(t("info_manual_zero_label"), " ")),
-                  t("info_manual_zero_body")),
+                  t("info_manual_body")),
               # Lolita 2026-06-02 review: provide a concrete starting CSV so
               # users don't have to hand-type parameter names (typos would be
               # silently dropped downstream).
@@ -2018,10 +1962,6 @@ app_ui <- function(request = NULL) {
       div(class = "info-panel", style = "margin: 16px;",
           tags$strong(paste0(t("what_to_do_label"), " ")),
           t("info_simulate"),
-          tags$br(), tags$br(),
-          tags$strong(t("info_simulate_results_switch")),
-          " ", tags$em(t("info_simulate_back")),
-          t("info_simulate_back_body"),
           tags$br(), tags$br(),
           tags$strong(paste0(t("info_simulate_n_label"), " ")),
           t("info_simulate_n_body"),
@@ -2470,19 +2410,7 @@ app_ui <- function(request = NULL) {
         condition = "input.analysis_mode != 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
             tags$strong(paste0(t("what_to_do_label"), " ")),
-            t("info_sens_what"),
-            tags$br(), tags$br(),
-            tags$strong(paste0(t("info_sens_note_label"), " ")),
-            tags$em(t("info_sens_note_body")),
-            tags$em(tags$strong(t("info_sens_note_uncertainty"))),
-            tags$em(t("info_sens_note_tail")),
-            tags$br(),
-            tags$strong(paste0(t("info_sens_action_label"), " ")),
-            t("info_sens_action_body"),
-            tags$br(), tags$br(),
-            tags$strong(paste0(t("info_sens_methods_label"), " ")),
-            tags$strong(t("info_sens_src_label")),
-            t("info_sens_src_body")),
+            t("info_sens_what")),
         uiOutput("sens_view_toggle"),
         div(style = "margin: 0 16px 12px 16px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;",
             selectInput("sens_source", t("sens_output_var"),
@@ -2520,26 +2448,7 @@ app_ui <- function(request = NULL) {
         condition = "input.analysis_mode == 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
             tags$strong(paste0(t("what_to_do_label"), " ")),
-            t("info_trend_sens_what"),
-            tags$strong(t("info_trend_sens_per_year_label")),
-            t("info_trend_sens_per_year_body"),
-            tags$strong(t("info_trend_sens_delta_label")),
-            t("info_trend_sens_delta_body"),
-            tags$strong(t("info_trend_sens_user_red")),
-            t("info_trend_sens_legend"),
-            tags$span(style = "color:#2D6A4F;font-weight:bold;", "■ ",
-                      if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
-                                          ifnotfound = "en"), "fr"))
-                        "vert" else "green"),
-            t("info_trend_sens_green_note"),
-            tags$span(style = "color:#78909C;font-weight:bold;", "■ ",
-                      if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
-                                          ifnotfound = "en"), "fr"))
-                        "gris" else "grey"),
-            t("info_trend_sens_grey_note"),
-            tags$br(), tags$br(),
-            tags$strong(paste0(t("info_sens_action_label"), " ")),
-            t("info_trend_sens_action")),
+            t("info_trend_sens_what")),
         h4(t("trend_sens_per_year_h"),
             style = "color:#1B4332; margin: 8px 16px 4px;"),
         bslib::layout_columns(
@@ -2590,33 +2499,7 @@ app_ui <- function(request = NULL) {
         condition = "input.analysis_mode != 'trend'",
         div(class = "info-panel", style = "margin: 16px;",
             tags$strong(paste0(t("what_to_do_label"), " ")),
-            t("info_ipcc_report_intro"), " ",
-            t("info_ipcc_three_cols"),
-            tags$strong(t("col_ad_uncert")), ", ",
-            tags$strong(t("col_ef_uncert")),
-            if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
-                                ifnotfound = "en"), "fr"))
-              ", et " else ", and ",
-            tags$strong(t("col_combined_uncert")),
-            if (identical(get0(".LANG_CURRENT", envir = .GlobalEnv,
-                                ifnotfound = "en"), "fr"))
-              ", toutes exprimées en " else ", all expressed as ",
-            tags$strong(t("info_ipcc_pct_label")),
-            t("info_ipcc_pct_body"),
-            " ", t("info_ipcc_click_label"),
-            tags$strong(t("info_ipcc_xlsx_label")),
-            t("info_ipcc_xlsx_body"),
-            tags$strong(t("info_ipcc_csv_label")),
-            t("info_ipcc_csv_body"),
-            " ", t("info_ipcc_click_label"),
-            tags$strong(t("info_ipcc_word_label")),
-            t("info_ipcc_word_body"),
-            tags$br(), tags$br(),
-            tags$strong(paste0(t("info_ipcc_software_label"), " ")),
-            t("info_ipcc_software_body")),
-        div(style = "margin: 0 16px 12px; font-size:0.82rem; color:#1B4332; background:#D8F3DC; border-left:3px solid #2D6A4F; padding:10px 12px; border-radius:4px;",
-            tags$strong(paste0(t("ad_ef_convention_label"), " ")),
-            t("ad_ef_convention_body")),
+            t("info_ipcc_report_intro")),
         bslib::card(
           bslib::card_header(t("card_ipcc_table_h")),
           bslib::card_body(
@@ -2771,8 +2654,6 @@ app_ui <- function(request = NULL) {
       title = t("tab_contact"),
       icon = icon("envelope"),
       div(class = "info-panel", style = "margin: 16px;",
-          tags$strong(t("contact_intro_label")),
-          tags$br(), tags$br(),
           t("contact_intro_body")),
       bslib::layout_columns(
         col_widths = c(6, 6),

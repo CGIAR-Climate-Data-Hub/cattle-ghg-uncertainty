@@ -207,19 +207,6 @@ lang_state_take <- function(token) {
   route_mixed          = list(en = "Mixed", fr = "Mixte"),
   res_col_intake_route = list(en = "Intake route", fr = "Voie d'ingestion"),
 
-  info_measured_intake_label = list(en = "Measured feed intake (optional):",
-                                      fr = "Ingestion alimentaire mesurée (facultatif) :"),
-  info_measured_intake_body = list(
-    en = "If your dataset already measures gross energy intake, enter it as GE in MJ per head per day. If it measures dry matter intake instead, enter DMI in kg per head per day and the tool converts it at the IPCC factor of 18.45 MJ per kg. Fill these cells only for the sub-categories where you have a measurement. Any sub-category left blank is calculated from the animal performance data exactly as before, so one inventory can mix measured and modelled groups. If you enter both, GE is used, because it carries your own measured energy density.",
-    fr = "Si votre jeu de données mesure déjà l'énergie brute ingérée, saisissez-la sous GE en MJ par tête et par jour. S'il mesure plutôt l'ingestion de matière sèche, saisissez DMI en kg par tête et par jour : l'outil la convertit avec le facteur IPCC de 18,45 MJ par kg. Ne remplissez ces cellules que pour les sous-catégories où vous disposez d'une mesure. Toute sous-catégorie laissée vide est calculée à partir des données de performance animale exactement comme avant, de sorte qu'un même inventaire peut mêler groupes mesurés et modélisés. Si vous saisissez les deux, GE est retenue, car elle porte votre propre densité énergétique mesurée."
-  ),
-  info_why_perf_still_needed_label = list(
-    en = "Why milk yield and weight gain are still required:",
-    fr = "Pourquoi la production laitière et le gain de poids restent nécessaires :"),
-  info_why_perf_still_needed_body = list(
-    en = "A measured GE replaces the IPCC energy balance, which is Equations 10.3 to 10.16. It does not replace the nitrogen balance. Nitrogen excretion (Equations 10.32 and 10.33) subtracts the nitrogen retained in milk and in liveweight gain from the nitrogen eaten, so milk yield, milk protein and weight gain still set direct and indirect nitrous oxide from manure and from pasture. Digestibility DE is still required for a similar reason: with GE supplied it no longer affects enteric methane, but it still sets the indigestible share of the feed that becomes volatile solids in Equation 10.24, and therefore manure methane.",
-    fr = "Une GE mesurée remplace le bilan énergétique IPCC, c'est-à-dire les équations 10.3 à 10.16. Elle ne remplace pas le bilan azoté. L'excrétion d'azote (équations 10.32 et 10.33) soustrait l'azote retenu dans le lait et dans le gain de poids vif de l'azote ingéré : la production laitière, la protéine du lait et le gain de poids déterminent donc toujours le N₂O direct et indirect du fumier et du pâturage. La digestibilité DE reste nécessaire pour une raison analogue : avec une GE fournie, elle n'agit plus sur le méthane entérique, mais elle fixe encore la part indigestible de la ration qui devient solides volatils dans l'équation 10.24, et donc le méthane du fumier."
-  ),
 
   # ---- SEO head strings (browser tab title, meta description) ----------
   # The window title deliberately says "Cattle" (the search phrase people
@@ -888,39 +875,38 @@ lang_state_take <- function(token) {
     fr = "Année unique : quantifier l'incertitude d'une année d'inventaire"
   ),
   tip_analysis_mode_single = list(
-    en = "Use this mode to estimate the uncertainty for one specific inventory year. All parameters are sampled independently for each iteration. This is the most common mode and is sufficient for IPCC Table 3.3 reporting. Choose Trend if you also want to assess whether emission changes over time are statistically significant.",
-    fr = "Mode pour estimer l'incertitude d'une année d'inventaire spécifique. Tous les paramètres sont échantillonnés indépendamment à chaque itération. C'est le mode le plus courant et suffisant pour le rapport IPCC Tableau 3.3. Choisissez Tendance si vous voulez aussi évaluer si les variations d'émissions dans le temps sont statistiquement significatives."
+    en = "One inventory year. Gives the uncertainty of that year's emissions, as IPCC Table 3.3 asks.",
+    fr = "Une année d'inventaire. Donne l'incertitude des émissions de cette année, comme le demande le Tableau 3.3 du GIEC."
   ),
   analysis_mode_trend = list(
     en = "Trend: compare uncertainty across multiple years",
     fr = "Tendance : comparer l'incertitude entre plusieurs années"
   ),
   tip_analysis_mode_trend = list(
-    en = "Use this mode when you have activity data for several inventory years and want to assess whether the trend (change over time) is statistically distinguishable from zero. IPCC Vol 1 Ch 3 §3.7 recommends reporting trend uncertainty for inventory series. Requires a Parameter_TimeSeries sheet in your upload template, or use one of the built-in example datasets.",
-    fr = "Mode quand vous disposez de données d'activité pour plusieurs années et voulez évaluer si la tendance est statistiquement distinguable de zéro. IPCC Vol 1 Ch 3 §3.7 recommande de rapporter l'incertitude de tendance pour les séries d'inventaire. Nécessite une feuille Parameter_TimeSeries dans votre modèle, ou utilisez un jeu d'exemple intégré."
+    en = "Several years. Gives the uncertainty of each year and of the change between the base year and the year you report (IPCC Vol. 1, Ch. 3, §3.7). Needs a Parameter_TimeSeries sheet, or an example dataset.",
+    fr = "Plusieurs années. Donne l'incertitude de chaque année et du changement entre l'année de base et l'année déclarée (GIEC Vol. 1, Ch. 3, §3.7). Nécessite une feuille Parameter_TimeSeries, ou un jeu d'exemple."
   ),
   analysis_mode_warning = list(
     en = "Selection required: pick Single year or Trend before moving on. The Run button on Tab 4 will block until a mode is chosen.",
     fr = "Sélection requise : choisissez Année unique ou Tendance avant de continuer. Le bouton Lancer de l'onglet 4 sera bloqué tant qu'un mode n'est pas choisi."
   ),
-  trend_explanation = list(
-    en = "What 'Trend' does in this tool: a full Monte Carlo uncertainty run is performed independently for every year present in your time-series upload, and the uncertainty on the trend itself is taken as the distribution of (Year_N − Year_1), the absolute change in CO₂eq between the last and first year.",
-    fr = "Ce que fait « Tendance » dans cet outil : un calcul Monte Carlo complet est exécuté indépendamment pour chaque année présente dans votre téléversement de séries temporelles, et l'incertitude sur la tendance elle-même est prise comme la distribution de (Année_N − Année_1), le changement absolu en CO₂éq entre la dernière et la première année."
-  ),
-  trend_ipcc_alignment = list(
-    en = "IPCC alignment: IPCC 2006 Vol.1 Ch.3 §3.7 (“Uncertainty in trends”) defines the trend as the change between a",
-    fr = "Alignement IPCC : IPCC 2006 Vol.1 Ch.3 §3.7 (« Incertitude des tendances ») définit la tendance comme le changement entre une"
-  ),
   trend_base_year = list(en = "base year", fr = "année de base"),
-  trend_current_year = list(en = "current year", fr = "année courante"),
-  trend_explanation_2 = list(
-    en = ". The first / last years of the time series you upload are used as those base and current years respectively. §3.7 covers both Approach 1 (error-propagation, Eq. 3.1–3.2) and Approach 2 (Monte Carlo) for the trend; this tool implements the Approach 2 version. Use 'Trend' if you have multi-year data; use 'Single year' for a one-off uncertainty estimate.",
-    fr = ". La première / dernière année de la série temporelle que vous téléversez sont utilisées comme année de base et courante respectivement. §3.7 couvre à la fois l'Approche 1 (propagation d'erreur, Éq. 3.1–3.2) et l'Approche 2 (Monte Carlo) pour la tendance ; cet outil implémente la version Approche 2. Choisissez « Tendance » si vous avez des données pluriannuelles ; « Année unique » pour une estimation ponctuelle."
-  ),
 
   info_data_input = list(
-    en = "Select an example country dataset from the dropdown, or upload your own data using the Excel template. The parameter table on the right shows the loaded data, read-only: each parameter's mean, distribution, uncertainty percentage, bounds and parameter type. To change a value, edit your Excel template and upload it again. Check the validation panel at the bottom left to ensure your data is complete and valid before proceeding to the next tab.",
-    fr = "Sélectionnez un jeu de données d'exemple dans le menu déroulant, ou téléversez vos propres données avec le modèle Excel. La table des paramètres à droite montre les données chargées, en lecture seule : la moyenne, la distribution, le pourcentage d'incertitude, les bornes et le type de chaque paramètre. Pour changer une valeur, modifiez votre modèle Excel et téléversez-le de nouveau. Vérifiez le panneau de validation en bas à gauche pour vous assurer que vos données sont complètes et valides avant de passer à l'onglet suivant."
+    en = "Pick an example country, or upload your own filled Excel template. The table on the right shows what was loaded. To change a value, edit the Excel file and upload it again.",
+    fr = "Choisissez un pays d'exemple, ou téléversez votre modèle Excel rempli. La table à droite montre ce qui a été chargé. Pour changer une valeur, modifiez le fichier Excel et téléversez-le de nouveau."
+  ),
+  info_data_input_ai_pre = list(
+    en = "To put your data in the right format, use the ",
+    fr = "Pour mettre vos données au bon format, utilisez le "
+  ),
+  info_data_input_ai_link = list(
+    en = "AI translator",
+    fr = "traducteur IA"
+  ),
+  info_data_input_ai_post = list(
+    en = ". Otherwise download the Excel template on the left, fill it in and upload it.",
+    fr = ". Sinon, téléchargez le modèle Excel à gauche, remplissez-le et téléversez-le."
   ),
   what_to_do_label = list(en = "What to do:", fr = "Marche à suivre :"),
 
@@ -972,31 +958,18 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_qaqc = list(
-    en = "After loading data, review these automated quality checks. The tiles count the findings by status and filter the table: click Fail to see every parameter with a failure, open, with the findings that need attention. One row per parameter; open a row to read each finding and its message.",
-    fr = "Après le chargement des données, examinez ces vérifications de qualité automatiques. Les vignettes comptent les constats par statut et filtrent le tableau : cliquez sur Échec pour voir chaque paramètre en échec, ouvert, avec les constats à traiter. Une ligne par paramètre ; ouvrez-la pour lire chaque constat et son message."
+    en = "Read the checks on your data. Click a status tile to filter the table. Fix every Fail in your Excel file and upload it again. Warn means check the value; Missing means an IPCC default was used.",
+    fr = "Lisez les vérifications de vos données. Cliquez sur une vignette de statut pour filtrer le tableau. Corrigez chaque Échec dans votre fichier Excel et téléversez-le de nouveau. Attention signifie vérifier la valeur ; Manquant signifie qu'une valeur GIEC par défaut a été utilisée."
   ),
   qa_status_missing = list(en = "Missing", fr = "Manquant"),
   qa_status_fail = list(en = "Fail", fr = "Échec"),
   qa_status_warn = list(en = "Warn", fr = "Attention"),
   qa_status_info = list(en = "Info", fr = "Info"),
   qa_status_pass = list(en = "Pass", fr = "OK"),
-  qa_missing_desc = list(en = ": the parameter was not in your upload and was auto-filled from the IPCC default. Verify or replace with country-specific data.",
-                            fr = " : le paramètre n'était pas dans votre téléversement et a été rempli automatiquement avec la valeur IPCC par défaut. Vérifiez ou remplacez par des données nationales."),
-  qa_fail_desc = list(en = ": the value, its unit or its bounds would break or distort the simulation. Correct it in your Excel file.",
-                        fr = " : la valeur, son unité ou ses bornes casseraient ou fausseraient la simulation. Corrigez-la dans votre fichier Excel."),
-  qa_warn_desc = list(en = ": the value is outside its usual range or far from the IPCC default, or the row has no uncertainty. Check it; if it is right, document the source in your inventory QA/QC records (the tool does not store notes).",
-                        fr = " : la valeur est hors de sa plage usuelle ou loin de la valeur IPCC par défaut, ou la ligne n'a pas d'incertitude. Vérifiez-la ; si elle est juste, documentez la source dans vos dossiers QA/QC d'inventaire (l'outil ne conserve pas de notes)."),
-  qa_info_desc = list(en = ": a note, nothing to correct: a row sampled as a constant because its bounds equal its mean, symmetric bounds where IPCC gives a skewed range, or no Manure_Management sheet.",
-                        fr = " : une note, rien à corriger : une ligne tirée comme constante parce que ses bornes égalent sa moyenne, des bornes symétriques là où l'IPCC donne une plage asymétrique, ou pas de feuille Manure_Management."),
-  qa_pass_desc = list(en = ": check satisfied.", fr = ", vérification satisfaite."),
   qa_fix_fails = list(en = "Fix any ", fr = "Corrigez tous les "),
   qa_before_sim = list(en = " before running the simulation. ",
                          fr = " avant de lancer la simulation. "),
   # QA ignore / repair (2026-09-18)
-  qa_fix_or_ignore_pre = list(en = "Fix any ", fr = "Corrigez tous les "),
-  qa_fix_or_ignore_post = list(
-    en = " before running: correct the value in your Excel file and upload it again. ",
-    fr = " avant de lancer : corrigez la valeur dans votre fichier Excel et téléversez-le de nouveau. "),
   qa_tile_all = list(en = "All checks", fr = "Toutes"),
   qa_table_hint = list(
     en = "Click a status to keep only the parameters concerned. One row per parameter: open it to read each finding with its message.",
@@ -1024,16 +997,8 @@ lang_state_take <- function(token) {
     fr = "Les résultats peuvent être peu fiables. Cette liste figure dans chaque export."),
   qa_repaired_notice = list(en = "Input repaired so the simulation can run:",
                             fr = "Entrée réparée pour permettre la simulation :"),
-  qa_warnings_advisory = list(en = " are advisory: document your justification for large deviations from IPCC defaults in your own inventory QA/QC records.",
-                                fr = " sont indicatifs : documentez votre justification pour les écarts importants par rapport aux valeurs IPCC par défaut dans vos propres dossiers QA/QC d'inventaire."),
-  qa_autofilled_label = list(en = "Auto-filled parameters:",
-                                fr = "Paramètres remplis automatiquement :"),
-  qa_autofilled_intro = list(en = "If any parameters were absent from your upload, an ",
-                                fr = "Si des paramètres étaient absents de votre téléversement, un panneau "),
   qa_autofilled_panel_label = list(en = "Auto-filled parameters",
                                       fr = "Paramètres remplis automatiquement"),
-  qa_autofilled_outro = list(en = " panel appears above the results table showing which values were substituted from IPCC defaults. Review these and replace with country-specific data in your template where possible.",
-                                fr = " apparaît au-dessus de la table de résultats indiquant quelles valeurs ont été substituées par les valeurs IPCC par défaut. Examinez-les et remplacez-les par des données nationales lorsque possible."),
   qa_checks_run_label = list(en = "What is checked", fr = "Ce qui est vérifié"),
   qa_checks_run = list(
     en = "On every row: bounds enclose the mean and give a spread; lower bound not negative; percentage or fraction unit (DE, Ym, Fat, CP, MilkPR in %; pct_pregnant, ASH, UE, Frac_* as fractions); usual range with its IPCC source; distribution usable as the sampler reads it (beta, lognormal, tnorm_0_1); fractions under an unbounded distribution; body weight against the IPCC Annex 10A weight of the animal class (above 50% = warn); symmetric bounds where IPCC gives a skewed range (EF3_PRP, Frac_LEACH_PRP, info); Parameters sub-categories against the Manure_Management sheet.",
@@ -1046,18 +1011,6 @@ lang_state_take <- function(token) {
   # on 2026-10-28 after the Nairobi review)
   # =====================================================================
 
-  info_unc_what_label = list(en = "Distributions and uncertainty ranges:",
-                             fr = "Distributions et plages d'incertitude :"),
-  info_unc_what = list(
-    en = "Each parameter's probability distribution (normal, lognormal, beta, triangular, pert, uniform, constant), uncertainty percentage and lower/upper bounds come from your file and are shown in the parameter table. To change any of them, edit your Excel template and upload it again; nothing is edited inside the tool.",
-    fr = "La distribution de probabilité de chaque paramètre (normal, lognormal, beta, triangulaire, pert, uniforme, constant), son pourcentage d'incertitude et ses bornes inférieure/supérieure viennent de votre fichier et figurent dans le tableau des paramètres. Pour en changer, modifiez votre modèle Excel et téléversez-le de nouveau ; rien n'est modifié dans l'outil."
-  ),
-  info_unc_triangular_label = list(en = "Note on triangular distributions:",
-                                      fr = "Note sur les distributions triangulaires :"),
-  info_unc_triangular_body = list(
-    en = "triangular is most often used when only the minimum, most-likely (mode), and maximum are known. The tool treats lower/upper as absolute min/max, not 95% CI bounds: for triangular, those are usually the same. If you have a 95% CI but want a triangular shape, use PERT instead (PERT uses the 95% bounds and a most-likely value).",
-    fr = "La distribution triangulaire est utilisée lorsque seuls le minimum, le mode et le maximum sont connus. L'outil traite lower/upper comme min/max absolus, pas comme bornes IC 95 % : pour la triangulaire, ces valeurs sont en général identiques. Si vous avez un IC 95 % mais voulez une forme triangulaire, utilisez plutôt PERT (PERT utilise les bornes 95 % et un mode)."
-  ),
 
   # =====================================================================
   # CORRELATIONS TAB
@@ -1065,8 +1018,8 @@ lang_state_take <- function(token) {
 
   info_corr_about_label = list(en = "What is this page about?", fr = "De quoi parle cette page ?"),
   info_corr_about_body = list(
-    en = "Real-world uncertainties don't usually live in separate boxes, and they overlap in two different ways. The first is inside a single group. If your body-weight estimate is off because the census missed some animals, your population estimate is probably off too. Telling the tool which parameters move together: when you have evidence, gives a more honest uncertainty range. If you don't have evidence, leave everything on \"No correlations\": for parameters inside one group that gives a conservative, defensible answer. The second way is between groups, and it is covered in its own block below.",
-    fr = "Les incertitudes du monde réel ne vivent pas dans des compartiments séparés, et elles se recoupent de deux façons différentes. La première se situe à l'intérieur d'un même groupe. Si votre estimation de poids vif est biaisée parce que le recensement a manqué des animaux, votre estimation de population l'est probablement aussi. Indiquer à l'outil quels paramètres bougent ensemble : lorsque vous avez des preuves, donne une plage d'incertitude plus honnête. Sans preuves, laissez tout sur « Pas de corrélations » : pour des paramètres au sein d'un même groupe, cela donne une réponse prudente et défendable. La seconde se situe entre les groupes, et elle est traitée dans son propre bloc ci-dessous."
+    en = "Some inputs move together. Telling the tool which ones gives a more realistic uncertainty range. With no evidence, keep 'No correlations'.",
+    fr = "Certaines entrées varient ensemble. Indiquer lesquelles à l'outil donne une plage d'incertitude plus réaliste. Sans preuve, gardez « Pas de corrélations »."
   ),
 
   # The second idea, kept out of the "which option do I pick?" list below
@@ -1076,67 +1029,68 @@ lang_state_take <- function(token) {
     en = "The other kind: one estimate used in several groups",
     fr = "L'autre type : une seule estimation utilisée dans plusieurs groupes"),
   info_corr_shared_body = list(
-    en = "A number can also be shared. One IPCC default for Ym, or one regional body weight applied to fifty groups, is still a single estimate. If it turns out to be wrong, all fifty groups are wrong in the same direction at the same time and nothing averages out. Drawing it separately for each group hides that, and hides more of it the more finely the inventory is split. The \"Inputs shared between groups\" setting in the activity data card on the left handles this, and the recommended option is the right answer for nearly everyone. Expect the reported uncertainty to go up when it is on: that is the correction, not a fault. The effect is usually much larger than the one described above, so if you change only one setting on this page, change that one.",
-    fr = "Un nombre peut aussi être partagé. Une valeur IPCC par défaut pour Ym, ou un seul poids vif régional appliqué à cinquante groupes, reste une seule estimation. Si elle est fausse, les cinquante groupes sont faux dans le même sens en même temps et rien ne se compense. La tirer séparément pour chaque groupe masque ce phénomène, d'autant plus que l'inventaire est découpé finement. Le réglage « Entrées partagées entre groupes », dans la carte des données d'activité à gauche, traite ce cas, et l'option recommandée convient à presque tout le monde. Attendez-vous à ce que l'incertitude rapportée augmente lorsqu'il est actif : c'est la correction, pas un défaut. L'effet est généralement bien plus important que celui décrit ci-dessus ; si vous ne modifiez qu'un seul réglage sur cette page, modifiez celui-là."),
+    en = "One IPCC default or one regional value used in many groups is a single estimate. If it is wrong, every group is wrong together. 'Inputs shared between groups' accounts for this. The uncertainty goes up when it is on; that is expected.",
+    fr = "Une valeur GIEC par défaut ou une valeur régionale utilisée dans plusieurs groupes reste une seule estimation. Si elle est fausse, tous les groupes sont faux ensemble. « Entrées partagées entre groupes » en tient compte. L'incertitude augmente quand l'option est active ; c'est attendu."
+  ),
   info_corr_quickguide = list(en = "Quick guide: which option do I pick?",
                                 fr = "Guide rapide : quelle option choisir ?"),
-  info_corr_q1 = list(en = "Do you have ≥5 years of national time-series data in your upload? → ",
-                        fr = "Avez-vous ≥5 années de séries temporelles nationales dans votre téléversement ? → "),
-  info_corr_q1_ans = list(en = "From template (auto, time-series)",
-                            fr = "Depuis le modèle (auto, séries temporelles)"),
-  info_corr_q2 = list(
-    en = "No time series, but you want to capture well-known biological linkages (BW ↔ MW, Milk ↔ Fat, DE ↔ Ym, …)? → ",
-    fr = "Pas de séries temporelles, mais vous voulez capturer des liens biologiques bien connus (BW ↔ MW, Milk ↔ Fat, DE ↔ Ym, …) ? → "
+  info_corr_q1 = list(
+    en = "Five or more years in your Parameter_TimeSeries sheet: ",
+    fr = "Cinq années ou plus dans votre feuille Parameter_TimeSeries : "
   ),
-  info_corr_q2_ans = list(en = "Structural defaults (literature-based)",
-                            fr = "Valeurs structurelles par défaut (fondées sur la littérature)"),
-  info_corr_q3 = list(en = "You have your own correlation matrix from a study or expert elicitation? → ",
-                        fr = "Vous avez votre propre matrice de corrélation à partir d'une étude ou d'un jugement d'expert ? → "),
-  info_corr_q3_ans = list(en = "Advanced: manual entry",
-                            fr = "Avancé : saisie manuelle"),
-  info_corr_q4 = list(en = "None of the above? → leave ",
-                        fr = "Aucune des options ci-dessus ? → laissez "),
+  info_corr_q1_ans = list(
+    en = "From template",
+    fr = "Depuis le modèle"
+  ),
+  info_corr_q2 = list(
+    en = "No time series, but you want the known biological links (weight, milk, digestibility): ",
+    fr = "Pas de série temporelle, mais vous voulez les liens biologiques connus (poids, lait, digestibilité) : "
+  ),
+  info_corr_q2_ans = list(
+    en = "Structural defaults",
+    fr = "Valeurs structurelles par défaut"
+  ),
+  info_corr_q3 = list(
+    en = "Your own matrix from a study: ",
+    fr = "Votre propre matrice issue d'une étude : "
+  ),
+  info_corr_q3_ans = list(
+    en = "Manual entry",
+    fr = "Saisie manuelle"
+  ),
+  info_corr_q4 = list(
+    en = "None of these: ",
+    fr = "Aucun de ces cas : "
+  ),
   info_corr_no = list(en = "No correlations",
                         fr = "Pas de corrélations"),
-  info_corr_q4_post = list(en = " (the default; conservative and defensible).",
-                              fr = " (par défaut ; prudent et défendable)."),
+  info_corr_q4_post = list(
+    en = ".",
+    fr = "."
+  ),
 
   card_ad_corr_h = list(en = "Activity Data Correlations",
                           fr = "Corrélations des données d'activité"),
   ai_find_out_more_long = list(en = "Find out more", fr = "En savoir plus"),
   info_ad_corr = list(
-    en = "Activity-data correlations describe how your input parameters move together. If you have a multi-year ",
-    fr = "Les corrélations des données d'activité décrivent comment vos paramètres d'entrée bougent ensemble. Si vous disposez d'une feuille pluriannuelle "
+    en = "If your file has a ",
+    fr = "Si votre fichier contient une feuille "
   ),
   info_ad_corr_post = list(
-    en = " sheet in your upload, the tool can learn the relationships from your own data. If not, pick a preset or skip.",
-    fr = " dans votre téléversement, l'outil peut apprendre les relations à partir de vos propres données. Sinon, choisissez un préréglage ou ignorez."
+    en = " sheet, the tool can read the correlations from it. Otherwise pick a preset or skip.",
+    fr = ", l'outil peut y lire les corrélations. Sinon, choisissez une option prédéfinie ou passez."
   ),
   info_struct_defaults_label = list(en = "Structural defaults (literature-based):",
                                        fr = "Valeurs structurelles par défaut (fondées sur la littérature) :"),
   info_struct_defaults_body = list(
-    en = "applies a sparse correlation matrix with seven well-documented structural pairs (BW ↔ MW, BW ↔ WG, Milk ↔ Fat, Milk ↔ BW, Milk ↔ DE, DE ↔ CP, DE ↔ Ym).",
-    fr = "applique une matrice de corrélation creuse avec sept paires structurelles bien documentées (BW ↔ MW, BW ↔ WG, Milk ↔ Fat, Milk ↔ BW, Milk ↔ DE, DE ↔ CP, DE ↔ Ym)."
-  ),
-  info_struct_defaults_note = list(
-    en = "Note: these values reflect documented biological/statistical relationships from the IPCC equations and the livestock literature, they are not IPCC-published correlation coefficients.",
-    fr = "Note : ces valeurs reflètent des relations biologiques/statistiques documentées issues des équations IPCC et de la littérature sur l'élevage, ce ne sont pas des coefficients de corrélation publiés par l'IPCC."
-  ),
-  info_struct_defaults_tail = list(
-    en = " All other pairs are zero. Hover any non-zero cell in the heatmap for the per-pair source citation; full provenance and revision history are in the Methodology document.",
-    fr = " Toutes les autres paires sont à zéro. Survolez une cellule non nulle de la carte de chaleur pour voir la citation par paire ; la provenance complète et l'historique de révision sont dans le document de méthodologie."
+    en = "seven pairs taken from the livestock literature (weight, milk, digestibility, methane conversion). They are not IPCC-published values. All other pairs are zero. Hover a cell for its source.",
+    fr = "sept paires tirées de la littérature sur l'élevage (poids, lait, digestibilité, conversion en méthane). Ce ne sont pas des valeurs publiées par le GIEC. Toutes les autres paires sont à zéro. Survolez une cellule pour voir sa source."
   ),
   info_manual_label = list(en = "Advanced: manual matrix entry.",
                               fr = "Avancé : saisie manuelle de la matrice."),
   info_manual_body = list(
-    en = "Upload a CSV with parameter names as both column headers and the first column. Values must be in [-1, 1] with the diagonal = 1. Don't write the matrix from scratch: download one of the templates below, edit cells in Excel, save as CSV, and re-upload.",
-    fr = "Téléversez un CSV avec les noms de paramètres comme en-têtes de colonnes et première colonne. Les valeurs doivent être dans [-1, 1] avec la diagonale = 1. N'écrivez pas la matrice à partir de zéro : téléchargez l'un des modèles ci-dessous, modifiez les cellules dans Excel, enregistrez en CSV et téléversez à nouveau."
-  ),
-  info_manual_zero_label = list(en = "Missing parameters are assumed to have zero correlation:",
-                                   fr = "Les paramètres manquants sont supposés avoir une corrélation nulle :"),
-  info_manual_zero_body = list(
-    en = "any parameter whose row/column is absent from the uploaded matrix (or whose name doesn't match the canonical list) is treated as independent of every other parameter: the simulation runs but no correlation is applied for that parameter.",
-    fr = "tout paramètre dont la ligne/colonne est absente de la matrice téléversée (ou dont le nom ne correspond pas à la liste canonique) est traité comme indépendant : la simulation tourne mais aucune corrélation n'est appliquée à ce paramètre."
+    en = "Download a template below, edit it in Excel, save as CSV, upload. Values between -1 and 1, diagonal 1. A parameter missing from the file is treated as independent.",
+    fr = "Téléchargez un modèle ci-dessous, modifiez-le dans Excel, enregistrez en CSV, téléversez. Valeurs entre -1 et 1, diagonale à 1. Un paramètre absent du fichier est traité comme indépendant."
   ),
 
   # =====================================================================
@@ -1144,28 +1098,19 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_simulate = list(
-    en = "Configure simulation settings on the left, then click 'Run Monte Carlo Simulation' at the bottom of the left-hand panel. The tool will sample all parameters from their distributions and run the IPCC equation chain thousands of times. 10,000+ iterations recommended; check convergence by re-running with a different seed (1,000 is fine for quick testing).",
-    fr = "Configurez les paramètres de simulation à gauche, puis cliquez sur « Lancer la simulation Monte Carlo » en bas du panneau de gauche. L'outil échantillonnera tous les paramètres selon leurs distributions et exécutera la chaîne d'équations IPCC des milliers de fois. 10 000+ itérations recommandées ; vérifiez la convergence en relançant avec une autre graine (1 000 suffit pour un test rapide)."
-  ),
-  info_simulate_results_switch = list(
-    en = "Once the simulation completes, this tab switches to the results view automatically.",
-    fr = "Une fois la simulation terminée, cet onglet bascule automatiquement vers la vue des résultats."
+    en = "Set the options on the left and click 'Run Monte Carlo simulation'. The results open on this tab when the run finishes. Use 'Back to settings' to change something and run again. Tabs 5 and 6 go deeper.",
+    fr = "Réglez les options à gauche et cliquez sur « Lancer la simulation Monte Carlo ». Les résultats s'ouvrent sur cet onglet à la fin du calcul. Utilisez « Retour aux réglages » pour changer quelque chose et relancer. Les onglets 5 et 6 vont plus loin."
   ),
   info_simulate_repro_label = list(en = "If you get disconnected:", fr = "En cas de déconnexion :"),
   info_simulate_repro_body = list(
-    en = "the app runs on a shared server and a long idle session can occasionally drop, which clears the results view. Nothing is lost permanently: with a fixed seed, results are exactly reproducible from your input file. Re-upload the same file, keep the same settings and seed, and re-run to get identical numbers. Downloading the Excel report right after a run also preserves a full record of every input used.",
-    fr = "l'application tourne sur un serveur partagé et une longue session inactive peut parfois se couper, ce qui efface la vue des résultats. Rien n'est perdu définitivement : avec une graine fixe, les résultats sont exactement reproductibles à partir de votre fichier d'entrée. Rechargez le même fichier, gardez les mêmes réglages et la même graine, puis relancez pour obtenir des chiffres identiques. Télécharger le rapport Excel juste après une exécution conserve aussi l'enregistrement complet de toutes les entrées utilisées."
-  ),
-  info_simulate_back = list(en = "Back to settings", fr = "Retour aux paramètres"),
-  info_simulate_back_body = list(
-    en = " button at the top of the results to change inputs and re-run; the next run will switch back to results when it finishes. Tab 5 (Sensitivity) and Tab 6 (IPCC Report) provide deeper drill-downs.",
-    fr = " en haut des résultats pour modifier les entrées et relancer ; la prochaine exécution rebasculera vers les résultats à la fin. L'onglet 5 (Sensibilité) et l'onglet 6 (Rapport IPCC) offrent des analyses plus approfondies."
+    en = "with the same file, settings and seed, the results are identical. If the session drops, upload the file again and run with the same seed.",
+    fr = "avec le même fichier, les mêmes réglages et la même graine, les résultats sont identiques. Si la session se coupe, téléversez le fichier de nouveau et relancez avec la même graine."
   ),
   info_simulate_n_label = list(en = "How many iterations to use:",
                                   fr = "Combien d'itérations utiliser :"),
   info_simulate_n_body = list(
-    en = "Use 1,000 only for a quick test run to check that the model runs. Use a minimum of 10,000 iterations for any result you intend to use; convergence is not guaranteed below 10,000. Higher is always better: 25,000–30,000 is recommended for final reporting, especially when correlations are enabled or you have many sub-categories. To verify convergence, re-run with a different random seed: if the 95% MoE (margin of error: half the width of the 95% confidence interval, expressed as a percentage of the mean) changes by more than ~2 percentage points, increase the number of iterations.",
-    fr = "Utilisez 1 000 uniquement pour un test rapide vérifiant que le modèle tourne. Utilisez au minimum 10 000 itérations pour tout résultat que vous comptez utiliser ; la convergence n'est pas garantie en dessous de 10 000. Plus c'est haut, mieux c'est : 25 000–30 000 sont recommandées pour le rapport final, surtout avec corrélations activées ou de nombreuses sous-catégories. Pour vérifier la convergence, relancez avec une autre graine aléatoire : si la MoE 95 % (marge d'erreur : demi-largeur de l'intervalle de confiance à 95 %, en pourcentage de la moyenne) change de plus de ~2 points, augmentez le nombre d'itérations."
+    en = "1,000 for a quick test. 10,000 or more for any result you use. To check convergence, run again with another seed: if the 95% margin changes by more than 2 points, increase the number.",
+    fr = "1 000 pour un test rapide. 10 000 ou plus pour tout résultat que vous utilisez. Pour vérifier la convergence, relancez avec une autre graine : si la marge à 95 % change de plus de 2 points, augmentez le nombre."
   ),
   card_sim_settings = list(en = "Simulation Settings", fr = "Paramètres de simulation"),
   sim_n_iter_label = list(en = "Number of Iterations", fr = "Nombre d'itérations"),
@@ -1210,14 +1155,16 @@ lang_state_take <- function(token) {
     en = "Iterations per year (trend)",
     fr = "Itérations par année (tendance)"),
   trend_n_iter_help = list(
-    en = "Each year is a full simulation. 2,000 is enough for the chart and the slope; the two reported years are run again at the count below.",
-    fr = "Chaque année est une simulation complète. 2 000 suffisent pour le graphique et la pente ; les deux années déclarées sont relancées avec le nombre ci-dessous."),
+    en = "Each year is a full simulation. 2,000 is enough for the chart and the slope.",
+    fr = "Chaque année est une simulation complète. 2 000 suffisent pour le graphique et la pente."
+  ),
   trend_n_iter_pair_label = list(
     en = "Draws for the base year and year t",
     fr = "Tirages pour l'année de base et l'année t"),
   trend_n_iter_pair_help = list(
-    en = "After the series, the base year and year t are simulated again at this count, as a pair, for the headline figures and IPCC Table 3.3. 10,000 matches the single-year run.",
-    fr = "Après la série, l'année de base et l'année t sont simulées à nouveau avec ce nombre, en paire, pour les chiffres principaux et le tableau 3.3 du GIEC. 10 000 correspond à l'exécution d'une seule année."),
+    en = "The two reported years are run again at this count for the headline figures and the IPCC table. 10,000 matches a single-year run.",
+    fr = "Les deux années déclarées sont recalculées à ce nombre pour les chiffres clés et le tableau GIEC. 10 000 correspond à un calcul d'année unique."
+  ),
   btn_run_trend = list(en = "Run Trend Analysis",
                          fr = "Lancer l'analyse de tendance"),
 
@@ -1225,17 +1172,9 @@ lang_state_take <- function(token) {
   # DEFINITIONS TAB
   # =====================================================================
 
-  info_definitions_label = list(en = "Parameter glossary.",
-                                  fr = "Glossaire des paramètres."),
   info_definitions_body = list(
-    en = "All parameters used in the IPCC Tier 2 calculations, with their plain-language definition, unit, IPCC default value, suggested distribution, level (core / advanced), IPCC framing (activity data vs coefficient), and IPCC reference table or equation. Variable names are aligned with the ",
-    fr = "Tous les paramètres utilisés dans les calculs IPCC Niveau 2, avec leur définition en langage clair, unité, valeur IPCC par défaut, distribution suggérée, niveau (de base / avancé), cadrage IPCC (donnée d'activité vs coefficient), et tableau ou équation IPCC de référence. Les noms de variables sont alignés sur le "
-  ),
-  info_definitions_software = list(en = "IPCC Inventory Software",
-                                      fr = "logiciel d'inventaire IPCC"),
-  info_definitions_tail = list(
-    en = " (v2.95) and the symbols used in the IPCC 2006 Vol.4 Ch.10 / Ch.11 equations.",
-    fr = " (v2.95) et les symboles utilisés dans les équations IPCC 2006 Vol.4 Ch.10 / Ch.11."
+    en = "Every parameter of the Tier 2 calculation: definition, unit, IPCC default, suggested distribution, and the IPCC table or equation it comes from. Names follow the IPCC Inventory Software (v2.95).",
+    fr = "Chaque paramètre du calcul de niveau 2 : définition, unité, valeur GIEC par défaut, distribution suggérée, et le tableau ou l'équation GIEC d'origine. Les noms suivent le logiciel d'inventaire GIEC (v2.95)."
   ),
   card_param_definitions = list(en = "Parameter definitions",
                                   fr = "Définitions des paramètres"),
@@ -1323,27 +1262,8 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_sens_what = list(
-    en = "This page shows which input parameters contribute most to the overall emission uncertainty. The tornado chart (Figure 5.1) ranks parameters by their influence: longer bars mean more influential parameters. Bars to the right mean a higher value gives higher emissions; bars to the left mean a higher value gives lower emissions. Colour shows whether better data could help: green bars are inputs you can improve with better national data, blue bars are IPCC coefficients you cannot improve locally.",
-    fr = "Cette page montre quels paramètres d'entrée contribuent le plus à l'incertitude globale des émissions. Le graphique tornade (Figure 5.1) classe les paramètres par leur influence : des barres plus longues indiquent des paramètres plus influents. Une barre à droite signifie qu'une valeur plus élevée donne des émissions plus élevées ; une barre à gauche, des émissions plus faibles. La couleur indique si de meilleures données peuvent aider : les barres vertes sont des entrées améliorables par de meilleures données nationales, les barres bleues des coefficients IPCC non améliorables localement."
-  ),
-  info_sens_note_label = list(en = "Note:", fr = "Note :"),
-  info_sens_note_body = list(en = "These rankings show which parameters drive the ",
-                                fr = "Ces classements montrent quels paramètres pilotent l'"),
-  info_sens_note_uncertainty = list(en = "uncertainty", fr = "incertitude"),
-  info_sens_note_tail = list(en = " of total emissions, not the absolute emission level.",
-                                fr = " des émissions totales, pas le niveau d'émission absolu."),
-  info_sens_action_label = list(en = "Action item:", fr = "À faire :"),
-  info_sens_action_body = list(
-    en = "Focus your data improvement efforts on the top 3-5 parameters to get the biggest reduction in overall inventory uncertainty.",
-    fr = "Concentrez vos efforts d'amélioration des données sur les 3 à 5 premiers paramètres pour obtenir la plus grande réduction de l'incertitude globale de l'inventaire."
-  ),
-  info_sens_methods_label = list(en = "Sensitivity methods explained:",
-                                    fr = "Méthodes de sensibilité expliquées :"),
-  info_sens_src_label = list(en = "SRC (Standardized Regression Coefficients)",
-                                fr = "SRC (coefficients de régression standardisés)"),
-  info_sens_src_body = list(
-    en = ": fits a linear model between each input parameter and the output; fast and easy to interpret. A positive SRC means higher values of that input produce higher emissions.",
-    fr = " : ajuste un modèle linéaire entre chaque paramètre d'entrée et la sortie ; rapide et facile à interpréter. Un SRC positif signifie que des valeurs plus élevées de cette entrée produisent des émissions plus élevées."
+    en = "The tornado chart ranks the inputs by their effect on the uncertainty. Green bars are inputs you can improve with national data; blue bars are IPCC coefficients. Focus your data work on the top green ones.",
+    fr = "Le graphique tornade classe les entrées selon leur effet sur l'incertitude. Les barres vertes sont des entrées améliorables avec des données nationales ; les barres bleues sont des coefficients GIEC. Concentrez votre travail de données sur les premières barres vertes."
   ),
   sens_output_var = list(en = "Output variable", fr = "Variable de sortie"),
   sens_total_co2e = list(en = "Total CO₂eq (all sources)",
@@ -1353,38 +1273,8 @@ lang_state_take <- function(token) {
   card_sens_rankings = list(en = "Sensitivity Rankings",
                               fr = "Classements de sensibilité"),
   info_trend_sens_what = list(
-    en = "Trend sensitivity has two complementary views. ",
-    fr = "La sensibilité de tendance comporte deux vues complémentaires. "
-  ),
-  info_trend_sens_per_year_label = list(en = "Latest year",
-                                           fr = "Dernière année"),
-  info_trend_sens_per_year_body = list(
-    en = ": which parameters dominate the uncertainty in the most recent year. ",
-    fr = " : quels paramètres dominent l'incertitude dans l'année la plus récente. "
-  ),
-  info_trend_sens_delta_label = list(en = "Change between first and last year",
-                                        fr = "Variation entre la première et la dernière année"),
-  info_trend_sens_delta_body = list(
-    en = ": which parameters drive the change between the first and last year (per IPCC Vol 1 Ch 3 §3.7). Bars are coloured by ",
-    fr = " : quels paramètres pilotent le changement entre la première et la dernière année (selon IPCC Vol 1 Ch 3 §3.7). Les barres sont colorées par "
-  ),
-  info_trend_sens_user_red = list(en = "user-reducibility",
-                                     fr = "réductibilité par l'utilisateur"),
-  info_trend_sens_legend = list(
-    en = " (same scheme as the single-year tornado): ",
-    fr = " (même schéma que le tornado annuel) : "
-  ),
-  info_trend_sens_green_note = list(
-    en = " = the user can improve uncertainty on this parameter with better local data; ",
-    fr = " = l'utilisateur peut améliorer l'incertitude de ce paramètre avec de meilleures données locales ; "
-  ),
-  info_trend_sens_grey_note = list(
-    en = " = IPCC coefficient (requires dedicated measurement research to improve). ",
-    fr = " = coefficient IPCC (nécessite de la recherche de mesure dédiée pour s'améliorer). "
-  ),
-  info_trend_sens_action = list(
-    en = "Focus your data improvement efforts on green-coloured parameters in the top 5: those give you the biggest uncertainty reduction with locally-collectible data.",
-    fr = "Concentrez vos efforts d'amélioration des données sur les paramètres verts du top 5 : ils donnent la plus grande réduction d'incertitude avec des données collectables localement."
+    en = "Two charts. 'Latest year' ranks the inputs behind that year's uncertainty. 'Change between first and last year' ranks the inputs behind the trend. Green bars are inputs you can improve with national data; grey bars are IPCC coefficients. Focus on the green ones in the top five.",
+    fr = "Deux graphiques. « Dernière année » classe les entrées derrière l'incertitude de cette année. « Variation entre la première et la dernière année » classe les entrées derrière la tendance. Les barres vertes sont des entrées améliorables avec des données nationales ; les barres grises sont des coefficients GIEC. Concentrez-vous sur les vertes du top 5."
   ),
   trend_sens_per_year_h = list(en = "What drives the uncertainty in the latest year",
                                   fr = "Ce qui pilote l'incertitude de la dernière année"),
@@ -1403,56 +1293,19 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_ipcc_report_intro = list(
-    en = "This page shows your uncertainty results formatted as IPCC Table 3.3, ready for your national inventory submission.",
-    fr = "Cette page montre vos résultats d'incertitude au format IPCC Tableau 3.3, prêts pour la soumission de votre inventaire national."
+    en = "Your results in the IPCC Table 3.3 format. AD uncertainty comes from the population, EF uncertainty from the emission factor, Combined from both. All are the half-width of the 95% interval as a percentage of the mean. For the IPCC Inventory Software, copy the AD and EF columns of the matching category rows; both are filled when decomposition was ticked on Tab 4.",
+    fr = "Vos résultats au format du Tableau 3.3 du GIEC. L'incertitude AD vient de la population, l'incertitude FE du facteur d'émission, Combinée des deux. Toutes sont la demi-largeur de l'intervalle à 95 % en pourcentage de la moyenne. Pour le logiciel d'inventaire GIEC, copiez les colonnes AD et FE des lignes de catégorie correspondantes ; les deux sont remplies si la décomposition était cochée à l'onglet 4."
   ),
-  info_ipcc_three_cols = list(en = "The table has three uncertainty columns: ",
-                                 fr = "Le tableau comporte trois colonnes d'incertitude : "),
   col_ad_uncert = list(en = "AD uncertainty (%)", fr = "Incertitude AD (%)"),
   col_ef_uncert = list(en = "EF uncertainty (%)", fr = "Incertitude FE (%)"),
   col_combined_uncert = list(en = "Combined uncertainty (%)",
                                 fr = "Incertitude combinée (%)"),
-  info_ipcc_pct_label = list(en = "% uncertainty",
-                                fr = "% d'incertitude"),
-  info_ipcc_pct_body = list(
-    en = " (half-width of the 95% CI ÷ mean × 100), following IPCC 2006 Vol. 1 Ch. 3 Table 3.3 conventions. AD = population/activity-data uncertainty only; EF = per-head emission factor uncertainty driven by the 23 IPCC coefficients; Combined = both sources together.",
-    fr = " (demi-largeur de l'IC 95 % ÷ moyenne × 100), suivant les conventions IPCC 2006 Vol. 1 Ch. 3 Tableau 3.3. AD = incertitude population/données d'activité uniquement ; FE = incertitude du facteur d'émission par tête, pilotée par les 23 coefficients IPCC ; Combinée = les deux sources ensemble."
-  ),
-  info_ipcc_xlsx_label = list(en = "'Download Excel Report'",
-                                  fr = "« Télécharger le rapport Excel »"),
-  info_ipcc_csv_label = list(en = "'Download CSV'",
-                                fr = "« Télécharger en CSV »"),
-  info_ipcc_xlsx_body = list(
-    en = " to get a complete workbook with all results, sensitivity rankings, run settings, and metadata. Click ",
-    fr = " pour obtenir un classeur complet avec tous les résultats, classements de sensibilité, paramètres d'exécution et métadonnées. Cliquez sur "
-  ),
-  info_ipcc_csv_body = list(en = " for a simpler file with uncertainty metrics only.",
-                              fr = " pour un fichier plus simple avec uniquement les métriques d'incertitude."),
-  info_ipcc_word_label = list(en = "'Download Word summary'",
-                                 fr = "« Télécharger le résumé Word »"),
-  info_ipcc_word_body = list(
-    en = " for the most complete output: a formatted narrative report with an executive summary, all the charts on this page, the full input record, and methodological notes, ready to adapt for your National Inventory Document.",
-    fr = " pour la sortie la plus complète : un rapport narratif mis en forme avec un résumé exécutif, tous les graphiques de cette page, l'enregistrement complet des entrées et des notes méthodologiques, prêt à adapter pour votre document d'inventaire national."
-  ),
-  info_ipcc_software_label = list(en = "Using these values in the IPCC Inventory Software:",
-                                     fr = "Utiliser ces valeurs dans le logiciel d'inventaire IPCC :"),
-  info_ipcc_software_body = list(
-    en = "the software's uncertainty worksheet asks for one AD uncertainty and one EF uncertainty per category, entered as a symmetric ±%. Copy the 'AD uncertainty (%)' and 'EF uncertainty (%)' values from the matching livestock category rows in the table below. Both columns are filled when 'Run uncertainty decomposition' was ticked on the Simulate tab.",
-    fr = "la feuille d'incertitude du logiciel demande une incertitude AD et une incertitude FE par catégorie, saisies en ±% symétrique. Copiez les valeurs « Incertitude AD (%) » et « Incertitude FE (%) » des lignes de catégorie d'élevage correspondantes du tableau ci-dessous. Les deux colonnes sont remplies lorsque « Lancer la décomposition d'incertitude » était coché sur l'onglet Simulation."
-  ),
-  info_ipcc_click_label = list(en = "Click ", fr = "Cliquez sur "),
-  ad_ef_convention_label = list(en = "AD vs EF column convention:",
-                                  fr = "Convention des colonnes AD vs FE :"),
-  ad_ef_convention_body = list(
-    en = "in this version, AD = population uncertainty only (N), and EF = the per-head emission factor uncertainty driven by the IPCC coefficients (live weight, feed quality, Ym, Bo, EF3_PRP, etc.). This matches IPCC Volume 1 Chapter 3 reporting conventions.",
-    fr = "dans cette version, AD = incertitude de population uniquement (N), et FE = incertitude du facteur d'émission par tête, pilotée par les coefficients IPCC (poids vif, qualité de l'alimentation, Ym, Bo, EF3_PRP, etc.). Cela correspond aux conventions de rapport IPCC Volume 1 Chapitre 3."
-  ),
   card_ipcc_table_h = list(en = "IPCC Table 3.3 - Uncertainty Report",
                               fr = "Tableau IPCC 3.3 : Rapport d'incertitude"),
   card_downloads_h = list(en = "Download reports", fr = "Télécharger les rapports"),
   downloads_intro = list(
-    en = "Export the run results: Excel for the full workbook with sensitivity / settings / metadata sheets, CSV for the bare uncertainty table, Word for the IPCC-style narrative summary.",
-    fr = "Exportez les résultats : Excel pour le classeur complet avec les feuilles sensibilité / paramètres / métadonnées, CSV pour le tableau d'incertitude brut, Word pour le résumé narratif au style IPCC."
+    en = "Excel: all results and settings. CSV: the table only. Word: the full report with charts, ready to adapt for your inventory document.",
+    fr = "Excel : tous les résultats et réglages. CSV : le tableau seul. Word : le rapport complet avec graphiques, prêt à adapter pour votre document d'inventaire."
   ),
   card_dist_per_source = list(en = "Uncertainty distributions per emission source",
                                 fr = "Distributions d'incertitude par source d'émission"),
@@ -1494,8 +1347,8 @@ lang_state_take <- function(token) {
   btn_download_docx = list(en = "Download Word summary",
                               fr = "Télécharger le résumé Word"),
   info_trend_report_what = list(
-    en = "This page gives what you report for a multi-year inventory: the two years IPCC asks for (base year and year t) in plain sentences, the IPCC reporting table for those two years, every year's total with its uncertainty, and what drives the uncertainty. The same content can be downloaded as Excel (several sheets), CSV (the year table) or Word (full report).",
-    fr = "Cette page donne ce qu'il faut déclarer pour un inventaire pluriannuel : les deux années demandées par le GIEC (année de base et année t) en phrases simples, le tableau de déclaration GIEC pour ces deux années, le total de chaque année avec son incertitude, et ce qui pilote l'incertitude. Le même contenu se télécharge en Excel (plusieurs feuilles), CSV (le tableau des années) ou Word (rapport complet)."
+    en = "What you report for several years: the base year and year t in plain sentences, the IPCC table for those two years, every year's total with its uncertainty, and what drives it. Pick the two years below. Downloads: Excel, CSV or Word.",
+    fr = "Ce que vous déclarez pour plusieurs années : l'année de base et l'année t en phrases simples, le tableau GIEC pour ces deux années, le total de chaque année avec son incertitude, et ce qui la pilote. Choisissez les deux années ci-dessous. Téléchargements : Excel, CSV ou Word."
   ),
   # ---- Trend: what to report (2026-10-22) ----------------------------------
   trend_report_h = list(en = "What to report", fr = "Ce qu'il faut déclarer"),
@@ -1587,13 +1440,9 @@ lang_state_take <- function(token) {
   # CONTACT TAB
   # =====================================================================
 
-  contact_intro_label = list(
-    en = "We welcome feedback, bug reports, feature suggestions, and methodology questions.",
-    fr = "Nous accueillons vos retours, signalements de bugs, suggestions de fonctionnalités et questions sur la méthodologie."
-  ),
   contact_intro_body = list(
-    en = "Submissions are sent to the development team. We aim to reply within a few working days.",
-    fr = "Les soumissions sont envoyées à l'équipe de développement. Nous visons à répondre dans quelques jours ouvrables."
+    en = "Send feedback, bug reports or methodology questions. The team replies within a few working days.",
+    fr = "Envoyez vos retours, signalements de bogues ou questions de méthode. L'équipe répond sous quelques jours ouvrés."
   ),
   card_contact_send = list(en = "Send us a message", fr = "Envoyez-nous un message"),
   card_contact_helps = list(en = "What kind of feedback helps most",
