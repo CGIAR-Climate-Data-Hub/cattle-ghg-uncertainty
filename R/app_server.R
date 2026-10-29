@@ -163,7 +163,29 @@ app_server <- function(input, output, session) {
   # T1.1 fix: when the user has a custom upload loaded and re-touches the country
   # dropdown, ask before overwriting. Otherwise load the example silently.
   observeEvent(input$country, {
-    if (!input$country %in% c("country_x", "country_y")) return()  # "custom" is a no-op
+    if (!input$country %in% c("country_x", "country_y")) {
+      # 2026-10-29 (Lolita): moving to Custom Upload (or back to the
+      # placeholder) after an example clears that example, so the page is
+      # the controls alone until a file is uploaded. A custom upload stays.
+      if (!isTRUE(rv$has_custom_upload) && !is.null(rv$param_specs)) {
+        rv$param_specs  <- NULL
+        rv$inv_metadata <- NULL
+        rv$manure_data  <- NULL
+        rv$population   <- NULL
+        rv$corr_matrix  <- NULL
+        .qa_reset_caveats()
+        rv$ts_available    <- FALSE
+        rv$manual_uploaded <- FALSE
+        rv$upload_status   <- NULL
+        # results of the cleared example would export its inputs
+        rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
+        rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
+        rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+        rv$diagnostics <- NULL
+        rv$sim_view <- "settings"
+      }
+      return()
+    }
     if (isTRUE(rv$has_custom_upload)) {
       showModal(modalDialog(
         title = "Discard custom upload?",
