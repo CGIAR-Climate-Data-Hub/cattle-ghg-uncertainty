@@ -2006,40 +2006,19 @@ app_ui <- function(request = NULL) {
                       tagList(tags$strong(t("n_year_none")),
                               tags$div(class = "small text-muted", t("n_year_none_help")))),
                     choiceValues = c("full", "partial", "none"), selected = "none"),
-                  tags$div(class = "small", style = "color:#1B4332;", tags$em(t("n_year_rule"))),
                   hr(),
-              radioButtons("year_corr", width = "100%",
-                            label = tagList(
-                              paste0(t("coef_year_label"), " "),
-                              bslib::tooltip(
-                                span(icon("circle-question"),
-                                     style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                                "How should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, …) move from one year to the next within a single Monte Carlo iteration? IPCC V1 Ch3 §3.2.3 (Trend section) says emission factors are typically estimated once and reused across years, so the default is full correlation. Activity data (N, BW, Milk, …) are always re-estimated each year regardless of this setting.",
-                                placement = "right"
-                              )
-                            ),
-                            choices = c(
-                              "Fully correlated coefficients (IPCC 2019 default)" = "full",
-                              "Partial (AR(1), ρ=0.7)"                       = "partial",
-                              "Independent (no year-to-year correlation)"         = "none"),
-                            selected = "full"),
-              div(class = "small text-muted",
-                  style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
-                  tags$ul(style = "padding-left:18px; margin:0;",
-                    tags$li(tags$strong("Fully correlated coefficients (IPCC 2019 default)"),
-                            ": same coefficient draw is reused for every year within one Monte Carlo iteration. ",
-                            "Trend uncertainty then reflects only the year-to-year changes in your activity data ",
-                            "(N, BW, Milk, …); coefficient uncertainty cancels because Ym is the same in 2010 and 2022. ",
-                            tags$em("Pick this if your emission factors are IPCC defaults or come from a single estimation programme reused across the whole inventory series.")),
-                    tags$li(tags$strong("Partial (AR(1), ρ=0.7)"),
-                            ": coefficient draws drift slowly between years (last year's value gets 70% weight, a fresh draw 30%). ",
-                            tags$em("Pick this if your emission factors are re-estimated periodically but neighbouring years share most of the same observational basis "),
-                            "- e.g. your country reviewed Ym every 5 years and the value drifted slightly each time."),
-                    tags$li(tags$strong("Independent (no year-to-year correlation)"),
-                            ": coefficient draws are sampled fresh each year. Maximises the EF contribution to trend uncertainty. ",
-                            tags$em("Pick this only if you genuinely re-measured every emission factor every year with fully new field data "),
-                            "- rarely realistic for a national inventory.")
-                  ))
+                  # 2026-10-30 (Lolita): plain words, the help under each option,
+                  # no technical names (AR(1), rho) and no "default" label.
+                  radioButtons("year_corr", width = "100%",
+                    label = t("coef_year_label"),
+                    choiceNames = list(
+                      tagList(tags$strong(t("coef_year_full")),
+                              tags$div(class = "small text-muted", t("coef_year_full_help"))),
+                      tagList(tags$strong(t("coef_year_partial")),
+                              tags$div(class = "small text-muted", t("coef_year_partial_help"))),
+                      tagList(tags$strong(t("coef_year_none")),
+                              tags$div(class = "small text-muted", t("coef_year_none_help")))),
+                    choiceValues = c("full", "partial", "none"), selected = "full")
                 )
               )
             )

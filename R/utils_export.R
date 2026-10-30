@@ -312,6 +312,6 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
            partial = "partly (0.5)", none = "separate counts per group (independent)", as.character(code))
   else
     switch(as.character(code), full = "one census, interpolated (fully correlated)",
-           partial = "census every few years (AR(1), 0.7)", none = "annual survey (independent)",
+           partial = "census every few years (partly correlated)", none = "annual survey (independent)",
            as.character(code))
 }

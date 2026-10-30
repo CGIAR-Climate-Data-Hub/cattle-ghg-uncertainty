@@ -184,7 +184,7 @@ trend_ipcc_table <- function(res, base_year, year_t, gwp = "AR5",
   ef <- if (!is.null(decomp)) decomp$ef_only else NULL
   yc <- switch(year_corr %||% "full",
                full    = "coefficients fully correlated between years",
-               partial = "coefficients partially correlated between years (AR(1), rho 0.7)",
+               partial = "coefficients partly correlated between years (factors revised every few years)",
                none    = "coefficients independent between years",
                year_corr)
   n_src <- sum(cmp$is_source)

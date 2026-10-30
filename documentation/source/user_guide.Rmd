@@ -207,7 +207,7 @@ An option you cannot use is greyed out, with a short note saying why. For exampl
 
 ## What change in the result should I expect?
 
-The central estimate (the mean emissions) stays the same whichever mode you pick. What changes is the width of the 95% uncertainty interval. As a rule of thumb, for a typical single-year cattle inventory:
+The central estimate (the mean emissions) stays the same whichever mode you pick. What changes is the width of the 95% uncertainty interval. For a typical single-year cattle inventory:
 
 - **No correlations**: the baseline. Every parameter is drawn independently.
 - **Structural defaults**: the interval changes by about one percentage point or less on the examples (Country X 25.3% to 25.2%; Country Y 36.5% to 37.5%). The effect is small because the preset links only 7 pairs out of about 78 possible pairs, with moderate values.
@@ -273,9 +273,7 @@ The last card on Tab 3 asks two things about your animal numbers. Both answer th
 
 - **One census, with the years in between filled in.** A census every five or ten years, the other years estimated from it. The same census error is kept for all years, so it cancels when two years are compared, and the trend is less uncertain.
 - **A census every few years, adjusted in between.** The middle case.
-- **A new survey every year** (IPCC default). Each year's number is a fresh count. Nothing cancels, and the trend is at its most uncertain. Choose this only if you really count every year.
-
-Rule of thumb: if your yearly numbers come from a growth rate applied to an old census, choose the first.
+- **A new survey every year.** Each year's number is a fresh count. Nothing cancels, and the trend is at its most uncertain. Choose this only if you really count every year.
 
 What changes: the first question changes the uncertainty of each year's total; the second changes the uncertainty of the trend; neither changes the mean. On the Zambia inventory (32 groups) the total 95% margin of error is 32.5% with separate counts, 40.1% partly and 47.1% with one count split; in trend mode the 95% range of the trend is about ±70 points with a new survey every year and about ±3 points with one census interpolated, with the coefficients fully correlated between years.
 
@@ -312,11 +310,11 @@ Why does it matter? Suppose your country uses the same emission factors for the 
 
 The three options:
 
-- **Fully correlated coefficients (IPCC 2019 default)**: one draw of each coefficient is reused for every year. Pick this if your emission factors are IPCC defaults or come from one national study used for the whole series. This is the IPCC recommendation.
-- **Partial (AR(1), rho = 0.7)**: the coefficients drift slowly from year to year (70% of last year's value, 30% fresh). Pick this if your factors are re-estimated every few years and neighbouring years share most of the same data.
-- **Independent**: the coefficients are drawn afresh every year. This gives the largest trend uncertainty. Pick it only if you really re-measured every emission factor every year with new field data, which is rare for a national inventory.
+- **The same factors for every year.** Your emission factors are IPCC defaults, or come from one national study used for every year. A factor's error is then the same in every year, so it cancels when two years are compared, and the trend is less uncertain.
+- **Factors revised every few years.** Your factors are revised from time to time, and nearby years mostly rely on the same data. The error changes slowly from year to year and cancels only in part.
+- **New factors every year.** Each year's factors were measured anew with new field data. Each year's error is new, so nothing cancels, and the trend is at its most uncertain. Choose this only if that is really how your factors were made.
 
-A practical check: run the trend once with "Fully correlated" and once with "Independent". If the two trend uncertainties are similar, your result does not depend on this choice. If they are very different, the emission factors dominate your trend uncertainty, and your inventory report should say which assumption you used.
+A practical check: run the trend once with "The same factors for every year" and once with "New factors every year". If the two trend uncertainties are similar, your result does not depend on this choice. If they are very different, the emission factors dominate your trend uncertainty, and your inventory report should say which assumption you used.
 
 Trend mode runs one full simulation per year. Two counts are set on Tab 4: the iterations per year (2,000 by default, enough for the yearly chart and the trend line) and the draws for the base year and the reported year (10,000 by default, the same as a single-year run; these two years give the headline figures and the IPCC table).
 

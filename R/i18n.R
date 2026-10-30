@@ -1832,13 +1832,34 @@ lang_state_take <- function(token) {
   n_year_partial_help = list(
     en = "Regular counts, and the years in between updated with new information. The middle case.",
     fr = "Des comptages réguliers, et les années intermédiaires mises à jour avec de nouvelles informations. Le cas intermédiaire."),
-  n_year_none = list(en = "A new survey every year (IPCC default)",
-                     fr = "Une nouvelle enquête chaque année (défaut GIEC)"),
+  n_year_none = list(en = "A new survey every year",
+                     fr = "Une nouvelle enquête chaque année"),
   n_year_none_help = list(
     en = "Each year's number is a fresh count. Each year's error is new, so nothing cancels, and the trend is at its most uncertain. Choose this only if you really count every year.",
     fr = "Le nombre de chaque année est un nouveau comptage. Chaque erreur est nouvelle, rien ne s'annule, et la tendance est au plus incertain. Choisissez ceci seulement si vous comptez vraiment chaque année."),
-  n_year_rule = list(en = "Rule of thumb: if your yearly numbers come from a growth rate applied to an old census, choose the first.",
-                     fr = "Règle simple : si vos effectifs annuels viennent d'un taux de croissance appliqué à un ancien recensement, choisissez la première option."),
+  coef_year_label = list(en = "Between years (trend only): how were your emission factors and coefficients made?",
+                         fr = "Entre années (tendance seulement) : comment vos facteurs d'émission et coefficients ont-ils été obtenus ?"),
+  coef_year_full = list(en = "The same factors for every year",
+                        fr = "Les mêmes facteurs pour toutes les années"),
+  coef_year_full_help = list(
+    en = "Your emission factors are IPCC defaults, or come from one national study used for every year. A factor's error is then the same in every year, so it cancels when two years are compared, and the trend is less uncertain.",
+    fr = "Vos facteurs d'émission sont des valeurs GIEC par défaut, ou viennent d'une étude nationale utilisée pour toutes les années. L'erreur d'un facteur est alors la même chaque année, elle s'annule quand on compare deux années, et la tendance est moins incertaine."),
+  coef_year_partial = list(en = "Factors revised every few years",
+                           fr = "Facteurs révisés tous les quelques années"),
+  coef_year_partial_help = list(
+    en = "Your factors are revised from time to time, and nearby years mostly rely on the same data. The error changes slowly from year to year and cancels only in part.",
+    fr = "Vos facteurs sont révisés de temps en temps, et les années proches reposent surtout sur les mêmes données. L'erreur change lentement d'une année à l'autre et ne s'annule qu'en partie."),
+  coef_year_none = list(en = "New factors every year",
+                        fr = "De nouveaux facteurs chaque année"),
+  coef_year_none_help = list(
+    en = "Each year's factors were measured anew with new field data. Each year's error is new, so nothing cancels, and the trend is at its most uncertain. Choose this only if that is really how your factors were made.",
+    fr = "Les facteurs de chaque année ont été mesurés à nouveau avec de nouvelles données de terrain. Chaque erreur est nouvelle, rien ne s'annule, et la tendance est au plus incertain. Choisissez ceci seulement si c'est vraiment ainsi que vos facteurs ont été obtenus."),
+
+  # Correlations TS status messages (server-rendered)
+  corr_ts_no_data = list(
+    en = " No time-series data in the loaded inventory. To enable auto-correlation, upload a template with a populated ",
+    fr = " Aucune donnée de séries temporelles dans l'inventaire chargé. Pour activer l'auto-corrélation, téléversez un modèle avec une feuille "
+  ),
   corr_ts_param_ts = list(en = "Parameter_TimeSeries", fr = "Parameter_TimeSeries"),
   corr_ts_no_data_tail = list(
     en = " sheet, or load Country X / Country Y from the dropdown (both ship with example time-series).",
