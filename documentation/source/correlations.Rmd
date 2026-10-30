@@ -8,317 +8,165 @@ output:
     mathjax: null
     includes:
       in_header: _head_correlations.html
-    pandoc_args: ["--metadata=title:Parameter Correlations in Monte Carlo GHG Inventory Uncertainty Analysis | Cattle GHG Uncertainty Calculator Help"]
+    pandoc_args: ["--metadata=title:Correlations between inputs | Cattle GHG Uncertainty Calculator Help"]
 params:
   cache_dir: "www/docs/_cache"
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
-                      dev = "png", dpi = 110)
-runs <- readRDS(file.path(params$cache_dir, "correlations_runs.rds"))
-
-.compare_country <- function(cn) {
-  modes <- c("none", "preset", "timeseries", "manual")
-  out <- do.call(rbind, lapply(modes, function(md) {
-    r <- runs[[paste(cn, md, sep = "_")]]$summary
-    co2e <- r[r$variable == "total_co2e", ]
-    data.frame(
-      Mode      = c(none = "No correlations",
-                    preset = "Structural defaults",
-                    timeseries = "Time-series (auto)",
-                    manual = "Manual (example template)")[md],
-      Mean_t    = round(co2e$mean, 0),
-      CI_low_t  = round(co2e$lo, 0),
-      CI_high_t = round(co2e$hi, 0),
-      MoE_pct   = round(co2e$moe_pct, 1),
-      stringsAsFactors = FALSE
-    )
-  }))
-  rownames(out) <- NULL
-  out
-}
-.fmt_t <- function(x) format(round(x), big.mark = ",")
-
-# Iman–Conover for small inline scatter plots. Pure R, no app dependencies,
-# fast on n = 1000.
-.ic_pair <- function(n, rho, marg1 = rnorm, marg2 = rnorm) {
-  x1 <- marg1(n); x2 <- marg2(n)
-  z  <- MASS::mvrnorm(n, mu = c(0, 0),
-                       Sigma = matrix(c(1, rho, rho, 1), 2, 2))
-  # rank-match each marginal to the ranks in z
-  data.frame(x = x1[rank(z[, 1])], y = x2[rank(z[, 2])])
-}
-```
-
-This page describes how correlations between input parameters affect Monte Carlo simulation results in the tool, what the correlation settings on the Simulate tab control, and how to interpret each option using two worked examples.
-
-The principle: when two input parameters tend to move together in nature, the Monte Carlo sampler should reproduce that joint behaviour. Sampling them independently when they are correlated produces parameter combinations that do not occur in real systems, which biases the spread (though not the central estimate) of the simulated emissions distribution.
-
-## Visualising correlation
-
-Consider two parameters, with 1000 Monte Carlo samples of each, plotted as a scatter cloud: one point per iteration, the first parameter on the x-axis and the second on the y-axis. The three panels below show the same two marginal distributions under different correlation strengths:
-
-```{r fig-scatter-normals, fig.width = 9, fig.height = 3.2, fig.alt = "Three scatter plots showing independent, positively, and negatively correlated bivariate normal samples"}
-set.seed(7)
-par(mfrow = c(1, 3), mar = c(3.2, 3.2, 2.6, 0.6), mgp = c(2, 0.7, 0))
-for (rho in c(0, 0.7, -0.7)) {
-  z <- MASS::mvrnorm(1000, mu = c(0, 0),
-                      Sigma = matrix(c(1, rho, rho, 1), 2, 2))
-  ttl <- if (rho == 0) "ρ = 0    (independent)"
-         else if (rho > 0) sprintf("ρ = +%.1f  (move together)", rho)
-         else sprintf("ρ = %.1f  (move opposite)", rho)
-  plot(z, pch = 16, col = adjustcolor("#2D6A4F", 0.4),
-       cex = 0.5, xlab = "parameter 1", ylab = "parameter 2",
-       main = ttl, cex.main = 0.95, cex.lab = 0.85, cex.axis = 0.8,
-       xlim = c(-3.5, 3.5), ylim = c(-3.5, 3.5), asp = 1)
-  abline(h = 0, v = 0, col = "grey85")
-}
-```
-
-In the centre panel, when parameter 1 takes a high value, parameter 2 tends to be high as well. The cloud tilts upward. In the right-hand panel the relationship is reversed: high values of parameter 1 occur with low values of parameter 2, and the cloud tilts downward.
-
-The marginal distribution of each parameter is identical across all three panels: the same range on each axis. Correlation does not change the distribution of either parameter on its own; it changes only which combinations of values occur together.
-
-## Preserving marginal distributions (Iman–Conover method)
-
-Real inventory parameters rarely follow symmetric normal distributions. Body weight is approximately symmetric, milk yield has a long right tail, and the methane conversion factor Y~m~ is bounded between approximately 5% and 8%. A bivariate-normal sampler with a target correlation cannot reproduce these shapes.
-
-The tool uses the Iman–Conover procedure (Iman & Conover 1982; IPCC 2006 Vol.1 Ch.3 §3.2.3.2). Each parameter is sampled from its specified marginal distribution (PERT, normal, lognormal, beta, etc.: as set in the Parameters sheet), and the samples are then re-ordered so that the *rank* correlation across pairs matches the target. The marginal distribution of each parameter is preserved exactly; only the joint pattern of ranks changes.
-
-The following panels show two parameters with identical right-skewed Beta distributions, sampled independently (left) and with rank correlation ρ = −0.5 imposed via Iman–Conover (right):
-
-```{r fig-iman-conover, fig.width = 8, fig.height = 4.2, fig.alt = "Two scatter plots showing two Beta-distributed parameters under independence and under negative rank correlation"}
-set.seed(13)
-n <- 1500
-marg <- function(n) qbeta(runif(n), 2, 5)  # right-skewed
-ind  <- data.frame(x = marg(n), y = marg(n))
-ic   <- .ic_pair(n, rho = -0.5, marg, marg)
-par(mfrow = c(1, 2), mar = c(3.5, 3.5, 2.6, 0.6), mgp = c(2, 0.7, 0))
-plot(ind, pch = 16, col = adjustcolor("#2D6A4F", 0.4), cex = 0.5,
-     xlab = "parameter 1", ylab = "parameter 2",
-     main = "Independent (ρ = 0)", cex.main = 0.95, cex.lab = 0.9,
-     xlim = c(0, 1), ylim = c(0, 1), asp = 1)
-plot(ic,  pch = 16, col = adjustcolor("#C0392B", 0.4), cex = 0.5,
-     xlab = "parameter 1", ylab = "parameter 2",
-     main = "Iman–Conover, ρ = −0.5", cex.main = 0.95, cex.lab = 0.9,
-     xlim = c(0, 1), ylim = c(0, 1), asp = 1)
-```
-
-The right-hand cloud tilts downward, but the lopsided shape of each marginal axis is unchanged. This is the defining property of the Iman–Conover procedure: marginal distributions are preserved exactly, and only the joint pattern of ranks is modified.
-
-## Implications for the IPCC equations
-
-Several pairs of IPCC Tier 2 input parameters are biologically correlated. A familiar example is the link between digestible energy (`DE`) and the methane conversion factor `Ym`: the IPCC 2019 Refinement (Table 10.12) assigns a lower `Ym` to more digestible diets. The two parameters enter the enteric-CH~4~ equation as a product, so the joint behaviour of `DE × Ym` directly shapes the emissions distribution.
-
-When `DE` and `Ym` are sampled independently, a non-trivial share of Monte Carlo iterations falls on combinations that are not biologically plausible: for example, very high `DE` paired with very high `Ym`. The product is then artificially inflated in those iterations, widening the right tail of the resulting CH~4~ distribution.
-
-For illustration, imposing a strong negative correlation (ρ = −0.5) between `DE` and `Ym` excludes the implausible combinations and changes the shape of the product distribution as follows (the preset itself uses −0.20 for this pair, see the seven pairs below):
-
-```{r fig-de-ym-product, fig.width = 8, fig.height = 3.6, fig.alt = "Two histograms showing the DE x Ym product under independence and under negative correlation"}
-set.seed(31)
-n <- 5000
-# PERT-ish samples around Country X central values
-de_marg <- function(n) mc2d::rpert(n, min = 40, mode = 55, max = 70, shape = 4)
-ym_marg <- function(n) mc2d::rpert(n, min = 5.5, mode = 6.5, max = 7.5, shape = 4)
-ind <- data.frame(de = de_marg(n), ym = ym_marg(n))
-cor <- .ic_pair(n, rho = -0.5, de_marg, ym_marg)
-names(cor) <- c("de", "ym")
-prod_ind <- ind$de * ind$ym
-prod_cor <- cor$de * cor$ym
-xlim <- range(c(prod_ind, prod_cor))
-par(mfrow = c(1, 2), mar = c(3.7, 3.7, 2.5, 0.6), mgp = c(2.2, 0.7, 0))
-hist(prod_ind, breaks = 50, col = "#94A3B8", border = "white",
-     freq = FALSE, xlim = xlim, ylim = c(0, 0.012),
-     main = "DE × Ym: independent",
-     xlab = "DE × Ym", ylab = "density",
-     cex.main = 0.95, cex.lab = 0.9)
-abline(v = mean(prod_ind), col = "black", lwd = 2, lty = 2)
-hist(prod_cor, breaks = 50, col = "#2D6A4F", border = "white",
-     freq = FALSE, xlim = xlim, ylim = c(0, 0.012),
-     main = "DE × Ym: correlated ρ = −0.5",
-     xlab = "DE × Ym", ylab = "density",
-     cex.main = 0.95, cex.lab = 0.9)
-abline(v = mean(prod_cor), col = "black", lwd = 2, lty = 2)
-```
-
-Two observations follow from the figure:
-
-First, the means of the two histograms (dashed vertical lines) are essentially identical. By construction, the Iman–Conover procedure preserves each marginal distribution, including its mean, so imposing correlation does not shift the central estimate of any function of those parameters.
-
-Second, the right-hand histogram is narrower. The negative correlation suppresses the implausible high-`DE`/high-`Ym` combinations that would otherwise produce extreme values of the product, reducing the spread. Positive correlations between parameters that enter a product have the opposite effect: they widen the spread by clustering extremes in the same direction.
-
-Within the full IPCC Tier 2 equation chain, the structural-defaults preset applies seven such correlations alongside roughly a dozen independent inputs. The individual effects partially cancel, and the net result on the 95% margin of error of total CO~2~eq is typically a few percentage points. The mean of the total is preserved.
-
-## Country X (smallholder dairy)
-
-Country X is the built-in dairy example: 500,000 head, milking cows on improved pasture and concentrate supplement, with `DE ≈ 55%`, `Milk ≈ 4 kg per lactating cow per day`, and `Ym ≈ 6.5%`. Diet quality and methane conversion both vary substantially across the herd, which is the condition under which the `DE ↔ Ym` correlation has the largest effect on the simulated emissions distribution.
-
-Each row in the table below is a full 3000-iteration simulation of Country X. Only the correlation mode varies between rows.
-
-```{r tbl-x}
-tx <- .compare_country("country_x")
-knitr::kable(
-  data.frame(
-    Mode = tx$Mode,
-    `Mean total CO₂eq (t)` = .fmt_t(tx$Mean_t),
-    `95% CI lower (t)`     = .fmt_t(tx$CI_low_t),
-    `95% CI upper (t)`     = .fmt_t(tx$CI_high_t),
-    `95% MoE (%)`          = sprintf("%.1f", tx$MoE_pct),
-    check.names = FALSE
-  ),
-  align = c("l", "r", "r", "r", "r")
-)
-```
-
-The mean total CO~2~eq is constant across the four modes to within Monte Carlo sampling noise. The 95% margin of error changes by about one percentage point or less when the structural-defaults preset is applied: the seven pairs are moderate (0.20 to 0.50 in absolute value), pull in different directions, and partially cancel.
-
-The same comparison can be reproduced directly on a user-supplied inventory: enabling the "Compare with/without correlations" option on the Simulate tab produces a side-by-side bar chart of the 95% margin of error with the selected correlation mode (green bars) and with all correlations disabled (grey bars).
-
-## Country Y (extensive pastoral, no dairy)
-
-Country Y is 2.4 million head of beef cattle on rangeland. `DE` is lower (around 50%, with a wider uncertainty bound), milk yield is essentially zero (calves only), and the population is dominated by adult animals on year-round grazing.
-
-```{r tbl-y}
-ty <- .compare_country("country_y")
-knitr::kable(
-  data.frame(
-    Mode = ty$Mode,
-    `Mean total CO₂eq (t)` = .fmt_t(ty$Mean_t),
-    `95% CI lower (t)`     = .fmt_t(ty$CI_low_t),
-    `95% CI upper (t)`     = .fmt_t(ty$CI_high_t),
-    `95% MoE (%)`          = sprintf("%.1f", ty$MoE_pct),
-    check.names = FALSE
-  ),
-  align = c("l", "r", "r", "r", "r")
-)
-```
-
-The preset operates the same way in Country Y as in Country X. The absolute margins of error are wider here across all four modes because each individual parameter has wider uncertainty bounds in a less-surveyed pastoral system. The relative effect of switching correlations on: a few percentage points of additional MoE, is comparable to Country X: the underlying biological mechanism is identical, and only the per-parameter uncertainty differs.
-
-The headline shift in both countries is shown side by side below:
-
-```{r fig-country-shift, fig.width = 7, fig.height = 3.5, fig.alt = "Bar chart comparing 95% MoE under no correlations vs structural-defaults preset, for Country X and Country Y"}
-x_none   <- runs$country_x_none$summary
-x_preset <- runs$country_x_preset$summary
-y_none   <- runs$country_y_none$summary
-y_preset <- runs$country_y_preset$summary
-get_moe <- function(s) s[s$variable == "total_co2e", "moe_pct"]
-df <- data.frame(
-  country = rep(c("Country X (dairy)", "Country Y (pastoral)"), each = 2),
-  mode    = rep(c("No correlations", "Structural defaults"), 2),
-  moe     = c(get_moe(x_none), get_moe(x_preset),
-              get_moe(y_none), get_moe(y_preset))
-)
-par(mar = c(2.6, 4, 2.2, 0.6), mgp = c(2.6, 0.7, 0))
-bp <- barplot(matrix(df$moe, ncol = 2), beside = TRUE,
-              names.arg = c("Country X (dairy)", "Country Y (pastoral)"),
-              col = c("#94A3B8", "#2D6A4F"),
-              border = "white", ylab = "95% MoE on total CO₂eq (%)",
-              ylim = c(0, max(df$moe) * 1.2), cex.names = 0.95,
-              cex.axis = 0.85, cex.lab = 0.9)
-text(bp, df$moe + max(df$moe) * 0.04, sprintf("%.1f%%", df$moe),
-     cex = 0.85, font = 2)
-legend("topleft", fill = c("#94A3B8", "#2D6A4F"),
-       legend = c("No correlations", "Structural defaults"),
-       border = NA, bty = "n", cex = 0.85)
-```
+<!-- 2026-10-30: rewritten from Lolita's edited Word drafts (correlations_guide_v2/v3). The worked example uses
+     a real national inventory, unnamed on request; its figures come from C:/tmp/g.R (log
+     C:/tmp/shots/guide_grid_2026-10-30.log). The screenshots are from the app of 30 October. -->
 
-## The seven pairs in the structural-defaults preset
+This guide explains, step by step, what correlations are and why they matter for your uncertainty analysis. It then shows where to set them in the tool, what each choice means, and what each choice changes in the results of a real inventory.
 
-The "Structural defaults" mode applies seven parameter-pair correlations. The values are literature-based: the direction of each link comes from the IPCC equations and published studies, and the size was set by the project team from the evidence listed; the IPCC publishes no numerical correlation coefficients for these pairs. Each pair, its ρ value, the biological reason and the references are listed below (the same text appears when you hover a cell of the heatmap in the app):
+## 1. What is a correlation?
 
-- **BW ↔ MW** (ρ = +0.50). Live weight and mature weight enter the IPCC net-energy-for-growth equation together, and animals of larger breeds are heavier at every age and have a larger mature weight. Set below the same-survey value because MW is usually a breed-reference constant while BW comes from the census; when both come from the same survey, 0.8 to 0.9 can be set via the manual matrix. IPCC 2006 Eq 10.6; IPCC 2019 Table 10A.2.
+Two inputs are **correlated** when they tend to move together. The correlation is **positive** when one input goes up and the other tends to go up as well: heavier cows, for example, tend to give more milk. It is **negative** when one input goes up and the other tends to go down: when cows give more milk, the fat content of that milk tends to be lower. When knowing one input tells you nothing about the other, there is **no correlation**.
 
-- **BW ↔ WG** (ρ = +0.40). Live weight and daily gain enter the same equation, and well-fed animals are both heavier and gain faster; the sign can reverse for young stock approaching mature size. IPCC 2006 Eq 10.6; Mehrban et al. 2021 (Animal Bioscience 34:824–832, phenotypic correlation 0.49 to 0.63 in 15,279 cattle); IPCC 2019 Table 10A.2.
+The strength of a correlation is a number between −1 and +1. A value of 0 means there is no link. A value of +1 means the two inputs always move together, and −1 means they always move in opposite directions. Most links between livestock inputs are weak to moderate, between 0.2 and 0.5 (or between −0.2 and −0.5).
 
-- **Milk ↔ Fat** (ρ = −0.30). Dilution effect: as milk yield rises, fat yield rises less than proportionally, so the fat percentage falls. Boujenane 2002 (−0.28 in 20,140 Holstein-Friesian lactations); Nistor et al. 2011 (−0.26 in 120 cows); IPCC 2019 Table 10A.1 (−0.30 across nine regions).
+**Why it matters.** The tool tests thousands of possible combinations of your inputs. If two inputs are linked in reality, but the tool picks their values independently, it builds combinations that do not exist, for example a very light cow with a very high milk yield. Such combinations do not change the average emissions. They change how wide the uncertainty range is.
 
-- **Milk ↔ BW** (ρ = +0.30). Larger dairy breeds and more intensive systems have both heavier cows and higher milk yields; within one breed the link is weak. IPCC 2019 Table 10A.1 (0.84 across regions); Berry and Evans 2022 (JDS Communications 3:32–37, the heaviest quarter of 16,980 cows yields only 3 to 4% more); Berry et al. 2003 (J. Dairy Sci. 86:2193–2204). A single-breed herd may use 0.10 to 0.20.
+## 2. Seeing a correlation
 
-- **Milk ↔ DE** (ρ = +0.30). More digestible feed gives more net energy per kg of feed and supports higher milk yield. NRC 2001 Ch. 2 (Energy); IPCC 2019 Table 10A.1 (0.65 across regions); no within-system coefficient is published.
+Figure 1 shows the same two inputs three times. Each dot is one combination of values: one value of input 1 (across) and one value of input 2 (up). There are 1,000 dots in each panel.
 
-- **DE ↔ CP** (ρ = +0.20). Within one forage, digestibility and crude protein fall together as the plant matures; across different feeds the link is weak, because protein and digestibility depend on different things (plant family, plant part, processing). INRAE-CIRAD-AFZ feed tables 2018 (feedtables.com: r = −0.07 over 193 plant feed materials); Feedipedia (0.1 to 0.2 over 82 forages with measured digestibility). Use 0.3 to 0.5 when the uncertainty is mainly about forage maturity.
+![Figure 1. Two inputs with no correlation (left), a positive correlation (centre) and a negative correlation (right).](img/corr/fig1_three_panels.png){width=100%}
 
-- **DE ↔ Y~m~** (ρ = −0.20). IPCC Table 10.12 assigns a lower Y~m~ to more digestible diets, mainly because high digestibility goes with high feeding level and grain-rich rations, which shift rumen fermentation and speed up passage; within forage-based diets, methane per unit of energy changes little with digestibility or rises slightly. IPCC 2019 Table 10.12; Ramin and Huhtanen 2013 (J. Dairy Sci. 96:2476–2493); Johnson and Johnson 1995 (J. Anim. Sci. 73:2483–2492). The value suits forage-based systems; use −0.3 to −0.5 for high-grain dairy or feedlot systems.
+On the left, there is no correlation: the dots form a round cloud, and a high value of input 1 can come with any value of input 2. In the centre, the correlation is positive: when input 1 is high, input 2 also tends to be high, and the cloud tilts upward. On the right, the correlation is negative: when input 1 is high, input 2 tends to be low, and the cloud tilts downward.
 
-The structure of the preset matrix is visualised below:
+In the three panels, each input has exactly the same values: the same spread on each axis. The correlation does not change the values of either input. It only changes which values come together.
 
-```{r preset-heatmap, fig.width = 8, fig.height = 6, fig.alt = "Heatmap of the seven structural-defaults correlation pairs"}
-m <- runs$country_x_preset$ad_corr_matrix %||% runs$country_x_preset$corr_matrix
-if (!is.null(m)) {
-  off_diag <- m; diag(off_diag) <- 0
-  has_corr <- rowSums(abs(off_diag)) > 0 | colSums(abs(off_diag)) > 0
-  if (sum(has_corr) >= 2) m <- m[has_corr, has_corr]
-  par(mar = c(5, 5, 1, 1))
-  image(seq_len(ncol(m)), seq_len(nrow(m)), base::t(m[nrow(m):1, ]),
-        zlim = c(-1, 1), axes = FALSE, xlab = "", ylab = "",
-        col = colorRampPalette(c("#C0392B", "white", "#2D6A4F"))(99))
-  axis(1, at = seq_len(ncol(m)), labels = colnames(m), las = 2, cex.axis = 0.9)
-  axis(2, at = seq_len(nrow(m)), labels = rownames(m)[nrow(m):1], las = 1,
-       cex.axis = 0.9)
-  for (i in seq_len(nrow(m))) for (j in seq_len(ncol(m))) {
-    v <- m[nrow(m) + 1 - i, j]
-    if (abs(v) > 0.01)
-      text(j, i, sprintf("%.2f", v),
-            col = if (abs(v) > 0.5) "white" else "black", cex = 0.85)
-  }
-}
-```
+## 3. How the tool takes correlations into account
 
-Green cells denote positive correlations, red cells negative, and white cells independence. The preset is intentionally sparse: only the seven pairs with documented published evidence are non-zero. All other parameter pairs are sampled independently unless overridden by a user-supplied matrix.
+### 3.1 The Monte Carlo method in a few words
 
-## Two different correlations, and which one matters more
+The tool uses the Monte Carlo method. For each input, it picks a value at random within the range you gave; values near your central value come up more often than values near the edges of the range. With these values, it calculates the emissions of your whole inventory. It then repeats this many times, for example 10,000 times, and each repetition is called an iteration. At the end, it has 10,000 possible results, and their spread shows how uncertain your emissions are.
 
-This page describes two settings that are both called correlation and are easy to confuse.
+### 3.2 The problem
 
-The **correlation mode** covers relationships *between different parameters within a group*: body weight with mature weight, digestibility with methane conversion, and so on. Its effect on the headline figure is real but modest, typically widening the interval by 3 to 10 per cent on a real inventory.
+When each input is picked on its own, the pairs are random. In Figure 2 (left), the lightest cow (250 kg) is paired with the highest milk yield (7.8 kg per day). In a real herd, that pair is unlikely.
 
-The **same parameter reused across groups** is a different matter. If one IPCC default or one regional study supplies a value used by many groups, that is a single estimate applied repeatedly. The tool draws such a value once per iteration for every group that carries it, and draws groups with their own value separately; nothing needs to be set. The correlation mode chosen on this page is applied between two shared values when they cover the same groups (one DE and one Ym used by the same groups move together), and between a group's own values; a shared value cannot be linked to a value that differs from group to group, because one draw cannot follow several. This is the larger of the two effects: on the Zambia inventory (32 groups) the reported margin of error is 32.5 per cent with shared draws and would be 23.7 per cent if every group drew its own value, and on the test in Common pitfalls below the difference grows with the number of groups.
+### 3.3 The solution: re-pairing the values
 
-## Selecting an activity-data correlation mode
+After drawing all the values of each input, the tool **re-pairs** them. It keeps every value, but changes which values go together, so that the pairs follow the link you chose. In Figure 2 (right), the 250 kg cow is now paired with 3.2 kg of milk per day.
 
-The left-hand card on the Simulate tab offers four options:
+![Figure 2. Ten iterations. Left: body weight and milk drawn on their own. Right: the same ten values of each input, re-paired so that heavier cows tend to give more milk. The red line follows the 250 kg cow.](img/corr/fig2_repair.png){width=100%}
 
-**No correlations.** The strict IPCC Approach-2 default, applicable when activity-data sources are independent or when a conservative baseline is required.
+Figure 3 shows the same thing with many iterations, for feed digestibility (DE) and the methane conversion factor (Ym). The bars along each axis show the values of each input. They are the same in both panels: each input keeps exactly the same values, so its average and its range do not change. Only the pairs change. Drawn on their own (A), the two inputs show no link, and some dots are herds that cannot exist, shown in red. Re-paired (B), high digestibility comes with a low methane conversion factor, as in real herds.
 
-**Structural defaults (literature-based).** Applies the seven biological pairs documented above. Suitable for single-year inventories without a multi-year time series of feed quality or herd structure.
+![Figure 3. Feed digestibility and the methane conversion factor, drawn on their own (A) and re-paired (B). The bars along each axis are the same in both panels.](img/corr/fig3_pair.png){width=100%}
 
-**From template (auto, time-series).** Keeps the seven literature pairs and lets the user's `Parameter_TimeSeries` sheet set the size of a pair where the series is long and clear: ten or more years, a Spearman rank correlation of the year-to-year changes with p below 0.05, and the literature's sign. Otherwise the pair keeps its literature value, and no other pair is created. A check under the option shows, pair by pair, what was used and why; if nothing passes, the run uses the structural defaults and says so. (Until 30 October 2026 this mode applied a correlation between every two columns of the sheet, which with a short series is mostly chance.)
+This way of re-pairing is called the Iman–Conover method. It is the method described in the IPCC Guidelines (IPCC 2006, Volume 1, Chapter 3).
 
-**Manual (CSV upload).** Uses a user-supplied square correlation matrix, intended for cases where a published matrix from a similar inventory or an expert-elicitation result is available. A template is provided in the panel.
+## 4. The correlation choices in the tool
 
-**Animal numbers (N).** The last card on the tab asks where the animal numbers come from. One national count split into groups gives every group the same census error, so the groups move together and the total is wider; separate counts per group let the errors cancel. In trend mode a second question asks whether the yearly numbers come from one census interpolated (the error cancels between years and the trend is narrower), a census every few years, or a new survey every year (the widest trend). On Zambia the single-year margin goes from 32.5% (separate counts) to 47.1% (one count split), and the trend's 95% range from about ±70 points (annual survey) to about ±3 points (one census interpolated).
+All the choices are on **Tab 3, Correlations**. The tab has two cards. The first, **Activity Data Correlations**, asks whether some of your inputs move together. The second, **Animal numbers (N): where do they come from?**, asks how your animal numbers were made.
 
-## Common pitfalls
+### 4.1 Do some inputs move together?
 
-- **Assuming a smaller margin of error means a better inventory.** It can mean the opposite. If the same coefficient value is reused across many groups and each group drew it separately, the errors would cancel against each other and the reported uncertainty would shrink as the inventory is disaggregated more finely: holding the herd, the parameters and the uncertainty inputs completely fixed and varying only the number of groups gives 25.1% on one group, 12.5% on four, 6.3% on sixteen, 3.1% on sixty-four and 1.5% on 251, with the data never changing. The tool avoids this by drawing a shared value once for every group that uses it (on the same test the figure stays between 25.1% and 22.7%). Still compare results only at the same level of disaggregation, and report the level you used.
+The first card offers four options (Figure 4). The text under each option in the tool repeats what it does.
 
-- **Expecting the mean to change.** Correlations modify the spread of the emissions distribution but preserve the central estimate to within Monte Carlo sampling noise. A mean shift of more than a few tenths of a percent across correlation modes is typically not a correlation effect but a separate issue (most often related to parameter rebroadcasting).
+![Figure 4. The first card on Tab 3, Correlations, with the default option selected.](img/corr/fig4_options.png){width=100%}
 
-- **Selecting "From template (auto)" with an empty `Parameter_TimeSeries` sheet.** In earlier versions this configuration silently reverted to no correlations. The radio button is now disabled when the sheet contains no data, and the Run button blocks with an explicit error if stale state slips through. Identical heights for the green and grey bars in the comparison chart are a symptom of this configuration.
+**No correlations.** Every input is drawn on its own, and no pair is re-paired. This is the starting point of the IPCC method (Approach 2). Choose it when you have no information about links between your inputs.
 
-- **Modifying row or column headers in the manual matrix.** Names that do not match the canonical entries in `PARAM_CATALOGUE` are dropped silently during import. The example template provided in the panel contains the canonical names and should be used as the starting point.
+**Structural defaults.** The tool applies seven links that are known from the livestock literature, and draws every other input on its own. Each link joins two inputs that are calculated together in the IPCC equations, or that change together in real herds: heavier cows give more milk, for example. The direction of each link comes from the IPCC equations and from published studies. Its size was set by the project team from the studies listed in the table below. IPCC publishes no values for these links. Choose this option when your inputs come from data in which these biological links hold, for example one survey of the same animals, and you have no long series of your own.
 
-- **Concerns about positive-definiteness.** If the uploaded matrix is not positive-definite, the tool automatically projects it onto the nearest positive-definite correlation matrix and reports any entry that shifts by more than 0.01. Manual construction of a positive-definite matrix is not required.
+| Link | Value | Source |
+|----------------|------|--------------------------------------|
+| Body weight and mature weight | +0.50 | IPCC 2006, Eq. 10.6; IPCC 2019, Table 10A.2 |
+| Body weight and weight gain | +0.40 | IPCC 2006, Eq. 10.6; Mehrban et al. 2021 |
+| Milk yield and milk fat | −0.30 | Boujenane 2002; Nistor et al. 2011; IPCC 2019, Table 10A.1 |
+| Milk yield and body weight | +0.30 | IPCC 2019, Table 10A.1; Berry and Evans 2022; Berry et al. 2003 |
+| Milk yield and digestibility | +0.30 | NRC 2001; IPCC 2019, Table 10A.1 |
+| Digestibility and crude protein | +0.20 | INRAE-CIRAD-AFZ feed tables 2018; Feedipedia |
+| Digestibility and methane conversion | −0.20 | IPCC 2019, Table 10.12; Ramin and Huhtanen 2013; Johnson and Johnson 1995 |
 
-- **Interpreting a small headline effect as an error.** A single correlated pair within a multiplicative chain of approximately thirteen inputs typically shifts the 95% margin of error by only a few percent. This is the expected mathematical behaviour. Larger effects require either a richer multi-year time series (the "From template (auto)" mode aggregates many correlated pairs simultaneously) or genuinely wide per-parameter uncertainty bounds.
+When you select this option, the right side of the card shows the links as a grid (Figure 5). Green cells are positive links, red cells negative ones, and white cells no link. Hover over a cell in the tool to read its source.
 
-## Evaluating the effect on a user-supplied inventory
+![Figure 5. The seven links of the structural defaults.](img/corr/fig5_structural.png){width=60%}
 
-Selecting the "Compare with/without correlations" option on the Simulate tab before running the simulation produces a side-by-side bar chart on the Results tab titled "Effect of Correlations on Uncertainty". The green bars show the 95% margin of error under the selected correlation configuration, and the grey bars show the same simulation with all correlations disabled. The difference between the two bars represents the effect of correlations on the user's specific inventory.
+**From template.** This option starts from the same seven links, and checks them against your own data. It can be used when your Excel template has a Parameter_TimeSeries sheet with 10 years or more. For each of the seven links, the tool looks at how the two inputs moved together over the years in your series. Where your data show a clear link, the run uses the size found in your data. Otherwise it keeps the literature value. The tool never adds a link that is not one of the seven.
 
-The Country X and Country Y examples in this document illustrate the typical magnitude of this effect, but the precise gap depends on the per-parameter uncertainty bounds and the sub-category composition of the inventory under analysis.
+Using your own data is better than using the literature, but only when the data really show a link. Two things can mislead. With only a few years of data, two inputs can seem to move together by chance. And two national values can both rise over the years, for example as the sector grows, without their errors being linked. This is why the tool runs a check on each link before using your data. It first checks that both inputs are in your series, and that the series has at least 10 years. It then calculates the probability that the link is due to chance (p), which must be below 5%. Finally, it checks that your data show the link in the same direction as the literature. Only when all four checks pass does the run use the value from your data; otherwise it keeps the literature value. To avoid being misled by a shared trend, the tool compares the change from one year to the next, not the values themselves.
 
-<div class="related">
-### Related material
+The result of the check appears in a table under the option (Figure 6). Each row is one of the seven links. "Literature" gives the value from the literature and "Your data" the value found in your series, left blank when the two inputs are not both in your series. "Years" is the length of your series, and "p" the probability that the link in your data is due to chance. "Used" says which value the run uses, and "Reason" explains why the literature value was kept.
 
-- [Methodology document](../methodology.pdf), §Correlation Structure: the full equations behind each preset pair, the Iman–Conover sampling procedure, and the rejected pairs (N↔BW, Cfi↔Ca, Milk↔pct_pregnant) with reasons.
-- [User Guide](../user_guide.pdf), §Correlations (Simulate tab): step-by-step workflow including how to download the manual-entry CSV template.
-- IPCC 2006 Vol.1 Ch.3 §3.2.3.2: the restricted-pairing rank-correlation procedure (Iman & Conover 1982) that the tool implements.
+![Figure 6. The check under "From template", for a series of 35 years.](img/corr/fig6_check.png){width=100%}
 
-</div>
+In Figure 6, the series has 35 years. For digestibility and crude protein, the data show 0.71 and the link is clear (p below 0.001), so the run uses 0.71. For milk yield and digestibility, the data show −0.27, but this could be chance (p = 0.13) and it goes in the opposite direction to the literature, so the run keeps the literature value of 0.30. For the other five links, at least one of the two inputs is not in the series, and the run keeps the literature values.
 
-<footer>
-Generated by <code>scripts/build_help_docs.R</code> from <code>documentation/source/correlations.Rmd</code>. Worked-example numbers reflect the Country X / Country Y built-in datasets at the current app version.
-</footer>
+**Advanced: manual entry.** This option lets you give your own table of correlations, for example from a study of your own herds. When you select it, two templates appear below the option. The first is a blank table with the names of all your inputs already in its rows and columns. The second is the same table filled with the seven structural-default links, as a starting point. Download one, fill it in Excel with values between −1 and +1 (the diagonal stays at 1), save it as CSV, and upload it. An input missing from your table is drawn on its own. Choose this option only if you have measured correlations.
+
+**To see the effect on your own inventory**, tick "Compare with/without correlations" on Tab 4 before you run. The tool then runs twice, once with your choice and once without any correlation, and shows both results side by side.
+
+### 4.2 Animal numbers between groups
+
+The second card asks how you got the number of animals in each group (Figure 7). The question behind it is simple: if one number is wrong, which other numbers are wrong with it?
+
+![Figure 7. Animal numbers between groups, on the second card of Tab 3.](img/corr/fig7_groups.png){width=100%}
+
+Choose **One national count, split into groups** when your group numbers come from one census or one official total, divided into groups by shares. If that count is 5% too low, every group is 5% too low at the same time, so the errors add up in the total. Choose **Partly** when your numbers come from one total, but some group numbers were then adjusted with their own surveys or data. Choose **Separate counts per group** only when each group was really counted with its own survey. Some groups will then be too high and others too low, so the errors partly cancel in the total.
+
+## 5. Trends
+
+In trend mode, you compare two years, for example 1990 and 2024. What matters then is the error **in the change** between the years, not only the error in each year.
+
+Suppose your animal numbers for 2024 come from a census, and your numbers for 1990 were estimated from the same census. If the census is 5% too low, both years are 5% too low, and the change between the two years is still right: the error cancels. Now suppose each year has its own survey. Each year then has its own error, the errors do not cancel, and the change is much more uncertain. The same is true for emission factors: if you use the same IPCC default value for every year, any error in it is the same every year, and it cancels in the change.
+
+This is why, in trend mode, the second card asks two more questions (Figure 8).
+
+![Figure 8. The two questions between years, shown on the second card of Tab 3 in trend mode only.](img/corr/fig8_years.png){width=100%}
+
+The first question is how your animal numbers change from year to year. Choose **One census, with the years in between filled in** when you have a census every five or ten years and the other years are estimated from it: the census error is then the same in all years, and it cancels when years are compared. Choose **A census every few years, adjusted in between** when you have regular counts and the years in between are updated with new information; this is the middle case. Choose **A new survey every year** when each year is really a fresh count: each year then has its own error, and nothing cancels.
+
+The second question is how your emission factors and coefficients were made. Choose **The same factors for every year** when you use IPCC defaults, or one national study for every year: the error is the same in every year and cancels in the change. Choose **Factors revised every few years** when your factors are updated from time to time and nearby years rely on the same data: the error then cancels in part. Choose **New factors every year** only when each year's factors were measured anew: nothing cancels.
+
+In both cases, choose the option that describes how your numbers and factors were really made.
+
+## 6. Example: what the choices change
+
+The example is a national cattle inventory with 32 groups of animals: dairy and other cattle, in five production systems, about 3.8 million animals in total. The file gives values for every year from 1990 to 2024, and the inventory year is 2022. The country gave its own uncertainty range for every input. Each run used 4,000 iterations and the same starting point for the random draws, so the only difference between two runs is the choice tested.
+
+### 6.1 One year (2022)
+
+The first table compares the three choices of the first card, with the animal numbers set to one national count split into groups. The second table compares the three answers about animal numbers between groups, with no correlations between inputs.
+
+| Do some inputs move together? | Total emissions (million t CO~2~e) | 95% range | Uncertainty |
+|---------------|-----------|-------------|---------|
+| No correlations | 9.3 | 5.4 to 14.2 | ±47.1% |
+| Structural defaults | 9.3 | 5.3 to 14.2 | ±48.0% |
+| From template | 9.3 | 5.3 to 14.1 | ±47.7% |
+
+| Animal numbers between groups | Total emissions (million t CO~2~e) | 95% range | Uncertainty |
+|---------------|-----------|-------------|---------|
+| Separate counts per group | 9.3 | 6.8 to 12.8 | ±32.6% |
+| Partly | 9.3 | 6.1 to 13.5 | ±40.2% |
+| One national count, split into groups | 9.3 | 5.4 to 14.2 | ±47.1% |
+
+**Why these results are expected.** The links between inputs change little here: the uncertainty moves by less than one point. In this inventory, most of the uncertainty comes from the animal numbers and from feed digestibility. The seven links are weak to moderate, and several of them pull in opposite directions, so their effects partly cancel. The structural defaults widen the range slightly because of one link: high digestibility comes with a low methane conversion factor, both of which lower the emissions, so they add up.
+
+How the animal numbers were made changes a lot. With separate counts, the 32 groups each have their own error. Some are too high and some too low, so the errors partly cancel in the total. With one national count split into groups, a count that is too low makes every group too low at the same time. Nothing cancels, so the range is much wider. Neither answer is better than the other: the right one is the one that describes how your numbers were made.
+
+### 6.2 Trend (1990 to 2024)
+
+In this inventory, emissions rose by about 154% between 1990 and 2024. Because the inputs are uncertain, the true rise is not known exactly. The table gives, for each pair of answers, the most likely rise and the range in which the true rise very likely lies (95% of the iterations). Read the first row like this: with the same factors every year and a new survey every year, emissions most likely rose by 154%, and the true rise is very likely somewhere between +46% and +337%.
+
+| Emission factors between years | Animal numbers between years | Most likely rise, 1990 to 2024 | The true rise is very likely between |
+|---------------|---------------|--------|--------------|
+| The same factors for every year | A new survey every year | +154% | +46% and +337% |
+| The same factors for every year | A census every few years | +154% | +48% and +343% |
+| The same factors for every year | One census, years filled in | +154% | +148% and +159% |
+| Factors revised every few years | A new survey every year | +154% | +29% and +407% |
+| Factors revised every few years | A census every few years | +154% | +30% and +400% |
+| Factors revised every few years | One census, years filled in | +154% | +69% and +284% |
+| New factors every year | A new survey every year | +162% | +25% and +435% |
+| New factors every year | A census every few years | +162% | +29% and +433% |
+| New factors every year | One census, years filled in | +162% | +65% and +317% |
+
+**Why these results are expected.** Errors shared by both years cancel. With one census and the same factors for every year, the error in 1990 and the error in 2024 are the same error, so it cancels in the change, and the range is narrow: between +148% and +159%. Errors that are new each year add up instead. With a new survey every year, the 1990 count and the 2024 count each have their own error. In this inventory the animal numbers are the largest source of uncertainty, so the range becomes very wide: between +46% and +337%.
+
+A census every few years behaves here almost like a new survey every year, because 1990 and 2024 are 34 years apart and their counts share almost nothing. This middle option makes more difference for years close together. New factors every year widen the range further, because the factor errors no longer cancel either. The most likely rise also moves a little, from +154% to +162%, because each year gets its own draws; the data are the same.
+
+The right choice is the one that describes how your numbers and factors were really made. It is not the one that gives the narrowest range.
