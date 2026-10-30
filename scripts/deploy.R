@@ -74,6 +74,9 @@ tryCatch(source("scripts/notify_approved.R"),
 # incl. its .manifest.json, app.R and the .Renviron with the secrets).
 app_files <- c(
   "app.R", ".Renviron",
+  # 2026-10-30: the VERSION file feeds the footer; it was missing from the
+  # list, so the live footer showed no version.
+  "VERSION",
   list.files("R", pattern = "[.]R$", full.names = TRUE),
   list.files("www", recursive = TRUE, full.names = TRUE),
   list.files("defaults", recursive = TRUE, full.names = TRUE),
