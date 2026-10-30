@@ -1446,6 +1446,17 @@ app_server <- function(input, output, session) {
     rv$sim_log <- paste0(rv$sim_log,
                          "Coefficient correlation: independent (IPCC default)\n")
 
+    # 2026-10-30: release the previous run's results before this run builds
+    # its own. They were held until replaced, so a second run with the
+    # comparison carried two full result sets: Zambia (27 groups, 10,000
+    # draws) peaked at about 835 MB of process memory locally against 570 MB
+    # for a first run, and crashed the 1 GB server (oom, 2026-10-30 19:27 UTC).
+    rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
+    rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
+    rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+    rv$diagnostics <- NULL
+    invisible(gc(FALSE))
+
     withProgress(
       message = sprintf("Monte Carlo simulation (%s iterations)", n_iter_fmt),
       value   = 0,
