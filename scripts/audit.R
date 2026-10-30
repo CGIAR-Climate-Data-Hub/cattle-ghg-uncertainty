@@ -3288,7 +3288,7 @@ section_F <- function() {
     if (grepl('"required":"', tj, fixed = TRUE)) f <- c(f, "a `required` field serialised as a scalar string")
     if (!grepl('"enum":["user_file"', tj, fixed = TRUE)) f <- c(f, "data_source enum missing from the parameter item schema")
     if (!grepl('"region":{"type":"string","enum":["africa"', tj, fixed = TRUE)) f <- c(f, "region enum missing from the metadata schema")
-    if (!grepl('"mode":{"type":"string","enum":["enumerate","batch","full"]', tj, fixed = TRUE)) f <- c(f, "mode enum missing")
+    if (!grepl('"mode":{"type":"string","enum":["enumerate","batch","full","review"]', tj, fixed = TRUE)) f <- c(f, "mode enum missing")
     if (length(anthropic_translator_tools()) != 1L) f <- c(f, "more than one tool definition")
     v <- .translator_subcategory_vocab()
     if (!setequal(v, ANIMAL_SUBCATEGORIES)) f <- c(f, "coverage vocabulary != ANIMAL_SUBCATEGORIES")
@@ -3991,7 +3991,7 @@ section_F <- function() {
     pr <- assemble_translator_system_prompt("translator_prompts")
     miss <- c("Relative-uncertainty rule", "Per-MMS uncertainty rule",
               "Named-distribution rule", "Right-row, right-column rule",
-              "Relative spread applied per row",
+              "Relative spread given as a percentage",
               "Per-MMS spreads carried, not dropped",
               "Distributions are the file's, not yours",
               "One year column, used everywhere",
@@ -4122,6 +4122,76 @@ section_F <- function() {
              f65_ok,
              notes = if (f65_ok) "11 inputs with a default; BW/EF5/MCF Missing; Ym/EF4/EF3/Table 10.22 filled at the IPCC value; gate source-aware; both examples complete"
                      else paste(f65_fail, collapse = "; "))
+
+  # F66 -- the translator review of the checks (2026-10-30). The server turns
+  # a relative manure spread into each row's bounds; the time-series checks
+  # find a group with no series and a value from the wrong year's column
+  # (without flagging a correct group); a review reply is applied (value,
+  # relative range recomputed, time-series row corrected and added, the
+  # "not an error" item recorded); the tool schema carries the review mode.
+  f66_fail <- tryCatch({
+    f <- character(0)
+    pc0 <- list(parameters = data.frame(sub_category = "cows", parameter = "N", mean = 1),
+                manure_management = data.frame(aggregation_level = "a", sub_category = "cows",
+                  mms_type = c("pasture", "solid_storage"), fraction_pct = c(60, 40), fraction_unc_pct = c(50, 50),
+                  MCF_pct = c(1, 5), mcf_unc_pct = c(25, 25)))
+    pr <- .translator_apply_relative_ranges(pc0)$manure_management
+    if (!isTRUE(all.equal(pr$lower_fraction, c(30, 20))) || !isTRUE(all.equal(pr$upper_fraction, c(90, 60))))
+      f <- c(f, "relative share bounds wrong")
+    if (!isTRUE(all.equal(pr$lower_mcf, c(0.75, 3.75)))) f <- c(f, "relative MCF bounds wrong")
+    ps0 <- data.frame(cattle_type = "dairy", aggregation_level = "sys", sub_category = c("cows", "bulls"),
+                      parameter = "DE", mean = 61.5, data_source = "user_file", distribution = "normal")
+    pop <- data.frame(cattle_type = "dairy", aggregation_level = "sys", sub_category = "cows",
+                      year = 2022:2024, DE = c(60.1, 60.9, 61.5))
+    src <- list(varying_rows = list(c(`2022` = 60.1, `2023` = 60.9, `2024` = 61.5)),
+                year_values = list(`2022` = 60.1, `2023` = 60.9, `2024` = 61.5))
+    is <- translator_consistency_checks(ps0, NULL, source = src, population = pop, inventory_year = 2024)
+    if (!any(is$check %in% "time-series coverage" & grepl("bulls", is$where))) f <- c(f, "coverage gap not found")
+    if (any(is$check %in% "time-series coverage" & grepl("cows", is$where))) f <- c(f, "coverage false alarm")
+    pop2 <- pop; pop2$DE[2] <- 61.5
+    is2 <- translator_consistency_checks(ps0[1, ], NULL, source = src, population = pop2, inventory_year = 2024)
+    if (!any(is2$check %in% "time-series year" & grepl("2023", is2$where))) f <- c(f, "wrong-year value not found")
+    if (any(is$check %in% "time-series year")) f <- c(f, "year false alarm")
+    piece <- list(
+      parameters = data.frame(aggregation_level = "sys", sub_category = "calves", parameter = "C", mean = 0.9,
+                              data_source = "ipcc_default"),
+      manure_management = data.frame(aggregation_level = "sys", sub_category = "calves", mms_type = "solid_storage",
+                                     fraction_pct = 40, lower_fraction = 0, upper_fraction = 80),
+      parameter_timeseries = data.frame(cattle_type = "dairy", aggregation_level = "sys", sub_category = "calves",
+                                        year = 2023L, N = 43341))
+    rv <- list(
+      parameters = data.frame(aggregation_level = "sys", sub_category = "calves", parameter = "C", mean = 1,
+                              data_source = "user_file"),
+      manure_management = data.frame(aggregation_level = "sys", sub_category = "calves", mms_type = "solid_storage",
+                                     fraction_pct = 40, fraction_unc_pct = 50),
+      parameter_timeseries = data.frame(cattle_type = "dairy", aggregation_level = "sys", sub_category = "calves",
+                                        year = c(2023L, 2024L), N = c(34634, 43341)),
+      not_errors = data.frame(check = "duplicate population", where = "sys / calves", reason = "same in the file"))
+    ap <- .translator_apply_review(piece, rv)
+    p2 <- .translator_apply_relative_ranges(ap$piece)
+    if (!isTRUE(all.equal(as.numeric(p2$parameters$mean), 1))) f <- c(f, "review value not applied")
+    if (!isTRUE(all.equal(c(p2$manure_management$lower_fraction, p2$manure_management$upper_fraction), c(20, 60))))
+      f <- c(f, "review relative range not recomputed")
+    if (nrow(p2$parameter_timeseries) != 2 || p2$parameter_timeseries$N[1] != 34634) f <- c(f, "review time series not applied")
+    if (nrow(ap$dismissed) != 1 || nrow(ap$changes) < 3) f <- c(f, "review changes or not_errors not recorded")
+    if (!all(c("time-series coverage", "time-series year", "distribution differs between systems",
+               "manure bounds missing", "default replaced file value") %in% .TRANSLATOR_REVIEW_CHECKS))
+      f <- c(f, "review check list incomplete")
+    sch <- .ANTHROPIC_TOOL_INPUT_SCHEMA
+    if (!"review" %in% sch$properties$mode$enum || is.null(sch$properties$not_errors) ||
+        is.null(.ANTHROPIC_MANURE_ITEM_SCHEMA$properties$fraction_unc_pct))
+      f <- c(f, "tool schema lacks review / not_errors / *_unc_pct")
+    pr_txt <- assemble_translator_system_prompt("translator_prompts")
+    for (k in c("All-rows rule", "Cover every group whose value changes", "mode = \"review\""))
+      if (!grepl(k, pr_txt, fixed = TRUE)) f <- c(f, paste("prompt lacks:", k))
+    f
+  }, error = function(e) conditionMessage(e))
+  f66_ok <- length(f66_fail) == 0L
+  check_bool("F66", "F",
+             "Translator review: relative manure ranges computed by the server, time-series coverage and year checks, review reply applied, schema and prompt carry the review",
+             f66_ok,
+             notes = if (f66_ok) "share and MCF bounds per row; gap and wrong year found, no false alarm; value, range, series and not_errors applied"
+                     else paste(f66_fail, collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

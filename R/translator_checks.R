@@ -145,7 +145,35 @@ translator_source_fingerprint <- function(parsed) {
       year_sums[[key]] <- unique(c(year_sums[[key]], cands[is.finite(cands) & cands > 0]))
     }
   }
+  # 2026-10-30: the numbers of each year's column (for the time-series
+  # year check) and every row that changes from year to year (for the
+  # time-series coverage check). A sheet needs two or more year columns.
+  year_values <- list(); varying_rows <- list()
+  for (sh in parsed$sheets) {
+    d <- sh$preview
+    if (is.null(d) || !NROW(d)) next
+    yrs <- suppressWarnings(as.integer(trimws(names(d))))
+    yc <- which(!is.na(yrs) & yrs >= 1950 & yrs <= 2100)
+    if (length(yc) < 2) next
+    M <- vapply(yc, function(j) suppressWarnings(as.numeric(gsub(",", "", as.character(d[[j]])))),
+                numeric(NROW(d)))
+    if (is.null(dim(M))) M <- matrix(M, nrow = NROW(d))
+    colnames(M) <- as.character(yrs[yc])
+    for (k in seq_along(yc)) {
+      v <- M[, k]; v <- v[is.finite(v)]
+      key <- colnames(M)[k]
+      year_values[[key]] <- sort(unique(c(year_values[[key]], signif(v, 9))))
+    }
+    for (r in seq_len(nrow(M))) {
+      v <- M[r, ]; ok <- is.finite(v)
+      if (sum(ok) < 3) next
+      vv <- v[ok]
+      if (length(unique(signif(vv, 9))) > 1) varying_rows[[length(varying_rows) + 1L]] <- vv
+    }
+  }
   list(numbers  = unique(round(nums, 6)),
+       year_values = year_values,
+       varying_rows = varying_rows,
        families = sub(" .*$", "", fam),      # "Ym (methane ...)" -> "Ym"
        family_values = tryCatch(.translator_family_column_values(parsed$sheets),
                                 error = function(e) list()),
@@ -258,6 +286,40 @@ translator_source_fingerprint <- function(parsed) {
   piece
 }
 
+# 2026-10-30: a relative spread on the manure sheet ("all shares +/-50 %",
+# "every MCF +/-25 %") is turned into bounds by the server, row by row, from
+# the percentage the AI wrote in the *_unc_pct field. The model kept doing
+# this arithmetic wrong (0 to 50 on every row, then 0 to twice the share).
+# Explicit bounds the AI wrote are kept. Bounds are clipped at 0 and, for
+# the percent columns, at 100.
+.TRANSLATOR_MANURE_REL <- list(
+  list(u = "fraction_unc_pct",   v = "fraction_pct",     lo = "lower_fraction",   hi = "upper_fraction",   cap = 100),
+  list(u = "mcf_unc_pct",        v = "MCF_pct",          lo = "lower_mcf",        hi = "upper_mcf",        cap = 100),
+  list(u = "ef3_unc_pct",        v = "EF3",              lo = "lower_ef3",        hi = "upper_ef3",        cap = Inf),
+  list(u = "frac_gas_unc_pct",   v = "Frac_GasMS_pct",   lo = "lower_frac_gas",   hi = "upper_frac_gas",   cap = 100),
+  list(u = "frac_leach_unc_pct", v = "Frac_LeachMS_pct", lo = "lower_frac_leach", hi = "upper_frac_leach", cap = 100))
+
+.translator_apply_relative_ranges <- function(piece) {
+  mm <- piece$manure_management
+  if (!is.data.frame(mm) || !nrow(mm)) return(piece)
+  num <- function(x) suppressWarnings(as.numeric(x))
+  changed <- FALSE
+  for (s in .TRANSLATOR_MANURE_REL) {
+    if (!s$u %in% names(mm) || !s$v %in% names(mm)) next
+    u <- num(mm[[s$u]]); v <- num(mm[[s$v]])
+    lo <- if (s$lo %in% names(mm)) num(mm[[s$lo]]) else rep(NA_real_, nrow(mm))
+    hi <- if (s$hi %in% names(mm)) num(mm[[s$hi]]) else rep(NA_real_, nrow(mm))
+    i <- which(is.finite(u) & u > 0 & is.finite(v) & v > 0 & is.na(lo) & is.na(hi))
+    if (!length(i)) next
+    lo[i] <- pmax(0, v[i] * (1 - u[i] / 100))
+    hi[i] <- pmin(s$cap, v[i] * (1 + u[i] / 100))
+    mm[[s$lo]] <- lo; mm[[s$hi]] <- hi
+    changed <- TRUE
+  }
+  if (changed) { piece$manure_management <- mm; piece$.relative_ranges_applied <- TRUE }
+  piece
+}
+
 # The template JSON after the server-side corrections; the same text when
 # there was nothing to correct, so the caller can tell.
 .translator_fix_piece_json <- function(json) {
@@ -267,8 +329,10 @@ translator_source_fingerprint <- function(parsed) {
   before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
   piece <- .translator_fix_uncertainty_scale(piece)
   piece <- tryCatch(.translator_fix_year_from_timeseries(piece), error = function(e) piece)
+  piece <- tryCatch(.translator_apply_relative_ranges(piece), error = function(e) piece)
+  rel <- isTRUE(piece$.relative_ranges_applied); piece$.relative_ranges_applied <- NULL
   after <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
-  if (after == before) return(json)
+  if (after == before && !rel) return(json)
   as.character(jsonlite::toJSON(piece, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
 }
 
@@ -735,6 +799,140 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     }
   }
 
+  # C10 (2026-10-30): one parameter, one distribution across the systems.
+  # On the Zambia file of 30 October the file named "normal" for Ym in all
+  # five systems and one batch came back with PERT. A minority shape among
+  # three or more systems, against a clear majority, is listed for review.
+  if (!is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 &&
+      all(c("parameter", "distribution", "mean") %in% names(ps))) {
+    lv10 <- if ("aggregation_level" %in% names(ps)) as.character(ps$aggregation_level) else rep("", nrow(ps))
+    lv10[is.na(lv10)] <- ""
+    d10 <- tolower(trimws(as.character(ps$distribution))); m10 <- suppressWarnings(as.numeric(ps$mean))
+    for (p in unique(as.character(ps$parameter))) {
+      idx <- which(ps$parameter == p & !is.na(d10) & nzchar(d10) & !d10 %in% c("constant", "const") &
+                   is.finite(m10) & m10 != 0)
+      if (!length(idx)) next
+      by_lvl <- tapply(d10[idx], lv10[idx], function(x) names(sort(table(x), decreasing = TRUE))[1])
+      if (length(by_lvl) < 3) next
+      tb <- table(by_lvl); maj <- names(tb)[which.max(tb)]
+      if (max(tb) == length(by_lvl) || max(tb) <= length(by_lvl) / 2) next
+      for (L in names(by_lvl)[by_lvl != maj])
+        add(sprintf("%s / %s", L, p),
+            sprintf(paste0("%s uses '%s' in %s but '%s' in %d other production systems (%s). ",
+                           "If the file names one distribution for %s, every system should carry it."),
+                    p, by_lvl[[L]], L, maj, max(tb), paste(names(by_lvl)[by_lvl == maj], collapse = ", "), p),
+            severity = "info", sheet = "Parameters", parameter = p, check = "distribution differs between systems")
+    }
+  }
+
+  # C11 and C12 (2026-10-30): the time series against the source.
+  # C11, coverage: a value the file gives year by year must have a series
+  # for that group. On the Zambia file of 30 October the series covered the
+  # cows only in three systems (DE and CP of 12 other groups, and the
+  # feedlot weights, were blank), so a trend run held those values at the
+  # 2024 level for 35 years. A value is "given year by year" when it is the
+  # inventory-year value of a source row that changes over the years.
+  # C12, year column: each series value must be in the file's column for
+  # that year; a value found only in another year's column was copied from
+  # the wrong column (emergent beef calves 2023 carried the 2024 count).
+  tsp <- intersect(c("N", "BW", "MW", "WG", "Milk", "Fat", "pct_pregnant", "DE", "CP", "MilkPR"),
+                   if (is.data.frame(population)) names(population) else character(0))
+  # tol_abs: a head count split into halves is rounded (25,927 calves give
+  # 12,963 per half), so N matches its source within one animal.
+  near_in <- function(x, s, tol = 1e-6, tol_abs = 0) {
+    if (!length(s) || !is.finite(x)) return(FALSE)
+    k <- findInterval(x, s)
+    cand <- s[unique(pmax(1, pmin(length(s), c(k - 1L, k, k + 1L, k + 2L))))]
+    any(abs(cand - x) <= max(tol * max(1, abs(x)), tol_abs))
+  }
+  if (length(tsp) && nrow(population) > 0 && "year" %in% names(population) &&
+      !is.null(ps) && is.data.frame(ps) && nrow(ps) > 0) {
+    ts_lv <- if ("aggregation_level" %in% names(population)) .translator_norm_level(population$aggregation_level) else rep("", nrow(population))
+    ts_key <- paste(ts_lv, population$sub_category, sep = "||")
+    ts_n <- function(L, S, p) sum(is.finite(suppressWarnings(as.numeric(population[[p]][ts_key == paste(L, S, sep = "||")]))))
+    p_lv <- if ("aggregation_level" %in% names(ps)) .translator_norm_level(ps$aggregation_level) else rep("", nrow(ps))
+    p_mu <- suppressWarnings(as.numeric(ps$mean))
+    p_src <- if ("data_source" %in% names(ps)) as.character(ps$data_source) else rep("user_file", nrow(ps))
+    flagged <- character(0)
+    yr0 <- suppressWarnings(as.integer(inventory_year))
+    vr <- if (!is.null(source)) source$varying_rows else NULL
+    if (length(vr) && length(yr0) && is.finite(yr0)) {
+      at0 <- vapply(vr, function(v) { x <- v[as.character(yr0)]; if (length(x) && is.finite(x)) unname(x) else NA_real_ }, numeric(1))
+      nyr <- vapply(vr, length, integer(1))
+      for (i in which(ps$parameter %in% tsp & grepl("^user", p_src) & is.finite(p_mu) & p_mu != 0)) {
+        v <- p_mu[i]
+        hit <- which(is.finite(at0) & (abs(at0 - v) <= 1e-6 * max(1, abs(v)) |
+                                       abs(at0 / 2 - v) <= 1e-6 * max(1, abs(v))))
+        if (!length(hit)) next
+        p <- as.character(ps$parameter[i]); L <- p_lv[i]; S <- as.character(ps$sub_category[i])
+        n <- ts_n(L, S, p); need <- max(nyr[hit])
+        k <- paste(L, S, p, sep = "||")
+        if (n == 0L) {
+          flagged <- c(flagged, k)
+          add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", S, p),
+              sprintf(paste0("The file gives %s for this group year by year (%d years), but the time series ",
+                             "has no %s values for it. A trend run would hold it at the %d value for every year."),
+                      p, need, p, yr0),
+              severity = "fail", sheet = "Parameter_TimeSeries", group = gkey(ps, i), parameter = p,
+              check = "time-series coverage")
+        } else if (n < need - 1L) {
+          flagged <- c(flagged, k)
+          add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", S, p),
+              sprintf("The file gives %s for this group for %d years; the time series has %d of them.", p, need, n),
+              severity = "warn", sheet = "Parameter_TimeSeries", group = gkey(ps, i), parameter = p,
+              check = "time-series coverage")
+        }
+      }
+    }
+    # Without a source: a group whose value equals another group's
+    # inventory-year series value in the same system, and has no series.
+    if (length(yr0) && is.finite(yr0)) {
+      py0 <- population[suppressWarnings(as.integer(population$year)) == yr0, , drop = FALSE]
+      py0_lv <- if ("aggregation_level" %in% names(py0)) .translator_norm_level(py0$aggregation_level) else rep("", nrow(py0))
+      for (i in which(ps$parameter %in% tsp & is.finite(p_mu) & p_mu != 0)) {
+        p <- as.character(ps$parameter[i]); L <- p_lv[i]; S <- as.character(ps$sub_category[i])
+        k <- paste(L, S, p, sep = "||")
+        if (k %in% flagged || ts_n(L, S, p) > 0L) next
+        sib <- suppressWarnings(as.numeric(py0[[p]][py0_lv == L & py0$sub_category != S]))
+        if (!any(is.finite(sib) & abs(sib - p_mu[i]) <= 1e-6 * max(1, abs(p_mu[i])))) next
+        flagged <- c(flagged, k)
+        add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", S, p),
+            sprintf(paste0("Other groups of this production system have a %s series with the same %d value, ",
+                           "but this group has none. If the file gives one series for these groups, copy it to each."),
+                    p, yr0),
+            severity = "fail", sheet = "Parameter_TimeSeries", group = gkey(ps, i), parameter = p,
+            check = "time-series coverage")
+      }
+    }
+    yv <- if (!is.null(source)) source$year_values else NULL
+    if (length(yv)) {
+      tr <- c(1, 0.5, 2, 100, 0.01)
+      yrs_ts <- as.character(suppressWarnings(as.integer(population$year)))
+      for (r in seq_len(nrow(population))) {
+        y <- yrs_ts[r]; s0 <- yv[[y]]
+        if (is.null(s0)) next
+        for (p in tsp) {
+          v <- suppressWarnings(as.numeric(population[[p]][r]))
+          if (!is.finite(v) || v == 0) next
+          cand <- v / tr
+          # one animal of rounding on the head-count readings only (x1, x2,
+          # x0.5), never on the unit conversions (x100 matched 433.41 to 434)
+          ta <- if (identical(p, "N")) ifelse(tr %in% c(1, 0.5, 2), 1.01, 0) else rep(0, length(tr))
+          if (any(mapply(function(cc, tt) near_in(cc, s0, tol_abs = tt), cand, ta))) next
+          other <- names(yv)[vapply(names(yv), function(yy) yy != y &&
+                                    any(vapply(cand, near_in, logical(1), s = yv[[yy]], tol_abs = 0)), logical(1))]
+          if (!length(other)) next
+          add(sprintf("%s / %s / %s / %s", population$aggregation_level[r] %||% "", population$sub_category[r], p, y),
+              sprintf(paste0("The time series gives %s for %s in %s, but the file's %s column does not have this ",
+                             "number; it is the file's value for %s. A neighbouring year's column was probably copied."),
+                      fmt(v), p, y, y, paste(utils::head(other, 3), collapse = ", ")),
+              severity = "fail", sheet = "Parameter_TimeSeries", group = gkey(population, r), parameter = p,
+              check = "time-series year")
+        }
+      }
+    }
+  }
+
   # C8 (2026-10-22, WP3): percent and fraction follow the catalogue units.
   # A % parameter below 1, or a fraction above 1, is a unit mistake that
   # the simulation cannot detect (DE = 0.55 passes every bound check and
@@ -886,4 +1084,28 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   if (!length(rows)) return(empty)
   out <- do.call(rbind, rows); rownames(out) <- NULL
   out
+}
+
+# 2026-10-30: the checks the AI review is asked to look at, with the file in
+# front of it. Every one of them can be a real error the model can fix from
+# the source (a row left out, a column read from the wrong year, a range or
+# a distribution not carried over), or a false alarm the model can explain
+# (two groups that really have the same head count). "range needed" is
+# included only when the source plausibly gives a range (manure and the
+# parameters the file states uncertainty for); the review is told so.
+.TRANSLATOR_REVIEW_CHECKS <- c(
+  "default replaced file value", "manure bounds missing", "manure bounds reused",
+  "distribution differs between systems", "time-series coverage", "time-series year",
+  "Parameters vs time series", "value not in file", "manure shares sum",
+  "manure coefficient consistency", "bounds bracket mean", "percent vs fraction",
+  "duplicate population", "category coverage", "time series totals", "range needed")
+
+translator_review_targets <- function(issues) {
+  if (!is.data.frame(issues) || !nrow(issues)) return(issues)
+  sev <- if ("severity" %in% names(issues)) issues$severity else rep("warn", nrow(issues))
+  ck  <- if ("check" %in% names(issues)) issues$check else rep(NA_character_, nrow(issues))
+  # A file may name different shapes in different systems, so that check
+  # is only a note for the user (info); the review still looks at it.
+  issues[ck %in% .TRANSLATOR_REVIEW_CHECKS &
+         (sev %in% c("fail", "warn") | ck %in% "distribution differs between systems"), , drop = FALSE]
 }

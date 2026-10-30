@@ -1286,7 +1286,14 @@ anthropic_chat_stream <- function(messages,
     Frac_LeachMS_pct  = list(type = c("number", "null"), description = "leaching fraction in PERCENT (2 means 2 %)"),
     lower_frac_leach  = list(type = c("number", "null")),
     upper_frac_leach  = list(type = c("number", "null")),
-    distribution_frac_leach = list(type = c("string", "null"))
+    distribution_frac_leach = list(type = c("string", "null")),
+    # 2026-10-30: a RELATIVE spread is given as a percentage and the server
+    # computes each row's bounds (the model got this arithmetic wrong).
+    fraction_unc_pct   = list(type = c("number", "null"), description = "relative spread of fraction_pct in percent (50 means +/-50 % of THIS row's share); leave lower_fraction/upper_fraction null, the server computes them"),
+    mcf_unc_pct        = list(type = c("number", "null"), description = "relative spread of MCF_pct in percent; leave lower_mcf/upper_mcf null"),
+    ef3_unc_pct        = list(type = c("number", "null"), description = "relative spread of EF3 in percent; leave lower_ef3/upper_ef3 null"),
+    frac_gas_unc_pct   = list(type = c("number", "null"), description = "relative spread of Frac_GasMS_pct in percent; leave lower_frac_gas/upper_frac_gas null"),
+    frac_leach_unc_pct = list(type = c("number", "null"), description = "relative spread of Frac_LeachMS_pct in percent; leave lower_frac_leach/upper_frac_leach null")
   ),
   required = I(c("sub_category", "mms_type", "fraction_pct",
                  "MCF_pct", "EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct"))
@@ -1334,13 +1341,15 @@ anthropic_chat_stream <- function(messages,
   type = "object",
   properties = list(
     mode = list(
-      type = "string", enum = I(c("enumerate", "batch", "full")),
+      type = "string", enum = I(c("enumerate", "batch", "full", "review")),
       description = paste(
         "Which piece the server asked for. enumerate: aggregation_levels +",
         "inventory_metadata only. batch: aggregation_level (echoed) +",
         "parameters + manure_management + parameter_timeseries for that one",
         "level. full: inventory_metadata + parameters + manure_management +",
-        "parameter_timeseries for the whole inventory.")),
+        "parameter_timeseries for the whole inventory. review: ONLY the rows",
+        "you correct after the server's checks (complete rows, any system),",
+        "plus not_errors for the flagged items that are not errors.")),
     inventory_metadata = .ANTHROPIC_METADATA_SCHEMA,
     aggregation_levels = list(
       type = "array", items = list(type = "string"),
@@ -1363,6 +1372,16 @@ anthropic_chat_stream <- function(messages,
       description = "mode = batch or full. One row per (sub_category, parameter), every catalogue parameter."),
     manure_management = list(type = "array", items = .ANTHROPIC_MANURE_ITEM_SCHEMA,
       description = "mode = batch or full. One row per (sub_category, mms_type)."),
+    not_errors = list(
+      type = "array",
+      items = list(type = "object",
+                   properties = list(check = list(type = "string"), where = list(type = "string"),
+                                     reason = list(type = "string")),
+                   required = I(c("where", "reason"))),
+      description = paste(
+        "mode = review only. One entry per flagged item that is NOT an error,",
+        "with the server's check name, its location, and one sentence that",
+        "quotes the file to show why the value is right.")),
     parameter_timeseries = list(type = "array", items = .ANTHROPIC_TIMESERIES_ITEM_SCHEMA,
       description = paste(
         "mode = batch or full. REQUIRED in those modes, [] when the file has",

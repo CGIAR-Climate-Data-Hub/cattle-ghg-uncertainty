@@ -2,6 +2,14 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-10-30, review of the checks and the Zambia errors
+
+- **Review mode.** After the workbook is written and checked, the flagged items go back to the AI once (`mode = "review"`, `not_errors`); it returns corrected rows or explains, quoting the file, why an item is not an error. The server applies the rows, rewrites, re-checks and lists every correction and explanation in the checks file (R/translator_review.R). Reason: the checks found three of the seven errors of the 30 October Zambia run but only reported them.
+- **All-rows rule (Step 4b).** A line labelled "all ..." applies to every row it names. Reason: the MCF spread line ("all ... all manure management") was dropped on all 164 rows; calves C = 1.0 ("All production systems") was missed in one system.
+- **Relative spread on the manure sheet** is written as a percentage in `fraction_unc_pct`, `mcf_unc_pct`, `ef3_unc_pct`, `frac_gas_unc_pct`, `frac_leach_unc_pct`; the server computes each row's bounds. Reason: the model wrote 0 to 50, then 0 to twice the share, for "beta 0.5".
+- **Time-series coverage (Step 8) and year columns (check 13).** Every group whose value changes over the years gets a series, including groups that share one series in the file; each year takes that year's column. Reason: DE and CP were written for the cows only in three systems, the feedlot weights not at all, and one 2023 value was the 2024 one.
+- **Distributions in every system (check 12).** Reason: Ym was PERT in one system where the file says normal in all five.
+
 ## 2026-10-30, default uncertainty ranges
 
 - **Defaulted-uncertainty rule, C2, check 14, case (a), no-uncertainty-anywhere rule.** A blank range is filled from the catalogue only for Ym, Bo (IPCC 2019), Cfi, Ca, C, Cp (Monni et al. 2007) and, as bounds belonging to the IPCC default value, EF3_PRP, EF4, EF5, Frac_GASM_PRP and Frac_LEACH_PRP. Every other range is left blank and reported to the user under "ranges you need to add"; the app lists it as Missing and does not run. Reason: no source gives a range for a country's own animal or diet data that applies to another country; the catalogue values used before (BW 15 %, Milk 20 %, ...) had no source.

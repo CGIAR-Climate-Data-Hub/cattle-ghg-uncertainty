@@ -1661,7 +1661,8 @@ translator_cancel_clear <- function(tok) {
 # Download click instant and gives the quality preview something to read.
 # Keyed on the JSON hash so a revised template rebuilds and a repeated
 # call is free.
-.translator_finalise_template <- function(state, json, notify = function(txt) NULL) {
+.translator_finalise_template <- function(state, json, notify = function(txt) NULL,
+                                         extra_issues = NULL, force = FALSE) {
   # 2026-10-23: what the server can settle from the catalogue is settled
   # before anything is written (an uncertainty given as a fraction of 1)
   fixed <- tryCatch(.translator_fix_piece_json(json), error = function(e) NULL)
@@ -1672,7 +1673,7 @@ translator_cancel_clear <- function(tok) {
   key <- tryCatch(.tp_sha256(json), error = function(e) NULL)
   if (is.null(key)) return(invisible(NULL))
   cached <- isolate(state$template_file)
-  if (identical(isolate(state$template_file_key), key) && !is.null(cached) &&
+  if (!isTRUE(force) && identical(isolate(state$template_file_key), key) && !is.null(cached) &&
       file.exists(cached) && !is.null(isolate(state$precheck)))
     return(invisible(cached))
   tryCatch(notify("Building the workbook and running the quality checks..."),
@@ -1691,6 +1692,17 @@ translator_cancel_clear <- function(tok) {
   }
   piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
   state$precheck     <- if (ok) .translator_precheck_file(path, source = src, piece = piece)
+  # 2026-10-30: what the AI review corrected, and what it explained as not
+  # an error, is listed with the checks (see R/translator_review.R).
+  if (ok && is.data.frame(extra_issues) && nrow(extra_issues)) {
+    pcx <- isolate(state$precheck)
+    if (!is.null(pcx) && is.data.frame(pcx$issues)) {
+      cols <- names(pcx$issues)
+      for (cl in setdiff(cols, names(extra_issues))) extra_issues[[cl]] <- NA
+      pcx$issues <- rbind(pcx$issues, extra_issues[, cols, drop = FALSE])
+      state$precheck <- pcx
+    }
+  }
   # 2026-10-22 (WP4): the checks are written into the workbook itself
   # (filters, coloured cells, Check and Why columns) once they are known.
   if (ok) tryCatch(.translator_annotate_workbook(path, isolate(state$precheck)$issues, isolate(state$precheck)$qa),
@@ -3114,9 +3126,23 @@ translator_cancel_clear <- function(tok) {
                      translator_job_update(job_id, status = "failed", error = state$last_error)
                      FALSE })
     if (ok && !is.null(state$last_template_json)) {
-      .translator_persist(state)
-      tryCatch(translator_job_finish(job_id, state, session),
-               error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
+      # 2026-10-30: before the files are delivered, the flagged items go
+      # back to the AI once (R/translator_review.R): it corrects them from
+      # the file or explains why they are not errors.
+      wrap_up <- function() {
+        .translator_persist(state)
+        tryCatch(translator_job_finish(job_id, state, session),
+                 error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
+        done()
+      }
+      return(tryCatch(
+        .translator_review_async(state, system_prompt, ctx$messages, ctx$register,
+                                 on_chunk_cb, on_tick_cb, stopper, info, inseq, job_id,
+                                 on_done = wrap_up),
+        error = function(e) {
+          message("translator: review step failed (", conditionMessage(e), "); delivering the template as it is")
+          wrap_up()
+        }))
     } else if (ok) {
       translator_job_update(job_id, status = "failed", error = state$last_error %||% "no template produced")
     }
@@ -3501,7 +3527,12 @@ translator_cancel_clear <- function(tok) {
     "   Frac_LeachMS_pct, include them as lower_mcf/upper_mcf,",
     "   lower_ef3/upper_ef3, lower_frac_gas/upper_frac_gas,",
     "   lower_frac_leach/upper_frac_leach with their respective",
-    "   distribution_* fields. When the user has no bounds, leave the",
+    "   distribution_* fields. A RELATIVE spread (e.g. 'all shares",
+    "   +/-50 %', 'every MCF +/-25 %') goes in fraction_unc_pct,",
+    "   mcf_unc_pct, ef3_unc_pct, frac_gas_unc_pct or frac_leach_unc_pct",
+    "   with the bounds null: the server computes each row's bounds.",
+    "   A line labelled 'all ...' applies to every row it names.",
+    "   When the user has no bounds, leave the",
     "   bounds fields null. The app then uses the IPCC range for EF3",
     "   and for the Table 10.22 fractions when the value is the IPCC",
     "   default; MCF has no IPCC range, so a blank MCF range is listed",

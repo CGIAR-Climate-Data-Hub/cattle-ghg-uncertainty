@@ -1,4 +1,4 @@
-# Usage: Rscript scripts/translator_dry_run.R   (needs the gitignored test_data/ZAM/zam2_fixed.xlsx; no API call, about 3 minutes)
+# Usage: Rscript scripts/translator_dry_run.R   (needs the gitignored test_data/ZAM/zam2_fixed.xlsx; no API call, about 15 minutes since the review step of 2026-10-30 rebuilds the workbook; do not run it under a 10-minute timeout)
 #
 # End-to-end dry run of the translator pipeline with a stubbed model:
 # explore -> clarify -> Produce (enumerate + 5 batches) -> merge -> writer ->
@@ -74,6 +74,20 @@ calls <- character()
                      rows_json(mn[mn$aggregation_level == lv & !is.na(mn$fraction_pct), mm_cols]),
                      rows_json(ts[ts$aggregation_level == lv, ts_cols]))
     return(c(list(reply = piece, tool_used = TRUE), base))
+  }
+  # 2026-10-30: the review of the checks (R/translator_review.R). The stub
+  # corrects one row (a visible uncertainty change) and explains the first
+  # flagged item as not an error.
+  if (startsWith(last, "REVIEW.")) {
+    calls <<- c(calls, "review")
+    stopifnot(grepl("FLAGGED ITEMS", last, fixed = TRUE), grepl("mode = \"review\"", last, fixed = TRUE))
+    first <- regmatches(last, regexpr("[[]1[]] [^|]+[|] [^|]+[|]", last))
+    where1 <- if (length(first)) trimws(strsplit(first, "|", fixed = TRUE)[[1]][2]) else "unknown"
+    r1 <- ps[ps$aggregation_level == levels[1] & ps$parameter == "BW", param_cols][1, ]
+    r1$uncertainty_pct <- 12.34; r1$lower <- NA; r1$upper <- NA
+    reply <- sprintf('{"mode":"review","parameters":%s,"not_errors":[{"check":"stub","where":"%s","reason":"The file gives this value (stub)."}]}',
+                     rows_json(r1), where1)
+    return(c(list(reply = reply, tool_used = TRUE), base))
   }
   calls <<- c(calls, "chat")
   # a clarify reply the way rule 11 asks for it: prose, questions, then the
@@ -157,6 +171,15 @@ stopifnot(nrow(out$param_specs) == n_groups * nrow(PARAM_CATALOGUE), state$prech
           length(state$batch_parts) == length(levels), !is.null(state$batch_parts_key))
 n_batch_1 <- sum(grepl("^batch:", calls))
 stopifnot(n_batch_1 == length(levels))
+# 2026-10-30: the review ran once, its correction is in the workbook and
+# both the correction and the explanation are listed with the checks.
+stopifnot(sum(calls == "review") == 1L, !is.null(state$review), state$review$corrected >= 1L,
+          any(state$precheck$issues$check %in% "corrected by the AI review"),
+          any(state$precheck$issues$check %in% "reviewed: not an error"))
+rv_ps <- suppressMessages(parse_uploaded_template(state$template_file))$param_specs
+stopifnot(any(abs(num(rv_ps$uncertainty_pct[rv_ps$aggregation_level == levels[1] & rv_ps$parameter == "BW"]) - 12.34) < 1e-6, na.rm = TRUE))
+cat("review: flagged", state$review$flagged, " corrected", state$review$corrected, " not errors", state$review$not_errors,
+    " still flagged", state$review$still_flagged, "\n")
 
 # ---- scenario 2: Produce again, nothing changed: parts reused -----------------
 calls <- character(); state$last_template_json <- NULL
