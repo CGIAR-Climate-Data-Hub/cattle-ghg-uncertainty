@@ -1911,15 +1911,23 @@ section_F <- function() {
     # reasoning now lives in the methodology document alone, so this page
     # is no longer checked for it. Country X / Y worked examples and the
     # pitfalls section remain the signals of structural completeness.
-    size_ok       <- file.info(help_html)$size >= 50000
-    has_x         <- grepl("Country X", txt, fixed = TRUE)
-    has_y         <- grepl("Country Y", txt, fixed = TRUE)
-    has_pitfalls  <- grepl("Common pitfalls", txt, fixed = TRUE)
+    # 2026-10-30: the page was rewritten from Lolita's edited drafts (plain
+    # language, one real inventory as the worked example, no Country X / Y,
+    # no pitfalls list). The signals are now its sections, its embedded
+    # figures, and the absence of the notation she asked to remove.
+    size_ok   <- file.info(help_html)$size >= 50000
+    sections  <- c("What is a correlation?", "How the tool takes correlations into account",
+                   "The correlation choices in the tool", "Trends", "Example: what the choices change",
+                   "From template", "Structural defaults")
+    miss_sec  <- sections[!vapply(sections, function(k) grepl(k, txt, fixed = TRUE), logical(1))]
+    n_fig     <- lengths(regmatches(txt, gregexpr("data:image/png;base64", txt, fixed = TRUE)))
+    no_rho    <- !grepl("ρ", txt, fixed = TRUE) && !grepl("Recommended", txt, fixed = TRUE)
     check_bool("F23", "F",
-               "Correlations help page rendered with both worked examples + pitfalls",
-               size_ok && has_x && has_y && has_pitfalls,
-               notes = sprintf("size_ok=%s X=%s Y=%s pitfalls=%s",
-                               size_ok, has_x, has_y, has_pitfalls))
+               "Correlations help page rendered with its sections, the eight figures, and no rho or 'Recommended'",
+               size_ok && !length(miss_sec) && n_fig >= 8 && no_rho,
+               notes = sprintf("size_ok=%s missing sections=%s figures=%d no rho/Recommended=%s",
+                               size_ok, if (length(miss_sec)) paste(miss_sec, collapse = "; ") else "none",
+                               n_fig, no_rho))
   } else {
     record("F23", "F", "Correlations help page",
            "rendered HTML", "missing", "SKIP",
