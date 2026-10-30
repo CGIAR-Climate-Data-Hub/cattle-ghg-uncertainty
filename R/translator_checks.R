@@ -575,7 +575,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   # ---- source reconciliation ------------------------------------------
   if (!is.null(source) && is.data.frame(ps) && nrow(ps) > 0 &&
       "data_source" %in% names(ps)) {
-    dsrc <- tolower(as.character(ps$data_source))
+    # a placeholder range tag does not change where the value came from
+    dsrc <- sub("; *placeholder range.*$", "", tolower(as.character(ps$data_source)))
     dsrc[is.na(dsrc)] <- ""
     val  <- suppressWarnings(as.numeric(ps$mean))
     lvl2 <- if ("aggregation_level" %in% names(ps)) as.character(ps$aggregation_level)
@@ -982,7 +983,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       for (i in seq_len(nrow(d9)))
         add(d9$where[i], d9$issue[i], severity = d9$severity[i] %||% "info", sheet = d9$sheet[i],
             group = d9$group[i], parameter = d9$parameter[i],
-            check = if (identical(d9$severity[i], "warn")) "range needed" else "default applied")
+            check = if (identical(d9$severity[i], "warn")) "placeholder range" else "default applied")
     # 2026-10-23: what the server corrected before writing (see
     # .translator_fix_uncertainty_scale), for the user to check
     sc <- piece$server_corrections
@@ -1041,7 +1042,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       if (no_spread && !has_def)
         rows[[length(rows) + 1L]] <- data.frame(
           where = where_i,
-          issue = sprintf("The file gave a value for %s (%s) but no uncertainty range, and there is no default range for %s. Add a range from your own data; the app lists it as Missing and will not run until you do.",
+          issue = sprintf("The file gave a value for %s (%s) but no uncertainty range, and there is no published default for %s. A placeholder range was written (marked 'placeholder range' in data_source) so the app can run. It has no source: replace it with a range from your own data.",
                           pn, format(signif(mean_v[i], 6)), pn),
           sheet = "Parameters", group = grp_i, parameter = pn, severity = "warn",
           stringsAsFactors = FALSE)
@@ -1075,7 +1076,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           issue = if (!is.null(r))
             sprintf("%s for %s came without a range; the IPCC range for this default value was applied (%s). Replace it if your inventory has its own.", cn, id_i, r$source)
           else
-            sprintf("%s for %s (%s) came without a range, and IPCC gives none for this value. Add a range from your own data; the app lists it as Missing and will not run until you do.", cn, id_i, format(signif(cm$v, 4))),
+            sprintf("%s for %s (%s) came without a range, and IPCC gives none for this value. A placeholder range was written (MCF +/-25 %%, EF3 a factor of 2, fractions +/-50 %%; marked in data_source) so the app can run. It has no source: replace it with your own.", cn, id_i, format(signif(cm$v, 4))),
           sheet = "Manure_Management", group = grp_m, parameter = cn,
           severity = if (!is.null(r)) "info" else "warn", stringsAsFactors = FALSE)
       }
@@ -1090,7 +1091,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
 # front of it. Every one of them can be a real error the model can fix from
 # the source (a row left out, a column read from the wrong year, a range or
 # a distribution not carried over), or a false alarm the model can explain
-# (two groups that really have the same head count). "range needed" is
+# (two groups that really have the same head count). "placeholder range" is
 # included only when the source plausibly gives a range (manure and the
 # parameters the file states uncertainty for); the review is told so.
 .TRANSLATOR_REVIEW_CHECKS <- c(
@@ -1098,7 +1099,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   "distribution differs between systems", "time-series coverage", "time-series year",
   "Parameters vs time series", "value not in file", "manure shares sum",
   "manure coefficient consistency", "bounds bracket mean", "percent vs fraction",
-  "duplicate population", "category coverage", "time series totals", "range needed")
+  "duplicate population", "category coverage", "time series totals", "placeholder range")
 
 translator_review_targets <- function(issues) {
   if (!is.data.frame(issues) || !nrow(issues)) return(issues)

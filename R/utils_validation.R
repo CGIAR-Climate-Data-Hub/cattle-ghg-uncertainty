@@ -467,7 +467,51 @@ range_is_blank <- function(mean, lower, upper, distribution) {
   !is_const & !is.na(mean) & mean != 0 & (is.na(lower) | is.na(upper))
 }
 
-# Fill blank ranges where a default exists; flag those rows range_default.
+# PLACEHOLDER RANGES (decision 2026-10-30, later the same day). A blank
+# range on an input with no defensible default no longer stops the run: it
+# takes a placeholder, the value the catalogue carried before the decision
+# (EXAMPLE_ILLUSTRATION_UNC_PCT). A placeholder has no published source. It is
+# flagged (range_placeholder), shown as a Warn on the QA/QC tab, listed in the
+# Word report, marked in the Excel and IPCC-table exports, and tagged in the
+# translated template ("placeholder range" in data_source), so it is never
+# mistaken for a default or for the country's own range.
+# Written out, not taken from EXAMPLE_ILLUSTRATION_UNC_PCT, because some
+# scripts source the R files in another order; audit F65 checks the two
+# agree.
+PLACEHOLDER_UNC_PCT <- c(
+  N = 10, BW = 15, MW = 10, WG = 30, Milk = 20, Fat = 10, pct_pregnant = 20,
+  DE = 15, hours = 20, CP = 15, ASH = 25, UE = 25, MilkPR = 10, Tw = 25,
+  GE = 15, DMI = 15)
+.PLACEHOLDER_TAG <- "placeholder range"
+
+# The placeholder range for one parameter around one value, or NULL.
+# Percentage parameters take PLACEHOLDER_UNC_PCT; a bounds-type IPCC input
+# with the country's own value keeps the IPCC range's shape scaled to it.
+placeholder_range_for <- function(parameter, mean, catalogue = PARAM_CATALOGUE) {
+  if (is.null(parameter) || is.na(parameter) || is.na(mean) || mean == 0) return(NULL)
+  # Tw at 20 C or above has no effect (the cold adjustment applies below
+  # 20 C only); a range around it would push half the draws below 20 and
+  # raise Cfi in warm climates. It is treated as a fixed value instead.
+  if (identical(parameter, "Tw") && mean >= 20) return(NULL)
+  pct <- if (parameter %in% names(PLACEHOLDER_UNC_PCT)) unname(PLACEHOLDER_UNC_PCT[[parameter]]) else NA_real_
+  if (!is.na(pct)) {
+    b <- calc_bounds(mean, pct)
+    return(list(pct = pct, lower = b$lower, upper = b$upper,
+                label = sprintf("+/-%s%%", format(pct))))
+  }
+  i <- match(parameter, catalogue$parameter)
+  if (is.na(i)) return(NULL)
+  lo  <- suppressWarnings(as.numeric(catalogue$suggested_lower_bound[i]))
+  hi  <- suppressWarnings(as.numeric(catalogue$suggested_upper_bound[i]))
+  def <- suppressWarnings(as.numeric(catalogue$ipcc_default[i]))
+  if (is.na(lo) || is.na(hi) || is.na(def) || def == 0) return(NULL)
+  list(pct = NA_real_, lower = mean * lo / def, upper = mean * hi / def,
+       label = "the IPCC range scaled to your value")
+}
+
+# Fill blank ranges: a defensible default where one exists (range_default),
+# else a placeholder (range_placeholder). A row the translator tagged
+# "placeholder range" in data_source keeps its range and is flagged too.
 apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
   ps <- param_specs
   if (is.null(ps) || !nrow(ps) || !all(c("parameter", "mean") %in% names(ps)))
@@ -475,14 +519,24 @@ apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
   for (cl in c("lower", "upper", "uncertainty_pct"))
     if (!cl %in% names(ps)) ps[[cl]] <- NA_real_
   if (!"distribution" %in% names(ps)) ps$distribution <- NA_character_
-  if (!"range_default" %in% names(ps)) ps$range_default <- FALSE
-  ps$range_default[is.na(ps$range_default)] <- FALSE
+  for (fl in c("range_default", "range_placeholder")) {
+    if (!fl %in% names(ps)) ps[[fl]] <- FALSE
+    ps[[fl]][is.na(ps[[fl]])] <- FALSE
+  }
+  if ("data_source" %in% names(ps))
+    ps$range_placeholder[grepl(.PLACEHOLDER_TAG, as.character(ps$data_source), fixed = TRUE)] <- TRUE
   mu <- suppressWarnings(as.numeric(ps$mean))
   blank <- range_is_blank(mu, suppressWarnings(as.numeric(ps$lower)),
                           suppressWarnings(as.numeric(ps$upper)),
                           as.character(ps$distribution))
   for (i in which(blank)) {
+    if (identical(as.character(ps$parameter[i]), "Tw") && mu[i] >= 20) {
+      ps$distribution[i] <- "constant"; ps$lower[i] <- mu[i]; ps$upper[i] <- mu[i]
+      next
+    }
     r <- default_range_for(ps$parameter[i], mu[i], catalogue)
+    is_def <- !is.null(r)
+    if (!is_def) r <- placeholder_range_for(ps$parameter[i], mu[i], catalogue)
     if (is.null(r)) next
     if (!is.na(r$pct)) ps$uncertainty_pct[i] <- r$pct
     ps$lower[i] <- r$lower
@@ -491,7 +545,7 @@ apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
       j <- match(ps$parameter[i], catalogue$parameter)
       ps$distribution[i] <- catalogue$suggested_distribution[j]
     }
-    ps$range_default[i] <- TRUE
+    if (is_def) ps$range_default[i] <- TRUE else ps$range_placeholder[i] <- TRUE
   }
   ps
 }
@@ -535,11 +589,36 @@ manure_default_range <- function(mms_type, column, value) {
        source = "IPCC 2019, Vol. 4, Table 10.22")
 }
 
-# Fill blank manure ranges where IPCC publishes one. Rows whose value cell is
-# blank are left alone here: the sampler fills the value from the system's
-# IPCC default, and manure_missing_ranges() treats them as carrying it.
+# Manure placeholders (2026-10-30): MCF +/-25 %, EF3 a factor of two either
+# way, the volatilisation and leaching fractions +/-50 %: the ranges the
+# translator and the project rule used before the decision. Percent columns
+# are capped at 100.
+MANURE_PLACEHOLDER <- list(
+  MCF_pct          = list(lo = 0.75, hi = 1.25, label = "+/-25%"),
+  EF3              = list(lo = 0.5,  hi = 2,    label = "a factor of 2"),
+  Frac_GasMS_pct   = list(lo = 0.5,  hi = 1.5,  label = "+/-50%"),
+  Frac_LeachMS_pct = list(lo = 0.5,  hi = 1.5,  label = "+/-50%"))
+
+# Fill blank manure ranges: the IPCC range where one exists for the IPCC
+# default value, else the placeholder. Placeholder columns are listed per row
+# in range_placeholder_cols (comma-separated); a translated template carries
+# them in its data_source column ("placeholder range: MCF_pct, EF3").
+# Rows whose value cell is blank are left alone here: the sampler fills the
+# value from the system's IPCC default and its IPCC range.
 apply_default_ranges_manure <- function(manure) {
   if (is.null(manure) || !nrow(manure) || !"mms_type" %in% names(manure)) return(manure)
+  if (!"range_placeholder_cols" %in% names(manure)) manure$range_placeholder_cols <- NA_character_
+  if ("data_source" %in% names(manure)) {
+    # the tag the translator writes starts the cell ("placeholder range:
+    # MCF_pct, EF3"); the template's hint row only mentions it
+    tagged <- grepl(paste0("^[[:space:]]*", .PLACEHOLDER_TAG), as.character(manure$data_source))
+    manure$range_placeholder_cols[tagged & is.na(manure$range_placeholder_cols)] <-
+      trimws(sub(paste0("^.*", .PLACEHOLDER_TAG, "[: ]*"), "", as.character(manure$data_source[tagged & is.na(manure$range_placeholder_cols)])))
+  }
+  add_flag <- function(i, col) {
+    cur <- manure$range_placeholder_cols[i]
+    manure$range_placeholder_cols[i] <<- if (is.na(cur) || !nzchar(cur)) col else paste(unique(c(strsplit(cur, ", *")[[1]], col)), collapse = ", ")
+  }
   for (col in names(MANURE_RANGE_FIELDS)) {
     if (!col %in% names(manure)) next
     f <- MANURE_RANGE_FIELDS[[col]]
@@ -547,11 +626,24 @@ apply_default_ranges_manure <- function(manure) {
     val <- suppressWarnings(as.numeric(manure[[col]]))
     lo  <- suppressWarnings(as.numeric(manure[[f[["lower"]]]]))
     hi  <- suppressWarnings(as.numeric(manure[[f[["upper"]]]]))
+    share <- if ("fraction_pct" %in% names(manure)) suppressWarnings(as.numeric(manure$fraction_pct)) else rep(1, nrow(manure))
     for (i in which(!is.na(val) & val != 0 & (is.na(lo) | is.na(hi)))) {
-      r <- manure_default_range(as.character(manure$mms_type[i]), col, val[i])
-      if (is.null(r)) next
-      manure[[f[["lower"]]]][i] <- r$lower
-      manure[[f[["upper"]]]][i] <- r$upper
+      id <- as.character(manure$mms_type[i])
+      r <- manure_default_range(id, col, val[i])
+      if (!is.null(r)) {
+        manure[[f[["lower"]]]][i] <- r$lower; manure[[f[["upper"]]]][i] <- r$upper
+        next
+      }
+      # pasture's EF3 and fractions are not used; systems with no share
+      # and placeholder rows of the template need no range
+      if (identical(id, "pasture") && col != "MCF_pct") next
+      if (is.na(share[i]) || share[i] <= 0) next
+      if (is.na(id) || !nzchar(trimws(id)) || grepl("^select", id, ignore.case = TRUE)) next
+      ph <- MANURE_PLACEHOLDER[[col]]
+      cap <- if (col == "EF3") Inf else 100
+      manure[[f[["lower"]]]][i] <- val[i] * ph$lo
+      manure[[f[["upper"]]]][i] <- min(cap, val[i] * ph$hi)
+      add_flag(i, col)
     }
   }
   manure
@@ -588,6 +680,9 @@ manure_missing_ranges <- function(manure, climate = "tropical") {
       if (!is.na(lo[i]) && !is.na(hi[i])) next
       id <- as.character(manure$mms_type[i])
       if (is.na(id) || !nzchar(trimws(id)) || grepl("^select", id, ignore.case = TRUE)) next
+      # A blank value cell is filled by the sampler with the system's IPCC
+      # default and its IPCC range or a placeholder: nothing is missing.
+      if (is.na(val[i])) next
       # Pasture N goes through the Chapter 11 pathway (EF3_PRP, Frac_GASM_PRP,
       # Frac_LEACH_PRP on the Parameters sheet); the row's EF3 and fractions
       # are not used, so they need no range. Its MCF is used.
@@ -640,4 +735,85 @@ run_range_gate <- function(param_specs, manure, needed_params, sources) {
                            mm$column, " (", mm$mms_type, ")"))
   }
   unique(out)
+}
+
+# Where each range came from, for the Excel export (one label per row).
+range_source_label <- function(param_specs) {
+  ps <- param_specs
+  if (is.null(ps) || !nrow(ps)) return(character(0))
+  d  <- if ("distribution" %in% names(ps)) tolower(as.character(ps$distribution)) else rep("", nrow(ps))
+  mu <- suppressWarnings(as.numeric(ps$mean))
+  out <- rep("your file", nrow(ps))
+  out[d %in% c("constant", "const") | (!is.na(mu) & mu == 0)] <- "no range (fixed value)"
+  if ("range_default" %in% names(ps)) {
+    k <- which(ps$range_default %in% TRUE)
+    out[k] <- paste0("default range: ", ifelse(ps$parameter[k] %in% names(DEFAULT_RANGE_SOURCE),
+                                               unname(DEFAULT_RANGE_SOURCE[as.character(ps$parameter[k])]), ""))
+  }
+  if ("range_placeholder" %in% names(ps))
+    out[ps$range_placeholder %in% TRUE] <- "PLACEHOLDER: no published source, replace with your own"
+  out
+}
+
+# Every placeholder, one row per (group, input), for the Word report.
+placeholder_table <- function(param_specs, manure = NULL) {
+  rows <- list()
+  ps <- param_specs
+  if (!is.null(ps) && nrow(ps) && "range_placeholder" %in% names(ps)) {
+    k <- which(ps$range_placeholder %in% TRUE)
+    for (i in k) {
+      pct <- suppressWarnings(as.numeric(ps$uncertainty_pct[i]))
+      rng <- if (!is.na(pct)) sprintf("+/-%s%%", format(pct))
+             else sprintf("%s to %s", format(signif(as.numeric(ps$lower[i]), 4)), format(signif(as.numeric(ps$upper[i]), 4)))
+      rows[[length(rows) + 1L]] <- data.frame(
+        Group = paste(c(if ("aggregation_level" %in% names(ps)) ps$aggregation_level[i], ps$sub_category[i]), collapse = " / "),
+        Input = as.character(ps$parameter[i]), Value = format(signif(as.numeric(ps$mean[i]), 5)),
+        `Placeholder range` = rng, check.names = FALSE, stringsAsFactors = FALSE)
+    }
+  }
+  if (!is.null(manure) && is.data.frame(manure) && nrow(manure) && "range_placeholder_cols" %in% names(manure)) {
+    for (i in which(!is.na(manure$range_placeholder_cols) & nzchar(manure$range_placeholder_cols))) {
+      for (col in strsplit(manure$range_placeholder_cols[i], ", *")[[1]]) {
+        f <- MANURE_RANGE_FIELDS[[col]]; if (is.null(f)) next
+        rows[[length(rows) + 1L]] <- data.frame(
+          Group = paste(c(if ("aggregation_level" %in% names(manure)) manure$aggregation_level[i], manure$sub_category[i]), collapse = " / "),
+          Input = sprintf("%s (%s)", col, manure$mms_type[i]),
+          Value = format(signif(suppressWarnings(as.numeric(manure[[col]][i])), 5)),
+          `Placeholder range` = sprintf("%s to %s (%s)", format(signif(as.numeric(manure[[f[["lower"]]]][i]), 4)),
+                                        format(signif(as.numeric(manure[[f[["upper"]]]][i]), 4)), MANURE_PLACEHOLDER[[col]]$label),
+          check.names = FALSE, stringsAsFactors = FALSE)
+      }
+    }
+  }
+  if (!length(rows)) return(NULL)
+  do.call(rbind, rows)
+}
+
+# For each IPCC reporting line, the inputs that carry a placeholder range
+# (the parameters the source uses, plus the manure columns it reads).
+.IPCC_LINE_SOURCES <- list(
+  enteric_ch4_total      = list(src = "enteric_ch4",          mm = character(0)),
+  manure_ch4_total       = list(src = "manure_ch4",           mm = "MCF_pct"),
+  direct_n2o_mm_total    = list(src = "manure_n2o_direct",    mm = "EF3"),
+  indirect_n2o_mm_total  = list(src = "manure_n2o_indirect",  mm = c("Frac_GasMS_pct", "Frac_LeachMS_pct")),
+  direct_n2o_prp_total   = list(src = "pasture_n2o_direct",   mm = character(0)),
+  indirect_n2o_prp_total = list(src = "pasture_n2o_indirect", mm = character(0)))
+.IPCC_LINE_TOTALS <- list(
+  total_ch4  = c("enteric_ch4_total", "manure_ch4_total"),
+  total_n2o  = c("direct_n2o_mm_total", "indirect_n2o_mm_total", "direct_n2o_prp_total", "indirect_n2o_prp_total"),
+  total_co2e = names(.IPCC_LINE_SOURCES))
+
+placeholder_inputs_by_line <- function(param_specs, manure = NULL) {
+  ps <- param_specs
+  pp <- if (!is.null(ps) && nrow(ps) && "range_placeholder" %in% names(ps))
+    unique(as.character(ps$parameter[ps$range_placeholder %in% TRUE])) else character(0)
+  mc <- if (!is.null(manure) && is.data.frame(manure) && "range_placeholder_cols" %in% names(manure))
+    unique(unlist(strsplit(stats::na.omit(manure$range_placeholder_cols), ", *"))) else character(0)
+  one <- function(k) {
+    sp <- .IPCC_LINE_SOURCES[[k]]
+    c(intersect(pp, SOURCE_PARAM_DEPS[[sp$src]]), intersect(mc, sp$mm))
+  }
+  out <- lapply(names(.IPCC_LINE_SOURCES), one); names(out) <- names(.IPCC_LINE_SOURCES)
+  for (k in names(.IPCC_LINE_TOTALS)) out[[k]] <- unique(unlist(out[.IPCC_LINE_TOTALS[[k]]]))
+  vapply(out, function(v) if (length(v)) paste(sort(v), collapse = ", ") else "none", character(1))
 }

@@ -3535,8 +3535,8 @@ translator_cancel_clear <- function(tok) {
     "   When the user has no bounds, leave the",
     "   bounds fields null. The app then uses the IPCC range for EF3",
     "   and for the Table 10.22 fractions when the value is the IPCC",
-    "   default; MCF has no IPCC range, so a blank MCF range is listed",
-    "   as Missing and the user must add it.",
+    "   default; any other blank range (MCF always) gets a placeholder,",
+    "   marked as such, which the user should replace.",
     "",
     "7. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
     "   'for brevity not shown' placeholders, no trailing commas.",
@@ -4095,7 +4095,7 @@ translator_cancel_clear <- function(tok) {
           # (per sub-category where the resolver has one). Since 2026-10-30
           # the catalogue has a range only for the inputs with a defensible
           # default; for every other input the range stays blank and the app
-          # lists it as Missing. Both cases are listed in the checks.
+          # fills a placeholder, tagged in data_source. Both cases are listed in the checks.
           num0 <- function(x) suppressWarnings(as.numeric(x))
           is_const <- identical(tolower(as.character(v_dist)), "constant")
           if (!is_const && !is.na(num0(v_mean))) {
@@ -4105,6 +4105,19 @@ translator_cancel_clear <- function(tok) {
               v_unc <- .translator_scalar(rs9$uncertainty_pct %||% PARAM_CATALOGUE$suggested_uncertainty_pct[i])
             if (is.na(v_dist) || !nzchar(as.character(v_dist)))
               v_dist <- .translator_scalar(rs9$distribution %||% PARAM_CATALOGUE$suggested_distribution[i])
+          }
+          # 2026-10-30 (later): no range and no defensible default: a
+          # placeholder range, tagged in data_source so the app, the report
+          # and the exports can tell it from the country's own.
+          ph_tag <- FALSE
+          if (!is_const && is.finite(num0(v_mean)) && num0(v_mean) != 0 &&
+              is.na(v_lo) && is.na(v_hi) && is.na(num0(v_unc)) &&
+              is.null(default_range_for(p_name, num0(v_mean)))) {
+            ph <- placeholder_range_for(p_name, num0(v_mean))
+            if (!is.null(ph)) {
+              if (!is.na(ph$pct)) v_unc <- ph$pct else { v_lo <- ph$lower; v_hi <- ph$upper }
+              ph_tag <- TRUE
+            }
           }
           .put_param(7,  v_mean)
           .put_param(8,  v_unc)
@@ -4120,7 +4133,8 @@ translator_cancel_clear <- function(tok) {
           if (!is.na(v_hi)) .put_param(13, v_hi)
           else if (!is.na(num(v_mean)) && !is.na(num(v_unc))) .put_param(13, num(v_mean) * (1 + num(v_unc) / 100))
           else if (identical(tolower(as.character(v_dist)), "constant")) .put_param(13, v_mean)
-          .put_param(16, ai$data_source %||% "AI translator")
+          .put_param(16, if (ph_tag) paste0(ai$data_source %||% "AI translator", "; ", .PLACEHOLDER_TAG)
+                         else ai$data_source %||% "AI translator")
         } else if (identical(PARAM_CATALOGUE$param_tier[i], "optional")) {
           # Measured-intake parameters (GE, DMI) are the one kind of gap that
           # must STAY a gap. A blank cell is the signal that means "derive
@@ -4180,6 +4194,15 @@ translator_cancel_clear <- function(tok) {
           ub  <- if (!is.null(rs)) rs$upper           else PARAM_CATALOGUE$suggested_upper_bound[i]
           dst <- if (!is.null(rs)) rs$distribution    else PARAM_CATALOGUE$suggested_distribution[i]
           src <- if (!is.null(rs)) rs$data_source     else "ipcc_default"
+          # 2026-10-30 (later): a placeholder where there is no default range
+          if (is.na(unc) && is.na(lb) && is.na(ub) && is.finite(suppressWarnings(as.numeric(dv))) &&
+              !identical(tolower(as.character(dst)), "constant")) {
+            ph <- placeholder_range_for(p_name, as.numeric(dv))
+            if (!is.null(ph)) {
+              if (!is.na(ph$pct)) unc <- ph$pct else { lb <- ph$lower; ub <- ph$upper }
+              src <- paste0(src, "; ", .PLACEHOLDER_TAG)
+            }
+          }
           .put_param(7,  dv)
           .put_param(8,  unc)
           .put_param(9,  lb)
@@ -4318,6 +4341,25 @@ translator_cancel_clear <- function(tok) {
       .put_mm(22, lea_lo)
       .put_mm(23, lea_hi)
       .put_mm(24, mm$distribution_frac_leach[i])
+      # 2026-10-30 (later): ranges still blank take a placeholder (MCF
+      # +/-25 %, EF3 x2, fractions +/-50 %), listed in data_source (col 25)
+      # so the app, the report and the exports know them.
+      ph_cols <- character(0)
+      share_i <- suppressWarnings(as.numeric(.translator_scalar(mm$fraction_pct[i])))
+      if (is.finite(share_i) && share_i > 0) {
+        for (cc in list(list(c = "MCF_pct", v = mcf_v, lo = mcf_lo, hi = mcf_hi, lc = 10, hc = 11),
+                        list(c = "EF3", v = ef3_v, lo = ef3_lo, hi = ef3_hi, lc = 14, hc = 15),
+                        list(c = "Frac_GasMS_pct", v = gas_v, lo = gas_lo, hi = gas_hi, lc = 18, hc = 19),
+                        list(c = "Frac_LeachMS_pct", v = lea_v, lo = lea_lo, hi = lea_hi, lc = 22, hc = 23))) {
+          if (!is.finite(cc$v) || cc$v == 0 || !is.na(cc$lo) || !is.na(cc$hi)) next
+          if (identical(as.character(mms_id), "pasture") && cc$c != "MCF_pct") next
+          p0 <- MANURE_PLACEHOLDER[[cc$c]]
+          .put_mm(cc$lc, cc$v * p0$lo)
+          .put_mm(cc$hc, if (cc$c == "EF3") cc$v * p0$hi else min(100, cc$v * p0$hi))
+          ph_cols <- c(ph_cols, cc$c)
+        }
+      }
+      if (length(ph_cols)) .put_mm(25, paste0(.PLACEHOLDER_TAG, ": ", paste(ph_cols, collapse = ", ")))
     }
   }
 

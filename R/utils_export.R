@@ -87,7 +87,7 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
 
 export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, filepath,
                                 settings = NULL, param_specs = NULL,
-                                qa_caveats = NULL) {
+                                qa_caveats = NULL, manure = NULL) {
   # Andreas 2026-05 #38: previously crashed when ipcc_table was NULL (which
   # happens whenever AD/EF decomposition didn't run, e.g. for custom uploads
   #: see app_server.R line 982). Replace NULL/empty inputs with placeholder
@@ -98,6 +98,15 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   summary_df <- if (is.null(ipcc_table) || !is.data.frame(ipcc_table) || nrow(ipcc_table) == 0)
     placeholder("IPCC summary unavailable. Enable 'Run uncertainty decomposition (AD/EF/Combined)' on Tab 5 and re-run to populate this sheet.")
   else ipcc_table
+  # 2026-10-30: which inputs of each reporting line carry a placeholder
+  # range (no published source; see the Word report, section 2a).
+  if (is.data.frame(ipcc_table) && nrow(ipcc_table) == 9L && !is.null(param_specs)) {
+    ph <- tryCatch(placeholder_inputs_by_line(param_specs, manure), error = function(e) NULL)
+    if (!is.null(ph))
+      summary_df[["Inputs with a placeholder range (no published source)"]] <-
+        unname(ph[c("enteric_ch4_total", "manure_ch4_total", "direct_n2o_mm_total", "indirect_n2o_mm_total",
+                    "direct_n2o_prp_total", "indirect_n2o_prp_total", "total_ch4", "total_n2o", "total_co2e")])
+  }
 
   # 2026-06: drop the cv_pct column from the Uncertainty_Metrics sheet so the
   # Excel export aligns with every other user-facing surface (in-app tables,
@@ -153,9 +162,12 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   # Word report's section 13 table is capped against (officer print.rdocx is too
   # slow on the full 500+ row table for a large inventory): Excel handles it
   # instantly, so the exhaustive audit lives here.
-  inputs_df <- if (!is.null(param_specs) && is.data.frame(param_specs) && nrow(param_specs) > 0)
-    param_specs
-  else placeholder("Input parameters unavailable. Run a Monte Carlo simulation on Tab 5 first.")
+  inputs_df <- if (!is.null(param_specs) && is.data.frame(param_specs) && nrow(param_specs) > 0) {
+    x <- param_specs
+    # 2026-10-30: where each range came from; placeholders are marked
+    x$range_source <- tryCatch(range_source_label(param_specs), error = function(e) NA_character_)
+    x
+  } else placeholder("Input parameters unavailable. Run a Monte Carlo simulation on Tab 5 first.")
 
   # 2026-09-18: QA/QC failures the user ignored, and repairs applied so the
   # run could proceed. Reviewers must see these next to the numbers.

@@ -50,13 +50,14 @@ make_group_key <- function(df) {
   # 2026-10-30: the IPCC range of a system's EF3 or Table 10.22 fraction
   # applies when the row carries the IPCC default, including a blank value
   # cell (which the build fills with that default). MCF has no IPCC range.
-  for (col in c("EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct")) {
+  # 2026-10-30 (later): a blank value cell takes the system's IPCC default
+  # here, as the build does below, and then its IPCC range or a placeholder.
+  for (col in c("MCF_pct", "EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct")) {
     if (!col %in% names(mms_rows)) next
     v <- suppressWarnings(as.numeric(mms_rows[[col]]))
     for (j in which(is.na(v))) {
       d <- .manure_column_default(as.character(mms_rows$mms_type[j]), col)
-      if (!is.na(d) && !is.null(manure_default_range(as.character(mms_rows$mms_type[j]), col, d)))
-        v[j] <- d
+      if (!is.na(d)) v[j] <- d
     }
     mms_rows[[col]] <- v
   }

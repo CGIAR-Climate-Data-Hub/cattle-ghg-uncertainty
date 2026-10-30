@@ -39,7 +39,10 @@ TEMPLATE_MM_COLS <- c("cattle_type","aggregation_level","sub_category",
                       "MCF_pct","lower_mcf","upper_mcf","distribution_mcf",
                       "EF3","lower_ef3","upper_ef3","distribution_ef3",
                       "Frac_GasMS_pct","lower_frac_gas","upper_frac_gas","distribution_frac_gas",
-                      "Frac_LeachMS_pct","lower_frac_leach","upper_frac_leach","distribution_frac_leach")
+                      "Frac_LeachMS_pct","lower_frac_leach","upper_frac_leach","distribution_frac_leach",
+                      # 2026-10-30: optional free text, as on Parameters; the
+                      # translator marks placeholder ranges here
+                      "data_source")
 TEMPLATE_TS_COLS <- c("cattle_type","aggregation_level","sub_category","year",
                       "N","BW","MW","WG","Milk","Fat","pct_pregnant","DE","CP","MilkPR")
 # Inventory_Metadata rows, in sheet order (row 2 onwards). Column B carries the
@@ -794,7 +797,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
   # Row 1: instruction banner
   openxlsx::writeData(wb, "Parameters",
-    "HOW TO USE: YELLOW = core activity data, enter your own values. ORANGE = technical IPCC coefficient, pre-filled with the IPCC default value; edit if you have country-specific values. UNCERTAINTY RANGES: a default range is pre-filled only for Ym and Bo (IPCC 2019), Cfi, Ca, C and Cp (Monni et al. 2007) and the pasture N2O factors and fractions (IPCC 2019, as lower and upper bounds). Every other range must come from your own data: a blank range is listed as Missing on the QA/QC tab and the simulation will not run until you fill it. GREEN = dropdown. BLUE = pre-filled info. GREY = auto-computed. PERCENTAGE FIELDS (DE_pct, milk_fat, CP_pct, Ym_pct, uncertainty_pct, etc.): enter the bare number, e.g. '45' for 45%, do NOT include the '%' symbol. uncertainty_pct is the ±% half-width of the 95% CI. For symmetric distributions: fill value (G) + uncertainty_pct (H). For asymmetric distributions (PERT/lognormal): fill lower_bound (I) and upper_bound (J) instead, these override the pct formula. Copy rows 4 onwards to add more sub-categories.",
+    "HOW TO USE: YELLOW = core activity data, enter your own values. ORANGE = technical IPCC coefficient, pre-filled with the IPCC default value; edit if you have country-specific values. UNCERTAINTY RANGES: a default range is pre-filled only for Ym and Bo (IPCC 2019), Cfi, Ca, C and Cp (Monni et al. 2007) and the pasture N2O factors and fractions (IPCC 2019, as lower and upper bounds). Every other range should come from your own data. If you leave one blank, the tool uses a placeholder range so it can run, warns about it on the QA/QC tab, and lists it in the report and the exports: a placeholder has no published source. GREEN = dropdown. BLUE = pre-filled info. GREY = auto-computed. PERCENTAGE FIELDS (DE_pct, milk_fat, CP_pct, Ym_pct, uncertainty_pct, etc.): enter the bare number, e.g. '45' for 45%, do NOT include the '%' symbol. uncertainty_pct is the ±% half-width of the 95% CI. For symmetric distributions: fill value (G) + uncertainty_pct (H). For asymmetric distributions (PERT/lognormal): fill lower_bound (I) and upper_bound (J) instead, these override the pct formula. Copy rows 4 onwards to add more sub-categories.",
     startRow=1, startCol=1, colNames=FALSE)
   openxlsx::mergeCells(wb, "Parameters", cols=1:16, rows=1)
   apply_style("Parameters",
@@ -1030,7 +1033,7 @@ generate_template_openxlsx <- function(filepath, include_example,
   MM_COLS   <- TEMPLATE_MM_COLS
   MM_WIDTHS <- c(14, 20, 16, 18, 12, 12, 12, 18,
                  10, 10, 10, 15, 10, 10, 10, 15,
-                 14, 12, 12, 18, 14, 12, 12, 18)
+                 14, 12, 12, 18, 14, 12, 12, 18, 30)
   MM_NCOL   <- length(MM_COLS)
 
   openxlsx::setColWidths(wb, "Manure_Management",
@@ -1076,6 +1079,7 @@ generate_template_openxlsx <- function(filepath, include_example,
     lower_frac_leach="Optional: min for asymmetric Frac_LeachMS distribution",
     upper_frac_leach="Optional: max for asymmetric Frac_LeachMS distribution",
     distribution_frac_leach="Distribution for Frac_LeachMS: select from dropdown",
+    data_source="Optional, free text. 'placeholder range: MCF_pct, ...' marks ranges filled with a placeholder (no published source): replace them with your own",
     stringsAsFactors=FALSE)
   openxlsx::writeData(wb, "Manure_Management", hints_mm, startRow=3, startCol=1,
                       colNames=FALSE)

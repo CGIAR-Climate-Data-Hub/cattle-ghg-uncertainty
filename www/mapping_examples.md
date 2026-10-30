@@ -101,7 +101,7 @@ This is common: small-inventory teams who know their animal numbers but nothing 
 
 **You do:** Build a Parameters block with `N = 500000` (`data_source = "user_file"`) and every other parameter set to its `ipcc_default` from `param_catalogue.md`, distribution = `suggested_distribution`, `data_source = "ipcc_default"`. Give a range only where the catalogue has a default range (Ym, Bo, Cfi, Ca, C, Cp, and the bounds of the pasture N2O factors); leave every other range blank, including the range of N. Build one Manure_Management row: `mms_type=pasture, fraction_pct=100`, plus the MCF/EF3/Frac defaults for pasture. Done in two minutes.
 
-**Important caveat to tell the user:** "I used IPCC default values. Default uncertainty ranges exist only for Ym, Bo, Cfi, Ca, C, Cp and the pasture N2O factors. Every other range, starting with your animal numbers, has to come from your own data: the app lists them as Missing on its QA/QC tab and will not run until you add them in the Excel file."
+**Important caveat to tell the user:** "I used IPCC default values. Default uncertainty ranges exist only for Ym, Bo, Cfi, Ca, C, Cp and the pasture N2O factors. Every other range, starting with your animal numbers, should come from your own data: until you add them, the app uses placeholder ranges with no published source, warns about each one and lists them in the report."
 
 ---
 
@@ -155,7 +155,7 @@ dairy_cows      120000    1320             0
 
 **You do:** `parameter = CP, value = 11, distribution = normal`, `data_source = "user_chat"`, with `uncertainty_pct`, `lower` and `upper` left blank. CP has no default range: neither IPCC nor the literature gives one that applies to another country's diet data.
 
-**Tell the user:** "CP = 11% is in the template. There is no default uncertainty range for CP, so the app will list it as Missing and will not run until you enter one. If you know how the 11% was obtained (for example from feed tables or a survey), I can help you work out a range: tell me the spread, or the lowest and highest plausible values."
+**Tell the user:** "CP = 11% is in the template. There is no published default uncertainty range for CP, so the app will use a placeholder range, warn about it and list it in the report, until you enter your own. If you know how the 11% was obtained (for example from feed tables or a survey), I can help you work out a range: tell me the spread, or the lowest and highest plausible values."
 
 ---
 

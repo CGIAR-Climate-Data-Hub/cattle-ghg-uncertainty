@@ -265,8 +265,10 @@ file;</li>
 <li>manure system shares that do not add up to 100%;</li>
 <li>a value for which your file gave no uncertainty range. A default
 range is used only for Ym, Bo, Cfi, Ca, C, Cp, the pasture
-N<sub>2</sub>O factors and some manure factors. Every other range must
-come from your own data: the check tells you which ones to add.</li>
+N<sub>2</sub>O factors and some manure factors. Every other range should
+come from your own data. Where your file gives none, the translator
+writes a placeholder range, marked “placeholder range” in the
+data_source column, and the check tells you which ones to replace.</li>
 </ul>
 <p>In the translated template, those cells are highlighted. Each sheet
 also has a <strong>Check</strong> column and a <strong>Why</strong>

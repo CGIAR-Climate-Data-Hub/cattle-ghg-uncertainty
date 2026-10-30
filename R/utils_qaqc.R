@@ -370,6 +370,14 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       src <- if (p %in% names(DEFAULT_RANGE_SOURCE)) DEFAULT_RANGE_SOURCE[[p]] else ""
       add(grp, p, "range_default", "info", qa_msg("range_default", p, src))
     }
+    # 2026-10-30 (later): a placeholder range lets the run go ahead; it is a
+    # warning, and it is listed in the report and the exports.
+    if ("range_placeholder" %in% names(ps) && isTRUE(ps$range_placeholder[i])) {
+      pc <- suppressWarnings(as.numeric(ps$uncertainty_pct[i]))
+      rng <- if (!is.na(pc)) sprintf("+/-%s%%", format(pc))
+             else sprintf("%s to %s", format(signif(lo, 4)), format(signif(hi, 4)))
+      add(grp, p, "range_placeholder", "warn", qa_msg("range_placeholder", p, rng))
+    }
 
     # ------------------------------------------------------------------
     # Check 2: non-negative lower bound (not for the temperature, which is
@@ -631,6 +639,20 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     if (nrow(sg$issues) > 0) {
       sg$issues$level <- NA_character_
       result <- rbind(result, sg$issues)
+    }
+    # 2026-10-30 (later): manure ranges filled with a placeholder.
+    if ("range_placeholder_cols" %in% names(manure_data)) {
+      kk <- which(!is.na(manure_data$range_placeholder_cols) & nzchar(manure_data$range_placeholder_cols))
+      for (i in kk) {
+        grp_m <- paste(c(if ("cattle_type" %in% names(manure_data)) manure_data$cattle_type[i],
+                         manure_data$sub_category[i]), collapse = " / ")
+        result <- rbind(result, data.frame(
+          group = grp_m, parameter = paste0(manure_data$range_placeholder_cols[i], " (", manure_data$mms_type[i], ")"),
+          check = "range_placeholder", status = "warn",
+          message = sprintf(t("qa_msg_range_placeholder_mms"), manure_data$range_placeholder_cols[i], manure_data$mms_type[i]),
+          level = if ("aggregation_level" %in% names(manure_data)) as.character(manure_data$aggregation_level[i]) else NA_character_,
+          stringsAsFactors = FALSE))
+      }
     }
     # 2026-10-30: manure values with no range and no IPCC range.
     mm <- manure_missing_ranges(manure_data)

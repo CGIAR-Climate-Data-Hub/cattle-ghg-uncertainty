@@ -220,7 +220,8 @@ build_run_summary_docx <- function(path,
                                    diagnostics            = NULL,
                                    samples_for_density    = NULL,
                                    app_version = NULL,
-                                   qa_caveats  = NULL) {
+                                   qa_caveats  = NULL,
+                                   manure      = NULL) {
 
   doc <- officer::read_docx()
 
@@ -269,6 +270,9 @@ build_run_summary_docx <- function(path,
       "These parameters were not in the upload and were filled with IPCC defaults so the simulation could run. Override with country-specific data when available.")
     doc <- .add_flextable_safe(doc, .styled_flextable(imputed_ft))
   }
+
+  # ---- Placeholder uncertainty ranges (2026-10-30) ------------------------
+  doc <- .add_placeholder_section(doc, param_specs, manure, "2a. Placeholder uncertainty ranges")
 
   # ---- QA/QC checks ignored or repaired (2026-09-18) ----------------------
   if (!is.null(qa_caveats) && is.data.frame(qa_caveats) && nrow(qa_caveats) > 0) {
@@ -471,7 +475,7 @@ build_run_summary_docx <- function(path,
   doc <- .add_p(doc,
     "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo) for combined uncertainty estimation. The headline 95% MoE values in section 4 are the per-source combined-uncertainty figures used to populate the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (the % uncertainty column, which is the half-width of the 95% confidence interval divided by the mean, per IPCC's own definition). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; coefficient (EF) = the IPCC equation parameters that combine into the per-head emission factor. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance, including the CRT category map and the three-level disaggregation scheme this tool produces.")
   doc <- .add_p(doc,
-    "Default uncertainty ranges are used only where the literature gives one that applies to any country: Ym (IPCC 2019, Table 10.12), Bo (IPCC 2019, Table 10.16A), the pasture N2O factors and fractions (IPCC 2019, Tables 11.1 and 11.3), EF3 and the volatilisation and leaching fractions of each manure system when the IPCC default value is used (IPCC 2019, Tables 10.21 and 10.22), and Cfi, Ca, C and Cp (Monni et al. 2007, Table I, also used by the UK inventory). Every other range was supplied by the country in the uploaded template; the tool does not run when one is missing.")
+    "Default uncertainty ranges are used only where the literature gives one that applies to any country: Ym (IPCC 2019, Table 10.12), Bo (IPCC 2019, Table 10.16A), the pasture N2O factors and fractions (IPCC 2019, Tables 11.1 and 11.3), EF3 and the volatilisation and leaching fractions of each manure system when the IPCC default value is used (IPCC 2019, Tables 10.21 and 10.22), and Cfi, Ca, C and Cp (Monni et al. 2007, Table I, also used by the UK inventory). Every other range comes from the uploaded template; where the template gave none, a placeholder range without a published source was used, and each one is listed in section 2a.")
 
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")
@@ -550,7 +554,8 @@ build_trend_summary_docx <- function(path,
                                       # base year and year t
                                       headline    = NULL,
                                       ipcc_table  = NULL,
-                                      compare     = NULL) {
+                                      compare     = NULL,
+                                      manure      = NULL) {
 
   doc <- officer::read_docx()
   yrs <- if (!is.null(years)) range(years) else range(trend_results$Year)
@@ -606,6 +611,7 @@ build_trend_summary_docx <- function(path,
   doc <- .add_h2(doc, "1. What was run")
   doc <- .add_flextable_safe(doc,
     .styled_flextable(.trend_settings_flextable(year_corr, n_iter, yrs, ipcc_meta, headline$n_iter_pair)))
+  doc <- .add_placeholder_section(doc, param_specs, manure, "1a. Placeholder uncertainty ranges")
 
   # ---- Trend table (LANDSCAPE) -------------------------------------------
   doc <- .add_h2(doc, "2. Year-by-year trend")
@@ -832,6 +838,17 @@ build_trend_summary_docx <- function(path,
   df <- do.call(rbind.data.frame, c(rows, list(stringsAsFactors = FALSE)))
   names(df) <- c("Setting", "Value")
   flextable::flextable(df)
+}
+
+# 2026-10-30: every placeholder range, by group and input (see
+# PLACEHOLDER_UNC_PCT in R/utils_validation.R). NULL when there is none.
+.add_placeholder_section <- function(doc, param_specs, manure, heading) {
+  tb <- tryCatch(placeholder_table(param_specs, manure), error = function(e) NULL)
+  if (is.null(tb) || !nrow(tb)) return(doc)
+  doc <- .add_h2(doc, heading)
+  doc <- .add_p(doc, "Your file gave no uncertainty range for the inputs below, and no published default exists for them. So that the run could go ahead, the tool used placeholder ranges: for parameters, the values the tool used before October 2026; for manure, MCF +/-25 %, EF3 a factor of 2, and the volatilisation and leaching fractions +/-50 %. These ranges have no published source. They are not IPCC defaults. The results that depend on them are indicative only. Replace each one with a range from your own data and run again.")
+  doc <- .add_p(doc, sprintf("%d placeholder range(s) were used.", nrow(tb)))
+  .add_flextable_safe(doc, .styled_flextable(flextable::flextable(tb)))
 }
 
 .imputed_flextable <- function(param_specs) {

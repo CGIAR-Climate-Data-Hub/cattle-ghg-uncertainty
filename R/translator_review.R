@@ -35,18 +35,18 @@
 # current rows they concern.
 .translator_review_request <- function(targets, piece, register = NULL) {
   tg <- targets
-  # "range needed" can be long (one row per input without a range); it is
+  # "placeholder range" can be long (one row per input without a range); it is
   # summarised per parameter, and the model is told when to act on it.
-  rn <- tg[tg$check %in% "range needed", , drop = FALSE]
-  tg <- tg[!tg$check %in% "range needed", , drop = FALSE]
+  rn <- tg[tg$check %in% "placeholder range", , drop = FALSE]
+  tg <- tg[!tg$check %in% "placeholder range", , drop = FALSE]
   if (nrow(tg) > .TRANSLATOR_REVIEW_MAX_ITEMS) tg <- tg[seq_len(.TRANSLATOR_REVIEW_MAX_ITEMS), , drop = FALSE]
   items <- if (nrow(tg)) sprintf("[%d] %s | %s | %s", seq_len(nrow(tg)), tg$check, tg$where, tg$issue) else character(0)
   if (nrow(rn)) {
     by_p <- table(rn$parameter)
-    items <- c(items, sprintf(paste0("[%d] range needed | %s | %d row(s) of %s have a value and no uncertainty range. ",
-                                     "Return ranges only if the file states one for them (for example a line that ",
-                                     "covers 'all sub-categories' or 'all manure management systems'); otherwise ",
-                                     "add one not_errors entry for %s saying the file gives none."),
+    items <- c(items, sprintf(paste0("[%d] placeholder range | %s | %d row(s) of %s have no uncertainty range in your ",
+                                     "output, so a placeholder was written. Return the ranges only if the file states ",
+                                     "one for them (for example a line that covers 'all sub-categories' or 'all manure ",
+                                     "management systems'); otherwise add one not_errors entry for %s saying the file gives none."),
                               length(items) + seq_along(by_p), names(by_p), as.integer(by_p), names(by_p), names(by_p)))
   }
 
@@ -62,7 +62,7 @@
     ps[k %in% keys_pg, , drop = FALSE]
   } else NULL
   manure_checks <- c("manure bounds missing", "manure bounds reused", "manure shares sum",
-                     "manure coefficient consistency", "range needed")
+                     "manure coefficient consistency", "placeholder range")
   rows_m <- if (is.data.frame(mm) && nrow(mm)) {
     k <- paste(.translator_norm_level(mm$aggregation_level), mm$sub_category, sep = "##")
     sel <- k %in% keys_g

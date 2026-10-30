@@ -97,6 +97,7 @@ Units on this sheet: `fraction_pct`, `MCF_pct`, `Frac_GasMS_pct` and `Frac_Leach
 | V | lower_frac_leach | no | percent |
 | W | upper_frac_leach | no | percent |
 | X | distribution_frac_leach | no |  |
+| Y | data_source | no | free text; the server writes 'placeholder range: <columns>' when it fills a range the file did not give |
 
 ### MMS types: by IPCC version
 

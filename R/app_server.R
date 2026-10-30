@@ -3076,6 +3076,7 @@ app_server <- function(input, output, session) {
         rv$sensitivity, rv$ipcc_table, file,
         param_specs = rv$param_specs,
         qa_caveats  = .qa_caveats_export(),
+        manure      = rv$manure_data,
         settings = list(
           n_iter           = as.integer(input$n_iter),
           corr_mode        = input$corr_mode,
@@ -3194,6 +3195,19 @@ app_server <- function(input, output, session) {
         out <- rbind(out, cav)
       }
 
+      # 2026-10-30: the inputs of each line that carry a placeholder range
+      # (no published source; listed in the Word report, section 2a)
+      ph <- tryCatch(placeholder_inputs_by_line(rv$param_specs, rv$manure_data), error = function(e) NULL)
+      if (!is.null(ph)) {
+        key <- sub("^total_(enteric_ch4|manure_ch4|direct_n2o_mm|indirect_n2o_mm|direct_n2o_prp|indirect_n2o_prp)$",
+                   "\\1_total", out$variable)
+        both <- function(a, b) { v <- setdiff(unique(c(strsplit(ph[[a]], ", ")[[1]], strsplit(ph[[b]], ", ")[[1]])), "none")
+                                 if (length(v)) paste(sort(v), collapse = ", ") else "none" }
+        extra <- c(total_direct_n2o = both("direct_n2o_mm_total", "direct_n2o_prp_total"),
+                   total_indirect_n2o = both("indirect_n2o_mm_total", "indirect_n2o_prp_total"))
+        lut <- c(ph, extra)
+        out$placeholder_ranges <- ifelse(!is.na(key) & key %in% names(lut), unname(lut[key]), "")
+      }
       write.csv(out, file, row.names = FALSE)
     }
   )
@@ -3243,7 +3257,8 @@ app_server <- function(input, output, session) {
         comparison_uncertainty = comp_unc,
         diagnostics           = rv$diagnostics,
         samples_for_density   = density_samples,
-        qa_caveats            = .qa_caveats_export()
+        qa_caveats            = .qa_caveats_export(),
+        manure                = rv$manure_data
       )
     }
   )
@@ -4004,7 +4019,8 @@ app_server <- function(input, output, session) {
         param_specs          = rv$param_specs,
         headline             = trend_head(),
         ipcc_table           = trend_ipcc(),
-        compare              = trend_cmp()
+        compare              = trend_cmp(),
+        manure               = rv$manure_data
       )
     }
   )

@@ -111,7 +111,7 @@ The AI translator is not perfect. You still have the responsibility to check you
 - a percentage written as a fraction, or the reverse;
 - a population counted twice, under two groups;
 - manure system shares that do not add up to 100%;
-- a value for which your file gave no uncertainty range. A default range is used only for Ym, Bo, Cfi, Ca, C, Cp, the pasture N~2~O factors and some manure factors. Every other range must come from your own data: the check tells you which ones to add.
+- a value for which your file gave no uncertainty range. A default range is used only for Ym, Bo, Cfi, Ca, C, Cp, the pasture N~2~O factors and some manure factors. Every other range should come from your own data. Where your file gives none, the translator writes a placeholder range, marked "placeholder range" in the data_source column, and the check tells you which ones to replace.
 
 In the translated template, those cells are highlighted. Each sheet also has a **Check** column and a **Why** column at the right, with filters, so you can show only the cells that need to be checked and read the message. You can also download the list of checks as a separate file.
 

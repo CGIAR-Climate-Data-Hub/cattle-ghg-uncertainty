@@ -258,7 +258,8 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
   Frac_LeachMS_pct  = "yes | per-MMS leaching fraction in PERCENT (e.g. 2): defaults from IPCC 2019 Table 10.22",
   lower_frac_leach  = "no | percent",
   upper_frac_leach  = "no | percent",
-  distribution_frac_leach = "no | ")
+  distribution_frac_leach = "no | ",
+  data_source       = "no | free text; the server writes 'placeholder range: <columns>' when it fills a range the file did not give")
 
 .tp_col_table <- function(cols, notes) {
   out <- c("| col | header | required? | notes |", "|-----|--------|-----------|-------|")

@@ -114,7 +114,7 @@ Before opening the tool, you need the right data to run it. Four kinds of input 
     - a percentage (for example ±20%, meaning the true value is very likely within 20% of the number you give), or
     - a lower and an upper value.
 
-    The tool has a default range for only a few IPCC coefficients: Ym, Bo, Cfi, Ca, C, Cp, the pasture N~2~O factors, and some manure factors. For every other input, the range must come from your own data. The tool will not run if one is missing.
+    The tool has a default range for only a few IPCC coefficients: Ym, Bo, Cfi, Ca, C, Cp, the pasture N~2~O factors, and some manure factors. For every other input, the range should come from your own data. If one is missing, the tool uses a placeholder range so that it can run. A placeholder has no published source: the tool warns you about it, and lists it in the report and the exports. Replace it with your own range.
 
 3. **Manure management fractions.** The share of manure handled in each management system (for example pasture, solid storage, liquid storage).
 
@@ -176,11 +176,9 @@ The QA/QC tab checks every parameter you loaded and tells you if something looks
 
 - **Pass** (green). The value, its unit and its bounds are fine. Nothing to do.
 - **Info** (blue). A note, nothing to correct. Example: a parameter whose lower and upper bounds equal its mean is treated as a fixed value. The simulation can run.
-- **Warn** (amber). The value is unusual, or something is missing that the tool can work around. Examples: a body weight far from the IPCC default for that animal class; a digestibility outside its usual range. The simulation can run. Check the value. If it is correct for your country, keep it and note the source in your inventory report. If it is a mistake, correct it in your file.
+- **Warn** (amber). The value is unusual, or something is missing that the tool can work around. Examples: a body weight far from the IPCC default for that animal class; a digestibility outside its usual range; an input with no uncertainty range in your file and no published default, so a placeholder range is used. The simulation can run. Check the value. If it is correct for your country, keep it and note the source in your inventory report. If it is a mistake, correct it in your file.
 - **Fail** (red). The value would break or distort the calculation. Examples: bounds that do not contain the mean; a percentage entered as a fraction (DE = 0.65 instead of 65); a fraction entered as a percentage (pct_pregnant = 52 instead of 0.52). The simulation cannot run until every Fail is corrected.
-- **Missing** (grey). Something was not in your file. There are two cases.
-    - A parameter was not in your file. The tool filled it with the IPCC default and tells you which value it used. The simulation can run. Check that the default makes sense for your country. If you have a national value, add it to your file.
-    - An uncertainty range was not in your file, and there is no default range for that input. You must add the range in your file. The simulation cannot run until you do.
+- **Missing** (grey). The parameter was not in your file. The tool filled it with the IPCC default and tells you which value it used. The simulation can run. Check that the default makes sense for your country. If you have a national value, add it to your file.
 
 Make every correction in your Excel file and upload it again on Tab 1. The simulation then uses the values in your file, and the reports document them as such.
 

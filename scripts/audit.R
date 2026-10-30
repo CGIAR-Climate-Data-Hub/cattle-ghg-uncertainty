@@ -4081,16 +4081,25 @@ section_F <- function() {
       f <- c(f, "a blank Ym range did not take +/-20%")
     if (!isTRUE(all.equal(c(g("EF4")$lower, g("EF4")$upper), c(0.011, 0.017))))
       f <- c(f, "a blank EF4 range at the IPCC value did not take the Table 11.3 bounds")
-    if (!is.na(g("EF5")$lower)) f <- c(f, "an own EF5 value took the IPCC bounds")
-    if (!is.na(g("BW")$lower)) f <- c(f, "a blank BW range was filled")
+    # 2026-10-30 (later): no default -> a placeholder, flagged, a Warn, and
+    # the run goes ahead
+    if (!isTRUE(all.equal(c(g("BW")$lower, g("BW")$upper), c(255, 345))) || !isTRUE(g("BW")$range_placeholder))
+      f <- c(f, "a blank BW range did not take the +/-15% placeholder")
+    if (!isTRUE(g("EF5")$range_placeholder) || isTRUE(all.equal(c(g("EF5")$lower, g("EF5")$upper), c(0.0005, 0.02))))
+      f <- c(f, "an own EF5 value took the IPCC bounds, or no placeholder")
+    if (isTRUE(g("Ym")$range_placeholder) || isTRUE(g("N")$range_placeholder)) f <- c(f, "a default or own range flagged as placeholder")
     qa <- run_qaqc(p2)
-    miss <- qa$parameter[qa$check == "range_missing"]
-    if (!all(c("BW", "EF5") %in% miss)) f <- c(f, "BW / EF5 not reported as Missing")
-    if (any(c("Ym", "EF4", "Cfi", "N", "WG") %in% miss)) f <- c(f, "a row with a range (or a zero) reported as Missing")
-    if (!"range_missing" %in% QAQC_NON_IGNORABLE) f <- c(f, "range_missing can be ignored")
-    gt <- run_range_gate(p2, NULL, params_needed_for_sources("enteric_ch4"), "enteric_ch4")
-    if (!any(grepl(": BW$", gt)) || any(grepl("EF5", gt)))
-      f <- c(f, "the run gate is not source-aware (BW must block enteric, EF5 must not)")
+    if (!all(c("BW", "EF5") %in% qa$parameter[qa$check == "range_placeholder" & qa$status == "warn"]))
+      f <- c(f, "BW / EF5 placeholders not reported as Warn")
+    if (any(qa$check == "range_missing")) f <- c(f, "a range reported as Missing although a placeholder exists")
+    gt <- run_range_gate(p2, NULL, params_needed_for_sources(names(SOURCE_PARAM_DEPS)), names(SOURCE_PARAM_DEPS))
+    if (length(gt)) f <- c(f, "the run is still blocked")
+    tw <- ensure_completeness(fill_bounds(data.frame(cattle_type = "dairy", aggregation_level = "A", sub_category = "cows",
+                                parameter = "Tw", mean = 20, uncertainty_pct = NA, distribution = "normal",
+                                lower = NA_real_, upper = NA_real_, param_type = "coefficient")))$param_specs
+    if (!identical(tw$distribution[tw$parameter == "Tw"][1], "constant")) f <- c(f, "Tw at 20 C not fixed")
+    if (!any(grepl("PLACEHOLDER", range_source_label(p2)))) f <- c(f, "range_source_label does not mark placeholders")
+    if (!identical(PLACEHOLDER_UNC_PCT, EXAMPLE_ILLUSTRATION_UNC_PCT)) f <- c(f, "placeholder and example ranges differ")
     mm <- data.frame(cattle_type = "dairy", aggregation_level = "A", sub_category = "cows",
       mms_type = c("pasture", "solid_storage", "composting"), fraction_pct = c(40, 40, 20),
       MCF_pct = c(2, 5, 1), EF3 = c(0.02, 0.01, 0.02), Frac_GasMS_pct = c(21, 45, 65),
@@ -4098,16 +4107,24 @@ section_F <- function() {
     m2 <- apply_default_ranges_manure(mm)
     if (!isTRUE(all.equal(c(m2$lower_ef3[2], m2$upper_ef3[2]), c(0.005, 0.02))))
       f <- c(f, "solid storage EF3 at the IPCC value did not take a factor of 2")
-    if (!is.na(m2$lower_ef3[3])) f <- c(f, "an own EF3 value took the IPCC range")
     if (!isTRUE(all.equal(c(m2$lower_frac_gas[2], m2$upper_frac_gas[2]), c(10, 65))))
       f <- c(f, "solid storage Frac_GasMS did not take the Table 10.22 range")
-    if (!is.na(m2$lower_frac_leach[2])) f <- c(f, "a leaching fraction with no IPCC range took one")
-    mr <- manure_missing_ranges(m2)
-    key <- paste(mr$mms_type, mr$column)
-    if (!all(c("pasture MCF_pct", "solid_storage MCF_pct", "solid_storage Frac_LeachMS_pct") %in% key))
-      f <- c(f, "MCF / a leaching fraction without range not reported as Missing")
-    if (any(c("pasture EF3", "pasture Frac_GasMS_pct", "pasture Frac_LeachMS_pct") %in% key))
-      f <- c(f, "pasture EF3 or fractions (unused) reported as Missing")
+    if (!isTRUE(all.equal(c(m2$lower_frac_leach[2], m2$upper_frac_leach[2]), c(1, 3))))
+      f <- c(f, "a leaching fraction with no IPCC range did not take the +/-50% placeholder")
+    if (!isTRUE(all.equal(c(m2$lower_mcf[2], m2$upper_mcf[2]), c(3.75, 6.25))))
+      f <- c(f, "MCF did not take the +/-25% placeholder")
+    if (!isTRUE(all.equal(c(m2$lower_ef3[3], m2$upper_ef3[3]), c(0.01, 0.04))))
+      f <- c(f, "an own EF3 did not take the factor-of-2 placeholder")
+    pcols <- m2$range_placeholder_cols
+    if (!grepl("MCF_pct", pcols[2]) || !grepl("Frac_LeachMS_pct", pcols[2]) || grepl("EF3", pcols[2] %||% ""))
+      f <- c(f, "placeholder columns not flagged per row (or an IPCC range flagged)")
+    if (NROW(manure_missing_ranges(m2))) f <- c(f, "manure ranges still Missing after placeholders")
+    if (grepl("EF3|Frac", pcols[1] %||% "")) f <- c(f, "pasture EF3 or fractions (unused) given a placeholder")
+    pt <- placeholder_table(p2, m2)
+    if (is.null(pt) || !all(c("BW", "MCF_pct (solid_storage)") %in% pt$Input)) f <- c(f, "placeholder_table incomplete")
+    pl <- placeholder_inputs_by_line(p2, m2)
+    if (!grepl("MCF_pct", pl[["manure_ch4_total"]]) || grepl("MCF_pct", pl[["enteric_ch4_total"]]))
+      f <- c(f, "placeholder_inputs_by_line maps the manure inputs to the wrong lines")
     for (nm in c("x", "y")) {
       ps <- ensure_completeness(fill_bounds(get(paste0("generate_country_", nm, "_example"))()))$param_specs
       mx <- apply_default_ranges_manure(get(paste0("generate_country_", nm, "_manure"))())
@@ -4118,9 +4135,9 @@ section_F <- function() {
   }, error = function(e) conditionMessage(e))
   f65_ok <- length(f65_fail) == 0L
   check_bool("F65", "F",
-             "Default uncertainty ranges only where defensible (IPCC, Monni for Cfi/Ca/C/Cp); every other blank range is Missing and blocks the run; examples complete",
+             "Default uncertainty ranges only where defensible (IPCC, Monni for Cfi/Ca/C/Cp); every other blank range takes a flagged placeholder (Warn, report, exports); examples complete",
              f65_ok,
-             notes = if (f65_ok) "11 inputs with a default; BW/EF5/MCF Missing; Ym/EF4/EF3/Table 10.22 filled at the IPCC value; gate source-aware; both examples complete"
+             notes = if (f65_ok) "11 inputs with a default; BW/EF5/MCF/leaching placeholders flagged and warned; Tw at 20 C fixed; Ym/EF4/EF3/Table 10.22 at the IPCC value; report and export helpers; examples complete"
                      else paste(f65_fail, collapse = "; "))
 
   # F66 -- the translator review of the checks (2026-10-30). The server turns
