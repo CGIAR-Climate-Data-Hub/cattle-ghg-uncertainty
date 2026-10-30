@@ -1820,8 +1820,6 @@ lang_state_take <- function(token) {
   n_group_none_help = list(
     en = "Each group was counted on its own, with its own survey. Choose this only if that is really how the numbers were made. Each group's error is then drawn on its own, and the errors partly cancel in the total.",
     fr = "Chaque groupe a été compté séparément, avec sa propre enquête. Choisissez ceci seulement si c'est vraiment ainsi que les nombres ont été faits. L'erreur de chaque groupe est alors tirée séparément, et les erreurs se compensent en partie dans le total."),
-  n_group_rule = list(en = "Rule of thumb: if you can point at one table that gave you the total, choose the first.",
-                      fr = "Règle simple : si vous pouvez montrer une table qui vous a donné le total, choisissez la première option."),
   n_year_label = list(en = "Between years (trend only): how do your animal numbers change from year to year?",
                       fr = "Entre années (tendance seulement) : comment vos effectifs changent-ils d'une année à l'autre ?"),
   n_year_full = list(en = "One census, with the years in between filled in",

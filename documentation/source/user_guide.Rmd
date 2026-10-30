@@ -269,8 +269,6 @@ The last card on Tab 3 asks two things about your animal numbers. Both answer th
 - **Partly.** One count, but the group numbers were adjusted group by group with their own surveys or data.
 - **Separate counts per group.** Each group was counted on its own. Choose this only if that is really how the numbers were made. Each group's error is then drawn on its own, and the errors partly cancel in the total.
 
-Rule of thumb: if you can point at one table that gave you the total, choose the first.
-
 **Between years (trend only).** How do your animal numbers change from year to year?
 
 - **One census, with the years in between filled in.** A census every five or ten years, the other years estimated from it. The same census error is kept for all years, so it cancels when two years are compared, and the trend is less uncertain.

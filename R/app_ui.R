@@ -1991,8 +1991,7 @@ app_ui <- function(request = NULL) {
                             tags$div(class = "small text-muted", t("n_group_partial_help"))),
                     tagList(tags$strong(t("n_group_none")),
                             tags$div(class = "small text-muted", t("n_group_none_help")))),
-                  choiceValues = c("full", "partial", "none"), selected = "full"),
-                tags$div(class = "small", style = "color:#1B4332;", tags$em(t("n_group_rule")))
+                  choiceValues = c("full", "partial", "none"), selected = "full")
               ),
               div(
                 conditionalPanel(
