@@ -266,7 +266,8 @@ get_mms_for_version <- function(version = "2006") {
 ## and leaching (Frac_LeachMS). (Corrected citation: leaching is Table 10.22, not
 ## 10.23; Table 10.23 is the N2:N2O loss ratio.) Values are the "Other Cattle"
 ## column of Table 10.22; bounds use the IPCC ranges where the table gives them,
-## else +-50% (Penman 2000 / Monni 2007).
+## else +-50% (a project rule; since 2026-10-30 those +-50% leaching bounds
+## are no longer applied as a default range, see manure_default_range()).
 ##
 ## 2026-09-10: that rule was introduced on 2026-06-16 but applied only to the
 ## four rows corrected that day. The other five still carried the blanket +-50%
@@ -835,23 +836,49 @@ resolve_subcat_default <- function(sub_category, parameter,
   res
 }
 
+# Illustration ranges for the hypothetical examples ONLY (Country X, Country Y
+# and the worked example template). They are not defaults: since 2026-10-30
+# the app applies no range to these inputs when a country leaves one blank,
+# because no source gives one that applies to another country's own data.
+# They are the values the catalogue carried before that decision, kept so the
+# examples run and show what a filled-in range looks like.
+EXAMPLE_ILLUSTRATION_UNC_PCT <- c(
+  N = 10, BW = 15, MW = 10, WG = 30, Milk = 20, Fat = 10, pct_pregnant = 20,
+  DE = 15, hours = 20, CP = 15, ASH = 25, UE = 25, MilkPR = 10, Tw = 25,
+  GE = 15, DMI = 15)
+
+# Uncertainty column of the worked example template, aligned with
+# PARAM_CATALOGUE: the default range where one exists, else the illustration.
+example_uncertainty_pct <- function(catalogue = PARAM_CATALOGUE) {
+  u <- suppressWarnings(as.numeric(catalogue$suggested_uncertainty_pct))
+  no_def <- is.na(u) & is.na(suppressWarnings(as.numeric(catalogue$suggested_lower_bound)))
+  u[no_def] <- unname(EXAMPLE_ILLUSTRATION_UNC_PCT[catalogue$parameter[no_def]])
+  u
+}
+
 # Country X \u2014 hypothetical mid-altitude smallholder dairy system.
 # Visibly distinct from Country Y: dairy cattle, milking, higher live weight.
 generate_country_x_example <- function() {
+  # 2026-10-30: pct_pregnant, CP and MilkPR were left to the auto-fill,
+  # which no longer supplies a range for them; they are given here with
+  # illustration ranges so the example runs.
   data.frame(
-    cattle_type       = rep("dairy", 12),
-    aggregation_level = rep("Country X \u2013 smallholder dairy", 12),
-    sub_category      = rep("cows", 12),
+    cattle_type       = rep("dairy", 15),
+    aggregation_level = rep("Country X \u2013 smallholder dairy", 15),
+    sub_category      = rep("cows", 15),
     parameter = c("N", "BW", "MW", "WG",
                    "Milk", "Fat", "DE", "Cfi", "Ca", "Cp",
-                   "Ym", "Bo"),
-    mean = c(500000, 275, 300, 0, 4, 4, 55, 0.386, 0.17, 0.10, 6.5, 0.10),
-    uncertainty_pct = c(10, 15, 10, 0, 20, 10, 10, 5, 20, 15, 15, 20),
+                   "Ym", "Bo", "pct_pregnant", "CP", "MilkPR"),
+    mean = c(500000, 275, 300, 0, 4, 4, 55, 0.386, 0.17, 0.10, 6.5, 0.10,
+             0.52, 9.6, 3.6),
+    uncertainty_pct = c(10, 15, 10, 0, 20, 10, 10, 5, 20, 15, 15, 20,
+                        20, 15, 10),
     distribution = c("normal", "normal", "normal", "constant", "normal", "normal",
-                      "normal", "pert", "triangular", "beta", "pert", "pert"),
+                      "normal", "pert", "triangular", "beta", "pert", "pert",
+                      "beta", "normal", "normal"),
     lower = NA_real_, upper = NA_real_,
     # D1: only cattle_pop is activity_data; everything else is "coefficient"
-    param_type = c("activity_data", rep("coefficient", 11)),
+    param_type = c("activity_data", rep("coefficient", 14)),
     stringsAsFactors = FALSE
   )
 }
@@ -878,20 +905,25 @@ generate_country_x_timeseries <- function() {
 # Country Y \u2014 hypothetical pastoral non-dairy beef system (semi-arid rangeland).
 # Visibly different from Country X \u2014 non-dairy, smaller animals, no milk.
 generate_country_y_example <- function() {
+  # 2026-10-30: Fat, pct_pregnant, CP and MilkPR added with illustration
+  # ranges (the auto-fill no longer supplies a range for them).
   data.frame(
-    cattle_type       = rep("non_dairy", 11),
-    aggregation_level = rep("Country Y \u2013 pastoral rangeland", 11),
-    sub_category      = rep("breeding_cows", 11),
+    cattle_type       = rep("non_dairy", 15),
+    aggregation_level = rep("Country Y \u2013 pastoral rangeland", 15),
+    sub_category      = rep("breeding_cows", 15),
     parameter = c("N", "BW", "MW", "WG",
                    "Milk", "DE", "Cfi", "Ca", "Cp",
-                   "Ym", "Bo"),
-    mean = c(2400000, 230, 260, 0.05, 1.5, 50, 0.322, 0.36, 0.10, 7.0, 0.10),
-    uncertainty_pct = c(15, 20, 15, 50, 40, 15, 5, 25, 25, 20, 25),
+                   "Ym", "Bo", "Fat", "pct_pregnant", "CP", "MilkPR"),
+    mean = c(2400000, 230, 260, 0.05, 1.5, 50, 0.322, 0.36, 0.10, 7.0, 0.10,
+             4.3, 0.52, 9.6, 3.6),
+    uncertainty_pct = c(15, 20, 15, 50, 40, 15, 5, 25, 25, 20, 25,
+                        10, 20, 15, 10),
     distribution = c("normal", "normal", "normal", "pert", "lognormal",
-                      "normal", "pert", "triangular", "beta", "pert", "pert"),
+                      "normal", "pert", "triangular", "beta", "pert", "pert",
+                      "normal", "beta", "normal", "normal"),
     lower = NA_real_, upper = NA_real_,
     # D1: only cattle_pop is activity_data; everything else is "coefficient"
-    param_type = c("activity_data", rep("coefficient", 10)),
+    param_type = c("activity_data", rep("coefficient", 14)),
     stringsAsFactors = FALSE
   )
 }
@@ -955,7 +987,17 @@ generate_country_x_manure <- function() {
     upper_ef3             = c(0.060, 0.0250, 0.0250, 0.0015),
     distribution_ef3      = rep("pert", 4),
     Frac_GasMS_pct        = c(21, 45, 32, 5),
+    # 2026-10-30: ranges for the fractions so the example runs. Solid storage
+    # gas is the IPCC Table 10.22 range; the others are illustration values
+    # (the pasture row's fractions are not used: pasture N is the Chapter 11
+    # pathway).
+    lower_frac_gas        = c(NA, 10, 16, 2.5),
+    upper_frac_gas        = c(NA, 65, 48, 7.5),
+    distribution_frac_gas = rep("pert", 4),
     Frac_LeachMS_pct      = c(30,  2,  0, 0),
+    lower_frac_leach      = c(NA, 1, NA, NA),
+    upper_frac_leach      = c(NA, 3, NA, NA),
+    distribution_frac_leach = rep("pert", 4),
     stringsAsFactors      = FALSE
   )
 }
@@ -986,7 +1028,15 @@ generate_country_y_manure <- function() {
     upper_ef3             = c(0.060, 0.0250),
     distribution_ef3      = rep("pert", 2),
     Frac_GasMS_pct        = c(21, 45),
+    # 2026-10-30: solid storage gas is the IPCC Table 10.22 range; leaching
+    # is an illustration range (IPCC gives a point value only).
+    lower_frac_gas        = c(NA, 10),
+    upper_frac_gas        = c(NA, 65),
+    distribution_frac_gas = rep("pert", 2),
     Frac_LeachMS_pct      = c(30,  2),
+    lower_frac_leach      = c(NA, 1),
+    upper_frac_leach      = c(NA, 3),
+    distribution_frac_leach = rep("pert", 2),
     stringsAsFactors      = FALSE
   )
 }

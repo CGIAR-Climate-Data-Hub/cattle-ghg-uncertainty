@@ -148,8 +148,9 @@ build_param_catalogue_md <- function(partials_dir = .TP_PARTIALS_DIR) {
       "| `%s` | %s | %s | %s | %s | %s | %s | %s | %s | %s |",
       pc$parameter[i], pc$param_tier[i], pc$param_type[i], pc$unit[i],
       .tp_fmt_num(pc$ipcc_default[i]),
-      if (is.na(pc$suggested_uncertainty_pct[i])) "(asymmetric: use bounds)"
-        else paste0(pc$suggested_uncertainty_pct[i], "%"),
+      if (!is.na(pc$suggested_uncertainty_pct[i])) paste0(pc$suggested_uncertainty_pct[i], "%")
+        else if (!is.na(pc$suggested_lower_bound[i])) "(asymmetric: use bounds)"
+        else "none: leave blank unless the file gives one",
       pc$suggested_distribution[i],
       if (nzchar(pc$ipcc_ref[i])) pc$ipcc_ref[i] else "-",
       alias_to(pc$parameter[i]),

@@ -2,6 +2,13 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-10-30, default uncertainty ranges
+
+- **Defaulted-uncertainty rule, C2, check 14, case (a), no-uncertainty-anywhere rule.** A blank range is filled from the catalogue only for Ym, Bo (IPCC 2019), Cfi, Ca, C, Cp (Monni et al. 2007) and, as bounds belonging to the IPCC default value, EF3_PRP, EF4, EF5, Frac_GASM_PRP and Frac_LEACH_PRP. Every other range is left blank and reported to the user under "ranges you need to add"; the app lists it as Missing and does not run. Reason: no source gives a range for a country's own animal or diet data that applies to another country; the catalogue values used before (BW 15 %, Milk 20 %, ...) had no source.
+- **Catalogue table** says "none: leave blank unless the file gives one" for those inputs instead of "(asymmetric: use bounds)".
+- **Mapping examples 6 and 7** rewritten accordingly; the Ym definition cites IPCC 2019 Table 10.12 footnote 3 instead of Penman (2000).
+- **In-app rule 6 (manure)**: blank bounds take the IPCC range for EF3 and the Table 10.22 fractions only at the IPCC default value; a blank MCF range is Missing.
+
 ## 2026-10-22, after the Nairobi review workshop
 
 - **Rule 11, decisions block.** Every clarify reply ends with a fenced `decisions` JSON array (topic, decision, basis, confidence, quote). The app keeps it as the register, shows it, and appends it as BINDING DECISIONS to every emission request. Reason: answers given in the chat were resent as transcript only and were not reliably applied.

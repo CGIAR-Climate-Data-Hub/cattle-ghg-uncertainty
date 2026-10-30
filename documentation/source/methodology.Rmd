@@ -813,6 +813,37 @@ The full multi-sub-category inventory chain must pass all checks before the tool
 
 Every IPCC default value and uncertainty range pre-loaded in the tool: the energy-equation coefficients, the methane conversion factor $Y_m$, the maximum methane producing capacity $B_o$, the manure-system MCF values, and the N$_2$O emission factors and volatilisation / leaching fractions ($EF_3$, $EF_4$, $EF_5$, FracGASM, FracLEACH), has been checked line-by-line against the IPCC 2019 Refinement source text (Volume 4, Chapter 10 and Chapter 11). This review confirmed the central values and corrected two pre-loaded uncertainty ranges ($B_o$ and the pasture direct-N$_2$O factor $EF_{3,\text{PRP}}$) to match the climate-specific ranges in Tables 10.16a and 11.1.
 
+## Default uncertainty ranges
+
+The tool applies a default uncertainty range only where the literature gives one that applies to any country. These are the ranges IPCC publishes with its default values, and the expert-judgement ranges of Monni et al. (2007) for four IPCC equation coefficients that no country can measure; the UK agriculture inventory uses the same four ranges (Milne et al., 2014). Table \ref{tab:defranges} lists them.
+
+Every other input describes the country's own data: animal numbers, weights, weight gain, milk yield and fat, pregnancy, feed digestibility and crude protein, MCF, and the remaining manure inputs. Its range reflects how those data were collected, so it must come from the country. IPCC 2019, Vol. 1, Table 3.6 gives ranges for some of these inputs, but for one national example (Italy); Monni et al. (2007) give them for Finland's animal register. Neither applies to another country's data. A blank range for such an input is listed as Missing on the QA/QC tab, and the simulation does not run until the range is filled, or the distribution is set to constant to state that the value is known exactly.
+
+The asymmetric IPCC ranges belong to the IPCC default value. They are applied only when the input carries that value; a country that uses its own value supplies its own range. The percentage ranges are applied around the value given, and the QA/QC tab notes each one so that a country with its own value can replace it.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Inputs with a default uncertainty range.\label{tab:defranges}}
+\begin{tabular}{p{4.2cm} p{3.6cm} p{6.4cm}}
+\toprule
+\textbf{Input} & \textbf{Default range} & \textbf{Source} \\
+\midrule
+$Y_m$ & $\pm$20\% & IPCC 2019, Vol. 4, Table 10.12, footnote 3 \\
+$B_o$ & $\pm$15\% & IPCC 2019, Vol. 4, Table 10.16A \\
+$EF_{3,\text{PRP}}$ & 0.0005 to 0.027 & IPCC 2019, Vol. 4, Table 11.1 (lower bound 0 in IPCC; a small positive floor is used) \\
+$EF_4$ & 0.011 to 0.017 & IPCC 2019, Vol. 4, Table 11.3 \\
+$EF_5$ & 0.0005 to 0.020 & IPCC 2019, Vol. 4, Table 11.3 \\
+Frac\textsubscript{GASM} (pasture) & 0.005 to 0.31 & IPCC 2019, Vol. 4, Table 11.3 \\
+Frac\textsubscript{LEACH} (pasture) & 0.01 to 0.73 & IPCC 2019, Vol. 4, Table 11.3 \\
+$EF_3$ by manure system & a factor of 2 & IPCC 2019, Vol. 4, Table 10.21, footnote 24 \\
+Frac\textsubscript{GasMS}, Frac\textsubscript{LeachMS} by system & the Table 10.22 range, where IPCC gives one & IPCC 2019, Vol. 4, Table 10.22 \\
+$C_{fi}$, $C_a$, $C$ & $\pm$30\% & Monni et al. (2007), Table I \\
+$C_p$ & $\pm$10\% & Monni et al. (2007), Table I \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 ## Reproducibility
 
 Each simulation is driven by an explicit random seed, so any run can be reproduced exactly by re-supplying the same inputs and seed. The convergence guidance in Section "Recommended Iteration Count and Convergence": re-running with a second seed and checking that the 95\% margin of error is stable, lets a user confirm that a reported result is converged rather than an artefact of a particular random draw.
@@ -924,11 +955,11 @@ A user-selectable toggle to choose the reporting disaggregation level for the wh
 
 \vspace{6pt}
 \hangindent=1.5em
-\noindent Milne, E., Sessitsch, A., Wilson, J., et al. (2014). Estimating uncertainty in pasture-based dairy CH$_4$ emissions using Monte Carlo simulation. *Animal*, 8(2), 313--320.
+\noindent Milne, A.E., Glendining, M.J., Bellamy, P., Misselbrook, T., Gilhespy, S., Rivas Casado, M., Hulin, A., Van Oijen, M., and Whitmore, A.P. (2014). Analysis of uncertainties in the estimates of nitrous oxide and methane emissions in the UK's greenhouse gas inventory for agriculture. *Atmospheric Environment*, 82, 94--105.
 
 \vspace{6pt}
 \hangindent=1.5em
-\noindent Monni, S., Syri, S., and Savolainen, I. (2007). Uncertainties in the Finnish greenhouse gas emission inventory. *Environmental Science and Policy*, 7(2), 87--98.
+\noindent Monni, S., Per\"al\"a, P., and Regina, K. (2007). Uncertainty in agricultural CH$_4$ and N$_2$O emissions from Finland: possibilities to increase accuracy in emission estimates. *Mitigation and Adaptation Strategies for Global Change*, 12, 545--571.
 
 \vspace{6pt}
 \hangindent=1.5em

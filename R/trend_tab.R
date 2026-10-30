@@ -39,12 +39,29 @@
       which(ps$parameter == p & ps_key == year_df$group[i])
     else which(ps$parameter == p)
     if (length(sel) == 0) next
+    old_mean <- suppressWarnings(as.numeric(ps$mean[sel]))
     if (!is.na(new_mean)) ps$mean[sel] <- new_mean
     if (!is.na(new_pct))  ps$uncertainty_pct[sel] <- new_pct
     # Recompute bounds from the new mean and pct
     if (!is.na(new_mean) && !is.na(new_pct)) {
       ps$lower[sel] <- new_mean * (1 - new_pct / 100)
       ps$upper[sel] <- new_mean * (1 + new_pct / 100)
+    } else if (!is.na(new_mean)) {
+      # 2026-10-30: no range for this year: each row keeps its own relative
+      # range (its own uncertainty_pct, or its bounds scaled with the value).
+      # It used to take the first group's pct, or a blanket 15%.
+      for (k in seq_along(sel)) {
+        r <- sel[k]
+        pc <- suppressWarnings(as.numeric(ps$uncertainty_pct[r]))
+        if (!is.na(pc)) {
+          ps$lower[r] <- new_mean * (1 - pc / 100)
+          ps$upper[r] <- new_mean * (1 + pc / 100)
+        } else if (!is.na(old_mean[k]) && old_mean[k] != 0) {
+          ratio <- new_mean / old_mean[k]
+          ps$lower[r] <- suppressWarnings(as.numeric(ps$lower[r])) * ratio
+          ps$upper[r] <- suppressWarnings(as.numeric(ps$upper[r])) * ratio
+        }
+      }
     }
   }
   ps
@@ -57,7 +74,7 @@
 # translator leaves a column blank where a value does not change across
 # years, and that blank means "keep the template value".
 trend_df_from_population <- function(population, base_specs,
-                                      default_uncertainty_pct = 15) {
+                                      default_uncertainty_pct = NA_real_) {
   if (is.null(population) || ncol(population) < 2)
     stop("No time-series data available: load a template with a Parameter_TimeSeries sheet, or use the CSV upload override below.")
   if (!"year" %in% names(population))
@@ -70,12 +87,11 @@ trend_df_from_population <- function(population, base_specs,
   for (p in param_cols) {
     vals <- suppressWarnings(as.numeric(population[[p]]))
     if (all(is.na(vals))) next          # a label column, or a blank one
+    # 2026-10-30: blank unless the caller sets one. A year without its own
+    # range keeps each group's range from the Parameters sheet (see
+    # .trend_year_specs); taking the first group's, or 15%, was wrong for
+    # every other group and invented a range where the country gave none.
     pct_default <- default_uncertainty_pct
-    if (!is.null(base_specs)) {
-      hit <- which(base_specs$parameter == p)
-      if (length(hit) > 0 && !is.na(base_specs$uncertainty_pct[hit[1]]))
-        pct_default <- base_specs$uncertainty_pct[hit[1]]
-    }
     rows[[length(rows) + 1]] <- data.frame(
       group            = group,
       year             = population$year,

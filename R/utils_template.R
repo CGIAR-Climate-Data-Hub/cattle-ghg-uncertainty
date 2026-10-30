@@ -794,7 +794,7 @@ generate_template_openxlsx <- function(filepath, include_example,
 
   # Row 1: instruction banner
   openxlsx::writeData(wb, "Parameters",
-    "HOW TO USE: YELLOW = core activity data, enter your own values. ORANGE = technical IPCC coefficient, pre-filled with defaults from Penman et al. (2000); uncertainty ranges from Penman (2000) / Monni et al. (2007); edit if you have country-specific values. GREEN = dropdown. BLUE = pre-filled info. GREY = auto-computed. PERCENTAGE FIELDS (DE_pct, milk_fat, CP_pct, Ym_pct, uncertainty_pct, etc.): enter the bare number, e.g. '45' for 45%, do NOT include the '%' symbol. uncertainty_pct is the ±% half-width of the 95% CI. For symmetric distributions: fill value (G) + uncertainty_pct (H). For asymmetric distributions (PERT/lognormal): fill lower_bound (I) and upper_bound (J) instead, these override the pct formula. Copy rows 4 onwards to add more sub-categories.",
+    "HOW TO USE: YELLOW = core activity data, enter your own values. ORANGE = technical IPCC coefficient, pre-filled with the IPCC default value; edit if you have country-specific values. UNCERTAINTY RANGES: a default range is pre-filled only for Ym and Bo (IPCC 2019), Cfi, Ca, C and Cp (Monni et al. 2007) and the pasture N2O factors and fractions (IPCC 2019, as lower and upper bounds). Every other range must come from your own data: a blank range is listed as Missing on the QA/QC tab and the simulation will not run until you fill it. GREEN = dropdown. BLUE = pre-filled info. GREY = auto-computed. PERCENTAGE FIELDS (DE_pct, milk_fat, CP_pct, Ym_pct, uncertainty_pct, etc.): enter the bare number, e.g. '45' for 45%, do NOT include the '%' symbol. uncertainty_pct is the ±% half-width of the 95% CI. For symmetric distributions: fill value (G) + uncertainty_pct (H). For asymmetric distributions (PERT/lognormal): fill lower_bound (I) and upper_bound (J) instead, these override the pct formula. Copy rows 4 onwards to add more sub-categories.",
     startRow=1, startCol=1, colNames=FALSE)
   openxlsx::mergeCells(wb, "Parameters", cols=1:16, rows=1)
   apply_style("Parameters",
@@ -844,7 +844,9 @@ generate_template_openxlsx <- function(filepath, include_example,
   ex_values <- PARAM_CATALOGUE$ipcc_default
   ex_values[PARAM_CATALOGUE$parameter == "N"]  <- 500000  # illustrative herd
   ex_values[PARAM_CATALOGUE$parameter == "WG"] <- 0.10    # illustrative gain
-  ex_unc <- PARAM_CATALOGUE$suggested_uncertainty_pct
+  # 2026-10-30: inputs without a default range carry an illustration range
+  # in the worked example only (EXAMPLE_ILLUSTRATION_UNC_PCT).
+  ex_unc <- example_uncertainty_pct()
 
   for (i in seq_len(n_params)) {
     r <- DATA_START + i - 1
@@ -945,9 +947,14 @@ generate_template_openxlsx <- function(filepath, include_example,
   apply_style("Parameters", s_pre,  rows=data_rows, cols=P_COL_IDX["unit"])
   # value + uncertainty_pct: yellow for core (user enters), orange for technical (IPCC default pre-filled)
   apply_style("Parameters", s_req,  rows=core_rows, cols=P_COL_IDX["value"])
-  apply_style("Parameters", s_req,  rows=core_rows, cols=P_COL_IDX["uncertainty_pct"])
   apply_style("Parameters", s_tech, rows=tech_rows, cols=P_COL_IDX["value"])
-  apply_style("Parameters", s_tech, rows=tech_rows, cols=P_COL_IDX["uncertainty_pct"])
+  # 2026-10-30: the range cell is orange (pre-filled) only where a default
+  # range exists; everywhere else it is yellow, because the country must
+  # enter it.
+  def_range_rows   <- DATA_START - 1 + which(PARAM_CATALOGUE$parameter %in% names(DEFAULT_RANGE_SOURCE))
+  nodef_range_rows <- DATA_START - 1 + which(!PARAM_CATALOGUE$parameter %in% names(DEFAULT_RANGE_SOURCE))
+  apply_style("Parameters", s_req,  rows=nodef_range_rows, cols=P_COL_IDX["uncertainty_pct"])
+  apply_style("Parameters", s_tech, rows=def_range_rows,   cols=P_COL_IDX["uncertainty_pct"])
   apply_style("Parameters", s_opt,  rows=data_rows, cols=P_COL_IDX["lower_bound"])
   apply_style("Parameters", s_opt,  rows=data_rows, cols=P_COL_IDX["upper_bound"])
   apply_style("Parameters", s_drop, rows=data_rows, cols=P_COL_IDX["distribution"])
@@ -1091,12 +1098,16 @@ generate_template_openxlsx <- function(filepath, include_example,
       upper_fraction=c(80,40),
       distribution_fraction=c("pert","pert"),
       MCF_pct=c(1.5,5.0),
-      lower_mcf=c(NA_real_,NA_real_),
-      upper_mcf=c(NA_real_,NA_real_),
+      # 2026-10-30: illustration ranges. IPCC gives no MCF range, and the
+      # solid-storage EF3 here (0.005) is not the IPCC 2019 value, so the
+      # IPCC factor of 2 does not apply to it; a country enters its own.
+      # Pasture EF3 is not used (Chapter 11 pathway) and needs none.
+      lower_mcf=c(1.0,4.0),
+      upper_mcf=c(2.0,6.0),
       distribution_mcf=c("pert","pert"),
       EF3=c(0.02,0.005),
-      lower_ef3=c(NA_real_,NA_real_),
-      upper_ef3=c(NA_real_,NA_real_),
+      lower_ef3=c(NA_real_,0.0025),
+      upper_ef3=c(NA_real_,0.01),
       distribution_ef3=c("pert","pert"),
       Frac_GasMS_pct=c(mms_frac_defaults_2019("pasture")$frac_gas * 100,
                        mms_frac_defaults_2019("solid_storage")$frac_gas * 100),
@@ -1338,17 +1349,33 @@ generate_template_openxlsx <- function(filepath, include_example,
     rows=1, cols=1:8)
   openxlsx::setRowHeights(wb, "Vocab", rows=1, heights=28)
 
+  # 2026-10-30: eight named columns written explicitly. The header used to
+  # sit over the whole catalogue, so "param_type" and "ipcc_ref" were printed
+  # above the lower and upper bounds. The last column says where each
+  # default range comes from, or that the country must supply it.
   cat_hdr <- data.frame(
     parameter="parameter", definition="definition", unit="unit",
-    ipcc_default="ipcc_default", suggested_uncertainty_pct="suggested_unc_%",
-    suggested_distribution="suggested_distribution",
-    param_type="param_type", ipcc_ref="ipcc_ref",
+    ipcc_default="ipcc_default", default_unc="default range (+/- %)",
+    default_lower="default lower", default_upper="default upper",
+    range_source="source of the default range",
     stringsAsFactors=FALSE)
   openxlsx::writeData(wb, "Vocab", cat_hdr, startRow=2, startCol=1,
                       colNames=FALSE)
   apply_style("Vocab", s_hdr, rows=2, cols=1:8)
 
-  openxlsx::writeData(wb, "Vocab", PARAM_CATALOGUE, startRow=3, startCol=1,
+  cat_tbl <- data.frame(
+    parameter     = PARAM_CATALOGUE$parameter,
+    definition    = PARAM_CATALOGUE$definition,
+    unit          = PARAM_CATALOGUE$unit,
+    ipcc_default  = PARAM_CATALOGUE$ipcc_default,
+    default_unc   = PARAM_CATALOGUE$suggested_uncertainty_pct,
+    default_lower = PARAM_CATALOGUE$suggested_lower_bound,
+    default_upper = PARAM_CATALOGUE$suggested_upper_bound,
+    range_source  = ifelse(PARAM_CATALOGUE$parameter %in% names(DEFAULT_RANGE_SOURCE),
+                           unname(DEFAULT_RANGE_SOURCE[PARAM_CATALOGUE$parameter]),
+                           "No default range: enter your own range from your data"),
+    stringsAsFactors = FALSE)
+  openxlsx::writeData(wb, "Vocab", cat_tbl, startRow=3, startCol=1,
                       colNames=FALSE)
   cat_data_rows <- 3:(2+nrow(PARAM_CATALOGUE))
 
@@ -1582,7 +1609,7 @@ generate_template_basic <- function(filepath, include_example) {
       definition=PARAM_CATALOGUE$definition,
       unit=PARAM_CATALOGUE$unit,
       value=ex_values,
-      uncertainty_pct=PARAM_CATALOGUE$suggested_uncertainty_pct,
+      uncertainty_pct=example_uncertainty_pct(),
       lower_bound=NA_real_,
       upper_bound=NA_real_,
       distribution=PARAM_CATALOGUE$suggested_distribution,

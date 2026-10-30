@@ -3502,7 +3502,10 @@ translator_cancel_clear <- function(tok) {
     "   lower_ef3/upper_ef3, lower_frac_gas/upper_frac_gas,",
     "   lower_frac_leach/upper_frac_leach with their respective",
     "   distribution_* fields. When the user has no bounds, leave the",
-    "   bounds fields null and the catalogue defaults will be used.",
+    "   bounds fields null. The app then uses the IPCC range for EF3",
+    "   and for the Table 10.22 fractions when the value is the IPCC",
+    "   default; MCF has no IPCC range, so a blank MCF range is listed",
+    "   as Missing and the user must add it.",
     "",
     "7. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
     "   'for brevity not shown' placeholders, no trailing commas.",
@@ -4058,8 +4061,10 @@ translator_cancel_clear <- function(tok) {
           v_dist <- .translator_scalar(ai$distribution)
           # 2026-10-22 (WP3, C9): a value with no spread takes the catalogue's
           # range, and a missing distribution the catalogue's suggested one
-          # (per sub-category where the resolver has one), so no row is left
-          # exactly known by accident. Listed as "info" in the checks.
+          # (per sub-category where the resolver has one). Since 2026-10-30
+          # the catalogue has a range only for the inputs with a defensible
+          # default; for every other input the range stays blank and the app
+          # lists it as Missing. Both cases are listed in the checks.
           num0 <- function(x) suppressWarnings(as.numeric(x))
           is_const <- identical(tolower(as.character(v_dist)), "constant")
           if (!is_const && !is.na(num0(v_mean))) {
@@ -4232,25 +4237,37 @@ translator_cancel_clear <- function(tok) {
       if (is.na(mcf_in) && !is.na(d_mcf))
         mm_gapfilled_mcf <- TRUE
 
-      # 2026-10-22 (WP3, worklist B5): a coefficient with no range was
-      # treated as exactly known and its uncertainty never reached the
-      # result. MCF takes plus or minus 25% (pert) and EF3 a factor of two
-      # either way (lognormal, the spread of IPCC 2006 Table 10.21), both
-      # stated project assumptions, listed as "info" in the checks.
+      # 2026-10-30: a blank range takes the IPCC range only where IPCC gives
+      # one for this system's default value: EF3 a factor of 2 (IPCC 2019
+      # Table 10.21, footnote 24) and the Table 10.22 fractions. MCF has no
+      # IPCC range, so it gets none. Any other blank range stays blank; the
+      # app lists it as Missing until the user adds one. (Replaces the
+      # 2026-10-22 project assumptions: MCF +/-25% and EF3 x2 for any value.)
       numm <- function(x) suppressWarnings(as.numeric(.translator_scalar(x)))
       mcf_v <- numm(mcf_in %||% d_mcf)
       mcf_lo <- numm(mm$lower_mcf[i]); mcf_hi <- numm(mm$upper_mcf[i])
       mcf_dist <- .translator_scalar(mm$distribution_mcf[i])
-      if (is.finite(mcf_v) && is.na(mcf_lo) && is.na(mcf_hi)) {
-        mcf_lo <- mcf_v * 0.75; mcf_hi <- mcf_v * 1.25
-        if (is.na(mcf_dist) || !nzchar(mcf_dist)) mcf_dist <- "pert"
-      }
       ef3_v <- numm(mm$ef3[i] %||% mm$EF3[i] %||% d_ef3)
       ef3_lo <- numm(mm$lower_ef3[i]); ef3_hi <- numm(mm$upper_ef3[i])
       ef3_dist <- .translator_scalar(mm$distribution_ef3[i])
       if (is.finite(ef3_v) && is.na(ef3_lo) && is.na(ef3_hi)) {
-        ef3_lo <- ef3_v / 2; ef3_hi <- ef3_v * 2
-        if (is.na(ef3_dist) || !nzchar(ef3_dist)) ef3_dist <- "lognormal"
+        r3 <- manure_default_range(mms_id, "EF3", ef3_v)
+        if (!is.null(r3)) {
+          ef3_lo <- r3$lower; ef3_hi <- r3$upper
+          if (is.na(ef3_dist) || !nzchar(ef3_dist)) ef3_dist <- "lognormal"
+        }
+      }
+      gas_v  <- numm(mm$Frac_GasMS_pct[i] %||% mm$frac_gasms_pct[i] %||% mm$Frac_GasMS[i] %||% d_gas)
+      gas_lo <- numm(mm$lower_frac_gas[i]); gas_hi <- numm(mm$upper_frac_gas[i])
+      if (is.finite(gas_v) && is.na(gas_lo) && is.na(gas_hi)) {
+        rg <- manure_default_range(mms_id, "Frac_GasMS_pct", gas_v)
+        if (!is.null(rg)) { gas_lo <- rg$lower; gas_hi <- rg$upper }
+      }
+      lea_v  <- numm(mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||% mm$Frac_LeachMS[i] %||% d_leach)
+      lea_lo <- numm(mm$lower_frac_leach[i]); lea_hi <- numm(mm$upper_frac_leach[i])
+      if (is.finite(lea_v) && is.na(lea_lo) && is.na(lea_hi)) {
+        rl <- manure_default_range(mms_id, "Frac_LeachMS_pct", lea_v)
+        if (!is.null(rl)) { lea_lo <- rl$lower; lea_hi <- rl$upper }
       }
       .put_mm(9,  mcf_in %||% d_mcf)
       .put_mm(10, mcf_lo)
@@ -4262,17 +4279,13 @@ translator_cancel_clear <- function(tok) {
       .put_mm(16, ef3_dist)
       .put_mm(17, mm$Frac_GasMS_pct[i]   %||% mm$frac_gasms_pct[i] %||%
                    mm$Frac_GasMS[i] %||% d_gas)
-      .put_mm(18, mm$lower_frac_gas[i]   %||%
-                   if (!is.null(d_fr)) d_fr$frac_gas_low  * 100 else NA_real_)
-      .put_mm(19, mm$upper_frac_gas[i]   %||%
-                   if (!is.null(d_fr)) d_fr$frac_gas_high * 100 else NA_real_)
+      .put_mm(18, gas_lo)
+      .put_mm(19, gas_hi)
       .put_mm(20, mm$distribution_frac_gas[i])
       .put_mm(21, mm$Frac_LeachMS_pct[i] %||% mm$frac_leachms_pct[i] %||%
                    mm$Frac_LeachMS[i] %||% d_leach)
-      .put_mm(22, mm$lower_frac_leach[i] %||%
-                   if (!is.null(d_fr)) d_fr$frac_leach_low  * 100 else NA_real_)
-      .put_mm(23, mm$upper_frac_leach[i] %||%
-                   if (!is.null(d_fr)) d_fr$frac_leach_high * 100 else NA_real_)
+      .put_mm(22, lea_lo)
+      .put_mm(23, lea_hi)
       .put_mm(24, mm$distribution_frac_leach[i])
     }
   }

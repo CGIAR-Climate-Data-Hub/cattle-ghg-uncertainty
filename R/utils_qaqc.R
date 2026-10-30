@@ -357,7 +357,18 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
     } else if (is_zero_mean) {
       add(grp, p, "bounds_order", "pass", t("qa_msg_bounds_order_zero"))
     } else if (!is_constant && !is.na(mu) && (is.na(lo) || is.na(hi))) {
-      add(grp, p, "bounds_order", "warn", qa_msg("unc_missing_warn", p, mu))
+      # 2026-10-30: no range and no defensible default (apply_default_ranges
+      # has already filled the inputs that have one). The country must enter
+      # a range; the run is blocked until it does (run_range_gate).
+      if (mu == 0) {
+        add(grp, p, "bounds_order", "pass", t("qa_msg_bounds_order_zero"))
+      } else {
+        add(grp, p, "range_missing", "missing", qa_msg("range_missing", p, mu))
+      }
+    }
+    if ("range_default" %in% names(ps) && isTRUE(ps$range_default[i])) {
+      src <- if (p %in% names(DEFAULT_RANGE_SOURCE)) DEFAULT_RANGE_SOURCE[[p]] else ""
+      add(grp, p, "range_default", "info", qa_msg("range_default", p, src))
     }
 
     # ------------------------------------------------------------------
@@ -621,6 +632,18 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       sg$issues$level <- NA_character_
       result <- rbind(result, sg$issues)
     }
+    # 2026-10-30: manure values with no range and no IPCC range.
+    mm <- manure_missing_ranges(manure_data)
+    if (!is.null(mm) && nrow(mm) > 0) {
+      result <- rbind(result, data.frame(
+        group     = ifelse(nzchar(mm$group), mm$group, "Manure_Management"),
+        parameter = paste0(mm$column, " (", mm$mms_type, ")"),
+        check     = "range_missing",
+        status    = "missing",
+        message   = sprintf(t("qa_msg_range_missing_mms"), mm$column, mm$mms_type, mm$value),
+        level     = mm$level,
+        stringsAsFactors = FALSE))
+    }
   }
 
   result$id <- qaqc_row_id(result)
@@ -651,7 +674,7 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
 # unchanged. sub_category_ambiguous cannot be ignored: the simulation would
 # not know which Manure_Management row to read.
 # ---------------------------------------------------------------------------
-QAQC_NON_IGNORABLE <- c("sub_category_ambiguous")
+QAQC_NON_IGNORABLE <- c("sub_category_ambiguous", "range_missing")
 QAQC_REPAIRABLE    <- c("bounds_order", "dist_suitability")
 
 qaqc_row_id <- function(df) {

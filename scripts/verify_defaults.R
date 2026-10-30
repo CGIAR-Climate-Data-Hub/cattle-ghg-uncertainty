@@ -214,7 +214,7 @@ S[["prompt_param_catalogue"]] <- local({
       v[paste("PARAM_CATALOGUE", code, fld, sep = "|")] <- norm(t[[map[[fld]]]])
     if ("suggested ±%" %in% names(t)) {
       u <- norm(sub("%$", "", t[["suggested ±%"]]))
-      u[grepl("asymmetric", u)] <- NA
+      u[grepl("asymmetric|^none", u)] <- NA
       v[paste("PARAM_CATALOGUE", code, "suggested_uncertainty_pct",
               sep = "|")] <- u
     }
@@ -332,9 +332,16 @@ S[["xlsx_parameters"]] <- local({
   for (pair in list(c("value", "ipcc_default"),
                     c("uncertainty_pct", "suggested_uncertainty_pct"),
                     c("distribution", "suggested_distribution")))
-    if (pair[1] %in% nm)
-      v[paste("PARAM_CATALOGUE", k[keep], pair[2], sep = "|")] <-
-        norm(p[[pair[1]]][keep])
+    if (pair[1] %in% nm) {
+      kk <- keep
+      # 2026-10-30: the worked example carries illustration ranges where the
+      # catalogue has no default range (EXAMPLE_ILLUSTRATION_UNC_PCT); those
+      # are not catalogue values, so only inputs with a default are compared.
+      if (pair[2] == "suggested_uncertainty_pct")
+        kk <- keep & k %in% pc$parameter[!is.na(pc$suggested_uncertainty_pct)]
+      v[paste("PARAM_CATALOGUE", k[kk], pair[2], sep = "|")] <-
+        norm(p[[pair[1]]][kk])
+    }
   v
 })
 

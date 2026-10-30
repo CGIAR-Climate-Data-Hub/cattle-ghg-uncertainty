@@ -782,8 +782,9 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     d9 <- tryCatch(.translator_defaults_applied(piece), error = function(e) NULL)
     if (!is.null(d9) && nrow(d9))
       for (i in seq_len(nrow(d9)))
-        add(d9$where[i], d9$issue[i], severity = "info", sheet = d9$sheet[i],
-            group = d9$group[i], parameter = d9$parameter[i], check = "default applied")
+        add(d9$where[i], d9$issue[i], severity = d9$severity[i] %||% "info", sheet = d9$sheet[i],
+            group = d9$group[i], parameter = d9$parameter[i],
+            check = if (identical(d9$severity[i], "warn")) "range needed" else "default applied")
     # 2026-10-23: what the server corrected before writing (see
     # .translator_fix_uncertainty_scale), for the user to check
     sc <- piece$server_corrections
@@ -808,7 +809,8 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
 # the difference.
 .translator_defaults_applied <- function(piece) {
   empty <- data.frame(where = character(), issue = character(), sheet = character(),
-                      group = character(), parameter = character(), stringsAsFactors = FALSE)
+                      group = character(), parameter = character(), severity = character(),
+                      stringsAsFactors = FALSE)
   ps <- piece$parameters
   rows <- list()
   if (is.data.frame(ps) && nrow(ps) && all(c("sub_category", "parameter") %in% names(ps))) {
@@ -823,14 +825,28 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       no_spread <- !is.finite(unc[i]) && !is.finite(lo[i]) && !is.finite(hi[i])
       no_dist   <- is.na(dist[i]) || !nzchar(dist[i]) || dist[i] == "na"
       if (!no_spread && !no_dist) next
-      what <- paste(c(if (no_spread) "range", if (no_dist) "distribution"), collapse = " and ")
-      rows[[length(rows) + 1L]] <- data.frame(
-        where = sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], ps$parameter[i]),
-        issue = sprintf("The file gave a value for %s (%s) but no %s; the IPCC catalogue %s was applied. Replace it if your inventory has its own.",
-                        ps$parameter[i], format(signif(mean_v[i], 6)), what, what),
-        sheet = "Parameters",
-        group = paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i] %||% "", sep = "||"),
-        parameter = as.character(ps$parameter[i]), stringsAsFactors = FALSE)
+      # 2026-10-30: a range is applied only where a defensible default
+      # exists; otherwise the user must add one (the app will not run).
+      pn <- as.character(ps$parameter[i])
+      has_def <- no_spread && !is.null(default_range_for(pn, mean_v[i]))
+      what <- paste(c(if (no_spread && has_def) "range", if (no_dist) "distribution"), collapse = " and ")
+      grp_i <- paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i] %||% "", sep = "||")
+      where_i <- sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], pn)
+      if (nzchar(what))
+        rows[[length(rows) + 1L]] <- data.frame(
+          where = where_i,
+          issue = sprintf("The file gave a value for %s (%s) but no %s; the default %s was applied%s. Replace it if your inventory has its own.",
+                          pn, format(signif(mean_v[i], 6)), what, what,
+                          if (no_spread && has_def) sprintf(" (%s)", DEFAULT_RANGE_SOURCE[[pn]]) else ""),
+          sheet = "Parameters", group = grp_i, parameter = pn, severity = "info",
+          stringsAsFactors = FALSE)
+      if (no_spread && !has_def)
+        rows[[length(rows) + 1L]] <- data.frame(
+          where = where_i,
+          issue = sprintf("The file gave a value for %s (%s) but no uncertainty range, and there is no default range for %s. Add a range from your own data; the app lists it as Missing and will not run until you do.",
+                          pn, format(signif(mean_v[i], 6)), pn),
+          sheet = "Parameters", group = grp_i, parameter = pn, severity = "warn",
+          stringsAsFactors = FALSE)
     }
   }
   mm <- piece$manure_management
@@ -839,18 +855,32 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     get <- function(nm) if (nm %in% names(mm)) mm[[nm]] else rep(NA, nrow(mm))
     for (i in seq_len(nrow(mm))) {
       mcf <- num(get("MCF_pct")[i] %||% get("mcf")[i]); ef3 <- num(get("EF3")[i] %||% get("ef3")[i])
-      if (is.finite(mcf) && !is.finite(num(get("lower_mcf")[i])) && !is.finite(num(get("upper_mcf")[i])))
+      # 2026-10-30: the writer applies an IPCC range only at the system's
+      # IPCC default value (EF3 a factor of 2, Table 10.22 fractions); MCF
+      # never. Pasture's EF3 and fractions are unused (Chapter 11 pathway).
+      id_i  <- as.character(get("mms_type")[i])
+      grp_m <- paste(mm$cattle_type[i] %||% "", mm$aggregation_level[i] %||% "", mm$sub_category[i], sep = "||")
+      share <- num(get("fraction_pct")[i])
+      if (is.finite(share) && share <= 0) next
+      cols_m <- list(MCF_pct = list(v = mcf, lo = "lower_mcf", hi = "upper_mcf"),
+                     EF3 = list(v = ef3, lo = "lower_ef3", hi = "upper_ef3"),
+                     Frac_GasMS_pct = list(v = num(get("Frac_GasMS_pct")[i]), lo = "lower_frac_gas", hi = "upper_frac_gas"),
+                     Frac_LeachMS_pct = list(v = num(get("Frac_LeachMS_pct")[i]), lo = "lower_frac_leach", hi = "upper_frac_leach"))
+      for (cn in names(cols_m)) {
+        cm <- cols_m[[cn]]
+        if (!is.finite(cm$v) || cm$v == 0) next
+        if (identical(id_i, "pasture") && cn != "MCF_pct") next
+        if (is.finite(num(get(cm$lo)[i])) || is.finite(num(get(cm$hi)[i]))) next
+        r <- manure_default_range(id_i, cn, cm$v)
         rows[[length(rows) + 1L]] <- data.frame(
-          where = sprintf("%s / %s / MCF_pct", mm$aggregation_level[i] %||% "", mm$sub_category[i]),
-          issue = "MCF_pct came without a range; plus or minus 25% (pert) was applied as a project assumption. Replace it if your inventory has its own.",
-          sheet = "Manure_Management", group = paste(mm$cattle_type[i] %||% "", mm$aggregation_level[i] %||% "", mm$sub_category[i], sep = "||"),
-          parameter = "MCF_pct", stringsAsFactors = FALSE)
-      if (is.finite(ef3) && !is.finite(num(get("lower_ef3")[i])) && !is.finite(num(get("upper_ef3")[i])))
-        rows[[length(rows) + 1L]] <- data.frame(
-          where = sprintf("%s / %s / EF3", mm$aggregation_level[i] %||% "", mm$sub_category[i]),
-          issue = "EF3 came without a range; a factor of two either way (lognormal), the spread of the IPCC 2006 Table 10.21 ranges, was applied. Replace it if your inventory has its own.",
-          sheet = "Manure_Management", group = paste(mm$cattle_type[i] %||% "", mm$aggregation_level[i] %||% "", mm$sub_category[i], sep = "||"),
-          parameter = "EF3", stringsAsFactors = FALSE)
+          where = sprintf("%s / %s / %s (%s)", mm$aggregation_level[i] %||% "", mm$sub_category[i], cn, id_i),
+          issue = if (!is.null(r))
+            sprintf("%s for %s came without a range; the IPCC range for this default value was applied (%s). Replace it if your inventory has its own.", cn, id_i, r$source)
+          else
+            sprintf("%s for %s (%s) came without a range, and IPCC gives none for this value. Add a range from your own data; the app lists it as Missing and will not run until you do.", cn, id_i, format(signif(cm$v, 4))),
+          sheet = "Manure_Management", group = grp_m, parameter = cn,
+          severity = if (!is.null(r)) "info" else "warn", stringsAsFactors = FALSE)
+      }
     }
   }
   if (!length(rows)) return(empty)

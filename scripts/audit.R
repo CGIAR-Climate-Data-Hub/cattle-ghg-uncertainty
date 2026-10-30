@@ -4001,7 +4001,10 @@ section_F <- function() {
               # throughout. These three say the value and its range have
               # separate provenance and the second has to be declared.
               "Defaulted-uncertainty rule", "No-uncertainty-anywhere rule",
-              "Defaulted ranges declared", "C2. Missing ranges",
+              "Defaulted and missing ranges declared", "C2. Missing ranges",
+              # 2026-10-30. Default ranges only where defensible; the
+              # rest is listed for the user to add.
+              "ranges you need to add",
               # 2026-10-13. Nothing told the model the app has a size
               # ceiling, so a municipality-level file would map in full and
               # OOM at Simulate. The server-side check is in chat_ui.R
@@ -4046,6 +4049,79 @@ section_F <- function() {
              notes = if (f64_ok)
                sprintf("both state %d groups", .MAX_SIMULATED_GROUPS)
              else paste(f64_fail, collapse = "; "))
+
+  # F65 -- default uncertainty ranges (decision 2026-10-30). A default range
+  # exists only for Ym, Bo, the Chapter 11 pasture factors (IPCC 2019) and
+  # Cfi, Ca, C, Cp (Monni et al. 2007). Every other blank range is Missing on
+  # the QA/QC tab and blocks the run (source-aware). Asymmetric IPCC bounds
+  # apply only at the IPCC default value. Per manure system: EF3 a factor of
+  # 2 and the Table 10.22 fractions where IPCC gives a range, at the IPCC
+  # value only; MCF never; pasture's EF3 and fractions are not used. Both
+  # built-in examples run with no Missing range.
+  f65_fail <- tryCatch({
+    f <- character(0)
+    pc <- PARAM_CATALOGUE
+    has_def <- pc$parameter[!is.na(pc$suggested_uncertainty_pct) | !is.na(pc$suggested_lower_bound)]
+    want <- c("Ym", "Bo", "Cfi", "Ca", "C", "Cp", "EF3_PRP", "EF4", "EF5",
+              "Frac_GASM_PRP", "Frac_LEACH_PRP")
+    if (!setequal(has_def, want))
+      f <- c(f, sprintf("catalogue default ranges are for %s", paste(sort(has_def), collapse = ", ")))
+    if (!setequal(names(DEFAULT_RANGE_SOURCE), want))
+      f <- c(f, "DEFAULT_RANGE_SOURCE does not name exactly the inputs with a default range")
+    ps <- fill_bounds(data.frame(cattle_type = "dairy", aggregation_level = "A",
+      sub_category = "cows", parameter = c("N", "BW", "Ym", "EF4", "EF5", "Cfi", "WG"),
+      mean = c(1000, 300, 6.5, 0.014, 0.02, 0.386, 0),
+      uncertainty_pct = c(10, NA, NA, NA, NA, NA, NA),
+      distribution = c("normal", "normal", "pert", "lognormal", "lognormal", "pert", "pert"),
+      lower = NA_real_, upper = NA_real_, param_type = "coefficient",
+      stringsAsFactors = FALSE))
+    p2 <- ensure_completeness(ps)$param_specs
+    g  <- function(p) p2[p2$parameter == p, , drop = FALSE][1, ]
+    if (!isTRUE(all.equal(c(g("Ym")$lower, g("Ym")$upper), c(5.2, 7.8))))
+      f <- c(f, "a blank Ym range did not take +/-20%")
+    if (!isTRUE(all.equal(c(g("EF4")$lower, g("EF4")$upper), c(0.011, 0.017))))
+      f <- c(f, "a blank EF4 range at the IPCC value did not take the Table 11.3 bounds")
+    if (!is.na(g("EF5")$lower)) f <- c(f, "an own EF5 value took the IPCC bounds")
+    if (!is.na(g("BW")$lower)) f <- c(f, "a blank BW range was filled")
+    qa <- run_qaqc(p2)
+    miss <- qa$parameter[qa$check == "range_missing"]
+    if (!all(c("BW", "EF5") %in% miss)) f <- c(f, "BW / EF5 not reported as Missing")
+    if (any(c("Ym", "EF4", "Cfi", "N", "WG") %in% miss)) f <- c(f, "a row with a range (or a zero) reported as Missing")
+    if (!"range_missing" %in% QAQC_NON_IGNORABLE) f <- c(f, "range_missing can be ignored")
+    gt <- run_range_gate(p2, NULL, params_needed_for_sources("enteric_ch4"), "enteric_ch4")
+    if (!any(grepl(": BW$", gt)) || any(grepl("EF5", gt)))
+      f <- c(f, "the run gate is not source-aware (BW must block enteric, EF5 must not)")
+    mm <- data.frame(cattle_type = "dairy", aggregation_level = "A", sub_category = "cows",
+      mms_type = c("pasture", "solid_storage", "composting"), fraction_pct = c(40, 40, 20),
+      MCF_pct = c(2, 5, 1), EF3 = c(0.02, 0.01, 0.02), Frac_GasMS_pct = c(21, 45, 65),
+      Frac_LeachMS_pct = c(30, 2, 6), stringsAsFactors = FALSE)
+    m2 <- apply_default_ranges_manure(mm)
+    if (!isTRUE(all.equal(c(m2$lower_ef3[2], m2$upper_ef3[2]), c(0.005, 0.02))))
+      f <- c(f, "solid storage EF3 at the IPCC value did not take a factor of 2")
+    if (!is.na(m2$lower_ef3[3])) f <- c(f, "an own EF3 value took the IPCC range")
+    if (!isTRUE(all.equal(c(m2$lower_frac_gas[2], m2$upper_frac_gas[2]), c(10, 65))))
+      f <- c(f, "solid storage Frac_GasMS did not take the Table 10.22 range")
+    if (!is.na(m2$lower_frac_leach[2])) f <- c(f, "a leaching fraction with no IPCC range took one")
+    mr <- manure_missing_ranges(m2)
+    key <- paste(mr$mms_type, mr$column)
+    if (!all(c("pasture MCF_pct", "solid_storage MCF_pct", "solid_storage Frac_LeachMS_pct") %in% key))
+      f <- c(f, "MCF / a leaching fraction without range not reported as Missing")
+    if (any(c("pasture EF3", "pasture Frac_GasMS_pct", "pasture Frac_LeachMS_pct") %in% key))
+      f <- c(f, "pasture EF3 or fractions (unused) reported as Missing")
+    for (nm in c("x", "y")) {
+      ps <- ensure_completeness(fill_bounds(get(paste0("generate_country_", nm, "_example"))()))$param_specs
+      mx <- apply_default_ranges_manure(get(paste0("generate_country_", nm, "_manure"))())
+      gx <- run_range_gate(ps, mx, params_needed_for_sources(names(SOURCE_PARAM_DEPS)), names(SOURCE_PARAM_DEPS))
+      if (length(gx)) f <- c(f, sprintf("Country %s example has missing ranges: %s", toupper(nm), paste(gx, collapse = "; ")))
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  f65_ok <- length(f65_fail) == 0L
+  check_bool("F65", "F",
+             "Default uncertainty ranges only where defensible (IPCC, Monni for Cfi/Ca/C/Cp); every other blank range is Missing and blocks the run; examples complete",
+             f65_ok,
+             notes = if (f65_ok) "11 inputs with a default; BW/EF5/MCF Missing; Ym/EF4/EF3/Table 10.22 filled at the IPCC value; gate source-aware; both examples complete"
+                     else paste(f65_fail, collapse = "; "))
 
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files

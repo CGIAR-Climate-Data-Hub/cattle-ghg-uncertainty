@@ -412,8 +412,8 @@ lang_state_take <- function(token) {
     fr = "Karimi-Zindashty et al. (2012) : Sources d'incertitude dans les inventaires d'émissions d'élevage : étude de cas canadienne"
   ),
   resources_milne = list(
-    en = "Milne et al. (2014): Estimating uncertainty in pasture-based dairy CH₄ emissions",
-    fr = "Milne et al. (2014) : Estimation de l'incertitude des émissions de CH₄ laitières au pâturage"
+    en = "Milne et al. (2014): Analysis of uncertainties in the estimates of nitrous oxide and methane emissions in the UK's greenhouse gas inventory for agriculture",
+    fr = "Milne et al. (2014) : Analyse des incertitudes des estimations des émissions d'oxyde nitreux et de méthane de l'inventaire agricole des gaz à effet de serre du Royaume-Uni"
   ),
   resources_more_to_come = list(en = "Additional national-inventory examples to be added.",
                                   fr = "D'autres exemples d'inventaires nationaux seront ajoutés."),
@@ -935,8 +935,8 @@ lang_state_take <- function(token) {
   # =====================================================================
 
   info_qaqc = list(
-    en = "Read the checks on your data. Click a status tile to filter the table. Fix every Fail in your Excel file and upload it again. Warn means check the value; Missing means an IPCC default was used.",
-    fr = "Lisez les vérifications de vos données. Cliquez sur une vignette de statut pour filtrer le tableau. Corrigez chaque Échec dans votre fichier Excel et téléversez-le de nouveau. Attention signifie vérifier la valeur ; Manquant signifie qu'une valeur GIEC par défaut a été utilisée."
+    en = "Read the checks on your data. Click a status tile to filter the table. Fix every Fail in your Excel file and upload it again. Warn means check the value. Missing means something was not in your file: either an IPCC default value was used, or you must add an uncertainty range.",
+    fr = "Lisez les vérifications de vos données. Cliquez sur une vignette de statut pour filtrer le tableau. Corrigez chaque Échec dans votre fichier Excel et téléversez-le de nouveau. Attention signifie vérifier la valeur. Manquant signifie qu'il manquait quelque chose dans votre fichier : soit une valeur GIEC par défaut a été utilisée, soit vous devez ajouter une plage d'incertitude."
   ),
   qa_status_missing = list(en = "Missing", fr = "Manquant"),
   qa_li_pass = list(
@@ -948,16 +948,16 @@ lang_state_take <- function(token) {
     fr = " : une note, rien à corriger. Exemple : des bornes égales à la moyenne, la valeur est donc traitée comme fixe. La simulation peut tourner."
   ),
   qa_li_warn = list(
-    en = ": the value is unusual, or something is missing that the tool can work around. Example: a body weight far from the IPCC default, or a row without uncertainty. The simulation can run. Check the value; if it is right for your country, keep it and note the source in your report.",
-    fr = " : la valeur est inhabituelle, ou il manque quelque chose que l'outil peut contourner. Exemple : un poids vif loin de la valeur GIEC par défaut, ou une ligne sans incertitude. La simulation peut tourner. Vérifiez la valeur ; si elle est juste pour votre pays, gardez-la et notez la source dans votre rapport."
+    en = ": the value is unusual. Example: a body weight far from the IPCC default. The simulation can run. Check the value; if it is right for your country, keep it and note the source in your report.",
+    fr = " : la valeur est inhabituelle. Exemple : un poids vif loin de la valeur GIEC par défaut. La simulation peut tourner. Vérifiez la valeur ; si elle est juste pour votre pays, gardez-la et notez la source dans votre rapport."
   ),
   qa_li_fail = list(
     en = ": the value would break or distort the calculation. Example: bounds that do not contain the mean, or a percentage entered as a fraction (DE = 0.65 instead of 65). The simulation cannot run until it is corrected in your Excel file.",
     fr = " : la valeur casserait ou fausserait le calcul. Exemple : des bornes qui ne contiennent pas la moyenne, ou un pourcentage saisi en fraction (DE = 0,65 au lieu de 65). La simulation ne peut pas tourner tant que ce n'est pas corrigé dans votre fichier Excel."
   ),
   qa_li_missing = list(
-    en = ": the parameter was not in your file. The tool filled it with the IPCC default and shows which value it used. The simulation can run. If you have a national value, add it to your file.",
-    fr = " : le paramètre n'était pas dans votre fichier. L'outil l'a rempli avec la valeur GIEC par défaut et montre la valeur utilisée. La simulation peut tourner. Si vous avez une valeur nationale, ajoutez-la à votre fichier."
+    en = ": something was not in your file. There are two cases. A parameter was missing: the tool used the IPCC default value and shows it. The simulation can run; if you have a national value, add it to your file. An uncertainty range was missing: only a few inputs have a default range (Ym, Bo, Cfi, Ca, C, Cp, the pasture N2O factors, and some manure factors). For every other input the range must come from your own data. The simulation cannot run until you enter it.",
+    fr = " : il manquait quelque chose dans votre fichier. Il y a deux cas. Un paramètre manquait : l'outil a utilisé la valeur GIEC par défaut et la montre. La simulation peut tourner ; si vous avez une valeur nationale, ajoutez-la à votre fichier. Une plage d'incertitude manquait : seules quelques entrées ont une plage par défaut (Ym, Bo, Cfi, Ca, C, Cp, les facteurs N2O des pâturages et certains facteurs des effluents). Pour toutes les autres entrées, la plage doit venir de vos propres données. La simulation ne peut pas tourner tant que vous ne l'avez pas saisie."
   ),
   qa_status_fail = list(en = "Fail", fr = "Échec"),
   qa_status_warn = list(en = "Warn", fr = "Attention"),
@@ -1603,9 +1603,21 @@ lang_state_take <- function(token) {
     en = "lower = upper = mean: no uncertainty, %s is sampled as a constant.",
     fr = "inférieure = supérieure = moyenne : aucune incertitude, %s est tiré comme une constante."
   ),
-  qa_msg_unc_missing_warn = list(
-    en = "No lower/upper bounds and no uncertainty_pct: %s is sampled as a constant (%.4g). Give a range, or set the distribution to constant.",
-    fr = "Aucune borne inférieure/supérieure ni uncertainty_pct : %s est tiré comme une constante (%.4g). Donnez une plage, ou mettez la distribution à constant."
+  qa_msg_range_missing = list(
+    en = "%s (value %.4g) has no uncertainty range, and there is no default range for it. Enter a range from your own data: uncertainty_pct, or lower_bound and upper_bound. If the value is known exactly, set the distribution to constant. The simulation cannot run until this is done.",
+    fr = "%s (valeur %.4g) n'a pas de plage d'incertitude, et il n'existe pas de plage par défaut. Saisissez une plage tirée de vos propres données : uncertainty_pct, ou lower_bound et upper_bound. Si la valeur est connue exactement, mettez la distribution à constant. La simulation ne peut pas tourner tant que ce n'est pas fait."
+  ),
+  qa_msg_range_missing_mms = list(
+    en = "%s for %s (value %.4g) has no uncertainty range, and IPCC gives none for this value. Enter the lower and upper values in the Manure_Management sheet. The simulation cannot run until this is done.",
+    fr = "%s pour %s (valeur %.4g) n'a pas de plage d'incertitude, et le GIEC n'en donne pas pour cette valeur. Saisissez les valeurs inférieure et supérieure dans la feuille Manure_Management. La simulation ne peut pas tourner tant que ce n'est pas fait."
+  ),
+  qa_msg_range_default = list(
+    en = "No range was given for %s, so the default range was used (%s). If the value is your own and not the default, enter your own range.",
+    fr = "Aucune plage n'a été donnée pour %s, la plage par défaut a donc été utilisée (%s). Si la valeur est la vôtre et non la valeur par défaut, saisissez votre propre plage."
+  ),
+  range_gate_msg = list(
+    en = "Cannot run simulation: %d input(s) have no uncertainty range, and there is no default range for them. Enter the ranges in your Excel file and upload it again. They are listed as Missing on the QA/QC tab: %s%s",
+    fr = "Impossible de lancer la simulation : %d entrée(s) n'ont pas de plage d'incertitude, et il n'existe pas de plage par défaut. Saisissez les plages dans votre fichier Excel et téléversez-le de nouveau. Elles sont listées comme Manquant dans l'onglet QA/QC : %s%s"
   ),
   qa_msg_unit_fraction_fail = list(
     en = "%s = %.4g. The template expects a percentage (%s); this looks like a fraction. If it is one, enter %.4g.",

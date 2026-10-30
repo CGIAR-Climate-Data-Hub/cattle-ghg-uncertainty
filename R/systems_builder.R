@@ -47,6 +47,20 @@ make_group_key <- function(df) {
 # sums to 1: keeps the values on the simplex (Option A from the design Q:
 # independent sample + renormalise).
 .draw_per_mms_samples <- function(mms_rows, n_iter) {
+  # 2026-10-30: the IPCC range of a system's EF3 or Table 10.22 fraction
+  # applies when the row carries the IPCC default, including a blank value
+  # cell (which the build fills with that default). MCF has no IPCC range.
+  for (col in c("EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct")) {
+    if (!col %in% names(mms_rows)) next
+    v <- suppressWarnings(as.numeric(mms_rows[[col]]))
+    for (j in which(is.na(v))) {
+      d <- .manure_column_default(as.character(mms_rows$mms_type[j]), col)
+      if (!is.na(d) && !is.null(manure_default_range(as.character(mms_rows$mms_type[j]), col, d)))
+        v[j] <- d
+    }
+    mms_rows[[col]] <- v
+  }
+  mms_rows <- apply_default_ranges_manure(mms_rows)
   mr_mcf_scaled <- mms_rows
   for (col in c("MCF_pct", "lower_mcf", "upper_mcf")) {
     if (col %in% names(mr_mcf_scaled))

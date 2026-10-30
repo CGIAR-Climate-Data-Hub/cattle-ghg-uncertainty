@@ -269,7 +269,9 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   group_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category"),
                           names(param_specs))
   if (length(group_cols) == 0) {
-    return(list(valid = TRUE, param_specs = param_specs, auto_filled = NULL,
+    ps1 <- apply_default_ranges(param_specs, catalogue)
+    return(list(valid = TRUE, param_specs = ps1, auto_filled = NULL,
+                ranges_filled = sum(ps1$range_default %in% TRUE),
                 message = "Single-group input: no per-group completeness check."))
   }
 
@@ -317,11 +319,13 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
       }
       pct <- if (!is.null(rs) && !is.null(rs$uncertainty_pct) &&
                  !is.na(rs$uncertainty_pct)) rs$uncertainty_pct else unc_lut[[p]]
-      if (is.null(pct) || is.na(pct)) pct <- 20  # safe fallback
+      # No fallback range any more (2026-10-30): an input without a default
+      # range keeps a blank one, which the QA/QC reports as Missing.
+      if (is.null(pct)) pct <- NA_real_
       lower <- if (!is.null(rs) && !is.null(rs$lower) && !is.na(rs$lower))
-                 rs$lower else def * (1 - pct / 100)
+                 rs$lower else if (is.na(pct)) NA_real_ else def * (1 - pct / 100)
       upper <- if (!is.null(rs) && !is.null(rs$upper) && !is.na(rs$upper))
-                 rs$upper else def * (1 + pct / 100)
+                 rs$upper else if (is.na(pct)) NA_real_ else def * (1 + pct / 100)
       new_row <- as.data.frame(
         c(as.list(g),
           list(parameter = p,
@@ -372,12 +376,19 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
       sprintf("Cannot run: %d core parameter(s) have no IPCC default and are missing: %s.",
               length(unfillable), paste(head(uf, 3), collapse = "; ")))
   }
+  # 2026-10-30: blank ranges take a default only where one is defensible
+  # (see apply_default_ranges). Everything else stays blank for the QA/QC.
+  n_before <- if ("range_default" %in% names(param_specs)) sum(param_specs$range_default %in% TRUE) else 0L
+  param_specs <- apply_default_ranges(param_specs, catalogue)
+  ranges_filled <- sum(param_specs$range_default %in% TRUE) - n_before
+
   if (length(msg_parts) == 0) msg_parts <- "All sub-categories complete."
 
   list(
     valid = length(unfillable) == 0,
     param_specs = param_specs,
     auto_filled = added_rows,
+    ranges_filled = ranges_filled,
     message = paste(msg_parts, collapse = " ")
   )
 }
@@ -386,4 +397,247 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
 validate_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE) {
   res <- ensure_completeness(param_specs, catalogue)
   list(valid = res$valid, missing = NULL, message = res$message)
+}
+
+# ===========================================================================
+# DEFAULT UNCERTAINTY RANGES (decision 2026-10-30)
+#
+# A default range is applied ONLY where the literature gives one that can be
+# defended for another country's data:
+#   - IPCC publishes the range together with the default value (Ym, Bo, the
+#     Chapter 11 pasture factors and fractions; per manure system, EF3 and
+#     the Table 10.22 volatilisation and leaching fractions);
+#   - Cfi, Ca, C and Cp: IPCC equation coefficients that no country can
+#     measure, with the expert-judgement ranges of Monni et al. (2007) that
+#     the Finnish and UK inventories use.
+# Every other input (animal numbers, weights, milk, fat, pregnancy, diet,
+# MCF ...) describes the country's own data, so its range must come from the
+# country. A blank range there is reported as Missing by the QA/QC and blocks
+# the run until the compiler enters one (or sets the distribution to
+# constant, which says the value is known exactly).
+#
+# The bounds-type defaults (asymmetric IPCC ranges) belong to the IPCC
+# default value: they are applied only when the row carries that value. A
+# percentage default is applied around whatever value the row carries, and
+# the QA/QC info row asks for an own range when the value is the country's.
+# ===========================================================================
+DEFAULT_RANGE_SOURCE <- c(
+  Ym             = "IPCC 2019, Vol. 4, Table 10.12",
+  Bo             = "IPCC 2019, Vol. 4, Table 10.16A",
+  Cfi            = "Monni et al. (2007), Table I",
+  Ca             = "Monni et al. (2007), Table I",
+  C              = "Monni et al. (2007), Table I",
+  Cp             = "Monni et al. (2007), Table I",
+  EF3_PRP        = "IPCC 2019, Vol. 4, Table 11.1",
+  EF4            = "IPCC 2019, Vol. 4, Table 11.3",
+  EF5            = "IPCC 2019, Vol. 4, Table 11.3",
+  Frac_GASM_PRP  = "IPCC 2019, Vol. 4, Table 11.3",
+  Frac_LEACH_PRP = "IPCC 2019, Vol. 4, Table 11.3"
+)
+
+.same_value <- function(a, b) {
+  length(a) == 1L && length(b) == 1L && !is.na(a) && !is.na(b) &&
+    abs(a - b) <= 1e-9 * max(1, abs(b))
+}
+
+# The default range for one parameter around one value, or NULL.
+default_range_for <- function(parameter, mean, catalogue = PARAM_CATALOGUE) {
+  if (is.null(parameter) || is.na(parameter) || is.na(mean)) return(NULL)
+  if (!parameter %in% names(DEFAULT_RANGE_SOURCE)) return(NULL)
+  i <- match(parameter, catalogue$parameter)
+  if (is.na(i)) return(NULL)
+  src <- unname(DEFAULT_RANGE_SOURCE[[parameter]])
+  pct <- suppressWarnings(as.numeric(catalogue$suggested_uncertainty_pct[i]))
+  if (!is.na(pct)) {
+    b <- calc_bounds(mean, pct)
+    return(list(pct = pct, lower = b$lower, upper = b$upper, source = src))
+  }
+  lo  <- suppressWarnings(as.numeric(catalogue$suggested_lower_bound[i]))
+  hi  <- suppressWarnings(as.numeric(catalogue$suggested_upper_bound[i]))
+  def <- suppressWarnings(as.numeric(catalogue$ipcc_default[i]))
+  if (!is.na(lo) && !is.na(hi) && .same_value(mean, def))
+    return(list(pct = NA_real_, lower = lo, upper = hi, source = src))
+  NULL
+}
+
+# TRUE when a row needs a range and has none: not a constant, a non-zero
+# value, and no lower or no upper bound.
+range_is_blank <- function(mean, lower, upper, distribution) {
+  is_const <- !is.na(distribution) & tolower(distribution) %in% c("constant", "const")
+  !is_const & !is.na(mean) & mean != 0 & (is.na(lower) | is.na(upper))
+}
+
+# Fill blank ranges where a default exists; flag those rows range_default.
+apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
+  ps <- param_specs
+  if (is.null(ps) || !nrow(ps) || !all(c("parameter", "mean") %in% names(ps)))
+    return(ps)
+  for (cl in c("lower", "upper", "uncertainty_pct"))
+    if (!cl %in% names(ps)) ps[[cl]] <- NA_real_
+  if (!"distribution" %in% names(ps)) ps$distribution <- NA_character_
+  if (!"range_default" %in% names(ps)) ps$range_default <- FALSE
+  ps$range_default[is.na(ps$range_default)] <- FALSE
+  mu <- suppressWarnings(as.numeric(ps$mean))
+  blank <- range_is_blank(mu, suppressWarnings(as.numeric(ps$lower)),
+                          suppressWarnings(as.numeric(ps$upper)),
+                          as.character(ps$distribution))
+  for (i in which(blank)) {
+    r <- default_range_for(ps$parameter[i], mu[i], catalogue)
+    if (is.null(r)) next
+    if (!is.na(r$pct)) ps$uncertainty_pct[i] <- r$pct
+    ps$lower[i] <- r$lower
+    ps$upper[i] <- r$upper
+    if (is.na(ps$distribution[i]) || !nzchar(ps$distribution[i])) {
+      j <- match(ps$parameter[i], catalogue$parameter)
+      ps$distribution[i] <- catalogue$suggested_distribution[j]
+    }
+    ps$range_default[i] <- TRUE
+  }
+  ps
+}
+
+# Manure sheet: the IPCC range of a per-system value, or NULL. EF3 varies by
+# a factor of 2 (IPCC 2019 Vol. 4 Table 10.21 footnote 24); the volatilisation
+# and leaching fractions take the Table 10.22 range where IPCC publishes one.
+# MCF has no published range, so it has none here. Each range belongs to the
+# IPCC default value of that system and is used only when the row carries it.
+# `value` is in the sheet's unit (EF3 a fraction, the fractions in percent).
+MANURE_RANGE_FIELDS <- list(
+  MCF_pct          = c(lower = "lower_mcf",        upper = "upper_mcf"),
+  EF3              = c(lower = "lower_ef3",        upper = "upper_ef3"),
+  Frac_GasMS_pct   = c(lower = "lower_frac_gas",   upper = "upper_frac_gas"),
+  Frac_LeachMS_pct = c(lower = "lower_frac_leach", upper = "upper_frac_leach")
+)
+
+.mms_bound_is_ipcc <- function(mms_type, field) {
+  if (!exists(".defaults_master")) return(FALSE)
+  m <- .defaults_master
+  v <- m$ipcc_verdict[m$object == "MMS_FRAC_DEFAULTS_2019" & m$key == mms_type &
+                      m$field %in% paste0(field, c("_low", "_high"))]
+  length(v) == 2L && all(v %in% c("CONFIRMED", "INTERPRETED"))
+}
+
+manure_default_range <- function(mms_type, column, value) {
+  if (is.na(value) || is.na(mms_type)) return(NULL)
+  if (column == "EF3") {
+    d <- tryCatch(mms_default(mms_type, "ef3"), error = function(e) NA_real_)
+    if (!.same_value(value, d) || d <= 0) return(NULL)
+    return(list(lower = d / 2, upper = d * 2,
+                source = "IPCC 2019, Vol. 4, Table 10.21 (factor of 2)"))
+  }
+  fld <- switch(column, Frac_GasMS_pct = "frac_gas", Frac_LeachMS_pct = "frac_leach", NULL)
+  if (is.null(fld)) return(NULL)
+  if (!mms_type %in% MMS_FRAC_DEFAULTS_2019$mms_type) return(NULL)
+  if (!.mms_bound_is_ipcc(mms_type, fld)) return(NULL)
+  d <- mms_frac_defaults_2019(mms_type)
+  if (!.same_value(value, d[[fld]] * 100)) return(NULL)
+  list(lower = d[[paste0(fld, "_low")]] * 100, upper = d[[paste0(fld, "_high")]] * 100,
+       source = "IPCC 2019, Vol. 4, Table 10.22")
+}
+
+# Fill blank manure ranges where IPCC publishes one. Rows whose value cell is
+# blank are left alone here: the sampler fills the value from the system's
+# IPCC default, and manure_missing_ranges() treats them as carrying it.
+apply_default_ranges_manure <- function(manure) {
+  if (is.null(manure) || !nrow(manure) || !"mms_type" %in% names(manure)) return(manure)
+  for (col in names(MANURE_RANGE_FIELDS)) {
+    if (!col %in% names(manure)) next
+    f <- MANURE_RANGE_FIELDS[[col]]
+    for (cl in f) if (!cl %in% names(manure)) manure[[cl]] <- NA_real_
+    val <- suppressWarnings(as.numeric(manure[[col]]))
+    lo  <- suppressWarnings(as.numeric(manure[[f[["lower"]]]]))
+    hi  <- suppressWarnings(as.numeric(manure[[f[["upper"]]]]))
+    for (i in which(!is.na(val) & val != 0 & (is.na(lo) | is.na(hi)))) {
+      r <- manure_default_range(as.character(manure$mms_type[i]), col, val[i])
+      if (is.null(r)) next
+      manure[[f[["lower"]]]][i] <- r$lower
+      manure[[f[["upper"]]]][i] <- r$upper
+    }
+  }
+  manure
+}
+
+# The IPCC default of a manure column for one system, in the sheet's unit.
+.manure_column_default <- function(id, column, climate = "tropical") {
+  tryCatch(switch(column,
+    MCF_pct          = mms_mcf_fraction(id, climate) * 100,
+    EF3              = mms_default(id, "ef3"),
+    Frac_GasMS_pct   = mms_frac_defaults_2019(id)$frac_gas * 100,
+    Frac_LeachMS_pct = mms_frac_defaults_2019(id)$frac_leach * 100,
+    NA_real_), error = function(e) NA_real_)
+}
+
+# Manure rows still without a range: one row per (sheet row, column), for the
+# QA/QC. A blank value cell is read as that system's IPCC default, since that
+# is what the sampler uses, and takes the IPCC range where one exists.
+# Systems with a zero share, and zero values, need no range.
+manure_missing_ranges <- function(manure, climate = "tropical") {
+  if (is.null(manure) || !nrow(manure) || !"mms_type" %in% names(manure)) return(NULL)
+  frac <- if ("fraction_pct" %in% names(manure))
+    suppressWarnings(as.numeric(manure$fraction_pct)) else rep(1, nrow(manure))
+  col_or_na <- function(nm) if (nm %in% names(manure))
+    suppressWarnings(as.numeric(manure[[nm]])) else rep(NA_real_, nrow(manure))
+  out <- list()
+  for (col in names(MANURE_RANGE_FIELDS)) {
+    f <- MANURE_RANGE_FIELDS[[col]]
+    val <- col_or_na(col); lo <- col_or_na(f[["lower"]]); hi <- col_or_na(f[["upper"]])
+    for (i in seq_len(nrow(manure))) {
+      # A row with no share, or no system (the template's "Select from
+      # dropdown" placeholder), is not a manure system.
+      if (is.na(frac[i]) || frac[i] <= 0) next
+      if (!is.na(lo[i]) && !is.na(hi[i])) next
+      id <- as.character(manure$mms_type[i])
+      if (is.na(id) || !nzchar(trimws(id)) || grepl("^select", id, ignore.case = TRUE)) next
+      # Pasture N goes through the Chapter 11 pathway (EF3_PRP, Frac_GASM_PRP,
+      # Frac_LEACH_PRP on the Parameters sheet); the row's EF3 and fractions
+      # are not used, so they need no range. Its MCF is used.
+      if (identical(id, "pasture") && col != "MCF_pct") next
+      v <- val[i]
+      if (is.na(v)) v <- .manure_column_default(id, col, climate)
+      if (is.na(v) || v == 0) next
+      if (!is.null(manure_default_range(id, col, v))) next
+      grp <- paste(c(if ("cattle_type" %in% names(manure)) manure$cattle_type[i],
+                     if ("sub_category" %in% names(manure) && !is.na(manure$sub_category[i]) &&
+                         nzchar(manure$sub_category[i])) manure$sub_category[i]),
+                   collapse = " / ")
+      lvl <- if ("aggregation_level" %in% names(manure)) as.character(manure$aggregation_level[i]) else NA_character_
+      out[[length(out) + 1L]] <- data.frame(row = i, group = grp, level = lvl,
+                                            mms_type = id, column = col, value = v,
+                                            stringsAsFactors = FALSE)
+    }
+  }
+  if (!length(out)) return(NULL)
+  do.call(rbind, out)
+}
+
+# Labels of the inputs that still have no range, limited to what the selected
+# emission sources use. Empty when the run may go ahead.
+run_range_gate <- function(param_specs, manure, needed_params, sources) {
+  out <- character()
+  ps <- param_specs
+  if (!is.null(ps) && nrow(ps) > 0 && all(c("parameter", "mean") %in% names(ps))) {
+    lo <- if ("lower" %in% names(ps)) suppressWarnings(as.numeric(ps$lower)) else rep(NA_real_, nrow(ps))
+    hi <- if ("upper" %in% names(ps)) suppressWarnings(as.numeric(ps$upper)) else rep(NA_real_, nrow(ps))
+    d  <- if ("distribution" %in% names(ps)) as.character(ps$distribution) else rep(NA_character_, nrow(ps))
+    bl <- range_is_blank(suppressWarnings(as.numeric(ps$mean)), lo, hi, d) &
+          ps$parameter %in% needed_params
+    if (any(bl)) {
+      key_cols <- intersect(c("cattle_type", "sub_category"), names(ps))
+      grp <- if (length(key_cols)) do.call(paste, c(lapply(key_cols, function(k) ps[[k]][bl]), sep = " / ")) else ""
+      out <- c(out, paste0(grp, ": ", ps$parameter[bl]))
+    }
+  }
+  mm <- manure_missing_ranges(manure)
+  if (!is.null(mm) && nrow(mm) > 0) {
+    if ("pasture_n2o" %in% sources) sources <- c(sources, "pasture_n2o_direct", "pasture_n2o_indirect")
+    need_col <- c(MCF_pct = "manure_ch4" %in% sources,
+                  EF3 = "manure_n2o_direct" %in% sources,
+                  Frac_GasMS_pct = "manure_n2o_indirect" %in% sources,
+                  Frac_LeachMS_pct = "manure_n2o_indirect" %in% sources)
+    mm <- mm[need_col[mm$column] %in% TRUE, , drop = FALSE]
+    if (nrow(mm) > 0)
+      out <- c(out, paste0(ifelse(nzchar(mm$group), paste0(mm$group, ": "), ""),
+                           mm$column, " (", mm$mms_type, ")"))
+  }
+  unique(out)
 }

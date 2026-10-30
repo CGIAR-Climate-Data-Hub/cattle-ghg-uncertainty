@@ -209,9 +209,14 @@ app_server <- function(input, output, session) {
   # the imputed-parameter flags are set before the user reaches Tab 2 or Tab 5.
   .apply_completeness <- function(region = NULL) {
     comp <- ensure_completeness(rv$param_specs, region = region)
-    if (isTRUE(comp$valid) && length(comp$auto_filled) > 0) {
+    if (isTRUE(comp$valid) && (length(comp$auto_filled) > 0 ||
+                               isTRUE(comp$ranges_filled > 0))) {
       rv$param_specs <- comp$param_specs
     }
+    # 2026-10-30: blank manure ranges take the IPCC range where one exists
+    # (EF3, Table 10.22 fractions); the rest is reported as Missing.
+    md <- isolate(rv$manure_data)
+    if (!is.null(md)) rv$manure_data <- apply_default_ranges_manure(md)
   }
 
   # A new upload starts with a clean QA slate: ignores and repairs referred
@@ -250,14 +255,14 @@ app_server <- function(input, output, session) {
       # every N2O row collapses to the same Nex-dominated MoE: looks like a
       # bug but is actually structural for single-MMS inventories).
       rv$manure_data <- generate_country_x_manure()
-      rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded: 12 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
+      rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded: 15 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
       .qa_reset_caveats()
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
       rv$manure_data <- generate_country_y_manure()
-      rv$sim_log <- "Country Y (hypothetical pastoral non-dairy) example data loaded: 11 parameters, non_dairy / breeding_cows; 2 MMS types (pasture / solid_storage); 5-year synthetic time-series populated for correlation auto-mode.\n"
+      rv$sim_log <- "Country Y (hypothetical pastoral non-dairy) example data loaded: 15 parameters, non_dairy / breeding_cows; 2 MMS types (pasture / solid_storage); 5-year synthetic time-series populated for correlation auto-mode.\n"
     }
     # Flag any missing core parameters immediately so the Tab 1 notice appears
     # without needing to run the simulation first.
@@ -1322,6 +1327,8 @@ app_server <- function(input, output, session) {
                            "Completeness check failed: ", comp$message, "\n")
       return()
     }
+    if (isTRUE(comp$ranges_filled > 0) && length(comp$auto_filled) == 0)
+      rv$param_specs <- comp$param_specs
     if (length(comp$auto_filled) > 0) {
       rv$param_specs <- comp$param_specs
       showNotification(comp$message, type = "warning", duration = 6)
@@ -1402,6 +1409,21 @@ app_server <- function(input, output, session) {
         else preview_txt)
       showNotification(msg, type = "error", duration = 15)
       rv$sim_log <- paste0(rv$sim_log, msg, "\n")
+      return()
+    }
+
+    # 2026-10-30: a range is required wherever no defensible default exists
+    # (animal numbers, weights, milk, diet, MCF ...). Such a row is Missing on
+    # the QA/QC tab; the run stops here too, for users who go straight to Run.
+    rng_missing <- run_range_gate(rv$param_specs, rv$manure_data,
+                                  needed_params, input$emission_sources)
+    if (length(rng_missing) > 0) {
+      msg <- sprintf(t("range_gate_msg"), length(rng_missing),
+                     paste(head(rng_missing, 6), collapse = "; "),
+                     if (length(rng_missing) > 6) " ..." else "")
+      showNotification(msg, type = "error", duration = 15)
+      rv$sim_log <- paste0(rv$sim_log, msg, "\n")
+      bslib::nav_select(id = "nav", selected = t("tab_qaqc"), session = session)
       return()
     }
 

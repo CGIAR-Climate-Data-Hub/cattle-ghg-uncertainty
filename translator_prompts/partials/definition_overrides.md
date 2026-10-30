@@ -15,7 +15,7 @@ Fraction of females in this sub-category that are pregnant during the year, betw
 
 ## Ym
 
-Methane conversion factor: % of gross energy in feed converted to methane (IPCC Vol.4 Ch.10 Table 10.12). Default uncertainty 20% per Penman et al. (2000) and IPCC 2019R Vol.1 Ch.3 Tier 2 guidance, Ym is one of the most uncertain parameters in cattle CH₄ inventories and a tight ±% misstates that. Sub-category values the tool ships (2019 Refinement): lactating dairy cows 6.5%, all other grazing classes 7.0%, feedlot 4.0%. Under the 2006 Guidelines the tool uses 6.5% for every class except feedlot, which is 3.0%. Calves here are the forage-fed class, Ym 7.0 in Annex 10A.2. Milk-fed pre-weaning calves are a different animal: Annex 10A.2 gives them Ym 0.0 and a zero enteric emission factor, and the tool has no sub-category for them, so a herd with a large milk-fed calf population must enter Ym explicitly or it will be overstated.
+Methane conversion factor: % of gross energy in feed converted to methane (IPCC Vol.4 Ch.10 Table 10.12). Default uncertainty ±20% (IPCC 2019, Vol. 4, Table 10.12, footnote 3), Ym is one of the most uncertain parameters in cattle CH₄ inventories and a tight ±% misstates that. Sub-category values the tool ships (2019 Refinement): lactating dairy cows 6.5%, all other grazing classes 7.0%, feedlot 4.0%. Under the 2006 Guidelines the tool uses 6.5% for every class except feedlot, which is 3.0%. Calves here are the forage-fed class, Ym 7.0 in Annex 10A.2. Milk-fed pre-weaning calves are a different animal: Annex 10A.2 gives them Ym 0.0 and a zero enteric emission factor, and the tool has no sub-category for them, so a herd with a large milk-fed calf population must enter Ym explicitly or it will be overstated.
 
 ## Bo
 

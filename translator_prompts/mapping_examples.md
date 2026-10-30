@@ -99,9 +99,9 @@ This is common: small-inventory teams who know their animal numbers but nothing 
 
 **User says:** "Country X, 2022, IPCC 2019 Refinement, 500,000 dairy cows in one sub-category, 100% pasture, use IPCC defaults for everything else."
 
-**You do:** Build a Parameters block with `N = 500000` (`data_source = "user_file"`) and every other parameter set to its `ipcc_default` from `param_catalogue.md`, distribution = `suggested_distribution`, uncertainty = `suggested_uncertainty_pct`, `data_source = "ipcc_default"`. Build one Manure_Management row: `mms_type=pasture, fraction_pct=100`, plus the MCF/EF3/Frac defaults for pasture. Done in two minutes.
+**You do:** Build a Parameters block with `N = 500000` (`data_source = "user_file"`) and every other parameter set to its `ipcc_default` from `param_catalogue.md`, distribution = `suggested_distribution`, `data_source = "ipcc_default"`. Give a range only where the catalogue has a default range (Ym, Bo, Cfi, Ca, C, Cp, and the bounds of the pasture N2O factors); leave every other range blank, including the range of N. Build one Manure_Management row: `mms_type=pasture, fraction_pct=100`, plus the MCF/EF3/Frac defaults for pasture. Done in two minutes.
 
-**Important caveat to tell the user:** "I used Africa-region IPCC defaults uniformly. The Cattle Uncertainty App's QA/QC tab will flag any of these as 'IPCC default' so you can replace them with country-specific values later. The simulation will run, but the resulting uncertainty bands will be wide because they reflect IPCC's Tier 1 ranges, not your country's actual measurement quality."
+**Important caveat to tell the user:** "I used IPCC default values. Default uncertainty ranges exist only for Ym, Bo, Cfi, Ca, C, Cp and the pasture N2O factors. Every other range, starting with your animal numbers, has to come from your own data: the app lists them as Missing on its QA/QC tab and will not run until you add them in the Excel file."
 
 ---
 
@@ -153,9 +153,9 @@ dairy_cows      120000    1320             0
 
 **User says:** "Our crude protein in feed is 11%, that's the only number I have."
 
-**You do:** `parameter = CP, value = 11, distribution = normal, uncertainty_pct = 15` (from catalogue), `data_source = "user_chat"`. Leave `lower` / `upper` blank, for a symmetric Normal the app reconstructs them from the mean ± uncertainty_pct (here 9.35–12.65), so emitting them is redundant.
+**You do:** `parameter = CP, value = 11, distribution = normal`, `data_source = "user_chat"`, with `uncertainty_pct`, `lower` and `upper` left blank. CP has no default range: neither IPCC nor the literature gives one that applies to another country's diet data.
 
-**Tell the user:** "I used a ±15% Normal distribution around 11%, IPCC's suggested uncertainty for CP. If you have a measured range or a different distribution shape in mind, let me know and I'll update it."
+**Tell the user:** "CP = 11% is in the template. There is no default uncertainty range for CP, so the app will list it as Missing and will not run until you enter one. If you know how the 11% was obtained (for example from feed tables or a survey), I can help you work out a range: tell me the spread, or the lowest and highest plausible values."
 
 ---
 
