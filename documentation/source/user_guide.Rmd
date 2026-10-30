@@ -432,9 +432,9 @@ From experience with IPCC expert reviews, reviewers usually look at:
 
 This example walks through the whole workflow with the Country X dataset.
 
-**Step 1: Load data.** On Tab 1, choose "Single year". In the "Country / Example Data" list, pick "Country X (hypothetical dairy)" and confirm. The data loads (12 parameters, a smallholder dairy system). In the parameter table, note that the activity data (N, BW, Milk, WG, Fat) use normal distributions and the coefficients (Ym, DE, Bo and so on) use PERT or lognormal distributions.
+**Step 1: Load data.** On Tab 1, choose "Single year". In the "Country / Example Data" list, pick "Country X (hypothetical dairy)" and confirm. The data loads (15 parameters, a smallholder dairy system). In the parameter table, note that the activity data (N, BW, Milk, WG, Fat) use normal distributions and the coefficients (Ym, DE, Bo and so on) use PERT or lognormal distributions.
 
-**Step 2: QA/QC.** Go to Tab 2. Most parameters pass. Four are marked Missing: they were not in the example file and the tool filled them with IPCC defaults. A Warn on body weight would mean the value is far from the IPCC default for that animal class; a deliberate country-specific value can be documented in the inventory report rather than corrected.
+**Step 2: QA/QC.** Go to Tab 2. Most parameters pass. One is marked Missing: the hours of work. It is not in the example file, so the tool used the IPCC default (zero for cows). A Warn on body weight would mean the value is far from the IPCC default for that animal class; a deliberate country-specific value can be documented in the inventory report rather than corrected.
 
 **Step 3: Correlations.** Go to Tab 3. Select "From template (auto, time-series)". The example has a 5-year time series, so the tool computes the correlation matrix from it and shows it on the right.
 
