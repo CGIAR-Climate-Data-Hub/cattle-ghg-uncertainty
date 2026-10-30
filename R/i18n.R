@@ -166,33 +166,6 @@ lang_state_take <- function(token) {
     fr = "Monte Carlo Approche 2 · Alliance CGIAR / Bioversity-CIAT · financé par le Global Methane Hub"
   ),
 
-  # ---- Cross-group coefficient sharing (2026-09) -----------------------
-  crossgroup_label = list(
-    en = "Inputs shared between groups",
-    fr = "Entrées partagées entre groupes"),
-  crossgroup_shared = list(
-    en = "Treat a shared value as one estimate",
-    fr = "Traiter une valeur partagée comme une seule estimation"),
-  crossgroup_shared_help = list(
-    en = "Where several groups carry the same number for a coefficient, it is one estimate applied several times, so its error moves every group in the same direction at once. This is the IPCC treatment and it keeps the reported uncertainty independent of how finely you split the inventory.",
-    fr = "Lorsque plusieurs groupes portent le même nombre pour un coefficient, il s'agit d'une seule estimation appliquée plusieurs fois : son erreur déplace donc tous les groupes dans le même sens en même temps. C'est le traitement IPCC, et il rend l'incertitude rapportée indépendante de la finesse du découpage de l'inventaire."),
-  crossgroup_independent = list(
-    en = "Treat every group independently (default)",
-    fr = "Traiter chaque groupe indépendamment (par défaut)"),
-  crossgroup_independent_help = list(
-    en = "Each group redraws every coefficient on its own. Correct only if each group's values were estimated separately. On a shared estimate this understates the uncertainty, and increasingly so the more groups there are.",
-    fr = "Chaque groupe retire lui-même chaque coefficient. Correct uniquement si les valeurs de chaque groupe ont été estimées séparément. Sur une estimation partagée, cela sous-estime l'incertitude, d'autant plus que les groupes sont nombreux."),
-  crossgroup_detected_none = list(
-    en = "No coefficient is shared between groups in this inventory, so this setting changes nothing.",
-    fr = "Aucun coefficient n'est partagé entre les groupes de cet inventaire : ce réglage ne change donc rien."),
-  crossgroup_exclusive = list(
-    en = "For a coefficient that is shared, sharing takes the place of the correlation mode chosen above: a value cannot be drawn once for every group and separately correlated inside each one at the same time. Coefficients that are not shared, and the activity data, still follow the mode above. Sharing is the larger of the two effects, which is why it takes precedence.",
-    fr = "Pour un coefficient partagé, le partage remplace le mode de corrélation choisi ci-dessus : une valeur ne peut pas être tirée une seule fois pour tous les groupes et corrélée séparément à l'intérieur de chacun en même temps. Les coefficients non partagés, ainsi que les données d'activité, suivent toujours le mode ci-dessus. Le partage est le plus important des deux effets, d'où sa priorité."),
-  crossgroup_detected_pre = list(
-    en = "Detected: ", fr = "Détecté : "),
-  crossgroup_detected_body = list(
-    en = "%d coefficients are used identically across groups in this inventory (%s). They will be drawn once and applied to every group that shares them.",
-    fr = "%d coefficients sont utilisés à l'identique entre groupes dans cet inventaire (%s). Ils seront tirés une fois puis appliqués à chaque groupe qui les partage."),
 
 
   # ---- Measured-intake route (GE / DMI), 2026-09 -----------------------
@@ -1045,11 +1018,12 @@ lang_state_take <- function(token) {
   # because that list is about choosing an activity-data mode, whereas this
   # is a separate switch with a different and usually larger effect.
   info_corr_shared_label = list(
-    en = "The other kind: one estimate used in several groups",
-    fr = "L'autre type : une seule estimation utilisée dans plusieurs groupes"),
+    en = "One value used by several groups",
+    fr = "Une valeur utilisée par plusieurs groupes"
+  ),
   info_corr_shared_body = list(
-    en = "One IPCC default or one regional value used in many groups is a single estimate. If it is wrong, every group is wrong together. 'Inputs shared between groups' accounts for this. The uncertainty goes up when it is on; that is expected.",
-    fr = "Une valeur GIEC par défaut ou une valeur régionale utilisée dans plusieurs groupes reste une seule estimation. Si elle est fausse, tous les groupes sont faux ensemble. « Entrées partagées entre groupes » en tient compte. L'incertitude augmente quand l'option est active ; c'est attendu."
+    en = "When several groups use the same number for a coefficient (an IPCC default, one national study), the tool treats it as one estimate: it draws it once per iteration for all of those groups. Groups with their own value are drawn separately. This is automatic; the draws follow your data. The uncertainty is larger than if every group were drawn on its own, and that is correct: one wrong number is wrong for every group at once.",
+    fr = "Quand plusieurs groupes utilisent le même nombre pour un coefficient (une valeur GIEC par défaut, une étude nationale), l'outil le traite comme une seule estimation : il le tire une fois par itération pour tous ces groupes. Les groupes qui ont leur propre valeur sont tirés séparément. C'est automatique ; les tirages suivent vos données. L'incertitude est plus grande que si chaque groupe était tiré séparément, et c'est correct : un nombre faux est faux pour tous les groupes à la fois."
   ),
   info_corr_quickguide = list(en = "Quick guide: which option do I pick?",
                                 fr = "Guide rapide : quelle option choisir ?"),

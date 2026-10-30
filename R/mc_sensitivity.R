@@ -175,6 +175,10 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   combined <- if (length(blocks) == 1) blocks[[1]] else do.call(cbind, blocks)
   full_means <- unname(unlist(full_means[names(full_rows)]))
   n_full     <- max(unlist(full_rows))
+  # The group tag of every column ("cows" or "cows, extensive beef"), kept
+  # so that each row of the result can say which groups it covers.
+  col_tags  <- sub("^.*\\(([^()]*)\\)\\s*$", "\\1", colnames(combined))
+  groups_of <- stats::setNames(col_tags, colnames(combined))
 
   # Cross-group sharing (2026-09) makes the per-group columns of a shared
   # coefficient NUMERICALLY IDENTICAL. Left alone that is a silent failure,
@@ -221,14 +225,27 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
                     function(v) format(signif(v, 3L), trim = TRUE,
                                        scientific = FALSE, drop0trailing = TRUE),
                     character(1))
+      # 2026-10-30 (Lolita): the groups behind each shared estimate are kept
+      # (the `groups` column of the result), and when they all sit in one
+      # production system the label names it: "DE = 52.8 (extensive beef,
+      # 6 groups)" instead of "DE = 52.8 (shared by 6 groups)".
+      members <- lapply(grp[keep_i], function(g) col_tags[grp == g])
+      level_of_tag <- function(tg) if (grepl(", ", tg, fixed = TRUE)) sub("^.*, ", "", tg) else NA_character_
+      one_level <- vapply(members, function(m) {
+        lv <- unique(vapply(m, level_of_tag, character(1)))
+        if (length(lv) == 1L && !is.na(lv)) lv else NA_character_
+      }, character(1))
       nm <- ifelse(n_share > 1L,
-                   paste0(base, " = ", val,
-                          " (shared by ", n_share, " groups)"),
+                   ifelse(!is.na(one_level),
+                          paste0(base, " = ", val, " (", one_level, ", ", n_share, " groups)"),
+                          paste0(base, " = ", val, " (shared by ", n_share, " groups)")),
                    nm)
       combined <- combined[, keep_i, drop = FALSE]
       # Safety net: never leave uniquification to data.frame(), which would
       # append a bare index and hide a collision instead of reporting one.
       colnames(combined) <- make.unique(nm, sep = " #")
+      groups_of <- stats::setNames(vapply(members, paste, character(1), collapse = "; "),
+                                   colnames(combined))
     }
   }
 
@@ -261,6 +278,12 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
     output   <- output[idx]
   }
   res <- sensitivity_analysis(combined, output, method = method)
+  # Which groups each row covers: one group, or the list behind a shared
+  # estimate. Read by the group filter on Tab 5 and shown in the table.
+  if (is.list(res) && is.data.frame(res$src) && nrow(res$src) > 0) {
+    g <- unname(groups_of[res$src$parameter])
+    res$src$groups <- ifelse(is.na(g), "", g)
+  }
   if (m < n_full && is.list(res)) {
     attr(res, "subsampled_note") <- sprintf(
       paste0("Sensitivity ranking computed on the first %s of %s iterations ",
@@ -279,4 +302,15 @@ sens_group_of <- function(var_name) {
   m <- regmatches(var_name,
                    regexec("\\(([^()]+)\\)\\s*$", var_name))[[1]]
   if (length(m) >= 2 && nzchar(m[2])) m[2] else "(ungrouped)"
+}
+
+# The groups a sensitivity row covers, from its `groups` column when the
+# frame has one (a shared estimate lists several, "; "-separated), else
+# from the label.
+sens_groups_of_row <- function(df) {
+  if (!is.null(df$groups)) {
+    out <- strsplit(as.character(df$groups), "; ", fixed = TRUE)
+    lapply(seq_along(out), function(i)
+      if (length(out[[i]]) && any(nzchar(out[[i]]))) out[[i]] else sens_group_of(df$parameter[i]))
+  } else lapply(df$parameter, sens_group_of)
 }

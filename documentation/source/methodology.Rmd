@@ -658,7 +658,7 @@ The magnitude is large. Holding the herd, the parameters and the uncertainty inp
 
 IPCC 2019 Refinement Vol.1 Ch.3 addresses this directly. It warns that subcategories ``can be highly correlated, because either the AD are derived from the same source or the EFs have parameters in common''; it states that ``in the case of full correlation among categories, aggregation of these categories is the recommended procedure''; and it recommends Approach 2 ``where partial correlations are known to exist and are relevant''. It also gives the general rule, in the context of the time dimension: ``emission factors (and other estimation parameters) uncertainties will tend to be correlated between years while activity data will tend to be uncorrelated between years.''
 
-\textit{Status in the app (October 2026).} After the Nairobi review the app samples every group independently and no longer offers the shared-draw option on the Correlations tab; the treatment described in the rest of this section is implemented in the code but not used in runs from the interface.
+\textit{Status in the app (30 October 2026).} Every run uses the shared draws described below, in single-year and in trend mode; there is no setting. The rule is stated on the Correlations tab and in the user guide. (Between 28 and 30 October the app had sampled every group independently.)
 
 \textbf{The rule the tool applies when shared draws are used.} Groups carrying an identical estimate for a coefficient share a single draw; activity data stays independent. Formally, for each coefficient the groups are partitioned by their (mean, lower bound, upper bound, distribution) tuple; every group within a partition receives the same per-iteration draw, and separate partitions are drawn independently. Population $N$ is never shared.
 
@@ -673,6 +673,25 @@ Three properties follow:
 Partitioning on the full tuple also guarantees that the marginal distributions within a partition are identical, which is the precondition for sharing sampled values directly rather than sharing ranks.
 
 \textbf{Verification.} Because IPCC states that full correlation should be equivalent to aggregation, the implementation has a hard acceptance property: splitting an inventory into more groups must not change the reported uncertainty. With sharing enabled the table above becomes approximately flat (25.1\% on one group, 22.7\% on 251). The residual decline is the genuinely independent activity-data component averaging out, and is quantitatively consistent with the 10\% uncertainty placed on $N$ in that test: $\sqrt{25.1^2 - 22.7^2} \approx 10.7\%$.
+
+\textbf{A real inventory.} The same comparison on the Zambia Tier 2 inventory (32 groups, 800 parameter rows, 4,000 draws, no activity-data correlations). The mean is unchanged (9.25 Mt CO$_2$eq); the activity-data-only margin is identical (12.9\%) because population is never shared; the whole difference sits in the emission-factor side, where Ym (one value in 12 groups), Cfi (one value in 22) and the pasture N$_2$O factors (one value in all 32) are drawn once instead of 32 times. Cutting every group into two and four identical parts, same animals and $N$ divided, reproduces the Country X pattern.
+
+\begin{center}
+\begin{tabular}{l r r}
+\toprule
+ & \textbf{Separate draws} & \textbf{Shared draws} \\
+\midrule
+Total CO$_2$eq, 95\% MoE (32 groups) & 23.7\% & 32.5\% \\
+Enteric CH$_4$ & 24.3\% & 33.4\% \\
+Pasture N$_2$O, direct / indirect & 39.7\% / 58.2\% & 103\% / 148\% \\
+AD-only / EF-only & 12.9\% / 19.2\% & 12.9\% / 29.2\% \\
+Same herd in 64 groups & 16.8\% & 30.9\% \\
+Same herd in 128 groups & 11.5\% & 30.3\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In the sensitivity ranking the shared estimates appear once each, labelled with the value and the groups they cover (``DE = 52.8 (extensive beef, 6 groups)''); with separate draws the same uncertainty is spread over one bar per group and the ranking is dominated by the largest groups.
 
 \textbf{Scope.} Only full sharing is implemented. Partial sharing ($0 < \rho < 1$), appropriate where a shared systematic component coexists with independent per-group sampling error, is not offered: it requires an $n_{\text{iter}} \times n_{\text{groups}}$ matrix per parameter held simultaneously, which is not feasible within the hosting memory budget at the group counts where the issue matters most. IPCC positions partial correlation as a refinement to apply ``where known to exist and relevant''.
 

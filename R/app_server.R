@@ -998,10 +998,10 @@ app_server <- function(input, output, session) {
   # run would otherwise be identical to the main run and waste compute time.
   output$run_comparison_ui <- renderUI({
     no_ad_corr <- is.null(input$corr_mode) || input$corr_mode == "none"
-    # 2026-10-15: was the EF block mode. With coefficients always independent,
-    # the remaining thing a comparison run can show is cross-group sharing.
-    no_cg_corr <- is.null(input$crossgroup_mode) ||
-                  input$crossgroup_mode == "independent"
+    # 2026-10-30: every run shares the draws of a value used by several
+    # groups, and the comparison run drops that sharing with the matrix, so
+    # there is always something to compare. The checkbox stays enabled.
+    no_cg_corr <- FALSE
     if (no_ad_corr && no_cg_corr) {
       tagList(
         tags$div(
@@ -1369,8 +1369,8 @@ app_server <- function(input, output, session) {
     rv$sim_log <- paste0(rv$sim_log, "GWP: ", input$gwp_version, "\n")
     rv$sim_log <- paste0(rv$sim_log, "Activity-data correlation: ",
                          input$corr_mode %||% "none", "\n")
-    rv$sim_log <- paste0(rv$sim_log, "Shared inputs across groups: ",
-                         input$crossgroup_mode %||% "independent", "\n")
+    rv$sim_log <- paste0(rv$sim_log, "Shared inputs across groups: shared ",
+                         "(a value used by several groups is drawn once)\n")
     rv$sim_log <- paste0(rv$sim_log,
                          "Coefficient correlation: independent (IPCC default)\n")
 
@@ -1463,8 +1463,10 @@ app_server <- function(input, output, session) {
           # trend ran the whole sheet as one system. knowledge/22-trend-capacity.md
           built <- build_systems_data(
             specs, manure = manure, n_iter = n_iter_val, seed = input$seed,
-            crossgroup  = if (identical(input$crossgroup_mode %||% "independent", "shared"))
-                            "shared" else "independent",
+            # 2026-10-30 (Lolita): always shared. Groups that carry the same
+            # value for a coefficient receive one draw; groups with their own
+            # value draw separately. The draws follow the data, no setting.
+            crossgroup  = "shared",
             corr_matrix = if (isTRUE(input$corr_mode != "none")) effective_corr_matrix() else NULL,
             sg_to_mm    = sg_to_mm)
           systems_data      <- built$systems
@@ -2533,9 +2535,12 @@ app_server <- function(input, output, session) {
     if (is.null(sens)) return(NULL)
     df <- if (!is.null(sens$src) && is.data.frame(sens$src) && nrow(sens$src) > 0)
       sens$src else NULL
-    if (is.null(df) || !"variable" %in% names(df)) return(NULL)
+    if (is.null(df) || !"parameter" %in% names(df)) return(NULL)
 
-    groups <- unique(sapply(df$variable, .sens_group))
+    # 2026-10-30: the frame's label column is `parameter` (the old test on
+    # `variable` never matched, so the filter never appeared), and a shared
+    # estimate lists every group it covers.
+    groups <- unique(unlist(sens_groups_of_row(df)))
     if (length(groups) <= 1) return(NULL)   # single group: no filter needed
 
     div(style = "min-width: 280px;",
@@ -2563,7 +2568,7 @@ app_server <- function(input, output, session) {
     if (is.null(sens)) return()
     df <- if (!is.null(sens$src) && is.data.frame(sens$src)) sens$src else NULL
     if (is.null(df)) return()
-    groups <- unique(sapply(df$variable, .sens_group))
+    groups <- unique(unlist(sens_groups_of_row(df)))
     updateSelectizeInput(session, "sens_groups", selected = groups)
   })
   observeEvent(input$sens_groups_none, {
@@ -2609,8 +2614,9 @@ app_server <- function(input, output, session) {
     if (is.null(raw) || is.null(sel_groups)) return(raw)
 
     filter_sens_df <- function(df) {
-      if (is.null(df) || !is.data.frame(df) || !"variable" %in% names(df)) return(df)
-      keep <- sapply(df$variable, .sens_group) %in% sel_groups
+      if (is.null(df) || !is.data.frame(df) || !"parameter" %in% names(df)) return(df)
+      # a shared estimate stays as long as one of its groups is selected
+      keep <- vapply(sens_groups_of_row(df), function(g) any(g %in% sel_groups), logical(1))
       df[keep, , drop = FALSE]
     }
     structure(
@@ -3231,7 +3237,7 @@ app_server <- function(input, output, session) {
           # correlation matrix and the resolved sub-category matches.
           sgm <- tryCatch(resolve_sub_category_matches(rv$param_specs, rv$manure_data)$matched,
                           error = function(e) list())
-          cg <- if (identical(input$crossgroup_mode %||% "independent", "shared")) "shared" else "independent"
+          cg <- "shared"   # 2026-10-30: always, as in the single-year run
           cm <- if (isTRUE(input$corr_mode != "none")) rv$corr_matrix else NULL
           res <- run_trend_analysis(
             df, base_specs = rv$param_specs, n_iter = n_iter,

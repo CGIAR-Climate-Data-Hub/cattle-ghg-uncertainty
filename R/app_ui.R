@@ -2009,7 +2009,7 @@ app_ui <- function(request = NULL) {
               col_widths = c(5, 7),
               div(
             sliderInput("n_iter", t("sim_n_iter_label"),
-              min = 1000, max = 50000, step = 1000,
+              min = 1000, max = 20000, step = 1000,
               value = 10000, sep = ",", width = "100%"),
             numericInput("seed",
               label = tagList(

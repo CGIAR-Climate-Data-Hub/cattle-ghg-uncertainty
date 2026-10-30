@@ -455,10 +455,13 @@ interval by 3 to 10 per cent on a real inventory.</p>
 <p>The <strong>same parameter reused across groups</strong> is a
 different matter. If one IPCC default or one regional study supplies a
 value used by many groups, that is a single estimate applied repeatedly.
-The tool samples each group independently, so the errors of such a value
-partly cancel between groups. Its effect is not modest: on the test in
-Common pitfalls below, the reported margin of error went from 25.1 per
-cent on one group to 1.5 per cent on 251 groups with the same data.</p>
+The tool draws such a value once per iteration for every group that
+carries it, and draws groups with their own value separately; nothing
+needs to be set. This is the larger of the two effects: on the Zambia
+inventory (32 groups) the reported margin of error is 32.5 per cent with
+shared draws and would be 23.7 per cent if every group drew its own
+value, and on the test in Common pitfalls below the difference grows
+with the number of groups.</p>
 </div>
 <div id="selecting-an-activity-data-correlation-mode" class="section level2">
 <h2>Selecting an activity-data correlation mode</h2>
@@ -486,16 +489,16 @@ template is provided in the panel.</p>
 <ul>
 <li><p><strong>Assuming a smaller margin of error means a better
 inventory.</strong> It can mean the opposite. If the same coefficient
-value is reused across many groups and each group samples it
-independently, the errors cancel against each other and the reported
-uncertainty shrinks as the inventory is disaggregated more finely.
-Holding the herd, the parameters and the uncertainty inputs completely
-fixed and varying only the number of groups gives 25.1% on one group,
-12.5% on four, 6.3% on sixteen, 3.1% on sixty-four and 1.5% on 251. The
-data never changed. Compare results only at the same level of
-disaggregation, and report the level you used. A reported uncertainty
-that looks implausibly tight for a Tier 2 inventory (well under 10%) on
-a finely disaggregated file is the symptom to look for.</p></li>
+value is reused across many groups and each group drew it separately,
+the errors would cancel against each other and the reported uncertainty
+would shrink as the inventory is disaggregated more finely: holding the
+herd, the parameters and the uncertainty inputs completely fixed and
+varying only the number of groups gives 25.1% on one group, 12.5% on
+four, 6.3% on sixteen, 3.1% on sixty-four and 1.5% on 251, with the data
+never changing. The tool avoids this by drawing a shared value once for
+every group that uses it (on the same test the figure stays between
+25.1% and 22.7%). Still compare results only at the same level of
+disaggregation, and report the level you used.</p></li>
 <li><p><strong>Expecting the mean to change.</strong> Correlations
 modify the spread of the emissions distribution but preserve the central
 estimate to within Monte Carlo sampling noise. A mean shift of more than
