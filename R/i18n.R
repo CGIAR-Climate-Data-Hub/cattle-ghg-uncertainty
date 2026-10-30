@@ -1841,17 +1841,6 @@ lang_state_take <- function(token) {
     fr = "Le nombre de chaque année est un nouveau comptage. Chaque erreur est nouvelle, rien ne s'annule, et la tendance est au plus incertain. Choisissez ceci seulement si vous comptez vraiment chaque année."),
   n_year_rule = list(en = "Rule of thumb: if your yearly numbers come from a growth rate applied to an old census, choose the first.",
                      fr = "Règle simple : si vos effectifs annuels viennent d'un taux de croissance appliqué à un ancien recensement, choisissez la première option."),
-  n_year_single_note = list(
-    en = "The between-years choices appear when the analysis mode is Trend (Tab 1).",
-    fr = "Les choix entre années apparaissent quand le mode d'analyse est Tendance (onglet 1)."),
-  coef_year_label = list(en = "Emission factors and coefficients between years",
-                         fr = "Facteurs d'émission et coefficients entre années"),
-
-  # Correlations TS status messages (server-rendered)
-  corr_ts_no_data = list(
-    en = " No time-series data in the loaded inventory. To enable auto-correlation, upload a template with a populated ",
-    fr = " Aucune donnée de séries temporelles dans l'inventaire chargé. Pour activer l'auto-corrélation, téléversez un modèle avec une feuille "
-  ),
   corr_ts_param_ts = list(en = "Parameter_TimeSeries", fr = "Parameter_TimeSeries"),
   corr_ts_no_data_tail = list(
     en = " sheet, or load Country X / Country Y from the dropdown (both ship with example time-series).",

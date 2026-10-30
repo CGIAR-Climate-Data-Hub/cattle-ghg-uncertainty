@@ -2041,10 +2041,7 @@ app_ui <- function(request = NULL) {
                             tags$em("Pick this only if you genuinely re-measured every emission factor every year with fully new field data "),
                             "- rarely realistic for a national inventory.")
                   ))
-                ),
-                conditionalPanel(
-                  condition = "input.analysis_mode != 'trend'",
-                  div(class = "small text-muted", t("n_year_single_note")))
+                )
               )
             )
           )
