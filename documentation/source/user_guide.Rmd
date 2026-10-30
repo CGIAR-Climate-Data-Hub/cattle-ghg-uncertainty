@@ -259,6 +259,32 @@ The built-in preset applies seven pairs. The direction of each link comes from t
 
 All other pairs are zero. Four values can reasonably be changed through the manual matrix when you know your situation: BW and MW 0.8 to 0.9 when both weights come from the same survey; Milk and BW 0.10 to 0.20 for a single-breed herd; DE and CP 0.3 to 0.5 when your feed-quality uncertainty is mainly about forage maturity; DE and Ym -0.3 to -0.5 for high-grain dairy or feedlot systems.
 
+## Animal numbers: where do they come from?
+
+The last card on Tab 3 asks two things about your animal numbers. Both answer the same question: if one number is wrong, which other numbers are wrong with it?
+
+**Between groups (single year and trend).** How did you get the number of animals for each group?
+
+- **One national count, split into groups** (recommended). You have one census or one official total and divided it into groups by shares. The tool then treats the census error as one error shared by all groups: if the count is 5% too low, every group is 5% too low. The range is wider, and that is correct.
+- **Partly.** One count, but the group numbers were adjusted group by group with their own surveys or data.
+- **Separate counts per group.** Each group was counted on its own. Choose this only if that is really how the numbers were made. Each group's error is then drawn on its own, and the errors partly cancel in the total.
+
+Rule of thumb: if you can point at one table that gave you the total, choose the first.
+
+**Between years (trend only).** How do your animal numbers change from year to year?
+
+- **One census, with the years in between filled in.** A census every five or ten years, the other years estimated from it. The same census error is kept for all years, so it cancels when two years are compared, and the trend is less uncertain.
+- **A census every few years, adjusted in between.** The middle case.
+- **A new survey every year** (IPCC default). Each year's number is a fresh count. Nothing cancels, and the trend is at its most uncertain. Choose this only if you really count every year.
+
+Rule of thumb: if your yearly numbers come from a growth rate applied to an old census, choose the first.
+
+What changes: the first question changes the uncertainty of each year's total; the second changes the uncertainty of the trend; neither changes the mean. On the Zambia inventory (32 groups) the total 95% margin of error is 32.5% with separate counts, 40.1% partly and 47.1% with one count split; in trend mode the 95% range of the trend is about ±70 points with a new survey every year and about ±3 points with one census interpolated, with the coefficients fully correlated between years.
+
+In the tornado chart, a count split into groups appears as one bar, "N (one count, 32 groups)", because the groups move together.
+
+Put one sentence in your inventory report, for example: "Animal numbers come from the 2017 livestock census, split by production system using survey shares, and extrapolated to other years with regional growth rates. The uncertainty analysis treats the census error as common to all groups and all years."
+
 \newpage
 
 # Running the simulation (Tab 4: Simulate)
@@ -282,7 +308,7 @@ Before you click Run, you will have to set the following parameters.
 
 ## Trend mode: year-to-year coefficient correlation
 
-If you chose Trend on Tab 1, one more setting appears on Tab 4: **Year-to-year correlation**. It says how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5 and so on) move from one year to the next within one Monte Carlo draw. The activity data (N, BW, Milk and so on) are always drawn afresh for every year. This setting only concerns the per-head coefficients.
+If you chose Trend on Tab 1, the between-years settings appear on Tab 3, in the "Animal numbers" card: the choice for the animal numbers (see above) and **Emission factors and coefficients between years**. The second says how the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5 and so on) move from one year to the next within one Monte Carlo draw. The animal numbers follow their own choice; the other inputs are drawn afresh for every year.
 
 Why does it matter? Suppose your country uses the same emission factors for the whole time series, for example because the Tier 2 factors were estimated once and applied to every year. Then a draw with a high Ym in the base year should also have a high Ym in the current year. When the two years are compared, this coefficient uncertainty cancels out, and the uncertainty of the trend comes only from the changes in activity data. The IPCC (Volume 1, Chapter 3, section 3.2.3) calls this a "Type A" sensitivity. Treating the factors as independent from year to year would make the trend look much more uncertain than it is.
 

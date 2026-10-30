@@ -146,7 +146,13 @@ materialise_mms_samples <- function(sys) {
 build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
                                crossgroup = c("shared", "independent"),
                                corr_matrix = NULL, sg_to_mm = list(),
-                               pre_sampled_blocks = NULL) {
+                               pre_sampled_blocks = NULL,
+                               # 2026-10-30: animal numbers correlated between
+                               # groups (0 = separate counts, 1 = one count
+                               # split into groups); or the blocks already
+                               # drawn (trend mode chains them across years)
+                               n_group_rho = 0,
+                               pre_sampled_activity = NULL) {
   crossgroup <- match.arg(crossgroup)
   n_iter <- as.integer(n_iter)
   group_key  <- make_group_key(specs)
@@ -188,6 +194,12 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
   # use `seed + group index` (run_inventory_simulation), so reusing either
   # would tie a manure draw to a parameter draw and create a correlation
   # nobody asked for. Trend mode passes seed + year, so years still differ.
+  activity_draws <- if (!is.null(pre_sampled_activity)) pre_sampled_activity
+    else if (n_group_rho > 0)
+      build_activity_draws(specs, n_iter, seed = seed, group_keys = group_key,
+                           rho_group = n_group_rho)$blocks
+    else list()
+
   if (!is.null(seed)) set.seed(as.integer(seed) + 1000003L)
   for (sg in sys_groups) {
     sys_specs <- specs[group_key == sg, ]
@@ -319,7 +331,8 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
       mms_draw = mms_draw,
       # Shared coefficient draws for this group (NULL when the group
       # shares nothing, or when the user chose independent groups).
-      pre_sampled_coefficients = shared_draws$blocks[[sg]]
+      pre_sampled_coefficients = shared_draws$blocks[[sg]],
+      pre_sampled_activity     = activity_draws[[sg]]
     )
   }
 
@@ -496,6 +509,9 @@ make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
 # holds the activity data at its mean (the EF-only run).
 fix_params_for_decomposition <- function(sd, fix_type) {
   ps <- sd$param_specs
+  # 2026-10-30: the EF-only run holds N at its mean, so the correlated N
+  # draws must not be re-injected.
+  if (fix_type == "activity_data") sd$pre_sampled_activity <- NULL
   ps$param_type[is.na(ps$param_type)] <- "coefficient"
   rows <- ps$param_type == fix_type
   ps$distribution[rows] <- "constant"

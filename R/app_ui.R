@@ -1971,6 +1971,83 @@ app_ui <- function(request = NULL) {
             # independently (the server falls back to "independent" when the
             # input is absent). The shared-draw code stays in mc_sampling.R.
           )
+        ),
+        # 2026-10-30 (Lolita): animal numbers, between groups and (trend)
+        # between years, and the coefficients between years (moved here from
+        # the Simulate tab), so every correlation choice sits on one page.
+        bslib::card(
+          bslib::card_header(t("card_n_corr_h")),
+          bslib::card_body(
+            div(class = "info-panel", style = "margin-top:0;", t("n_corr_intro")),
+            bslib::layout_columns(
+              col_widths = c(6, 6),
+              div(
+                radioButtons("n_group_corr", width = "100%",
+                  label = t("n_group_label"),
+                  choiceNames = list(
+                    tagList(tags$strong(t("n_group_full")),
+                            tags$div(class = "small text-muted", t("n_group_full_help"))),
+                    tagList(tags$strong(t("n_group_partial")),
+                            tags$div(class = "small text-muted", t("n_group_partial_help"))),
+                    tagList(tags$strong(t("n_group_none")),
+                            tags$div(class = "small text-muted", t("n_group_none_help")))),
+                  choiceValues = c("full", "partial", "none"), selected = "full"),
+                tags$div(class = "small", style = "color:#1B4332;", tags$em(t("n_group_rule")))
+              ),
+              div(
+                conditionalPanel(
+                  condition = "input.analysis_mode == 'trend'",
+                  radioButtons("n_year_corr", width = "100%",
+                    label = t("n_year_label"),
+                    choiceNames = list(
+                      tagList(tags$strong(t("n_year_full")),
+                              tags$div(class = "small text-muted", t("n_year_full_help"))),
+                      tagList(tags$strong(t("n_year_partial")),
+                              tags$div(class = "small text-muted", t("n_year_partial_help"))),
+                      tagList(tags$strong(t("n_year_none")),
+                              tags$div(class = "small text-muted", t("n_year_none_help")))),
+                    choiceValues = c("full", "partial", "none"), selected = "none"),
+                  tags$div(class = "small", style = "color:#1B4332;", tags$em(t("n_year_rule"))),
+                  hr(),
+              radioButtons("year_corr", width = "100%",
+                            label = tagList(
+                              paste0(t("coef_year_label"), " "),
+                              bslib::tooltip(
+                                span(icon("circle-question"),
+                                     style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
+                                "How should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, …) move from one year to the next within a single Monte Carlo iteration? IPCC V1 Ch3 §3.2.3 (Trend section) says emission factors are typically estimated once and reused across years, so the default is full correlation. Activity data (N, BW, Milk, …) are always re-estimated each year regardless of this setting.",
+                                placement = "right"
+                              )
+                            ),
+                            choices = c(
+                              "Fully correlated coefficients (IPCC 2019 default)" = "full",
+                              "Partial (AR(1), ρ=0.7)"                       = "partial",
+                              "Independent (no year-to-year correlation)"         = "none"),
+                            selected = "full"),
+              div(class = "small text-muted",
+                  style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
+                  tags$ul(style = "padding-left:18px; margin:0;",
+                    tags$li(tags$strong("Fully correlated coefficients (IPCC 2019 default)"),
+                            ": same coefficient draw is reused for every year within one Monte Carlo iteration. ",
+                            "Trend uncertainty then reflects only the year-to-year changes in your activity data ",
+                            "(N, BW, Milk, …); coefficient uncertainty cancels because Ym is the same in 2010 and 2022. ",
+                            tags$em("Pick this if your emission factors are IPCC defaults or come from a single estimation programme reused across the whole inventory series.")),
+                    tags$li(tags$strong("Partial (AR(1), ρ=0.7)"),
+                            ": coefficient draws drift slowly between years (last year's value gets 70% weight, a fresh draw 30%). ",
+                            tags$em("Pick this if your emission factors are re-estimated periodically but neighbouring years share most of the same observational basis "),
+                            "- e.g. your country reviewed Ym every 5 years and the value drifted slightly each time."),
+                    tags$li(tags$strong("Independent (no year-to-year correlation)"),
+                            ": coefficient draws are sampled fresh each year. Maximises the EF contribution to trend uncertainty. ",
+                            tags$em("Pick this only if you genuinely re-measured every emission factor every year with fully new field data "),
+                            "- rarely realistic for a national inventory.")
+                  ))
+                ),
+                conditionalPanel(
+                  condition = "input.analysis_mode != 'trend'",
+                  div(class = "small text-muted", t("n_year_single_note")))
+              )
+            )
+          )
         )
         # Coefficient correlations: the card that stood here was removed on
         # 2026-10-15, and the note that replaced it was removed the same
@@ -2077,51 +2154,8 @@ app_ui <- function(request = NULL) {
               # identical, so the toggle is meaningless).
               uiOutput("run_comparison_ui")
             ),
-            # Round 9: trend-only settings (year-correlation mode).
-            # Visible only when 'trend' is picked on Home.
-            # 2026-05 UX overhaul: the "optional separate CSV override" section
-            # was removed: the Parameter_TimeSeries sheet in the main upload is
-            # now the single source of trend data. Each radio choice carries
-            # its own tooltip with concrete "when to pick this" guidance.
-            conditionalPanel(
-              condition = "input.analysis_mode == 'trend'",
-              radioButtons("year_corr", width = "100%",
-                            label = tagList(
-                              "Year-to-year correlation ",
-                              bslib::tooltip(
-                                span(icon("circle-question"),
-                                     style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-                                "How should the IPCC coefficients (Cfi, Ca, Ym, Bo, MCF, EF3, EF4, EF5, …) move from one year to the next within a single Monte Carlo iteration? IPCC V1 Ch3 §3.2.3 (Trend section) says emission factors are typically estimated once and reused across years, so the default is full correlation. Activity data (N, BW, Milk, …) are always re-estimated each year regardless of this setting.",
-                                placement = "right"
-                              )
-                            ),
-                            choices = c(
-                              "Fully correlated coefficients (IPCC 2019 default)" = "full",
-                              "Partial (AR(1), ρ=0.7)"                       = "partial",
-                              "Independent (no year-to-year correlation)"         = "none"),
-                            selected = "full"),
-              div(class = "small text-muted",
-                  style = "margin-top:-4px; margin-bottom:8px; font-size:0.82rem; line-height:1.45;",
-                  tags$ul(style = "padding-left:18px; margin:0;",
-                    tags$li(tags$strong("Fully correlated coefficients (IPCC 2019 default)"),
-                            ": same coefficient draw is reused for every year within one Monte Carlo iteration. ",
-                            "Trend uncertainty then reflects only the year-to-year changes in your activity data ",
-                            "(N, BW, Milk, …); coefficient uncertainty cancels because Ym is the same in 2010 and 2022. ",
-                            tags$em("Pick this if your emission factors are IPCC defaults or come from a single estimation programme reused across the whole inventory series.")),
-                    tags$li(tags$strong("Partial (AR(1), ρ=0.7)"),
-                            ": coefficient draws drift slowly between years (last year's value gets 70% weight, a fresh draw 30%). ",
-                            tags$em("Pick this if your emission factors are re-estimated periodically but neighbouring years share most of the same observational basis "),
-                            "- e.g. your country reviewed Ym every 5 years and the value drifted slightly each time."),
-                    tags$li(tags$strong("Independent (no year-to-year correlation)"),
-                            ": coefficient draws are sampled fresh each year. Maximises the EF contribution to trend uncertainty. ",
-                            tags$em("Pick this only if you genuinely re-measured every emission factor every year with fully new field data "),
-                            "- rarely realistic for a national inventory.")
-                  )),
-              div(style = "font-size:0.78rem; color:#92400E; background:#FEF3C7; padding:6px 10px; border-radius:4px; margin-bottom:8px;",
-                  icon("info-circle"),
-                  tags$em(" Trend mode runs n_iter simulations ", tags$strong("per year"),
-                          ": total compute = n_iter × number of years."))
-            ),
+            # 2026-10-30 (Lolita): the year-to-year settings moved to Tab 3,
+            # next to the other correlation choices.
             hr(),
             # Round 9: route the Run button by mode. Single-year shows the
             # MC button (existing handler), trend shows Run Trend (existing

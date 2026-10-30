@@ -1799,6 +1799,54 @@ lang_state_take <- function(token) {
   corr_mode_advanced_manual_short = list(en = "Advanced: manual entry",
                                             fr = "Avancé : saisie manuelle"),
 
+  # ---- Animal numbers (N): between groups and between years (2026-10-30) ----
+  card_n_corr_h = list(en = "Animal numbers (N): where do they come from?",
+                       fr = "Effectifs animaux (N) : d'où viennent-ils ?"),
+  n_corr_intro = list(
+    en = "The tool needs to know two things about your animal numbers. Both answer the same question: if one number is wrong, which other numbers are wrong with it?",
+    fr = "L'outil doit savoir deux choses sur vos effectifs animaux. Les deux répondent à la même question : si un nombre est faux, quels autres nombres sont faux avec lui ?"),
+  n_group_label = list(en = "Between groups: how did you get the number of animals for each group?",
+                       fr = "Entre groupes : comment avez-vous obtenu l'effectif de chaque groupe ?"),
+  n_group_full = list(en = "One national count, split into groups (recommended)",
+                      fr = "Un comptage national, réparti entre les groupes (recommandé)"),
+  n_group_full_help = list(
+    en = "You have one census or one official total and divided it into groups by shares. The census error is then one error shared by all groups: if the count is 5% too low, every group is 5% too low. This gives a wider range, and that is correct.",
+    fr = "Vous avez un recensement ou un total officiel et l'avez réparti entre les groupes par parts. L'erreur du comptage est alors une seule erreur partagée par tous les groupes : si le comptage est 5 % trop bas, chaque groupe l'est aussi. La plage est plus large, et c'est correct."),
+  n_group_partial = list(en = "Partly", fr = "En partie"),
+  n_group_partial_help = list(
+    en = "One count, but the group numbers were adjusted group by group with their own surveys or data.",
+    fr = "Un comptage, mais les effectifs ont été ajustés groupe par groupe avec leurs propres enquêtes ou données."),
+  n_group_none = list(en = "Separate counts per group", fr = "Comptages séparés par groupe"),
+  n_group_none_help = list(
+    en = "Each group was counted on its own, with its own survey. Choose this only if that is really how the numbers were made. Each group's error is then drawn on its own, and the errors partly cancel in the total.",
+    fr = "Chaque groupe a été compté séparément, avec sa propre enquête. Choisissez ceci seulement si c'est vraiment ainsi que les nombres ont été faits. L'erreur de chaque groupe est alors tirée séparément, et les erreurs se compensent en partie dans le total."),
+  n_group_rule = list(en = "Rule of thumb: if you can point at one table that gave you the total, choose the first.",
+                      fr = "Règle simple : si vous pouvez montrer une table qui vous a donné le total, choisissez la première option."),
+  n_year_label = list(en = "Between years (trend only): how do your animal numbers change from year to year?",
+                      fr = "Entre années (tendance seulement) : comment vos effectifs changent-ils d'une année à l'autre ?"),
+  n_year_full = list(en = "One census, with the years in between filled in",
+                     fr = "Un recensement, avec les années intermédiaires complétées"),
+  n_year_full_help = list(
+    en = "A census every five or ten years, the other years estimated from it. The same census error is kept for all years, so it cancels when two years are compared, and the trend is less uncertain.",
+    fr = "Un recensement tous les cinq ou dix ans, les autres années estimées à partir de lui. La même erreur est gardée pour toutes les années, elle s'annule donc quand on compare deux années, et la tendance est moins incertaine."),
+  n_year_partial = list(en = "A census every few years, adjusted in between",
+                        fr = "Un recensement tous les quelques années, ajusté entre-temps"),
+  n_year_partial_help = list(
+    en = "Regular counts, and the years in between updated with new information. The middle case.",
+    fr = "Des comptages réguliers, et les années intermédiaires mises à jour avec de nouvelles informations. Le cas intermédiaire."),
+  n_year_none = list(en = "A new survey every year (IPCC default)",
+                     fr = "Une nouvelle enquête chaque année (défaut GIEC)"),
+  n_year_none_help = list(
+    en = "Each year's number is a fresh count. Each year's error is new, so nothing cancels, and the trend is at its most uncertain. Choose this only if you really count every year.",
+    fr = "Le nombre de chaque année est un nouveau comptage. Chaque erreur est nouvelle, rien ne s'annule, et la tendance est au plus incertain. Choisissez ceci seulement si vous comptez vraiment chaque année."),
+  n_year_rule = list(en = "Rule of thumb: if your yearly numbers come from a growth rate applied to an old census, choose the first.",
+                     fr = "Règle simple : si vos effectifs annuels viennent d'un taux de croissance appliqué à un ancien recensement, choisissez la première option."),
+  n_year_single_note = list(
+    en = "The between-years choices appear when the analysis mode is Trend (Tab 1).",
+    fr = "Les choix entre années apparaissent quand le mode d'analyse est Tendance (onglet 1)."),
+  coef_year_label = list(en = "Emission factors and coefficients between years",
+                         fr = "Facteurs d'émission et coefficients entre années"),
+
   # Correlations TS status messages (server-rendered)
   corr_ts_no_data = list(
     en = " No time-series data in the loaded inventory. To enable auto-correlation, upload a template with a populated ",

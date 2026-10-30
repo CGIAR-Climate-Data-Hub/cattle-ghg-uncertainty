@@ -791,6 +791,8 @@ build_trend_summary_docx <- function(path,
   rows <- list(
     c("Iterations",            .fmt_int(s$n_iter)),
     c("AD correlations",       .as_str(s$corr_mode,    "none")),
+    c("Animal numbers between groups", .n_corr_label(s$n_group_corr %||% "full", "group")),
+    c("Animal numbers between years (trend)", .n_corr_label(s$n_year_corr %||% "none", "year")),
     c("Comparison run (no corr.)", if (isTRUE(s$run_comparison)) "yes" else "no"),
     c("GWP basis",             .as_str(s$gwp_version,  "AR5")),
     c("Seed",                  .as_str(s$seed,         "(random)")),

@@ -120,6 +120,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   run_settings_df <- if (!is.null(settings)) {
     data.frame(
       Setting = c("Iterations", "AD correlations",
+                  "Animal numbers between groups", "Animal numbers between years (trend)",
                   "Comparison run (no corr.)", "GWP basis", "Seed",
                   "Analysis mode", "Emission sources",
                   # Measured-intake route (2026-09). Says which groups used
@@ -130,6 +131,8 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
       Value   = c(
         as.character(settings$n_iter %||% NA),
         as.character(settings$corr_mode %||% "none"),
+        .n_corr_label(settings$n_group_corr %||% "full", "group"),
+        .n_corr_label(settings$n_year_corr %||% "none", "year"),
         if (isTRUE(settings$run_comparison)) "yes" else "no",
         as.character(settings$gwp_version %||% NA),
         as.character(settings$seed %||% NA),
@@ -299,4 +302,16 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     Methodology      = methodology
   ))
   writexl::write_xlsx(sheets, path = filepath)
+}
+
+# 2026-10-30: the animal-number choices as the report words them.
+.n_corr_label <- function(code, kind = c("group", "year")) {
+  kind <- match.arg(kind)
+  if (kind == "group")
+    switch(as.character(code), full = "one count split into groups (fully correlated)",
+           partial = "partly (0.5)", none = "separate counts per group (independent)", as.character(code))
+  else
+    switch(as.character(code), full = "one census, interpolated (fully correlated)",
+           partial = "census every few years (AR(1), 0.7)", none = "annual survey (independent)",
+           as.character(code))
 }

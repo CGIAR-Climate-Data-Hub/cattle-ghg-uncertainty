@@ -1048,6 +1048,12 @@ app_server <- function(input, output, session) {
   # per-choice help text, plus a JS post-step that sets `disabled` on the
   # underlying <input> for greyed options. Prevents the silent no-op Andreas
   # hit on his ZIM run.
+  # 2026-10-30 (Lolita): animal numbers between groups, as a correlation
+  # of the groups' draws (1 = one count split into groups).
+  .n_group_rho <- function() {
+    c(full = 1, partial = 0.5, none = 0)[[input$n_group_corr %||% "full"]]
+  }
+
   output$corr_mode_ui <- renderUI({
     has_template <- !is.null(rv$param_specs)
     ts_ok        <- isTRUE(rv$ts_available)
@@ -1413,6 +1419,8 @@ app_server <- function(input, output, session) {
                          input$corr_mode %||% "none", "\n")
     rv$sim_log <- paste0(rv$sim_log, "Shared inputs across groups: shared ",
                          "(a value used by several groups is drawn once)\n")
+    rv$sim_log <- paste0(rv$sim_log, "Animal numbers between groups: ",
+                         input$n_group_corr %||% "full", "\n")
     rv$sim_log <- paste0(rv$sim_log,
                          "Coefficient correlation: independent (IPCC default)\n")
 
@@ -1510,7 +1518,8 @@ app_server <- function(input, output, session) {
             # value draw separately. The draws follow the data, no setting.
             crossgroup  = "shared",
             corr_matrix = if (isTRUE(input$corr_mode != "none")) effective_corr_matrix() else NULL,
-            sg_to_mm    = sg_to_mm)
+            sg_to_mm    = sg_to_mm,
+            n_group_rho = .n_group_rho())
           systems_data      <- built$systems
           rv$shared_summary <- built$shared$summary
 
@@ -3053,6 +3062,8 @@ app_server <- function(input, output, session) {
           seed             = input$seed,
           analysis_mode    = input$analysis_mode,
           emission_sources = input$emission_sources,
+          n_group_corr     = input$n_group_corr %||% "full",
+          n_year_corr      = input$n_year_corr %||% "none",
           # How each group reached gross energy. An inventory report that
           # does not say which groups bypassed the energy balance is not
           # reproducible, so this travels with every export.
@@ -3291,7 +3302,9 @@ app_server <- function(input, output, session) {
             corr_matrix = cm,
             sg_to_mm    = sgm,
             keep_samples = "ends",
-            keep_sample_rows = 4000L)
+            keep_sample_rows = 4000L,
+            n_group_rho = .n_group_rho(),
+            n_year_corr = input$n_year_corr %||% "none")
 
           # 2026-10-29: the two reported years again, as a pair, at the
           # reporting draw count (10,000 by default): the headline figures
@@ -3305,6 +3318,7 @@ app_server <- function(input, output, session) {
             df, rv$param_specs, y_first, y_last,
             n_iter = n_iter_pair, gwp = gv, seed = sd_, year_corr = yc,
             manure = rv$manure_data, crossgroup = cg, corr_matrix = cm, sg_to_mm = sgm,
+            n_group_rho = .n_group_rho(), n_year_corr = input$n_year_corr %||% "none",
             progress_fn = function(frac, lbl) setProgress(0.60 + 0.36 * frac, detail = lbl))
 
           # 2026-10-29: the two sensitivity regressions (latest year, and the
@@ -3328,7 +3342,9 @@ app_server <- function(input, output, session) {
           rv_trend$run_args        <- list(n_iter = n_iter, gwp = gv, seed = sd_,
                                            manure = rv$manure_data, crossgroup = cg,
                                            corr_matrix = cm, sg_to_mm = sgm, year_corr = yc,
-                                           n_iter_pair = n_iter_pair)
+                                           n_iter_pair = n_iter_pair,
+                                           n_group_rho = .n_group_rho(),
+                                           n_year_corr = input$n_year_corr %||% "none")
           rv_trend$pairs           <- setNames(list(pair),
                                                .trend_pair_key(pair$base_year, pair$year_t))
           # year selectors: base year = first, year t = last, on both tabs
@@ -3714,6 +3730,7 @@ app_server <- function(input, output, session) {
                              year_corr = a$year_corr, manure = a$manure,
                              crossgroup = a$crossgroup, corr_matrix = a$corr_matrix,
                              sg_to_mm = a$sg_to_mm,
+                             n_group_rho = a$n_group_rho %||% 0, n_year_corr = a$n_year_corr %||% "none",
                              progress_fn = function(frac, lbl) setProgress(frac, detail = lbl)),
         error = function(e) { showNotification(conditionMessage(e), type = "error"); NULL })
     })

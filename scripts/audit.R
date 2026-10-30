@@ -3879,6 +3879,55 @@ section_F <- function() {
              notes = if (f61c_ok) "DE~CP sized by data, DE~Ym refused (sign), 6 years replace nothing, no extra pair, long sheet = 29 years"
                      else paste(f61c_fail, collapse = "; "))
 
+  # F61d -- animal numbers between groups and between years (2026-10-30,
+  # Lolita): "one count split into groups" gives every group's N the same
+  # ranks (each with its own marginal); "separate counts" leaves them
+  # independent, which is also what a run with nothing chosen does; in
+  # trend mode "one census, interpolated" keeps the ranks across years and
+  # "annual survey" renews them; the EF-only run drops the pre-sampled N;
+  # the tornado shows one bar for a one-count N.
+  f61d_fail <- tryCatch({
+    f <- character(0)
+    b <- fill_bounds(generate_country_x_example())
+    b <- b[b$parameter %in% c("N", "BW", "DE", "Ym"), ]
+    b$distribution <- "normal"; b$lower <- b$mean * 0.9; b$upper <- b$mean * 1.1
+    sp <- do.call(rbind, lapply(1:3, function(i) { s <- b; s$cattle_type <- "dairy"
+      s$aggregation_level <- paste0("g", i); s$sub_category <- "cows"
+      s$mean[s$parameter == "N"] <- 1000 * i; s$lower <- s$mean * 0.9; s$upper <- s$mean * 1.1; s }))
+    gk <- make_group_key(sp)
+    rc <- function(x, y) stats::cor(x, y, method = "spearman")
+    b1 <- build_activity_draws(sp, 3000L, seed = 42, group_keys = gk, rho_group = 1)$blocks
+    b0 <- build_activity_draws(sp, 3000L, seed = 42, group_keys = gk, rho_group = 0)$blocks
+    if (abs(rc(b1[[1]][, "N"], b1[[2]][, "N"]) - 1) > 1e-9) f <- c(f, "one count split: groups' N not rank-identical")
+    if (abs(rc(b0[[1]][, "N"], b0[[2]][, "N"])) > 0.1) f <- c(f, "separate counts: groups' N correlated")
+    if (abs(mean(b1[[2]][, "N"]) - 2000) > 20) f <- c(f, "a group's N marginal moved under one count split")
+    g_full <- make_activity_generator(3000L, seed = 42, rho_group = 1, year_corr = "full")
+    g_none <- make_activity_generator(3000L, seed = 42, rho_group = 1, year_corr = "none")
+    yf1 <- g_full(sp); yf2 <- g_full(sp); yn1 <- g_none(sp); yn2 <- g_none(sp)
+    if (abs(rc(yf1[[1]][, "N"], yf2[[1]][, "N"]) - 1) > 1e-9) f <- c(f, "one census interpolated: ranks changed between years")
+    if (abs(rc(yn1[[1]][, "N"], yn2[[1]][, "N"])) > 0.1) f <- c(f, "annual survey: years correlated")
+    built <- build_systems_data(sp, n_iter = 2000L, seed = 42L, crossgroup = "shared", n_group_rho = 1)
+    if (!is.null(fix_params_for_decomposition(built$systems[[1]], "activity_data")$pre_sampled_activity))
+      f <- c(f, "EF-only run kept the pre-sampled N")
+    sim <- run_inventory_simulation(built$systems, n_iter = 2000L, gwp = "AR5", seed = 42L, keep_sample_rows = 2000L)
+    if (abs(rc(sim$by_system[[1]]$samples[, "N"], sim$by_system[[2]]$samples[, "N"]) - 1) > 1e-9)
+      f <- c(f, "the simulation did not use the one-count N draws")
+    sens <- aggregate_sensitivity(sim$by_system, sim$inventory$total_co2e)
+    if (sum(grepl("^N ", sens$src$parameter)) != 1L || !any(grepl("one count, 3 groups", sens$src$parameter)))
+      f <- c(f, "the tornado did not merge the one-count N into one bar")
+    built0 <- build_systems_data(sp, n_iter = 2000L, seed = 42L, crossgroup = "shared")
+    sim0 <- run_inventory_simulation(built0$systems, n_iter = 2000L, gwp = "AR5", seed = 42L, keep_sample_rows = 2000L)
+    if (abs(rc(sim0$by_system[[1]]$samples[, "N"], sim0$by_system[[2]]$samples[, "N"])) > 0.1)
+      f <- c(f, "a run with nothing chosen correlated the groups' N")
+    f
+  }, error = function(e) conditionMessage(e))
+  f61d_ok <- length(f61d_fail) == 0L
+  check_bool("F61d", "F",
+             "Animal numbers: one count split gives rank-identical N across groups (own marginals), separate counts and the default stay independent, trend full keeps the ranks across years, EF-only drops the draws, the tornado shows one bar",
+             f61d_ok,
+             notes = if (f61d_ok) "rank correlation 1 / 0 as chosen; years 1 / 0; marginal kept; EF-only nulls; one tornado bar"
+                     else paste(f61d_fail, collapse = "; "))
+
   # ---------------------------------------------------------------------
   # F62-F63 -- the absolute-versus-relative spread defect (Andreas, 2026-09-30).
   #

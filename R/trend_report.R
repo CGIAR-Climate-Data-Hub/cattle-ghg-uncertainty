@@ -223,10 +223,21 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
                                  gwp = "AR5", seed = 42, manure = NULL,
                                  crossgroup = "shared", corr_matrix = NULL,
                                  sg_to_mm = list(), year_corr = "full",
-                                 keep_sample_rows = 4000L, progress_fn = NULL) {
+                                 keep_sample_rows = 4000L, progress_fn = NULL,
+                                 n_group_rho = 0, n_year_corr = "none", ar1_rho = 0.7) {
   year <- as.integer(year)
   year_df <- trend_df[trend_df$year == year, , drop = FALSE]
   specs <- .trend_year_specs(year_df, base_specs)
+  # 2026-10-30: this year's animal-number draws, chained as the series
+  # chains them (the generator is stepped up to this year)
+  act_block <- NULL
+  if (n_group_rho > 0 || !identical(n_year_corr, "none")) {
+    years_all <- sort(unique(as.integer(trend_df$year)))
+    act_gen <- make_activity_generator(n_iter, seed = seed, rho_group = n_group_rho,
+                                       year_corr = n_year_corr, rho = ar1_rho)
+    for (k in seq_len(match(year, years_all)))
+      act_block <- act_gen(.trend_year_specs(trend_df[trend_df$year == years_all[k], , drop = FALSE], base_specs))
+  }
   # 2026-10-29: the year's own random stream, seeded as run_trend_analysis()
   # seeds it (.trend_year_seed on the year's index), so the AD-only and
   # EF-only runs of a year draw from the same streams as its combined run,
@@ -243,7 +254,8 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
   else NULL
   built <- build_systems_data(specs, manure = manure, n_iter = n_iter, seed = year_seed,
                               crossgroup = crossgroup, corr_matrix = corr_matrix,
-                              sg_to_mm = sg_to_mm, pre_sampled_blocks = blocks)
+                              sg_to_mm = sg_to_mm, pre_sampled_blocks = blocks,
+                              pre_sampled_activity = act_block)
   run_fixed <- function(fix_type, label) {
     if (is.function(progress_fn)) try(progress_fn(label), silent = TRUE)
     sys <- lapply(built$systems, fix_params_for_decomposition, fix_type = fix_type)
@@ -293,12 +305,24 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
                                  # trend tornadoes read the series), so one
                                  # row is kept: about 60 MB less at the peak
                                  # on Zambia at 10,000
-                                 keep_sample_rows = 1L, progress_fn = NULL) {
+                                 keep_sample_rows = 1L, progress_fn = NULL,
+                                 n_group_rho = 0, n_year_corr = "none") {
   n_iter <- as.integer(n_iter)
   trend_df$year <- suppressWarnings(as.integer(trend_df$year))
   years <- sort(unique(trend_df$year[!is.na(trend_df$year)]))
   pair  <- unique(as.integer(c(base_year, year_t)))
   yi    <- match(pair, years)
+  # 2026-10-30: the animal-number draws, chained across years as the
+  # series chains them, stepped up to the later of the two years
+  act_blocks <- list()
+  if (n_group_rho > 0 || !identical(n_year_corr, "none")) {
+    act_gen <- make_activity_generator(n_iter, seed = seed, rho_group = n_group_rho,
+                                       year_corr = n_year_corr, rho = ar1_rho)
+    for (k in seq_len(max(yi))) {
+      ab <- act_gen(.trend_year_specs(trend_df[trend_df$year == years[k], , drop = FALSE], base_specs))
+      if (k %in% yi) act_blocks[[as.character(years[k])]] <- ab
+    }
+  }
   if (anyNA(yi)) stop("trend_reporting_pair: a chosen year is not in the series.")
   tick <- function(frac, label)
     if (is.function(progress_fn)) try(progress_fn(frac, label), silent = TRUE)
@@ -329,7 +353,8 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
     built <- build_systems_data(ps, manure = manure, n_iter = n_iter, seed = year_seed,
                                 crossgroup = crossgroup, corr_matrix = corr_matrix,
                                 sg_to_mm = sg_to_mm,
-                                pre_sampled_blocks = blocks[[as.character(y)]])
+                                pre_sampled_blocks = blocks[[as.character(y)]],
+                                pre_sampled_activity = act_blocks[[as.character(y)]])
     run <- function(systems, label) {
       lo <- step / n_steps; hi <- (step + 1L) / n_steps
       tick(lo, label)

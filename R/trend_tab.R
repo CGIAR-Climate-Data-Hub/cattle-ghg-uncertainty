@@ -201,9 +201,19 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
                                 keep_samples = c("ends", "none", "all"),
                                 # Rows kept per retained sample matrix. The
                                 # Shiny app passes 4000, as single-year does.
-                                keep_sample_rows = NULL) {
+                                keep_sample_rows = NULL,
+                                # 2026-10-30: animal numbers, between groups
+                                # (0..1) and between years ("none" = annual
+                                # survey, "full" = one census interpolated,
+                                # "partial" = AR(1))
+                                n_group_rho = 0,
+                                n_year_corr = c("none", "full", "partial")) {
   year_corr  <- match.arg(year_corr)
   crossgroup <- match.arg(crossgroup)
+  n_year_corr <- match.arg(n_year_corr)
+  act_gen <- if (n_group_rho > 0 || n_year_corr != "none")
+    make_activity_generator(n_iter, seed = seed, rho_group = n_group_rho,
+                            year_corr = n_year_corr, rho = ar1_rho) else NULL
   keep_samples <- match.arg(keep_samples)
   n_iter <- as.integer(n_iter)
 
@@ -288,7 +298,8 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
     built <- build_systems_data(ps, manure = manure, n_iter = n_iter,
                                 seed = year_seed, crossgroup = crossgroup,
                                 corr_matrix = corr_matrix, sg_to_mm = sg_to_mm,
-                                pre_sampled_blocks = blocks)
+                                pre_sampled_blocks = blocks,
+                                pre_sampled_activity = if (!is.null(act_gen)) act_gen(ps) else NULL)
     if (is.null(shared_summary) && !is.null(built$shared$summary))
       shared_summary <- built$shared$summary
 
@@ -389,6 +400,8 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
       pct_ci     = c(q025(delta_pct_per_iter), q975(delta_pct_per_iter))
     ),
     year_corr = year_corr,
+    n_group_rho = n_group_rho,
+    n_year_corr = n_year_corr,
     years     = years,
     # iterations per year whose total was not finite and were left out of
     # the summaries above (0 everywhere on a healthy run)

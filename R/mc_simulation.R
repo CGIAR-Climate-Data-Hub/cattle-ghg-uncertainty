@@ -14,6 +14,7 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
                                unified_corr_matrix = NULL,
                                # Round 7 R1.14: pre-sampled coefficient block (trend mode)
                                pre_sampled_coefficients = NULL,
+                               pre_sampled_activity = NULL,
                                # Andreas 2026-05 follow-up (C4 / C6): per-MMS
                                # uncertainty matrices n_iter × n_MMS. NULL =
                                # treat the corresponding MMS values as
@@ -38,6 +39,7 @@ run_mc_simulation <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
   samples <- generate_mc_samples(param_specs, corr_matrix, n_iter, seed, ef_corr_matrix,
                                   unified_corr_matrix = unified_corr_matrix,
                                   pre_sampled_coefficients = pre_sampled_coefficients,
+                                  pre_sampled_activity = pre_sampled_activity,
                                   sampler = sampler)
 
   # Andreas 2026-05 follow-up (C4 / C6): expose per-MMS sampled values to the
@@ -243,6 +245,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
       frac_leach_values = sys$frac_leach_values,
       unified_corr_matrix      = sys$unified_corr_matrix,
       pre_sampled_coefficients = sys$pre_sampled_coefficients,
+      pre_sampled_activity     = sys$pre_sampled_activity,
       mcf_samples              = sys$mcf_samples,
       ef3_samples              = sys$ef3_samples,
       frac_gas_samples         = sys$frac_gas_samples,

@@ -249,6 +249,30 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
     }
   }
 
+  # 2026-10-30 (Lolita): animal numbers drawn as one count split into
+  # groups have identical ranks in every group (different scales), which a
+  # regression cannot separate. Columns of N with the same ranks become one
+  # column, their sum, shown as one bar: "N (one count, 32 groups)".
+  n_cols <- colnames(combined)[sub("\\s*\\(.*\\)$", "", colnames(combined)) == "N"]
+  if (length(n_cols) > 1L) {
+    rk  <- lapply(n_cols, function(cn) rank(combined[, cn], ties.method = "first"))
+    key <- vapply(rk, function(r) paste(r[seq_len(min(300L, length(r)))], collapse = ","), character(1))
+    for (k in unique(key[duplicated(key)])) {
+      members <- n_cols[key == k]
+      ref <- rk[[match(members[1], n_cols)]]
+      same <- vapply(members, function(cn) identical(rk[[match(cn, n_cols)]], ref), logical(1))
+      members <- members[same]
+      if (length(members) < 2L) next
+      tot <- rowSums(combined[, members, drop = FALSE])
+      lab <- sprintf("N (one count, %d groups)", length(members))
+      tags_m <- sub("^.*\\(([^()]*)\\)\\s*$", "\\1", members)
+      combined <- combined[, setdiff(colnames(combined), members), drop = FALSE]
+      combined <- cbind(combined, tot)
+      colnames(combined)[ncol(combined)] <- lab
+      groups_of[[lab]] <- paste(tags_m, collapse = "; ")
+    }
+  }
+
   # Row subsample for the sensitivity regression ONLY. On a large multi-system
   # inventory the combined design matrix is ~n_iter x (15 x n_systems) columns;
   # the SRC lm() on a full 10,000-row x ~685-column matrix peaks several hundred

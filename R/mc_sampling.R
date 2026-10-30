@@ -163,6 +163,13 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
                                  # years. Overrides the coefficient-block sampler
                                  # when supplied.
                                  pre_sampled_coefficients = NULL,
+                                 # 2026-10-30: animal numbers drawn for all
+                                 # groups together (correlated between groups
+                                 # and, in trend mode, between years): an
+                                 # n_iter x k matrix with the parameter names
+                                 # as columns, which REPLACES the group's own
+                                 # draws of those activity-data rows.
+                                 pre_sampled_activity = NULL,
                                  # All correlated paths use the rank-correlation
                                  # preserving procedure per IPCC Vol.1 Ch.3
                                  # §3.2.3.2. Kept as an argument for back-compat;
@@ -195,6 +202,11 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
           out[[cn]] <- pre_sampled_coefficients[, cn]
         }
       }
+      if (!is.null(pre_sampled_activity) && n_ad > 0) {
+        for (cn in intersect(colnames(pre_sampled_activity), names(out))) {
+          out[[cn]] <- pre_sampled_activity[, cn]
+        }
+      }
       return(.clamp_physical_bounds(out))
     }
     # If unified matrix has < 2 overlapping params, fall through to two-pass
@@ -208,6 +220,10 @@ generate_mc_samples <- function(param_specs, corr_matrix = NULL, n_iter = 10000,
       .iman_conover_sample(n_iter, ad_params, corr_matrix)
     } else {
       .indep_sample(n_iter, ad_params)
+    }
+    if (!is.null(pre_sampled_activity) && nrow(pre_sampled_activity) == n_iter) {
+      for (cn in intersect(colnames(pre_sampled_activity), colnames(ad_samples)))
+        ad_samples[, cn] <- pre_sampled_activity[, cn]
     }
   } else {
     ad_samples <- matrix(nrow = n_iter, ncol = 0)
@@ -724,4 +740,77 @@ build_shared_coefficient_draws <- function(param_specs, n_iter, seed = NULL,
 
   list(blocks = blocks,
        summary = if (length(summ)) do.call(rbind, summ) else NULL)
+}
+
+# ===========================================================================
+# Animal numbers (N) drawn for all groups together (2026-10-30, Lolita)
+# ===========================================================================
+#
+# The groups' N usually come from one national count split by shares, so
+# the count's error is common to every group; and in a trend the same
+# count, interpolated, serves many years. Drawing each group's N on its
+# own, afresh every year, makes those errors cancel. These draws keep
+# them together: normal scores z (n_iter x groups) carry the structure,
+# each group's own marginal is then placed on the ranks of its column.
+#
+#   rho_group  correlation between the groups' scores (1 = one count split
+#              into groups, 0 = separate counts)
+#   z          scores to reuse (trend mode: the chain across years); when
+#              NULL, fresh scores with the group structure are drawn
+#
+# Returns list(blocks = group key -> n_iter x 1 matrix "N", z = scores).
+.activity_scores <- function(n_iter, n_groups, rho_group) {
+  z_ind <- matrix(stats::rnorm(n_iter * n_groups), nrow = n_iter)
+  if (rho_group <= 0) return(z_ind)
+  if (rho_group >= 1) return(matrix(rep(stats::rnorm(n_iter), n_groups), nrow = n_iter))
+  common <- stats::rnorm(n_iter)
+  sqrt(rho_group) * common + sqrt(1 - rho_group) * z_ind
+}
+
+build_activity_draws <- function(specs, n_iter, seed = NULL, group_keys = NULL,
+                                 rho_group = 0, z = NULL, parameter = "N") {
+  if (is.null(group_keys)) group_keys <- make_group_key(specs)
+  pt <- if ("param_type" %in% names(specs)) specs$param_type else NA
+  rows <- which(specs$parameter == parameter & (is.na(pt) | pt == "activity_data"))
+  if (!length(rows)) return(list(blocks = list(), z = z))
+  rows <- rows[!duplicated(group_keys[rows], fromLast = TRUE)]
+  gk <- group_keys[rows]
+  if (!is.null(seed)) set.seed(as.integer(seed) + 3000017L)
+  if (is.null(z) || ncol(z) != length(rows) || nrow(z) != n_iter)
+    z <- .activity_scores(n_iter, length(rows), rho_group)
+  blocks <- list()
+  for (j in seq_along(rows)) {
+    i <- rows[j]
+    x <- sort(sample_distribution(n_iter, specs$distribution[i], specs$mean[i],
+                                  specs$lower[i], specs$upper[i]))
+    m <- matrix(x[rank(z[, j], ties.method = "first")], ncol = 1,
+                dimnames = list(NULL, parameter))
+    blocks[[gk[j]]] <- m
+  }
+  list(blocks = blocks, z = z)
+}
+
+# Trend mode: the scores chained across years. year_corr "full" keeps one
+# set of scores for every year (one census, interpolated), "partial" lets
+# them drift (AR(1), rho), "none" draws fresh scores each year (annual
+# survey). The group structure (rho_group) is inside the scores, so it
+# holds every year. Returns a function(specs_of_the_year) -> blocks.
+make_activity_generator <- function(n_iter, seed = NULL, rho_group = 0,
+                                    year_corr = c("none", "full", "partial"), rho = 0.7) {
+  year_corr <- match.arg(year_corr)
+  st <- new.env(parent = emptyenv()); st$z <- NULL; st$year <- 0L
+  function(specs) {
+    st$year <- st$year + 1L
+    gk <- make_group_key(specs)
+    n_g <- length(unique(gk[specs$parameter == "N"]))
+    if (!is.null(seed)) set.seed(as.integer(seed) + 3000017L + st$year)
+    z_new <- .activity_scores(n_iter, n_g, rho_group)
+    st$z <- if (is.null(st$z) || ncol(st$z) != n_g) z_new
+            else switch(year_corr,
+                        full    = st$z,
+                        partial = rho * st$z + sqrt(1 - rho^2) * z_new,
+                        none    = z_new)
+    build_activity_draws(specs, n_iter, seed = NULL, group_keys = gk,
+                         rho_group = rho_group, z = st$z)$blocks
+  }
 }
