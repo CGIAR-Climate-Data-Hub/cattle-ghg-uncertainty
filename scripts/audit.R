@@ -3760,17 +3760,21 @@ section_F <- function() {
       f <- c(f, "EF-only run dropped the shared coefficient block")
     if (!all(ef$param_specs$distribution[ef$param_specs$param_type == "activity_data"] == "constant"))
       f <- c(f, "EF-only run did not hold the activity data constant")
+    # 2026-10-30 (Lolita): sharing a value used by several groups is what
+    # the tool does, not a correlation option, so the comparison run keeps
+    # the shared block and differs from the main run by the Tab 3 matrix
+    # only. The comparison site must NOT null it.
     src <- readLines("R/app_server.R", warn = FALSE)
     src <- src[!grepl("^\\s*#", src)]
-    if (!any(grepl("pre_sampled_coefficients\\s*<-\\s*NULL", src)))
-      f <- c(f, "the no-correlation comparison run in app_server.R no longer nulls the shared block")
+    if (any(grepl("pre_sampled_coefficients\\s*<-\\s*NULL", src)))
+      f <- c(f, "the no-correlation comparison run in app_server.R nulls the shared block; sharing is not an option and must stay")
     f
   }, error = function(e) conditionMessage(e))
   f61_ok <- length(f61_fail) == 0L
   check_bool("F61", "F",
-             "The shared coefficient block is nulled for the AD-only run and for the no-correlation comparison run",
+             "The shared coefficient block is nulled for the AD-only run and kept for the no-correlation comparison run",
              f61_ok,
-             notes = if (f61_ok) "AD-only and EF-only behave; comparison-run site present"
+             notes = if (f61_ok) "AD-only and EF-only behave; the comparison run keeps the shared block"
                      else paste(f61_fail, collapse = "; "))
 
   # ---------------------------------------------------------------------
