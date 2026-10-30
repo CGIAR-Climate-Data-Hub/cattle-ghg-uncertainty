@@ -587,6 +587,60 @@ detect_shared_parameters <- function(param_specs, group_keys = NULL) {
   out
 }
 
+
+# Apply the Tab 3 correlation matrix to draws that are made once per set of
+# groups (2026-10-30, Lolita). `draws` is a named list of n_iter vectors,
+# one per draw id ("Ym#2" for a shared estimate, "Ym@group" for a group's
+# own value); `id_groups` names the groups each id covers. Two ids can only
+# move together when they cover exactly the same groups: one draw of Ym
+# given to 12 groups cannot follow 12 different DE draws. Within such a
+# set the rank correlation of the matrix is imposed with the same
+# restricted-pairing procedure as everywhere else (marginals unchanged).
+.correlate_draw_sets <- function(draws, id_groups, corr_matrix) {
+  if (is.null(corr_matrix) || length(draws) < 2) return(draws)
+  ids <- names(draws)
+  pn  <- sub("[#@].*$", "", ids)
+  ok  <- pn %in% rownames(corr_matrix) & pn %in% colnames(corr_matrix)
+  if (sum(ok) < 2) return(draws)
+  sigs <- vapply(ids, function(id) paste(sort(unique(id_groups[[id]])), collapse = "\r"),
+                 character(1))
+  for (s in unique(sigs[ok])) {
+    k <- which(ok & sigs == s)
+    k <- k[!duplicated(pn[k], fromLast = TRUE)]
+    if (length(k) < 2) next
+    R <- corr_matrix[pn[k], pn[k], drop = FALSE]
+    diag(R) <- 1
+    if (all(abs(R[upper.tri(R)]) < 1e-9)) next
+    R <- .repair_corr(R, "correlation between shared draws")
+    X <- do.call(cbind, draws[k])
+    Y <- mc2d::cornode(X, target = R, outrank = FALSE, result = FALSE)
+    for (j in seq_along(k)) draws[[ids[k[j]]]] <- Y[, j]
+  }
+  draws
+}
+
+# The upper Cholesky factors used by the AR(1) generator: one per set of
+# draw ids that cover the same groups and carry a non-zero correlation.
+.draw_set_chol <- function(ids, id_groups, corr_matrix) {
+  if (is.null(corr_matrix) || length(ids) < 2) return(list())
+  pn  <- sub("[#@].*$", "", ids)
+  ok  <- pn %in% rownames(corr_matrix) & pn %in% colnames(corr_matrix)
+  sigs <- vapply(ids, function(id) paste(sort(unique(id_groups[[id]])), collapse = "\r"),
+                 character(1))
+  out <- list()
+  for (s in unique(sigs[ok])) {
+    k <- which(ok & sigs == s)
+    k <- k[!duplicated(pn[k], fromLast = TRUE)]
+    if (length(k) < 2) next
+    R <- corr_matrix[pn[k], pn[k], drop = FALSE]
+    diag(R) <- 1
+    if (all(abs(R[upper.tri(R)]) < 1e-9)) next
+    R <- .repair_corr(R, "correlation between shared draws")
+    out[[length(out) + 1L]] <- list(k = k, U = chol(R))
+  }
+  out
+}
+
 # Draw the shared coefficients once and hand every group its own block.
 #
 # Returns list(blocks, summary):
@@ -597,7 +651,7 @@ detect_shared_parameters <- function(param_specs, group_keys = NULL) {
 # One draw per (parameter, partition). Groups in the same partition receive the
 # same column, which is what makes their errors move together.
 build_shared_coefficient_draws <- function(param_specs, n_iter, seed = NULL,
-                                           group_keys = NULL) {
+                                           group_keys = NULL, corr_matrix = NULL) {
   shared <- detect_shared_parameters(param_specs, group_keys)
   if (!length(shared)) return(list(blocks = list(), summary = NULL))
 
@@ -614,7 +668,7 @@ build_shared_coefficient_draws <- function(param_specs, n_iter, seed = NULL,
   # which on the 812-group Colombian fixture at 10,000 iterations is over 1 GB
   # and would OOM the deployment tier. Building them after the fact lets groups
   # that use exactly the same draws share one matrix object (see below).
-  per_group <- list(); summ <- list(); draws <- list()
+  per_group <- list(); summ <- list(); draws <- list(); id_groups <- list()
   for (p in names(shared)) {
     parts <- shared[[p]]
     n_g <- 0L
@@ -627,12 +681,17 @@ build_shared_coefficient_draws <- function(param_specs, n_iter, seed = NULL,
                                          param_specs$mean[row],
                                          param_specs$lower[row],
                                          param_specs$upper[row])
+      id_groups[[id]] <- part
       for (g in part) per_group[[g]] <- c(per_group[[g]], id)
       n_g <- n_g + length(part)
     }
     summ[[p]] <- data.frame(parameter = p, n_groups = n_g,
                             n_estimates = length(parts), stringsAsFactors = FALSE)
   }
+  # 2026-10-30: shared estimates that cover the same groups follow the
+  # Tab 3 matrix between them (DE and Ym both one value for the same
+  # groups move together as the matrix says).
+  draws <- .correlate_draw_sets(draws, id_groups, corr_matrix)
 
   # Groups that draw on the same estimates get the SAME matrix object rather
   # than a copy of it. generate_mc_samples() only ever reads the block, so no

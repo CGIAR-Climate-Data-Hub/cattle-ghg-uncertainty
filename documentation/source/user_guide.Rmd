@@ -214,7 +214,7 @@ The central estimate (the mean emissions) stays the same whichever mode you pick
 - **From template (auto, time-series)**: depends on your data. A rich series where several parameters really move together can have an effect similar to the structural defaults or larger. A sparse or mostly flat series has almost no effect.
 - **Advanced: manual entry**: depends entirely on what you upload. Strong correlations on parameters with wide uncertainty can move the interval by 20% or more, in either direction.
 
-If you select correlations and the result barely changes, that is usually expected, not a bug. The IPCC calculation multiplies about 13 parameters together, which dilutes the effect of any single pair. The Methodology document explains the mathematics.
+If you select correlations and the result barely changes, that is usually expected, not a bug. The IPCC calculation multiplies about 13 parameters together, which dilutes the effect of any single pair. Also, a value shared by several groups can only be linked to another value shared by the same groups, not to a value that differs from group to group. The Methodology document explains the mathematics.
 
 Before you run the simulation, Tab 4 (Simulate & Results) lets you tick "Compare with/without correlations". The run is then done twice, with and without your correlations, so you can see their effect directly.
 

@@ -175,7 +175,8 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
   shared_draws <- if (!is.null(pre_sampled_blocks)) {
     list(blocks = pre_sampled_blocks, summary = NULL)
   } else if (identical(crossgroup, "shared")) {
-    build_shared_coefficient_draws(specs, n_iter, seed = seed, group_keys = group_key)
+    build_shared_coefficient_draws(specs, n_iter, seed = seed, group_keys = group_key,
+                                   corr_matrix = corr_matrix)
   } else list(blocks = list(), summary = NULL)
 
   # 2026-10-28: the per-MMS draws below (MCF, EF3, Frac_GasMS,
@@ -339,7 +340,8 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
 # Memory is one n_iter vector per distinct draw. Groups whose coefficient
 # rows all resolve to the same draws share one matrix object.
 build_full_coefficient_blocks <- function(specs, n_iter, seed = NULL,
-                                          crossgroup = c("shared", "independent")) {
+                                          crossgroup = c("shared", "independent"),
+                                          corr_matrix = NULL) {
   crossgroup <- match.arg(crossgroup)
   n_iter <- as.integer(n_iter)
   group_key <- make_group_key(specs)
@@ -367,14 +369,20 @@ build_full_coefficient_blocks <- function(specs, n_iter, seed = NULL,
   }
 
   if (!is.null(seed)) set.seed(seed)
-  draws <- list()
+  draws <- list(); id_groups <- list()
   # Deterministic order: first appearance in the sheet.
   for (i in which(is_coef)) {
     id <- draw_id[i]
     if (!is.null(draws[[id]])) next
     draws[[id]] <- sample_distribution(n_iter, specs$distribution[i],
                                        specs$mean[i], specs$lower[i], specs$upper[i])
+    id_groups[[id]] <- if (grepl("#", id, fixed = TRUE))
+      shared[[specs$parameter[i]]][[as.integer(sub("^.*#", "", id))]] else group_key[i]
   }
+  # 2026-10-30: the Tab 3 matrix between draws that cover the same groups
+  # (a group's own coefficients among themselves, or shared estimates
+  # with the same group set), as in the single-year run.
+  draws <- .correlate_draw_sets(draws, id_groups, corr_matrix)
 
   per_group <- split(seq_len(nrow(specs))[is_coef], group_key[is_coef])
   per_group <- lapply(per_group, function(rows) {
@@ -411,7 +419,8 @@ build_full_coefficient_blocks <- function(specs, n_iter, seed = NULL,
 # over 2 GB. The sequential form keeps one n_iter vector of state per
 # distinct draw, whichever the number of years.
 make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
-                                         crossgroup = c("shared", "independent")) {
+                                         crossgroup = c("shared", "independent"),
+                                         corr_matrix = NULL) {
   crossgroup <- match.arg(crossgroup)
   n_iter <- as.integer(n_iter)
   group_key <- make_group_key(specs)
@@ -434,6 +443,13 @@ make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
   }
   ids   <- unique(draw_id[is_coef])
   spec_row <- vapply(ids, function(id) which(draw_id == id)[1], integer(1))
+  # 2026-10-30: the Tab 3 matrix between draws that cover the same groups,
+  # imposed on the normal innovations so the AR(1) chain keeps it every year.
+  id_groups <- lapply(ids, function(id) if (grepl("#", id, fixed = TRUE))
+    shared[[sub("[#@].*$", "", id)]][[as.integer(sub("^.*#", "", id))]]
+    else sub("^.*@", "", id))
+  names(id_groups) <- ids
+  chol_sets <- .draw_set_chol(ids, id_groups, corr_matrix)
   per_group <- split(seq_len(nrow(specs))[is_coef], group_key[is_coef])
   per_group <- lapply(per_group, function(rows) {
     pids <- draw_id[rows]; ps <- specs$parameter[rows]
@@ -450,6 +466,7 @@ make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
     st$year <- st$year + 1L
     if (!is.null(st$rng)) set.seed(st$rng + st$year)
     z_new <- matrix(stats::rnorm(n_iter * length(ids)), nrow = n_iter)
+    for (cs in chol_sets) z_new[, cs$k] <- z_new[, cs$k, drop = FALSE] %*% cs$U
     st$z <- if (is.null(st$z)) z_new else rho * st$z + sqrt(1 - rho^2) * z_new
     draws <- list()
     for (k in seq_along(ids)) {

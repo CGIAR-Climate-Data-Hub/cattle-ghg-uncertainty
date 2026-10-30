@@ -238,10 +238,11 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
   # "none": no blocks; each year builds its own shared draws with its own seed.
   full_blocks <- if (year_corr == "full")
     build_full_coefficient_blocks(base_specs, n_iter, seed = seed,
-                                  crossgroup = crossgroup) else NULL
+                                  crossgroup = crossgroup, corr_matrix = corr_matrix) else NULL
   next_partial <- if (year_corr == "partial")
     make_partial_block_generator(base_specs, n_iter, seed = seed,
-                                 rho = ar1_rho, crossgroup = crossgroup) else NULL
+                                 rho = ar1_rho, crossgroup = crossgroup,
+                                 corr_matrix = corr_matrix) else NULL
 
   rows            <- list()
   co2e_by_year    <- list()

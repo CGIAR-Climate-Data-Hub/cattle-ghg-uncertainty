@@ -3777,6 +3777,54 @@ section_F <- function() {
              notes = if (f61_ok) "AD-only and EF-only behave; the comparison run keeps the shared block"
                      else paste(f61_fail, collapse = "; "))
 
+  # F61b -- the Tab 3 matrix reaches shared draws (2026-10-30, Lolita):
+  # two shared estimates covering the same groups follow the matrix, in
+  # the single-year shared draws, the trend "full" blocks and the AR(1)
+  # innovations; a shared estimate and a group-specific value stay
+  # uncorrelated; the marginals are untouched (the procedure only reorders).
+  f61b_fail <- tryCatch({
+    f <- character(0)
+    b <- fill_bounds(generate_country_x_example())
+    b <- b[b$parameter %in% c("N", "BW", "DE", "Ym", "Cfi", "Milk"), ]
+    b$distribution <- "normal"; b$lower <- b$mean * 0.9; b$upper <- b$mean * 1.1
+    sp <- do.call(rbind, lapply(1:2, function(i) { s <- b; s$cattle_type <- "dairy"
+      s$aggregation_level <- paste0("g", i); s$sub_category <- "cows"; s }))
+    gk <- make_group_key(sp)
+    nm <- unique(sp$parameter)
+    M <- diag(length(nm)); dimnames(M) <- list(nm, nm)
+    M["DE", "Ym"] <- M["Ym", "DE"] <- -0.5
+    rc <- function(x, y) stats::cor(x, y, method = "spearman")
+    s0 <- build_shared_coefficient_draws(sp, 3000L, seed = 7, group_keys = gk)$blocks[[1]]
+    s1 <- build_shared_coefficient_draws(sp, 3000L, seed = 7, group_keys = gk, corr_matrix = M)$blocks[[1]]
+    if (abs(rc(s0[, "DE"], s0[, "Ym"])) > 0.1)
+      f <- c(f, sprintf("shared draws without a matrix are correlated (%.2f)", rc(s0[, "DE"], s0[, "Ym"])))
+    if (abs(rc(s1[, "DE"], s1[, "Ym"]) + 0.5) > 0.1)
+      f <- c(f, sprintf("shared draws do not follow the matrix (%.2f, target -0.5)", rc(s1[, "DE"], s1[, "Ym"])))
+    if (!isTRUE(all.equal(sort(s0[, "Ym"]), sort(s1[, "Ym"]))))
+      f <- c(f, "the matrix changed the marginal draws of a shared estimate")
+    f1 <- build_full_coefficient_blocks(sp, 3000L, seed = 7, corr_matrix = M)[[1]]
+    if (abs(rc(f1[, "DE"], f1[, "Ym"]) + 0.5) > 0.1)
+      f <- c(f, sprintf("trend full blocks do not follow the matrix (%.2f)", rc(f1[, "DE"], f1[, "Ym"])))
+    g1 <- make_partial_block_generator(sp, 3000L, seed = 7, rho = 0.7, corr_matrix = M)
+    y1 <- g1(); y2 <- g1()
+    if (abs(rc(y1[[1]][, "DE"], y1[[1]][, "Ym"]) + 0.5) > 0.1)
+      f <- c(f, sprintf("trend partial innovations do not follow the matrix (%.2f)", rc(y1[[1]][, "DE"], y1[[1]][, "Ym"])))
+    if (abs(rc(y1[[1]][, "Ym"], y2[[1]][, "Ym"]) - 0.7) > 0.1)
+      f <- c(f, sprintf("trend partial lost its year-to-year link (%.2f, target 0.7)", rc(y1[[1]][, "Ym"], y2[[1]][, "Ym"])))
+    sp2 <- sp; sp2$mean[sp2$parameter == "DE" & gk == unique(gk)[2]] <- 60
+    sp2$lower <- sp2$mean * 0.9; sp2$upper <- sp2$mean * 1.1
+    f2 <- build_full_coefficient_blocks(sp2, 3000L, seed = 7, corr_matrix = M)[[1]]
+    if (abs(rc(f2[, "DE"], f2[, "Ym"])) > 0.1)
+      f <- c(f, sprintf("a group-specific DE was linked to a shared Ym (%.2f)", rc(f2[, "DE"], f2[, "Ym"])))
+    f
+  }, error = function(e) conditionMessage(e))
+  f61b_ok <- length(f61b_fail) == 0L
+  check_bool("F61b", "F",
+             "The Tab 3 matrix is applied between shared estimates that cover the same groups (single-year, trend full, trend partial), never between a shared and a group-specific value, with marginals unchanged",
+             f61b_ok,
+             notes = if (f61b_ok) "DE~Ym -0.5 reproduced in the three samplers; mixed pair stays at 0; marginals identical"
+                     else paste(f61b_fail, collapse = "; "))
+
   # ---------------------------------------------------------------------
   # F62-F63 -- the absolute-versus-relative spread defect (Andreas, 2026-09-30).
   #

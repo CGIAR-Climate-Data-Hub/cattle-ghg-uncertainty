@@ -457,11 +457,16 @@ different matter. If one IPCC default or one regional study supplies a
 value used by many groups, that is a single estimate applied repeatedly.
 The tool draws such a value once per iteration for every group that
 carries it, and draws groups with their own value separately; nothing
-needs to be set. This is the larger of the two effects: on the Zambia
-inventory (32 groups) the reported margin of error is 32.5 per cent with
-shared draws and would be 23.7 per cent if every group drew its own
-value, and on the test in Common pitfalls below the difference grows
-with the number of groups.</p>
+needs to be set. The correlation mode chosen on this page is applied
+between two shared values when they cover the same groups (one DE and
+one Ym used by the same groups move together), and between a group’s own
+values; a shared value cannot be linked to a value that differs from
+group to group, because one draw cannot follow several. This is the
+larger of the two effects: on the Zambia inventory (32 groups) the
+reported margin of error is 32.5 per cent with shared draws and would be
+23.7 per cent if every group drew its own value, and on the test in
+Common pitfalls below the difference grows with the number of
+groups.</p>
 </div>
 <div id="selecting-an-activity-data-correlation-mode" class="section level2">
 <h2>Selecting an activity-data correlation mode</h2>
