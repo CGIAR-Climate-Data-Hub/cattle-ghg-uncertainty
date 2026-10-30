@@ -230,6 +230,27 @@ normalise_param_names <- function(param_specs) {
 # Returns a list with $param_specs (possibly augmented), $auto_filled (data frame
 # of what was added), $message, and $valid (only FALSE if a core param has no
 # default available: genuine error).
+# Rows apply_default_ranges() changed: a blank range filled (default,
+# placeholder, or Tw >= 20 made constant) or a range flag newly set.
+# 2026-10-30: this used to count only published defaults, so a translated
+# template (defaults already written, placeholders tagged) counted 0 and
+# the caller dropped the filled copy: Tw at 20 stayed Missing and the
+# placeholder flags were lost.
+.n_ranges_filled <- function(before, after) {
+  if (is.null(before) || is.null(after) || nrow(before) != nrow(after)) return(0L)
+  col <- function(d, n) if (n %in% names(d)) d[[n]] else rep(NA, nrow(d))
+  b0 <- range_is_blank(suppressWarnings(as.numeric(col(before, "mean"))),
+                       suppressWarnings(as.numeric(col(before, "lower"))),
+                       suppressWarnings(as.numeric(col(before, "upper"))),
+                       as.character(col(before, "distribution")))
+  b1 <- range_is_blank(suppressWarnings(as.numeric(col(after, "mean"))),
+                       suppressWarnings(as.numeric(col(after, "lower"))),
+                       suppressWarnings(as.numeric(col(after, "upper"))),
+                       as.character(col(after, "distribution")))
+  flag <- function(n) (col(after, n) %in% TRUE) & !(col(before, n) %in% TRUE)
+  sum(b0 & !b1) + sum(flag("range_default") | flag("range_placeholder"))
+}
+
 ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
                                  region = NULL) {
   if (is.null(param_specs) || nrow(param_specs) == 0)
@@ -271,7 +292,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   if (length(group_cols) == 0) {
     ps1 <- apply_default_ranges(param_specs, catalogue)
     return(list(valid = TRUE, param_specs = ps1, auto_filled = NULL,
-                ranges_filled = sum(ps1$range_default %in% TRUE),
+                ranges_filled = .n_ranges_filled(param_specs, ps1),
                 message = "Single-group input: no per-group completeness check."))
   }
 
@@ -378,9 +399,9 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   }
   # 2026-10-30: blank ranges take a default only where one is defensible
   # (see apply_default_ranges). Everything else stays blank for the QA/QC.
-  n_before <- if ("range_default" %in% names(param_specs)) sum(param_specs$range_default %in% TRUE) else 0L
+  ps0 <- param_specs
   param_specs <- apply_default_ranges(param_specs, catalogue)
-  ranges_filled <- sum(param_specs$range_default %in% TRUE) - n_before
+  ranges_filled <- .n_ranges_filled(ps0, param_specs)
 
   if (length(msg_parts) == 0) msg_parts <- "All sub-categories complete."
 
