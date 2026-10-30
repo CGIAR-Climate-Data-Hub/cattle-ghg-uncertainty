@@ -19,9 +19,10 @@ pop <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_cate
 src <- list(numbers = c(100, 200, 55, 60), families = character(0), family_values = list(),
             year_sums = list(`2022` = c(300, 999), `2021` = c(270)))
 iss <- translator_consistency_checks(ps, NULL, source = src, population = pop, inventory_year = 2022)
-c7 <- iss[grepl("heifers / N", iss$where), ]
+# by check name: the trend checks (C13) also name this group (a 39% jump)
+c7 <- iss[grepl("heifers / N", iss$where) & iss$check %in% "Parameters vs time series", ]
 ok(nrow(c7) == 1 && identical(c7$severity, "fail") && grepl("200", c7$issue) && grepl("250", c7$issue), "C7: a time-series value that differs from Parameters for the inventory year fails")
-ok(!any(grepl("bulls / N", iss$where)), "C7: an agreeing value is not flagged")
+ok(!any(grepl("bulls / N", iss$where) & iss$check %in% "Parameters vs time series"), "C7: an agreeing value is not flagged")
 ok(any(iss$where == "year 2022" & iss$severity == "warn" & iss$sheet == "Parameter_TimeSeries" & iss$parameter == "N" & iss$check == "time series totals"),
    "C7: a per-year total absent from the source year columns warns, on the time-series sheet, parameter N")
 ok(!any(iss$where == "year 2021"), "C7: a per-year total that matches a source column is silent")

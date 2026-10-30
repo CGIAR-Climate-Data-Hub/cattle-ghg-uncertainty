@@ -54,7 +54,11 @@
   # time-series rows of the flagged group-years
   ps <- piece$parameters; mm <- piece$manure_management; ts <- piece$parameter_timeseries
   grp_lv <- function(g) { p <- strsplit(g %||% "", "||", fixed = TRUE)[[1]]; if (length(p) >= 3) as.character(c(p[2], p[3])) else c(NA_character_, NA_character_) }
-  gl <- base::t(vapply(targets$group %||% rep(NA_character_, nrow(targets)), function(g) grp_lv(g), character(2)))
+  # 2026-10-30: not `targets$group %||% ...`, which drops every group when
+  # the first target has none (a manure-wide finding), so no rows were sent
+  grp_v <- if ("group" %in% names(targets)) as.character(targets$group) else rep(NA_character_, nrow(targets))
+  gl <- base::t(vapply(grp_v, function(g) grp_lv(g), character(2), USE.NAMES = FALSE))
+  if (!is.matrix(gl)) gl <- matrix(gl, ncol = 2L)
   keys_pg <- unique(paste(.translator_norm_level(gl[, 1]), gl[, 2], targets$parameter, sep = "##"))
   keys_g  <- unique(paste(.translator_norm_level(gl[, 1]), gl[, 2], sep = "##"))
   rows_p <- if (is.data.frame(ps) && nrow(ps)) {
@@ -73,12 +77,18 @@
     }
     mm[sel, , drop = FALSE]
   } else NULL
-  rows_t <- if (is.data.frame(ts) && nrow(ts) && any(targets$check %in% "time-series year")) {
-    yrs <- sub("^.* / ", "", targets$where[targets$check %in% "time-series year"])
+  # 2026-10-30: a gap in a series or rows the trend ignores (C13) send every
+  # time-series row of the group, so the model sees the whole series
+  ts_grp_checks <- c("time series: gap", "time series: rows ignored")
+  rows_t <- if (is.data.frame(ts) && nrow(ts) && any(targets$check %in% c("time-series year", ts_grp_checks))) {
+    yr_t <- targets$check %in% "time-series year"
+    yrs <- sub("^.* / ", "", targets$where[yr_t])
     k <- paste(.translator_norm_level(ts$aggregation_level), ts$sub_category, ts$year, sep = "##")
-    want <- paste(.translator_norm_level(gl[targets$check %in% "time-series year", 1]),
-                  gl[targets$check %in% "time-series year", 2], yrs, sep = "##")
-    ts[k %in% want, , drop = FALSE]
+    want <- paste(.translator_norm_level(gl[yr_t, 1]), gl[yr_t, 2], yrs, sep = "##")
+    g_t <- targets$check %in% ts_grp_checks
+    kg <- paste(.translator_norm_level(ts$aggregation_level), ts$sub_category, sep = "##")
+    want_g <- paste(.translator_norm_level(gl[g_t, 1]), gl[g_t, 2], sep = "##")
+    ts[k %in% want | kg %in% want_g, , drop = FALSE]
   } else NULL
   rows_txt <- c(
     if (!is.null(rows_p) && nrow(rows_p)) c("parameters:", .translator_rows_csv(rows_p,

@@ -4218,6 +4218,73 @@ section_F <- function() {
              notes = if (f66_ok) "share and MCF bounds per row; gap and wrong year found, no false alarm; value, range, series and not_errors applied"
                      else paste(f66_fail, collapse = "; "))
 
+  # F67 -- the trend checks of the translator (2026-10-30, C13). The trend
+  # starts each year from the Parameters sheet and replaces only what the
+  # series gives; rows whose group matches no Parameters row are skipped.
+  # A three-group fixture with one planted case of each finding: every
+  # check fires where planted and only there; a gap and ignored rows go to
+  # the AI review and the notes for the country team do not; one year of
+  # series gives no trend rows; the review request carries the series rows
+  # even when the first flagged item has no group.
+  f67_fail <- tryCatch({
+    f <- character(0)
+    grp <- c("cows", "bulls", "heifers")
+    ps7 <- data.frame(cattle_type = "dairy", aggregation_level = "sys", sub_category = rep(grp, each = 3),
+                      parameter = rep(c("N", "DE", "BW"), 3), mean = rep(c(140, 64, 400), 3),
+                      stringsAsFactors = FALSE)
+    ps7$mean[ps7$sub_category == "heifers" & ps7$parameter == "N"] <- 82
+    # bulls' DE differs from the cows' series, so C11 does not claim it
+    ps7$mean[ps7$sub_category == "bulls" & ps7$parameter == "DE"] <- 58
+    yrs <- 2020:2024
+    pop7 <- data.frame(cattle_type = c(rep("dairy", 15), NA, NA), aggregation_level = "sys",
+                       sub_category = c(rep(grp, each = 5), "calves", "calves"),
+                       year = c(rep(yrs, 3), 2020L, 2021L),
+                       N  = c(100, 110, 120, 130, 140,  100, 110, 120, 130, 140,  50, 75, NA, 80, 82,  9, 10),
+                       DE = c(60, 61, 61, 63, 64,       NA, NA, NA, NA, NA,       60, 61, 0.62, 63, 64,  NA, NA),
+                       BW = NA_real_, stringsAsFactors = FALSE)
+    is7 <- translator_consistency_checks(ps7, NULL, population = pop7, inventory_year = 2024)
+    got <- function(ck, pat = ".") is7[is7$check %in% ck & grepl(pat, paste(is7$where, is7$issue)), , drop = FALSE]
+    want <- list(
+      list("time series: years covered", "2020 to 2024", "info", 1L),
+      list("time series: fixed across years", "MCF", "info", 1L),
+      list("time series: held constant", "bulls", "info", 1L),
+      list("time series: gap", "heifers / N", "warn", 1L),
+      list("time series: uneven within system", "DE changes", "info", 1L),
+      list("time series: same as another group", "/ N", "info", 2L),
+      list("time series: large jump", "heifers / N", "info", 1L),
+      list("time series: unit change", "heifers / DE", "warn", 1L),
+      list("time series: repeated year", "cows / DE", "info", 1L),
+      list("time series: rows ignored", "calves", "warn", 1L))
+    for (w in want) {
+      x <- got(w[[1]], w[[2]])
+      if (nrow(x) != w[[4]] || !all(x$severity == w[[3]])) f <- c(f, sprintf("%s: %d row(s)", w[[1]], nrow(x)))
+    }
+    hc <- got("time series: held constant", "bulls")$issue
+    if (!length(hc) || !grepl("DE and BW", hc[1], fixed = TRUE) || !grepl("2024", hc[1], fixed = TRUE))
+      f <- c(f, "held constant text")
+    if (nrow(got("time series: large jump", "DE"))) f <- c(f, "unit change also counted as a jump")
+    if (nrow(got("time series: same as another group", "DE"))) f <- c(f, "DE in one system listed as copied")
+    rt <- translator_review_targets(is7)
+    if (!all(c("time series: gap", "time series: rows ignored") %in% rt$check) ||
+        any(c("time series: held constant", "time series: large jump", "time series: unit change",
+              "time series: same as another group") %in% rt$check))
+      f <- c(f, "review targets wrong")
+    one <- translator_consistency_checks(ps7, NULL, population = pop7[pop7$year == 2024, ], inventory_year = 2024)
+    if (any(grepl("^time series:", one$check))) f <- c(f, "one year gave trend rows")
+    tg7 <- rbind(data.frame(where = "x", issue = "y", severity = "warn", sheet = "Manure_Management", group = NA,
+                            parameter = NA, check = "manure shares sum", stringsAsFactors = FALSE),
+                 rt[rt$check %in% "time series: gap", names(is7)])
+    req <- .translator_review_request(tg7, list(parameters = ps7, parameter_timeseries = pop7))
+    if (!grepl("parameter_timeseries:", req, fixed = TRUE)) f <- c(f, "review request lacks the series rows")
+    f
+  }, error = function(e) conditionMessage(e))
+  f67_ok <- length(f67_fail) == 0L
+  check_bool("F67", "F",
+             "Translator trend checks: held constant, gap, uneven coverage, repeated year, identical series, jumps, unit change, rows ignored, fixed inputs, years covered; only gaps and ignored rows go to the AI review",
+             f67_ok,
+             notes = if (f67_ok) "each planted case found once with its severity; unit change not double-counted as a jump; one year gives no rows; review request carries the series"
+                     else paste(f67_fail, collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

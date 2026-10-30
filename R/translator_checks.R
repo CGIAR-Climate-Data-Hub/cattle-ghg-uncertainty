@@ -347,6 +347,358 @@ translator_source_fingerprint <- function(parsed) {
   NA_character_
 }
 
+# ---------------------------------------------------------------------------
+# Time-series ("trend") checks (2026-10-30, C13)
+#
+# The trend run (.trend_year_specs in R/trend_tab.R) starts every year from
+# the Parameters sheet and replaces only what Parameter_TimeSeries gives for
+# that year and group. An input the series leaves out keeps its
+# inventory-year value in every year, a year missing from one group's series
+# falls back to that value too (nothing is interpolated), and a series row
+# whose group or parameter matches no Parameters row is skipped without a
+# word. Manure has no time series at all. None of this shows in the
+# workbook, so the compiler is told before running the trend.
+#
+# Two kinds of finding. Translation mistakes the AI review can fix from the
+# file: a gap in a series and rows the trend ignores (both in
+# .TRANSLATOR_REVIEW_CHECKS). Notes for the country team: inputs held
+# constant, uneven coverage within a system, a value repeated in two
+# neighbouring years, two groups with the same series, large jumps, a unit
+# change inside a series, what stays fixed, and the years covered. All of
+# them reach the checks workbook and the Check and Why columns only, never
+# the app's QA/QC tab. They run only when the series has two years or more.
+# ---------------------------------------------------------------------------
+
+# "DE", "CP", "BW" -> "DE, CP and BW"
+.translator_and <- function(x) {
+  x <- as.character(x)
+  if (length(x) <= 1L) return(paste(x, collapse = ""))
+  paste(paste(x[-length(x)], collapse = ", "), "and", x[length(x)])
+}
+
+# 1990, 1991, 1992, 1995 -> "1990 to 1992, 1995"
+.translator_year_runs <- function(y) {
+  y <- sort(unique(as.integer(y[!is.na(y)])))
+  if (!length(y)) return("")
+  br <- c(0L, which(diff(y) != 1L), length(y))
+  paste(vapply(seq_len(length(br) - 1L), function(k) {
+    a <- y[br[k] + 1L]; b <- y[br[k + 1L]]
+    if (a == b) as.character(a) else sprintf("%d to %d", a, b)
+  }, character(1)), collapse = ", ")
+}
+
+# Ratios between two neighbouring years that read as a change of unit
+# (percent and fraction, per day and per year, kg and tonnes), within 3 %.
+.TRANSLATOR_UNIT_RATIOS <- c("100" = 100, "1/100" = 1 / 100, "365" = 365, "1/365" = 1 / 365,
+                             "1000" = 1000, "1/1000" = 1 / 1000)
+
+# `add` is the row writer of translator_consistency_checks(); `skip` holds
+# the level||sub_category||parameter keys C11 already reported: the
+# uneven-coverage and gap checks leave them out, and the held-constant row
+# names them with a pointer to C11 rather than a row of its own.
+.translator_trend_checks <- function(ps, population, inventory_year, add, skip = character(0)) {
+  if (!is.data.frame(ps) || !nrow(ps) || !all(c("sub_category", "parameter", "mean") %in% names(ps)) ||
+      !is.data.frame(population) || !"year" %in% names(population)) return(invisible(NULL))
+  # the trend drops the sheet's label rows (a year that is not a number)
+  yr_all <- suppressWarnings(as.integer(as.character(population$year)))
+  ok_yr <- !is.na(yr_all) & yr_all >= 1900 & yr_all <= 2100
+  ts <- population[ok_yr, , drop = FALSE]; yr <- yr_all[ok_yr]
+  years <- sort(unique(yr))
+  if (length(years) < 2L) return(invisible(NULL))
+  inputs <- intersect(names(ts), PARAM_CATALOGUE$parameter)
+  if (!length(inputs)) return(invisible(NULL))
+
+  num <- function(x) suppressWarnings(as.numeric(x))
+  fmt <- function(x) format(signif(x, 6), trim = TRUE, big.mark = ",", scientific = FALSE)
+  col <- function(df, nm) if (nm %in% names(df)) as.character(df[[nm]]) else rep(NA_character_, nrow(df))
+  blank <- function(v) ifelse(is.na(v), "", v)
+  quote_cell <- function(v) {
+    if (is.na(v) || !nzchar(trimws(v))) return("(blank)")
+    v <- trimws(v)
+    sprintf("'%s'", if (nchar(v) > 30L) paste0(substr(v, 1, 27), "...") else v)
+  }
+  norm3 <- function(lv, sc, p) paste(.translator_norm_level(lv), sc, p, sep = "||")
+  yr0 <- suppressWarnings(as.integer(.translator_scalar(inventory_year %||% NA)))
+  yr_txt <- if (length(yr0) && is.finite(yr0)) as.character(yr0) else "inventory-year"
+  TS <- "Parameter_TimeSeries"
+  # inputs a file usually gives once for a whole production system (the
+  # diet, the milk composition): the same series in two groups of one
+  # system is expected, so the identical-series check looks across systems
+  per_system <- c("DE", "CP", "Fat", "MilkPR", "pct_pregnant")
+
+  # The trend's own group key (make_group_key, where a blank cell reads
+  # "NA"), and the key the workbook annotation matches (a blank reads "").
+  t_key <- make_group_key(ts)
+  t_ann <- paste(blank(col(ts, "cattle_type")), blank(col(ts, "aggregation_level")),
+                 blank(col(ts, "sub_category")), sep = "||")
+  t_ct <- col(ts, "cattle_type"); t_lv <- col(ts, "aggregation_level"); t_sc <- col(ts, "sub_category")
+  p_key <- make_group_key(ps)
+  p_ann <- paste(blank(col(ps, "cattle_type")), blank(col(ps, "aggregation_level")),
+                 blank(col(ps, "sub_category")), sep = "||")
+  p_ct <- col(ps, "cattle_type"); p_lv <- col(ps, "aggregation_level"); p_sc <- col(ps, "sub_category")
+  p_mu <- num(ps$mean); p_par <- as.character(ps$parameter)
+  p_keys <- unique(p_key)
+  V <- lapply(stats::setNames(inputs, inputs), function(p) num(ts[[p]]))
+  any_val <- Reduce(`|`, lapply(V, is.finite))
+
+  # A row whose key matches no Parameters group, but whose system and
+  # sub-category name exactly one (a blank cattle_type, say), is counted
+  # with that group by the series checks below: the wrong cell is reported
+  # once, as rows ignored, and not again as a gap in the group's series.
+  r_key <- t_key
+  for (k in setdiff(unique(t_key), p_keys)) {
+    rk <- which(t_key == k)
+    cand <- unique(p_key[.translator_norm_level(p_lv) == .translator_norm_level(t_lv[rk[1]]) & p_sc %in% t_sc[rk[1]]])
+    if (length(cand) == 1L) r_key[rk] <- cand
+  }
+
+  # One entry per (series group, input) as the sheet gives it, sorted by
+  # year; where a year appears twice the later row wins, as in the trend.
+  series <- list()
+  for (k in unique(r_key[any_val])) {
+    rk <- which(r_key == k)
+    lab <- sprintf("%s / %s", blank(t_lv[rk[1]]), blank(t_sc[rk[1]]))
+    ann <- names(which.max(table(t_ann[rk])))
+    for (p in inputs) {
+      v <- V[[p]][rk]; ok <- is.finite(v)
+      if (!any(ok)) next
+      y <- yr[rk][ok]; v <- v[ok]
+      keep <- !duplicated(y, fromLast = TRUE); y <- y[keep]; v <- v[keep]; o <- order(y)
+      series[[length(series) + 1L]] <- list(key = k, ann = ann, lab = lab,
+        sys = .translator_norm_level(t_lv[rk[1]]), lv = blank(t_lv[rk[1]]), sc = blank(t_sc[rk[1]]),
+        norm = norm3(t_lv[rk[1]], t_sc[rk[1]], p), p = p, y = y[o], v = v[o])
+    }
+  }
+
+  # 11. Years covered
+  miss_yr <- setdiff(seq(min(years), max(years)), years)
+  add("time series: years covered",
+      paste0(sprintf("The time series covers %d to %d", min(years), max(years)),
+             if (length(miss_yr))
+               sprintf(" with %d of the %d years: %s %s missing, so the trend has no result for %s.",
+                       length(years), length(years) + length(miss_yr), .translator_year_runs(miss_yr),
+                       if (length(miss_yr) == 1L) "is" else "are", if (length(miss_yr) == 1L) "it" else "them")
+             else sprintf(" (%d years, none missing).", length(years)),
+             if (length(yr0) && is.finite(yr0) && !yr0 %in% years)
+               sprintf(" The inventory year %d is not one of them.", yr0) else ""),
+      severity = "info", sheet = TS, check = "time series: years covered")
+
+  # 10. Fixed across years by design
+  add("time series: fixed across years",
+      paste0("Manure system shares, MCF, EF3 and the N fractions (Frac_GasMS, Frac_LeachMS) have no time series: ",
+             "the trend uses the same values in every year, as it does for Ym, Cfi and every other input with no ",
+             "column on the Parameter_TimeSeries sheet. A year without its own range keeps the relative range of ",
+             "the inventory year: a value given as +/-10% keeps +/-10% around each year's value."),
+      severity = "info", sheet = TS, check = "time series: fixed across years")
+
+  # 9. Rows the trend ignores: a group key, or a parameter, with no
+  #    Parameters row to replace (`if (length(sel) == 0) next` in the trend).
+  #    One row per group they were meant for.
+  bad <- which(any_val & !t_key %in% p_keys)
+  ignored_for <- character(0)   # Parameters groups whose series rows are skipped
+  for (k in unique(r_key[bad])) {
+    rk <- bad[r_key[bad] == k]
+    trip <- paste(t_ct[rk], t_lv[rk], t_sc[rk], sep = "##")
+    cells <- vapply(unique(trip), function(tr) {
+      i <- rk[match(tr, trip)]; n <- sum(trip == tr)
+      sprintf("cattle_type %s, aggregation_level %s, sub_category %s in %d row%s",
+              quote_cell(t_ct[i]), quote_cell(t_lv[i]), quote_cell(t_sc[i]), n, if (n == 1L) "" else "s")
+    }, character(1))
+    j <- match(k, p_key)
+    tail_txt <- if (!is.na(j)) {
+      ignored_for <- c(ignored_for, k)
+      sprintf(paste0(" So %s / %s keeps the %s values of the Parameters sheet in every year. On the Parameters ",
+                     "sheet this group is cattle_type %s, aggregation_level %s, sub_category %s: write the same ",
+                     "in these rows."),
+              blank(p_lv[j]), blank(p_sc[j]), yr_txt, quote_cell(p_ct[j]), quote_cell(p_lv[j]), quote_cell(p_sc[j]))
+    } else " Their values are not used. Correct the three cells so they match a row of the Parameters sheet, or delete these rows."
+    add(sprintf("%s / %s", blank(t_lv[rk[1]]), blank(t_sc[rk[1]])),
+        paste0(sprintf(paste0("The trend run skips %d row%s of the time series (%s): the group named in %s matches ",
+                              "no group on the Parameters sheet (%s)."),
+                       length(rk), if (length(rk) == 1L) "" else "s", .translator_year_runs(yr[rk]),
+                       if (length(rk) == 1L) "it" else "them", paste(cells, collapse = "; ")),
+               tail_txt),
+        severity = "warn", sheet = TS, group = t_ann[rk[1]], check = "time series: rows ignored")
+  }
+  for (k in intersect(unique(t_key[any_val]), p_keys)) {
+    rk <- which(t_key == k)
+    for (p in inputs) {
+      if (!any(is.finite(V[[p]][rk])) || any(p_key == k & p_par == p)) next
+      add(sprintf("%s / %s / %s", blank(t_lv[rk[1]]), blank(t_sc[rk[1]]), p),
+          sprintf(paste0("The time series gives %s for this group, but the Parameters sheet has no %s row for it, ",
+                         "so the trend run skips these values. Add the %s row on the Parameters sheet."), p, p, p),
+          severity = "warn", sheet = TS, group = t_ann[rk[1]], parameter = p, check = "time series: rows ignored")
+    }
+  }
+
+  # 1. Inputs held constant, one row per Parameters group. An input with no
+  #    value in the group (0 or blank: no milk for bulls) is not listed.
+  applies <- function(i0, p) { j <- i0[p_par[i0] == p]; length(j) > 0 && any(is.finite(p_mu[j]) & p_mu[j] != 0) }
+  in_series <- function(g, p) any(is.finite(V[[p]][t_key == g]))
+  for (g in p_keys) {
+    i0 <- which(p_key == g)
+    app <- inputs[vapply(inputs, function(p) applies(i0, p), logical(1))]
+    has <- app[vapply(app, function(p) in_series(g, p), logical(1))]
+    held <- setdiff(app, has)
+    if (!length(held)) next
+    c11 <- held[norm3(p_lv[i0[1]], p_sc[i0[1]], held) %in% skip]
+    see <- if (length(c11))
+      sprintf(" %s %s also listed under 'time-series coverage'.", .translator_and(c11),
+              if (length(c11) == 1L) "is" else "are") else ""
+    msg <- if (g %in% ignored_for)
+      sprintf("The time-series rows for this group are skipped (see 'time series: rows ignored'): the trend uses the %s value of %s in every year.",
+              yr_txt, .translator_and(held))
+    else if (!length(has))
+      sprintf("This group has no values on the Parameter_TimeSeries sheet: the trend uses the %s value of %s in every year.",
+              yr_txt, .translator_and(held))
+    else
+      sprintf("%s %s no year-by-year values for this group: the trend uses the %s value in every year.",
+              .translator_and(held), if (length(held) == 1L) "has" else "have", yr_txt)
+    add(sprintf("%s / %s", blank(p_lv[i0[1]]), blank(p_sc[i0[1]])), paste0(msg, see),
+        severity = "info", sheet = TS, group = p_ann[i0[1]],
+        parameter = if (length(held) == 1L) held else NA_character_, check = "time series: held constant")
+  }
+
+  # 3. Uneven coverage within a production system: an input changes from
+  #    year to year for some sub-categories and has no series for others.
+  #    A row for a whole system carries no group, so it is listed in the
+  #    checks workbook without marking every row of the system.
+  sys_id <- paste(blank(p_ct), blank(p_lv), sep = "||")
+  for (sy in unique(sys_id)) {
+    gs <- unique(p_key[sys_id == sy])
+    if (length(gs) < 2L) next
+    i_sys <- which(sys_id == sy)
+    for (p in inputs) {
+      vary <- character(0); none <- character(0)
+      for (g in gs) {
+        i0 <- i_sys[p_key[i_sys] == g]
+        if (!applies(i0, p)) next
+        v <- V[[p]][t_key == g]; v <- v[is.finite(v)]
+        if (length(unique(signif(v, 9))) >= 2L) vary <- c(vary, p_sc[i0[1]])
+        else if (!length(v) && !norm3(p_lv[i0[1]], p_sc[i0[1]], p) %in% skip) none <- c(none, p_sc[i0[1]])
+      }
+      if (!length(vary) || !length(none)) next
+      lv <- p_lv[i_sys[1]]
+      add(sprintf("%s / %s", blank(lv), p),
+          sprintf(paste0("%s changes from year to year for %s in this production system, but not for %s, ",
+                         "which %s the %s value in every year. If the file gives one series for the whole ",
+                         "system, it applies to each of these sub-categories."),
+                  p, .translator_and(vary), .translator_and(none), if (length(none) == 1L) "keeps" else "keep", yr_txt),
+          severity = "info", sheet = TS, parameter = p, check = "time series: uneven within system")
+    }
+  }
+
+  # 2, 8, 7 and 5, on each series as the sheet gives it.
+  rep_hits <- list()
+  for (s in series) {
+    where_s <- sprintf("%s / %s", s$lab, s$p)
+    # 2. Gaps: years the sheet covers that this series lacks
+    gap <- setdiff(years, s$y)
+    if (length(gap) && !s$norm %in% skip)
+      add(where_s,
+          sprintf(paste0("%s has values for %d of the %d years; missing: %s. In a missing year the trend uses ",
+                         "the %s value from the Parameters sheet, not a value between the neighbouring years."),
+                  s$p, length(s$y), length(years), .translator_year_runs(gap), yr_txt),
+          severity = "warn", sheet = TS, group = s$ann, parameter = s$p, check = "time series: gap")
+    n <- length(s$v)
+    if (n < 2L) next
+    a <- s$v[-n]; b <- s$v[-1L]; ya <- s$y[-n]; yb <- s$y[-1L]
+    # 8. Unit change between two neighbouring values
+    ratio <- ifelse(a != 0, b / a, NA_real_)
+    unit <- vapply(ratio, function(r) {
+      if (!is.finite(r) || r <= 0) return(NA_character_)
+      hit <- names(.TRANSLATOR_UNIT_RATIOS)[abs(r / .TRANSLATOR_UNIT_RATIOS - 1) <= 0.03]
+      if (length(hit)) hit[1] else NA_character_
+    }, character(1))
+    if (any(!is.na(unit))) {
+      u <- which(!is.na(unit))
+      add(where_s,
+          sprintf(paste0("%s goes from %s: the unit seems to change inside the series (percent and fraction, ",
+                         "per day and per year, kg and tonnes). Write every year in the unit of the Parameters sheet."),
+                  s$p, paste(sprintf("%s in %d to %s in %d (a factor of %s)", vapply(a[u], fmt, ""), ya[u],
+                                     vapply(b[u], fmt, ""), yb[u], unit[u]), collapse = "; and from ")),
+          severity = "warn", sheet = TS, group = s$ann, parameter = s$p, check = "time series: unit change")
+    }
+    # 7. Large jumps, the unit changes above left out
+    rel <- ifelse(a != 0, (b - a) / abs(a), ifelse(b != 0, Inf, 0))
+    j <- which(is.na(unit) & abs(rel) > 0.25)
+    if (length(j)) {
+      lst <- sprintf("%d to %d (%s)", ya[j], yb[j],
+                     ifelse(is.finite(rel[j]), sprintf("%+.0f%%", 100 * rel[j]), "from 0"))
+      more <- if (length(lst) > 6L) sprintf(" and %d more", length(lst) - 6L) else ""
+      add(where_s,
+          sprintf(paste0("%s changes by more than 25%% from one year to the next %d time%s: %s%s. Check these ",
+                         "against the file: a jump this size can be a real change or a value from the wrong cell."),
+                  s$p, length(j), if (length(j) == 1L) "" else "s", paste(utils::head(lst, 6), collapse = ", "), more),
+          severity = "info", sheet = TS, group = s$ann, parameter = s$p, check = "time series: large jump")
+    }
+    # 5. The same value in two neighbouring years while the rest of the
+    #    series moves: at most two such pairs, neither next to another (a
+    #    run of equal years is a value carried forward, not a slip).
+    nb <- yb - ya == 1L
+    same <- nb & abs(b - a) <= 1e-9 * pmax(1, abs(a))
+    k5 <- which(same)
+    if (n >= 5L && length(k5) && length(k5) <= 2L && !any(diff(k5) == 1L) && sum(nb & !same) >= 3L)
+      rep_hits[[length(rep_hits) + 1L]] <- list(s = s, txt = paste(sprintf("%d and %d", ya[k5], yb[k5]), collapse = ", in "),
+                                                val = paste(vapply(a[k5], fmt, ""), collapse = ", "))
+  }
+  # one row per system, input and years: a population split by fixed
+  # shares repeats the same year in every sub-category of the system
+  if (length(rep_hits)) {
+    rk5 <- vapply(rep_hits, function(h) paste(h$s$sys, h$s$p, h$txt, sep = "##"), character(1))
+    for (k in unique(rk5)) {
+      hs <- rep_hits[rk5 == k]; s <- hs[[1]]$s
+      who <- vapply(hs, function(h) sprintf("%s (%s)", h$s$sc, h$val), character(1))
+      add(if (length(hs) == 1L) sprintf("%s / %s", s$lab, s$p) else sprintf("%s / %s", s$lv, s$p),
+          sprintf(paste0("%s is the same in %s for %s, while the rest of the series changes every year. Check that ",
+                         "one year's value was not copied into the next."),
+                  s$p, hs[[1]]$txt, .translator_and(who)),
+          severity = "info", sheet = TS, group = if (length(hs) == 1L) s$ann else NA_character_,
+          parameter = s$p, check = "time series: repeated year")
+    }
+  }
+
+  # 6. The same series in two groups: the same input and the same value in
+  #    every common year (at most one year apart when there are five or
+  #    more), the series not constant. One row per group, naming the others.
+  for (p in inputs) {
+    sp <- Filter(function(s) identical(s$p, p) && length(s$v) >= 2L && length(unique(signif(s$v, 9))) >= 2L, series)
+    if (length(sp) < 2L) next
+    partners <- vector("list", length(sp))
+    for (i in seq_along(sp)) for (j in seq_along(sp)) {
+      if (i >= j) next
+      a <- sp[[i]]; b <- sp[[j]]
+      if (p %in% per_system && identical(a$sys, b$sys)) next
+      # the two halves of a pooled calves row are equal by design (C1)
+      if (identical(a$sys, b$sys) && setequal(c(a$sc, b$sc), c("calves_male", "calves_female"))) next
+      cy <- intersect(a$y, b$y)
+      if (length(cy) < 2L || length(cy) < 0.9 * max(length(a$y), length(b$y))) next
+      va <- a$v[match(cy, a$y)]; vb <- b$v[match(cy, b$y)]
+      off <- which(abs(va - vb) > 1e-9 * pmax(1, abs(va)))
+      if (length(off) > (if (length(cy) >= 5L) 1L else 0L)) next
+      vv <- if (length(off)) va[-off] else va
+      if (length(unique(signif(vv, 9))) < 2L) next
+      ex <- function(x, y) if (length(off)) sprintf(" (except %d: %s here, %s there)", cy[off], fmt(x[off]), fmt(y[off])) else ""
+      partners[[i]] <- c(partners[[i]], paste0(b$lab, ex(va, vb)))
+      partners[[j]] <- c(partners[[j]], paste0(a$lab, ex(vb, va)))
+    }
+    for (i in seq_along(sp)) {
+      oth <- partners[[i]]
+      if (!length(oth)) next
+      s <- sp[[i]]
+      who <- if (length(oth) > 3L) sprintf("%s and %d other groups", paste(oth[1:3], collapse = ", "), length(oth) - 3L)
+             else .translator_and(oth)
+      add(sprintf("%s / %s", s$lab, p),
+          sprintf("%s for this group has the same values, year by year (%s), as %s. %s",
+                  p, .translator_year_runs(s$y), who,
+                  if (identical(p, "N")) "Two groups rarely have the same head count every year: check that one series was not copied to the other."
+                  else "This is expected if the file gives one series for these groups; otherwise one series was copied to the other."),
+          severity = "info", sheet = TS, group = s$ann, parameter = p, check = "time series: same as another group")
+    }
+  }
+  invisible(NULL)
+}
+
 translator_consistency_checks <- function(param_specs, manure = NULL,
                                           source = NULL, population = NULL,
                                           inventory_year = NULL, piece = NULL) {
@@ -846,6 +1198,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     cand <- s[unique(pmax(1, pmin(length(s), c(k - 1L, k, k + 1L, k + 2L))))]
     any(abs(cand - x) <= max(tol * max(1, abs(x)), tol_abs))
   }
+  ts_flagged <- character(0)   # level||sub_category||parameter rows C11 reported
   if (length(tsp) && nrow(population) > 0 && "year" %in% names(population) &&
       !is.null(ps) && is.data.frame(ps) && nrow(ps) > 0) {
     ts_lv <- if ("aggregation_level" %in% names(population)) .translator_norm_level(population$aggregation_level) else rep("", nrow(population))
@@ -878,8 +1231,14 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
               check = "time-series coverage")
         } else if (n < need - 1L) {
           flagged <- c(flagged, k)
+          # the years the sheet has and this group's series lacks, so the
+          # trend gap check need not repeat this row
+          ts_yrs <- suppressWarnings(as.integer(population$year))
+          have <- ts_yrs[ts_key == paste(L, S, sep = "||") & is.finite(suppressWarnings(as.numeric(population[[p]])))]
+          miss <- setdiff(ts_yrs[!is.na(ts_yrs)], have)
           add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", S, p),
-              sprintf("The file gives %s for this group for %d years; the time series has %d of them.", p, need, n),
+              sprintf("The file gives %s for this group for %d years; the time series has %d of them.%s", p, need, n,
+                      if (length(miss)) sprintf(" Missing: %s.", .translator_year_runs(miss)) else ""),
               severity = "warn", sheet = "Parameter_TimeSeries", group = gkey(ps, i), parameter = p,
               check = "time-series coverage")
         }
@@ -905,6 +1264,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
             check = "time-series coverage")
       }
     }
+    ts_flagged <- flagged
     yv <- if (!is.null(source)) source$year_values else NULL
     if (length(yv)) {
       tr <- c(1, 0.5, 2, 100, 0.01)
@@ -933,6 +1293,14 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       }
     }
   }
+
+  # C13 (2026-10-30): what the trend run will do with the time series, for
+  # the country team (see .translator_trend_checks). C7 above already
+  # compares the inventory year with the Parameters sheet, and C11 reports
+  # the inputs the file gives year by year, so neither is repeated here.
+  if (is.data.frame(population) && nrow(population) > 0)
+    tryCatch(.translator_trend_checks(ps, population, inventory_year, add, skip = ts_flagged),
+             error = function(e) message("translator checks: the time-series checks failed (", conditionMessage(e), ")"))
 
   # C8 (2026-10-22, WP3): percent and fraction follow the catalogue units.
   # A % parameter below 1, or a fraction above 1, is a unit mistake that
@@ -1094,12 +1462,16 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
 # (two groups that really have the same head count). "placeholder range" is
 # included only when the source plausibly gives a range (manure and the
 # parameters the file states uncertainty for); the review is told so.
+# Of the trend checks (C13) only a gap in a series and rows the trend
+# ignores are here: both are translation mistakes the file can settle. The
+# others describe the country's data and are for the country team.
 .TRANSLATOR_REVIEW_CHECKS <- c(
   "default replaced file value", "manure bounds missing", "manure bounds reused",
   "distribution differs between systems", "time-series coverage", "time-series year",
   "Parameters vs time series", "value not in file", "manure shares sum",
   "manure coefficient consistency", "bounds bracket mean", "percent vs fraction",
-  "duplicate population", "category coverage", "time series totals", "placeholder range")
+  "duplicate population", "category coverage", "time series totals", "placeholder range",
+  "time series: gap", "time series: rows ignored")
 
 translator_review_targets <- function(issues) {
   if (!is.data.frame(issues) || !nrow(issues)) return(issues)
