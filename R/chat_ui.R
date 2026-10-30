@@ -4390,6 +4390,25 @@ translator_cancel_clear <- function(tok) {
   #   5 N    6 BW    7 MW    8 WG    9 Milk   10 Fat
   #  11 pct_pregnant   12 DE   13 CP   14 MilkPR
   ts <- parsed$parameter_timeseries
+  # 2026-10-30: a row the AI left without cattle_type takes it from the
+  # Parameters group with the same aggregation_level and sub_category. The
+  # Zambia 2024 run left it blank for all commercial dairy rows: the trend
+  # matched none of them, and one cell kept the blank template's note.
+  if (is.data.frame(ts) && nrow(ts) > 0 && is.data.frame(parsed$parameters) &&
+      all(c("aggregation_level", "sub_category") %in% names(ts)) &&
+      all(c("cattle_type", "aggregation_level", "sub_category") %in% names(parsed$parameters))) {
+    if (!"cattle_type" %in% names(ts)) ts$cattle_type <- NA_character_
+    pk <- unique(parsed$parameters[, c("cattle_type", "aggregation_level", "sub_category")])
+    pk <- pk[!is.na(pk$cattle_type) & nzchar(as.character(pk$cattle_type)), , drop = FALSE]
+    blank_ct <- is.na(ts$cattle_type) | !nzchar(trimws(as.character(ts$cattle_type)))
+    for (i in which(blank_ct)) {
+      hit <- unique(pk$cattle_type[pk$aggregation_level %in% ts$aggregation_level[i] &
+                                   pk$sub_category %in% ts$sub_category[i]])
+      if (length(hit) != 1L)
+        hit <- unique(pk$cattle_type[pk$aggregation_level %in% ts$aggregation_level[i]])
+      if (length(hit) == 1L) ts$cattle_type[i] <- hit
+    }
+  }
   if (is.data.frame(ts) && nrow(ts) > 0) {
     TS_DATA_START <- 5L
     for (i in seq_len(nrow(ts))) {

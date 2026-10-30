@@ -81,6 +81,27 @@ trend_df_from_population <- function(population, base_specs,
     stop("Time-series must have a 'year' column.")
   key_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category",
                           "system", "subsystem"), names(population))
+  # 2026-10-30: the sheet says "blank = applies to all" for cattle_type. A
+  # blank one takes the cattle_type of the Parameters group with the same
+  # aggregation_level and sub_category (or the only one of that system);
+  # the key used to read "NA||...", matched nothing, and the trend kept the
+  # inventory-year values for the whole group without saying so (Zambia
+  # 2024 translation: all of commercial dairy).
+  if (all(c("cattle_type", "aggregation_level") %in% names(population)) &&
+      !is.null(base_specs) &&
+      all(c("cattle_type", "aggregation_level") %in% names(base_specs))) {
+    ct <- as.character(population$cattle_type)
+    blank <- is.na(ct) | !nzchar(trimws(ct))
+    sub_p <- if ("sub_category" %in% names(population)) as.character(population$sub_category) else rep(NA, nrow(population))
+    sub_b <- if ("sub_category" %in% names(base_specs)) as.character(base_specs$sub_category) else rep(NA, nrow(base_specs))
+    for (i in which(blank)) {
+      in_sys <- base_specs$aggregation_level %in% population$aggregation_level[i]
+      hit <- unique(base_specs$cattle_type[in_sys & sub_b %in% sub_p[i]])
+      if (length(hit) != 1L) hit <- unique(base_specs$cattle_type[in_sys])
+      if (length(hit) == 1L) ct[i] <- hit
+    }
+    population$cattle_type <- ct
+  }
   group <- if (length(key_cols)) make_group_key(population) else rep("", nrow(population))
   param_cols <- setdiff(names(population), c("year", key_cols))
   rows <- list()
