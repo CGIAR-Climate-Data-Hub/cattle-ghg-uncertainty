@@ -133,11 +133,20 @@ make_uniform_corr <- function(n, rho) {
 # every sample frame regardless of which parameters are present. Non-finite
 # entries are left untouched (the final scrub in sample_distribution() handles
 # those). Returns the same data frame with the offending columns clamped.
+# GE and DMI are optional measured intakes: a 0 (or blank) means "not
+# measured" and resolve_ge() then uses the energy balance. 2026-10-30: the
+# floor used to lift a constant 0 to 5 MJ/day (GE) and 0.2 kg/day (DMI),
+# which resolve_ge() took as a measured intake. On the Zambia 2024 translation
+# (GE = DMI = 0 written for 21 groups) those groups got about 2.5% of their
+# feed energy: total 11.3 instead of 15.4 Mt CO2e, uncertainty 48.7% instead
+# of 37.1%. A column with no positive draw is therefore left as it is.
+.OPTIONAL_INTAKE <- c("GE", "DMI")
 .clamp_physical_bounds <- function(df) {
   for (nm in intersect(names(df), names(.PHYSICAL_BOUNDS))) {
     b  <- .PHYSICAL_BOUNDS[[nm]]
     v  <- df[[nm]]
     ok <- is.finite(v)
+    if (nm %in% .OPTIONAL_INTAKE && !any(v[ok] > 0)) next
     v[ok] <- pmin(pmax(v[ok], b[1L]), b[2L])
     df[[nm]] <- v
   }
