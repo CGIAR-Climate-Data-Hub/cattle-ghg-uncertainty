@@ -998,11 +998,10 @@ app_server <- function(input, output, session) {
   # run would otherwise be identical to the main run and waste compute time.
   output$run_comparison_ui <- renderUI({
     no_ad_corr <- is.null(input$corr_mode) || input$corr_mode == "none"
-    # 2026-10-30: every run shares the draws of a value used by several
-    # groups, and the comparison run drops that sharing with the matrix, so
-    # there is always something to compare. The checkbox stays enabled.
-    no_cg_corr <- FALSE
-    if (no_ad_corr && no_cg_corr) {
+    # 2026-10-30 (Lolita): sharing of a value used by several groups is
+    # what the tool does, not an option, so the comparison is about the
+    # Tab 3 matrix only and is greyed out when no matrix is selected.
+    if (no_ad_corr) {
       tagList(
         tags$div(
           style = "opacity:0.55; pointer-events:none;",
@@ -1755,11 +1754,11 @@ app_server <- function(input, output, session) {
               s$corr_matrix         <- NULL
               s$ef_corr_matrix      <- NULL
               s$unified_corr_matrix <- NULL
-              # Cross-group sharing is a correlation too, and the comparison
-              # run exists to show the inventory WITHOUT correlations. Leaving
-              # it in would reproduce the June-2026 bug where the comparison
-              # bars came out identical to the main run.
-              s$pre_sampled_coefficients <- NULL
+              # 2026-10-30 (Lolita): the shared draws stay. Sharing a value
+              # used by several groups is what the tool does, not a
+              # correlation option, so "without correlations" means without
+              # the Tab 3 matrix only. The checkbox is greyed out when no
+              # matrix is selected, so the two runs always differ.
               s
             })
             nocorr_result <- run_inventory_simulation(
