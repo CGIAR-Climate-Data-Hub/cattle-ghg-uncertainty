@@ -273,11 +273,13 @@ translator_job_finish <- function(job_id, state, session) {
                   list(key = "checks", output_id = "translator_download_checks", name = nm$checks),
                   list(key = "conversation", output_id = "translator_download_conversation", name = nm$conversation))
     sent <- tryCatch({ s$sendCustomMessage("translatorJobDone", list(id = job_id, files = files, auto = "template")); TRUE },
-                     error = function(e) FALSE)
+                     error = function(e) { message("translator: delivery message failed (", conditionMessage(e), ")"); FALSE })
+    message("translator: job ", job_id, " done; files sent to the browser: ", sent)
     translator_job_update(job_id, delivery = list(mode = if (sent) "browser" else "none",
                                                   browser_notified_at = if (sent) .translator_now() else NULL))
     if (sent) return(invisible(job))
   }
+  message("translator: job ", job_id, " done; no open session, sending the files by email")
   translator_job_email(job_id, shiny::isolate(state$user_email))
   invisible(job)
 }

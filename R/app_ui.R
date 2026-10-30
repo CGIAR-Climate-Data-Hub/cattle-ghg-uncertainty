@@ -691,29 +691,45 @@ app_ui <- function(request = NULL) {
            if (head.length < 2 || head[0] !== 80 || head[1] !== 75) throw new Error('not a workbook');
            return blob;
          }
+         // 2026-10-30: a run lasts half an hour, and Chrome can withdraw the
+         // folder's write permission in that time (asking again needs a click,
+         // which a finished job does not have). The permission is checked
+         // first; when the folder cannot be written, the data workbook is
+         // downloaded instead, as without a folder, and the reason is reported.
+         function translatorAutoDownload(d, files, why) {
+           var auto = files.filter(function(f) { return f.key === d.auto; })[0];
+           if (!auto) return;
+           translatorWaitFor(auto.output_id, 120, function(a) {
+             if (a) a.click();
+             Shiny.setInputValue('translator_job_saved', { id: d.id, mode: why ? 'download (folder failed)' : 'download',
+               ok: !!a, error: (why ? why + '; ' : '') + (a ? '' : 'download link not ready'), t: Date.now() }, { priority: 'event' });
+           });
+         }
          Shiny.addCustomMessageHandler('translatorJobDone', function(d) {
            var files = (d && d.files) || [];
            if (window._translatorDirHandle && window.showDirectoryPicker) {
              (async function() {
-               var okAll = true, err = '';
+               var h = window._translatorDirHandle;
+               try {
+                 if (h.queryPermission && (await h.queryPermission({ mode: 'readwrite' })) !== 'granted')
+                   return translatorAutoDownload(d, files, 'the browser withdrew the permission to write in the folder');
+               } catch (e) { return translatorAutoDownload(d, files, String(e)); }
+               var okAll = true, err = '', nWritten = 0;
                for (var i = 0; i < files.length; i++) {
                  try {
                    var a = await new Promise(function(res) { translatorWaitFor(files[i].output_id, 120, res); });
                    if (!a) { okAll = false; err = 'download link not ready: ' + files[i].name; continue; }
                    var blob = await translatorFetchFile(a);
-                   var fh = await window._translatorDirHandle.getFileHandle(files[i].name, { create: true });
+                   var fh = await h.getFileHandle(files[i].name, { create: true });
                    var w = await fh.createWritable(); await w.write(blob); await w.close();
+                   nWritten++;
                  } catch (e) { okAll = false; err = String(e); }
                }
+               if (nWritten === 0) return translatorAutoDownload(d, files, err || 'nothing could be written to the folder');
                Shiny.setInputValue('translator_job_saved', { id: d.id, mode: 'folder', ok: okAll, error: err, t: Date.now() }, { priority: 'event' });
              })();
            } else {
-             var auto = files.filter(function(f) { return f.key === d.auto; })[0];
-             if (!auto) return;
-             translatorWaitFor(auto.output_id, 120, function(a) {
-               if (a) a.click();
-               Shiny.setInputValue('translator_job_saved', { id: d.id, mode: 'download', ok: !!a, error: a ? '' : 'download link not ready', t: Date.now() }, { priority: 'event' });
-             });
+             translatorAutoDownload(d, files, '');
            }
          });
          window.translatorPickDir = async function() {

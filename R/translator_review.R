@@ -239,21 +239,30 @@
                                      on_chunk, on_tick, should_stop, info, inseq,
                                      job_id, on_done) {
   pc <- shiny::isolate(state$precheck)
-  targets <- tryCatch(translator_review_targets(pc$issues), error = function(e) NULL)
-  if (is.null(targets) || !nrow(targets)) return(on_done())
+  targets <- tryCatch(translator_review_targets(pc$issues), error = function(e) {
+    message("translator review: selecting the items failed (", conditionMessage(e), ")"); NULL })
+  # 2026-10-30: every exit of the review is logged; the first live run left
+  # no trace of why it did not review anything.
+  if (is.null(targets) || !nrow(targets)) {
+    message("translator review: nothing to review (", if (is.null(pc$issues)) "no checks" else
+            paste(nrow(pc$issues), "check rows, none selected"), ")")
+    return(on_done())
+  }
   json <- shiny::isolate(state$last_template_json)
   piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
-  if (is.null(piece)) return(on_done())
+  if (is.null(piece)) { message("translator review: the template JSON could not be read"); return(on_done()) }
   info(sprintf("The checks flagged %d item(s). The AI is now looking at each one against your file, to correct it or explain it...",
                nrow(targets)))
   translator_job_update(job_id, stage = "review", progress = 0.96,
                         stage_label = "Reviewing the flagged items with the AI")
   req <- .translator_review_request(targets, piece, register)
+  message(sprintf("translator review: %d item(s), request %d characters", nrow(targets), nchar(req)))
   msgs <- anthropic_build_messages(system_prompt, history = history, new_user_message = req)
   anthropic_chat_batch_template_force_async(
     msgs, on_chunk = on_chunk, on_tick = on_tick, should_stop = should_stop,
     on_result = function(resp) inseq({
       if (isTRUE(resp$stopped) || !is.null(resp$error)) {
+        message("translator review: the call failed (", resp$error %||% "stopped", ")")
         info(paste0("The review could not be completed (", resp$error %||% "stopped",
                     "). The template is kept as it was, with the checks listed."))
         return(on_done())
@@ -263,6 +272,7 @@
       ap <- if (is.null(rv)) NULL else tryCatch(.translator_apply_review(piece, rv), error = function(e) {
         message("translator: applying the review failed (", conditionMessage(e), ")"); NULL })
       if (is.null(ap)) {
+        message("translator review: the reply could not be read or applied (", nchar(resp$reply %||% ""), " characters)")
         info("The review reply could not be read. The template is kept as it was, with the checks listed.")
         return(on_done())
       }
@@ -282,6 +292,8 @@
       n_left <- if (is.null(left)) 0L else sum(!left$where %in% ap$dismissed$where)
       state$review <- list(flagged = nrow(targets), corrected = nrow(ap$changes),
                            not_errors = nrow(ap$dismissed), still_flagged = n_left)
+      message(sprintf("translator review: %d correction(s), %d not error(s), %d still flagged",
+                      nrow(ap$changes), nrow(ap$dismissed), n_left))
       info(sprintf("Review done: %d correction(s) made, %d item(s) explained as not errors, %d still flagged for you to check.",
                    nrow(ap$changes), nrow(ap$dismissed), n_left))
       on_done()

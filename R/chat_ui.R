@@ -869,6 +869,8 @@ translator_chat_server <- function(input, output, session) {
   observeEvent(input$translator_job_saved, {
     v <- input$translator_job_saved
     req(is.list(v), !is.null(v$id))
+    message("translator: browser delivery for job ", v$id, ": mode ", v$mode %||% "?",
+            ", ok ", isTRUE(v$ok), if (nzchar(v$error %||% "")) paste0(", error: ", v$error) else "")
     translator_job_update(v$id, delivery = list(mode = v$mode %||% "browser",
                                                 browser_saved_at = .translator_now(),
                                                 ok = isTRUE(v$ok), error = v$error %||% NULL))
