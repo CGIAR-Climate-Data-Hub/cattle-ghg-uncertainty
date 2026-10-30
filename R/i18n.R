@@ -1807,8 +1807,8 @@ lang_state_take <- function(token) {
     fr = "L'outil doit savoir deux choses sur vos effectifs animaux. Les deux répondent à la même question : si un nombre est faux, quels autres nombres sont faux avec lui ?"),
   n_group_label = list(en = "Between groups: how did you get the number of animals for each group?",
                        fr = "Entre groupes : comment avez-vous obtenu l'effectif de chaque groupe ?"),
-  n_group_full = list(en = "One national count, split into groups (recommended)",
-                      fr = "Un comptage national, réparti entre les groupes (recommandé)"),
+  n_group_full = list(en = "One national count, split into groups",
+                      fr = "Un comptage national, réparti entre les groupes"),
   n_group_full_help = list(
     en = "You have one census or one official total and divided it into groups by shares. The census error is then one error shared by all groups: if the count is 5% too low, every group is 5% too low. This gives a wider range, and that is correct.",
     fr = "Vous avez un recensement ou un total officiel et l'avez réparti entre les groupes par parts. L'erreur du comptage est alors une seule erreur partagée par tous les groupes : si le comptage est 5 % trop bas, chaque groupe l'est aussi. La plage est plus large, et c'est correct."),

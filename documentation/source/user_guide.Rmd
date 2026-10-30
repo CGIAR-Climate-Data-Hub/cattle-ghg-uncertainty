@@ -265,7 +265,7 @@ The last card on Tab 3 asks two things about your animal numbers. Both answer th
 
 **Between groups (single year and trend).** How did you get the number of animals for each group?
 
-- **One national count, split into groups** (recommended). You have one census or one official total and divided it into groups by shares. The tool then treats the census error as one error shared by all groups: if the count is 5% too low, every group is 5% too low. The range is wider, and that is correct.
+- **One national count, split into groups.** You have one census or one official total and divided it into groups by shares. The tool then treats the census error as one error shared by all groups: if the count is 5% too low, every group is 5% too low. The range is wider, and that is correct.
 - **Partly.** One count, but the group numbers were adjusted group by group with their own surveys or data.
 - **Separate counts per group.** Each group was counted on its own. Choose this only if that is really how the numbers were made. Each group's error is then drawn on its own, and the errors partly cancel in the total.
 
