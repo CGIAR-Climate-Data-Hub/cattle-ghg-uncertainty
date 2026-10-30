@@ -109,7 +109,9 @@ file.copy("documentation/source/_shared.css", file.path(out_dir, "_shared.css"),
   ad_mtx <- switch(corr_mode,
     none       = NULL,
     preset     = build_ipcc_preset_corr(all_names),
-    timeseries = compute_corr_from_population(pop, detrend = "first_diff"),
+    # 2026-10-30: the seven literature pairs, sized by the series where it
+    # is long and clear (what the app applies in "From template")
+    timeseries = refine_preset_from_timeseries(pop, all_names)$matrix,
     manual     = build_ipcc_preset_corr(all_names)  # treat manual = preset CSV
   )
   ad_unified <- if (!is.null(ad_mtx)) expand_corr_matrix(ad_mtx, all_names) else NULL

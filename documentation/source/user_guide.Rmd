@@ -198,7 +198,7 @@ Why this matters: if each group drew its own value instead, the errors would par
 
 ## Quick guide: which option do I pick?
 
-- You have five or more years of national data in your Parameter_TimeSeries sheet: pick **From template (auto, time-series)**.
+- You have ten or more years of national data in your Parameter_TimeSeries sheet: pick **From template (auto, time-series)**.
 - You have no time series, but you want the known biological links (weight, milk, digestibility): pick **Structural defaults**.
 - You have your own correlation matrix from a study or from expert judgement: pick **Advanced: manual entry**.
 - None of these: keep **No correlations**. This is the default. It is simple to explain and defend.
@@ -211,7 +211,7 @@ The central estimate (the mean emissions) stays the same whichever mode you pick
 
 - **No correlations**: the baseline. Every parameter is drawn independently.
 - **Structural defaults**: the interval changes by about one percentage point or less on the examples (Country X 25.3% to 25.2%; Country Y 36.5% to 37.5%). The effect is small because the preset links only 7 pairs out of about 78 possible pairs, with moderate values.
-- **From template (auto, time-series)**: depends on your data. A rich series where several parameters really move together can have an effect similar to the structural defaults or larger. A sparse or mostly flat series has almost no effect.
+- **From template (auto, time-series)**: the same seven pairs as the structural defaults, with the size of a pair taken from your own series where the series is long and clear. The effect is therefore close to the structural defaults, a little larger or smaller depending on your data.
 - **Advanced: manual entry**: depends entirely on what you upload. Strong correlations on parameters with wide uncertainty can move the interval by 20% or more, in either direction.
 
 If you select correlations and the result barely changes, that is usually expected, not a bug. The IPCC calculation multiplies about 13 parameters together, which dilutes the effect of any single pair. Also, a value shared by several groups can only be linked to another value shared by the same groups, not to a value that differs from group to group. The Methodology document explains the mathematics.
@@ -220,11 +220,11 @@ Before you run the simulation, Tab 4 (Simulate & Results) lets you tick "Compare
 
 ## Automatic correlations from time-series data
 
-If your upload has a Parameter_TimeSeries sheet, the tool can compute the correlations from your own history:
+If your upload has a Parameter_TimeSeries sheet, the tool can use your own history to size the known pairs:
 
 1. On Tab 3, select **From template (auto, time-series)**.
-2. The tool computes the rank correlation between the year-to-year changes of each parameter. Using the changes, and not the raw values, removes the common long-term growth that would otherwise make everything look correlated. The matrix is applied in the simulation with the Iman-Conover method, the one the IPCC cites for this purpose.
-3. Look at the matrix on the right of the page and check that the correlations make sense.
+2. The tool keeps the seven known pairs of the structural defaults. For each pair, it measures the rank correlation between the year-to-year changes of the two parameters in your series. It uses your value instead of the literature value only when three conditions hold: the series has ten or more years, the correlation is clearly not chance (p below 0.05), and it has the same sign as the literature. Otherwise the pair keeps its literature value. No other pair is created: a correlation between any two columns of a short series is often chance, and the way national values move together over the years is not the same thing as a link between estimation errors.
+3. A check appears under the option. It says whether your series passed, and shows, pair by pair, the literature value, your value, the number of years, the p-value and which one the run uses. If no pair passes, the run uses the structural defaults and the check says so.
 
 ## Manual correlation matrix
 

@@ -3825,6 +3825,60 @@ section_F <- function() {
              notes = if (f61b_ok) "DE~Ym -0.5 reproduced in the three samplers; mixed pair stays at 0; marginals identical"
                      else paste(f61b_fail, collapse = "; "))
 
+  # F61c -- "From template" is the seven literature pairs sized by the
+  # series only where it is long, clear and of the literature's sign
+  # (2026-10-30, Lolita): a 29-year series with a strong DE~CP link of the
+  # right sign replaces the literature size; DE~Ym with the wrong sign keeps
+  # it; a 6-year series replaces nothing; no pair outside the seven exists;
+  # a long sheet (one row per group and year) is reduced to one national
+  # series per year before differencing.
+  f61c_fail <- tryCatch({
+    f <- character(0)
+    set.seed(3)
+    n <- 30; dDE <- stats::rnorm(n - 1); DE <- 55 + cumsum(dDE)
+    CP <- 9 + cumsum(0.3 * dDE + stats::rnorm(n - 1, sd = 0.3))
+    Ym <- 6.5 + cumsum(0.1 * dDE + stats::rnorm(n - 1, sd = 0.1))
+    pop <- data.frame(year = 1995:(1995 + n - 2), N = 1000 + cumsum(stats::rnorm(n - 1, sd = 10)),
+                      DE = DE, CP = CP, Ym = Ym, Milk = 4 + cumsum(stats::rnorm(n - 1, sd = 0.2)),
+                      Fat = 4 + cumsum(stats::rnorm(n - 1, sd = 0.1)))
+    nm <- c("N", "BW", "MW", "WG", "Milk", "Fat", "DE", "CP", "Ym")
+    r <- refine_preset_from_timeseries(pop, nm)
+    tb <- r$table
+    row <- function(a, b) tb[tb$a == a & tb$b == b, ]
+    if (!identical(row("DE", "CP")$used, "data"))
+      f <- c(f, sprintf("DE~CP (strong, right sign, 29 years) not taken from the data: %s", row("DE", "CP")$reason))
+    if (!identical(row("DE", "Ym")$reason, "opposite_sign"))
+      f <- c(f, sprintf("DE~Ym with the wrong sign was not refused: %s", row("DE", "Ym")$reason))
+    if (abs(r$matrix["DE", "CP"] - row("DE", "CP")$data) > 0.02)
+      f <- c(f, "the matrix does not carry the data value for DE~CP")
+    if (abs(r$matrix["DE", "Ym"] + 0.2) > 1e-9)
+      f <- c(f, "DE~Ym did not keep its literature value")
+    off <- r$matrix; diag(off) <- 0
+    pairs_lit <- vapply(PRESET_PAIRS, function(p) paste(sort(c(p$a, p$b)), collapse = "|"), character(1))
+    nz <- which(abs(off) > 1e-9, arr.ind = TRUE)
+    nz_pairs <- unique(apply(nz, 1, function(ij) paste(sort(rownames(off)[ij]), collapse = "|")))
+    if (length(setdiff(nz_pairs, pairs_lit)))
+      f <- c(f, paste("a pair outside the seven was created:", paste(setdiff(nz_pairs, pairs_lit), collapse = ", ")))
+    r6 <- refine_preset_from_timeseries(pop[1:6, ], nm)
+    if (r6$n_used != 0 || !all(r6$table$reason[r6$table$used == "literature"] %in% c("too_few_years", "not_in_series")))
+      f <- c(f, "a 6-year series replaced a literature value")
+    # long sheet: two groups with the same series, 29 years each
+    long <- rbind(cbind(cattle_type = "dairy", aggregation_level = "a", sub_category = "cows", pop),
+                  cbind(cattle_type = "dairy", aggregation_level = "b", sub_category = "cows", pop))
+    rl <- refine_preset_from_timeseries(long, nm)
+    if (rl$n_years != nrow(pop))
+      f <- c(f, sprintf("a long sheet counted %d years instead of %d", rl$n_years, nrow(pop)))
+    if (abs(rl$matrix["DE", "CP"] - r$matrix["DE", "CP"]) > 1e-9)
+      f <- c(f, "a long sheet with two identical groups gave a different DE~CP value")
+    f
+  }, error = function(e) conditionMessage(e))
+  f61c_ok <- length(f61c_fail) == 0L
+  check_bool("F61c", "F",
+             "From template keeps the seven literature pairs and sizes a pair from the series only with 10+ years, p < 0.05 and the literature's sign; no other pair; long sheets reduced to one series per year",
+             f61c_ok,
+             notes = if (f61c_ok) "DE~CP sized by data, DE~Ym refused (sign), 6 years replace nothing, no extra pair, long sheet = 29 years"
+                     else paste(f61c_fail, collapse = "; "))
+
   # ---------------------------------------------------------------------
   # F62-F63 -- the absolute-versus-relative spread defect (Andreas, 2026-09-30).
   #

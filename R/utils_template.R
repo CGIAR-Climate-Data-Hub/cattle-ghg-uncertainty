@@ -109,6 +109,105 @@ compute_corr_from_population <- function(population,
   }, error = function(e) NULL)
 }
 
+
+# Year-to-year changes of every numeric column of a Parameter_TimeSeries
+# frame (the same cleaning as compute_corr_from_population()), or NULL.
+.ts_first_differences <- function(population) {
+  if (is.null(population) || ncol(population) < 2) return(NULL)
+  if (exists("PARAM_ALIASES")) {
+    hits <- names(population) %in% names(PARAM_ALIASES)
+    if (any(hits))
+      names(population)[hits] <- PARAM_ALIASES[names(population)[hits]]
+  }
+  num_check  <- suppressWarnings(as.numeric(population[[1]]))
+  first_data <- which(!is.na(num_check))[1]
+  if (!is.na(first_data) && first_data > 1)
+    population <- population[first_data:nrow(population), , drop = FALSE]
+  # A long sheet (one row per group and year, as the template is) is first
+  # reduced to one national series per parameter: the mean over the groups
+  # present in each year. Differencing the stacked rows would mix the end
+  # of one group's series with the start of the next, and the pooled rows
+  # would count the same national change once per group.
+  key_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category",
+                          "system", "subsystem"), names(population))
+  population <- population[, setdiff(names(population), key_cols), drop = FALSE]
+  population[] <- lapply(population, function(x) suppressWarnings(as.numeric(x)))
+  if ("year" %in% names(population)) {
+    yr <- population$year
+    population <- population[!is.na(yr), , drop = FALSE]; yr <- yr[!is.na(yr)]
+    if (anyDuplicated(yr)) {
+      population <- as.data.frame(lapply(population, function(x)
+        as.numeric(tapply(x, yr, function(v) if (all(is.na(v))) NA_real_ else mean(v, na.rm = TRUE)))))
+      population$year <- sort(unique(yr))
+    } else {
+      population <- population[order(yr), , drop = FALSE]
+    }
+  }
+  numeric_cols <- vapply(population, function(x) sum(!is.na(x)) >= 3, logical(1))
+  pop_numeric  <- population[, numeric_cols, drop = FALSE]
+  if ("year" %in% names(pop_numeric)) pop_numeric$year <- NULL
+  if (ncol(pop_numeric) < 1 || nrow(pop_numeric) < 3) return(NULL)
+  as.data.frame(lapply(pop_numeric, function(y) diff(y)))
+}
+
+# 2026-10-30 (Lolita): "From template" no longer applies a correlation
+# between any two columns of the series: with a few years any pair can show
+# a large correlation by chance, and co-movement of national values over
+# the years is not the same thing as correlation between estimation errors.
+# It keeps the seven literature pairs (PRESET_PAIRS) and lets the country's
+# own series set the SIZE of a pair only when the series is long enough
+# (min_years), the correlation is clearly not chance (p below alpha) and it
+# has the literature's sign. Otherwise the pair keeps its literature value.
+# Every other pair stays at zero. The table says, pair by pair, what was
+# used and why; the Correlations tab shows it as the check.
+refine_preset_from_timeseries <- function(population, all_param_names,
+                                          min_years = 10L, alpha = 0.05) {
+  preset <- build_ipcc_preset_corr(all_param_names)
+  if (is.null(preset)) return(NULL)
+  series  <- .ts_first_differences(population)
+  n_years <- if (is.null(series)) 0L else nrow(series) + 1L
+  rows <- list()
+  for (p in PRESET_PAIRS) {
+    a <- p$a; b <- p$b; lit <- p$rho
+    data_rho <- NA_real_; pval <- NA_real_; n_pairs <- NA_integer_
+    used <- "literature"; reason <- ""
+    if (!(a %in% rownames(preset) && b %in% rownames(preset))) {
+      used <- "none"; reason <- "not_in_inventory"
+    } else if (is.null(series) || !(a %in% names(series) && b %in% names(series))) {
+      reason <- "not_in_series"
+    } else {
+      ok <- is.finite(series[[a]]) & is.finite(series[[b]])
+      n_pairs <- sum(ok)
+      if (n_pairs >= 3L) {
+        x <- series[[a]][ok]; y <- series[[b]][ok]
+        if (stats::sd(x) > 0 && stats::sd(y) > 0) {
+          data_rho <- suppressWarnings(stats::cor(x, y, method = "spearman"))
+          pval <- tryCatch(suppressWarnings(
+            stats::cor.test(x, y, method = "spearman", exact = FALSE)$p.value),
+            error = function(e) NA_real_)
+        }
+      }
+      if (!is.finite(data_rho))            reason <- "no_variation"
+      else if (n_pairs + 1L < min_years)   reason <- "too_few_years"
+      else if (!is.finite(pval) || pval > alpha) reason <- "not_significant"
+      else if (sign(data_rho) != sign(lit)) reason <- "opposite_sign"
+      else { used <- "data"; preset[a, b] <- preset[b, a] <- data_rho }
+    }
+    rows[[length(rows) + 1L]] <- data.frame(
+      a = a, b = b, literature = lit, data = data_rho,
+      n_years = if (is.na(n_pairs)) NA_integer_ else n_pairs + 1L,
+      p_value = pval, used = used, reason = reason, stringsAsFactors = FALSE)
+  }
+  tab <- do.call(rbind, rows)
+  if (any(tab$used == "data")) {
+    nm <- rownames(preset)
+    preset <- as.matrix(Matrix::nearPD(preset, corr = TRUE)$mat)
+    dimnames(preset) <- list(nm, nm)
+  }
+  list(matrix = preset, table = tab, n_years = n_years,
+       n_used = sum(tab$used == "data"))
+}
+
 # Andreas 28/5/26 follow-up: country-name → continental region lookup.
 # Used by normalise_metadata_region() to rescue legacy uploads that only
 # have a free-text "Country / region" cell (without the new Continental

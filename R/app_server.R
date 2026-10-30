@@ -1025,7 +1025,21 @@ app_server <- function(input, output, session) {
   # R/_test_correlation_effect.R confirmed the filter had no observable effect
   # on the headline for typical livestock inputs. The reactive is kept as a
   # thin wrapper around rv$corr_matrix so downstream callers don't change.
-  effective_corr_matrix <- reactive({ rv$corr_matrix })
+  # 2026-10-30 (Lolita): "From template" = the seven literature pairs with
+  # the size set by the country's own series where the series is long and
+  # clear (refine_preset_from_timeseries). The raw all-pairs matrix is only
+  # kept to say whether a series exists.
+  ts_refined <- reactive({
+    if (is.null(rv$population)) return(NULL)
+    nm <- if (!is.null(rv$param_specs)) rv$param_specs$parameter else PARAM_CATALOGUE$parameter
+    tryCatch(refine_preset_from_timeseries(rv$population, nm), error = function(e) NULL)
+  })
+  effective_corr_matrix <- reactive({
+    if (identical(input$corr_mode, "timeseries")) {
+      r <- ts_refined()
+      if (is.null(r)) NULL else r$matrix
+    } else rv$corr_matrix
+  })
 
   # 2026-06 Andreas review: the corr_mode radio is rendered server-side so we
   # can disable choices whose prerequisites are missing (empty TS sheet, no
@@ -1174,10 +1188,39 @@ app_server <- function(input, output, session) {
           tags$strong(t("corr_ts_param_ts")),
           t("corr_ts_no_data_tail"))
     } else {
-      n <- nrow(rv$corr_matrix)
-      nms <- paste(rownames(rv$corr_matrix), collapse = ", ")
-      div(style = "font-size:0.85rem; color:#1B4332; background:#D8F3DC; padding:8px 10px; border-radius:6px;",
-          icon("check-circle"), sprintf(t("corr_ts_loaded"), n, nms))
+      # 2026-10-30 (Lolita): the check. Pair by pair: the literature value,
+      # the value in the country's series, the years, the p-value, and
+      # which one the run uses, with the reason.
+      r <- ts_refined()
+      if (is.null(r)) return(NULL)
+      tab <- r$table[r$table$used != "none", , drop = FALSE]
+      pass <- r$n_used > 0
+      fmt <- function(x, d = 2) ifelse(is.finite(x), formatC(x, digits = d, format = "f"), "")
+      reason_txt <- function(code, p) switch(code,
+        not_in_series   = t("corr_ts_r_not_in_series"),
+        too_few_years   = t("corr_ts_r_too_few_years"),
+        not_significant = sprintf(t("corr_ts_r_not_significant"), fmt(p, 2)),
+        opposite_sign   = t("corr_ts_r_opposite_sign"),
+        no_variation    = t("corr_ts_r_no_variation"),
+        "")
+      head_txt <- if (pass) sprintf(t("corr_ts_check_pass"), r$n_years, r$n_used)
+                  else sprintf(t("corr_ts_check_fail"), r$n_years)
+      rows <- lapply(seq_len(nrow(tab)), function(i) tags$tr(
+        tags$td(paste0(tab$a[i], " \u2013 ", tab$b[i])),
+        tags$td(fmt(tab$literature[i])),
+        tags$td(fmt(tab$data[i])),
+        tags$td(if (is.na(tab$n_years[i])) "" else tab$n_years[i]),
+        tags$td(fmt(tab$p_value[i], 3)),
+        tags$td(if (tab$used[i] == "data") tags$strong(t("corr_ts_used_data")) else t("corr_ts_used_lit")),
+        tags$td(reason_txt(tab$reason[i], tab$p_value[i]))))
+      div(style = paste0("font-size:0.85rem; padding:8px 10px; border-radius:6px; ",
+                         if (pass) "color:#1B4332; background:#D8F3DC;" else "color:#92400E; background:#FEF3C7;"),
+          icon(if (pass) "check-circle" else "exclamation-triangle"), " ", head_txt,
+          tags$table(class = "table table-sm", style = "margin:8px 0 0 0; font-size:0.8rem; background:#FFFFFF;",
+            tags$thead(tags$tr(tags$th(t("corr_ts_col_pair")), tags$th(t("corr_ts_col_lit")),
+                               tags$th(t("corr_ts_col_data")), tags$th(t("corr_ts_col_years")),
+                               tags$th("p"), tags$th(t("corr_ts_col_used")), tags$th(t("corr_ts_col_reason")))),
+            tags$tbody(rows)))
     }
   })
 
@@ -3237,7 +3280,7 @@ app_server <- function(input, output, session) {
           sgm <- tryCatch(resolve_sub_category_matches(rv$param_specs, rv$manure_data)$matched,
                           error = function(e) list())
           cg <- "shared"   # 2026-10-30: always, as in the single-year run
-          cm <- if (isTRUE(input$corr_mode != "none")) rv$corr_matrix else NULL
+          cm <- if (isTRUE(input$corr_mode != "none")) effective_corr_matrix() else NULL
           res <- run_trend_analysis(
             df, base_specs = rv$param_specs, n_iter = n_iter,
             gwp = gv, seed = sd_, year_corr = yc,

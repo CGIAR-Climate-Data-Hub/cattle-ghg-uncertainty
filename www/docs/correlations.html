@@ -289,10 +289,10 @@ Country X. Only the correlation mode varies between rows.</p>
 </tr>
 <tr class="odd">
 <td align="left">Time-series (auto)</td>
-<td align="right">1,275,495</td>
-<td align="right">999,832</td>
-<td align="right">1,608,732</td>
-<td align="right">23.9</td>
+<td align="right">1,277,345</td>
+<td align="right">984,397</td>
+<td align="right">1,633,155</td>
+<td align="right">25.4</td>
 </tr>
 <tr class="even">
 <td align="left">Manual (example template)</td>
@@ -354,10 +354,10 @@ dominated by adult animals on year-round grazing.</p>
 </tr>
 <tr class="odd">
 <td align="left">Time-series (auto)</td>
-<td align="right">5,411,131</td>
-<td align="right">4,827,095</td>
-<td align="right">6,041,223</td>
-<td align="right">11.2</td>
+<td align="right">5,523,790</td>
+<td align="right">3,682,430</td>
+<td align="right">7,845,655</td>
+<td align="right">37.7</td>
 </tr>
 <tr class="even">
 <td align="left">Manual (example template)</td>
@@ -478,12 +478,16 @@ conservative baseline is required.</p>
 seven biological pairs documented above. Suitable for single-year
 inventories without a multi-year time series of feed quality or herd
 structure.</p>
-<p><strong>From template (auto, time-series).</strong> Computes a
-Spearman rank-correlation matrix from the user’s
-<code>Parameter_TimeSeries</code> sheet, with first-difference
-detrending applied internally to remove shared long-run growth. Requires
-at least five years of populated data; the radio button is disabled in
-the UI when this condition is not met.</p>
+<p><strong>From template (auto, time-series).</strong> Keeps the seven
+literature pairs and lets the user’s <code>Parameter_TimeSeries</code>
+sheet set the size of a pair where the series is long and clear: ten or
+more years, a Spearman rank correlation of the year-to-year changes with
+p below 0.05, and the literature’s sign. Otherwise the pair keeps its
+literature value, and no other pair is created. A check under the option
+shows, pair by pair, what was used and why; if nothing passes, the run
+uses the structural defaults and says so. (Until 30 October 2026 this
+mode applied a correlation between every two columns of the sheet, which
+with a short series is mostly chance.)</p>
 <p><strong>Manual (CSV upload).</strong> Uses a user-supplied square
 correlation matrix, intended for cases where a published matrix from a
 similar inventory or an expert-elicitation result is available. A

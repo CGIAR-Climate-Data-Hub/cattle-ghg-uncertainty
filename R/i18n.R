@@ -1028,8 +1028,8 @@ lang_state_take <- function(token) {
   info_corr_quickguide = list(en = "Quick guide: which option do I pick?",
                                 fr = "Guide rapide : quelle option choisir ?"),
   info_corr_q1 = list(
-    en = "Five or more years in your Parameter_TimeSeries sheet: ",
-    fr = "Cinq années ou plus dans votre feuille Parameter_TimeSeries : "
+    en = "Ten or more years in your Parameter_TimeSeries sheet: ",
+    fr = "Dix années ou plus dans votre feuille Parameter_TimeSeries : "
   ),
   info_corr_q1_ans = list(
     en = "From template",
@@ -1768,15 +1768,15 @@ lang_state_take <- function(token) {
   ),
   corr_help_ts_pre = list(en = "Pick this when your upload contains a ",
                             fr = "Choisissez ceci lorsque votre téléversement contient une feuille "),
-  corr_help_ts_post = list(en = " sheet with ≥5 years of data. ",
-                             fr = " avec ≥ 5 années de données. "),
-  corr_help_ts_em = list(en = "Recommended whenever you have the data.",
-                           fr = "Recommandé dès que vous avez les données."),
+  corr_help_ts_post = list(en = " sheet with 10 or more years. The seven known pairs are kept; your series sets their size where it is long and clear, and a check below says which. ",
+                             fr = " avec 10 années ou plus. Les sept paires connues sont gardées ; votre série fixe leur taille là où elle est longue et nette, et une vérification ci-dessous dit lesquelles. "),
+  corr_help_ts_em = list(en = "Recommended when you have a long series.",
+                           fr = "Recommandé quand vous avez une longue série."),
   corr_help_ts_disabled_pre = list(en = "your ",
                                       fr = "votre feuille "),
   corr_help_ts_disabled_post = list(
-    en = " sheet is empty or missing. Upload a template with a populated TS sheet (≥5 years, ≥2 numeric columns) to enable.",
-    fr = " est vide ou absente. Téléversez un modèle avec une feuille TS remplie (≥ 5 années, ≥ 2 colonnes numériques) pour l'activer."
+    en = " sheet is empty or missing. Upload a template with a populated TS sheet (at least 5 years to enable, 10 or more to be used) to enable.",
+    fr = " est vide ou absente. Téléversez un modèle avec une feuille TS remplie (au moins 5 années pour l'activer, 10 ou plus pour qu'elle serve) pour l'activer."
   ),
   corr_help_preset = list(
     en = "Known biological linkages (BW↔MW, DE↔Ym, Milk↔BW, Milk↔DE, etc.) applied automatically. ",
@@ -1811,6 +1811,26 @@ lang_state_take <- function(token) {
   ),
   corr_ts_loaded = list(en = " Correlation matrix loaded: %d parameters (%s).",
                           fr = " Matrice de corrélation chargée : %d paramètres (%s)."),
+  # 2026-10-30: the From-template check
+  corr_ts_check_pass = list(
+    en = "Check passed: your series (%d years) sets the size of %d of the 7 known pairs. The other pairs keep their literature value; every other pair is zero.",
+    fr = "Vérification réussie : votre série (%d années) fixe la taille de %d des 7 paires connues. Les autres paires gardent leur valeur de la littérature ; toute autre paire est à zéro."),
+  corr_ts_check_fail = list(
+    en = "Check failed: your series (%d years) cannot replace any literature value, so this run uses the structural defaults. Choose 'Structural defaults' to make that explicit, or add more years.",
+    fr = "Vérification échouée : votre série (%d années) ne peut remplacer aucune valeur de la littérature, ce calcul utilise donc les valeurs structurelles par défaut. Choisissez « Valeurs structurelles par défaut » pour le rendre explicite, ou ajoutez des années."),
+  corr_ts_col_pair = list(en = "Pair", fr = "Paire"),
+  corr_ts_col_lit = list(en = "Literature", fr = "Littérature"),
+  corr_ts_col_data = list(en = "Your data", fr = "Vos données"),
+  corr_ts_col_years = list(en = "Years", fr = "Années"),
+  corr_ts_col_used = list(en = "Used", fr = "Utilisé"),
+  corr_ts_col_reason = list(en = "Reason", fr = "Raison"),
+  corr_ts_used_data = list(en = "your data", fr = "vos données"),
+  corr_ts_used_lit = list(en = "literature", fr = "littérature"),
+  corr_ts_r_not_in_series = list(en = "not in your series", fr = "absent de votre série"),
+  corr_ts_r_too_few_years = list(en = "fewer than 10 years", fr = "moins de 10 années"),
+  corr_ts_r_not_significant = list(en = "could be chance (p = %s)", fr = "peut être le hasard (p = %s)"),
+  corr_ts_r_opposite_sign = list(en = "opposite sign to the literature", fr = "signe opposé à la littérature"),
+  corr_ts_r_no_variation = list(en = "no variation in your series", fr = "pas de variation dans votre série"),
 
   # Compare-with-without-correlations
   cmp_disabled_long = list(
