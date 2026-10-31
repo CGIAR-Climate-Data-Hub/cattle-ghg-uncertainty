@@ -1898,6 +1898,10 @@ translator_cancel_clear <- function(tok) {
     "`sheets[i].rows[\"<excel_row_number>\"]` gives you each row of ",
     "data keyed by its actual Excel row number (row 1 = header, ",
     "data starts at row 2). NA cells are dropped from each row object.\n\n",
+    "`_section` is added by the server, not a column of the file: it is the nearest ",
+    "heading row above that row, which names the parameter block the row belongs to ",
+    "(for example Weight versus Mature weight, whose rows otherwise look the same). ",
+    "Take the parameter of every value from its row's `_section`, never from nearby rows.\n\n",
     "```json\n",
     "{\n  \"file\": \"", file_name, "\",\n  \"sheets\": ", sheets_json, "\n}\n",
     "```\n\n---\n\n")
@@ -2153,6 +2157,61 @@ translator_cancel_clear <- function(tok) {
 # upload-handler call (around chat_ui.R:200) wraps the per-sheet JSON in a
 # single ```json``` fenced block under the EXPLORATION instruction.
 #
+# 2026-10-31: many inventory sheets name the parameter only in a heading
+# row above a block ("Weight (kg)", then one row per sub-category), so the
+# data rows of two blocks look identical. On the Zambia file the AI took the
+# feedlot mature-weight range (MoE row 162) for the body-weight row (154),
+# eight rows above. Each data row now carries the nearest heading above it
+# as `_section`.
+#
+# No layout rule holds for every file, so a label is written only when the
+# heading is unambiguous; a missing label leaves the AI where it was before,
+# a wrong one would mislead it. Rows, in order:
+# - data row: any cell is a number (or a number stored as text);
+# - heading: text only, one distinct value (merged cells repeat it), under
+#   a blank row, another heading or the column header;
+# - kept inside a block: a row of column names straight under a heading,
+#   and a row without values whose first cell matches the same column of
+#   the row above (a group with no entry, Zambia MoE rows 35 to 38 and 94);
+# - after a blank row the label carries on only for rows with the same
+#   columns as the block above (Zambia Coefficients: one block per
+#   parameter, a blank between production systems), so a different table
+#   without a heading never inherits it;
+# - anything else clears the label (a value-less label such as an unused
+#   manure system, a heading with its unit in a second cell, a heading
+#   straight under data).
+# Checked on eight inventory files (Zambia, Zimbabwe, Burkina, Ethiopia,
+# Kenya twice, Uganda, Colombia): no row was given a wrong label.
+.translator_add_sections <- function(row_vals) {
+  numberish <- function(x) is.numeric(x) || is.logical(x) ||
+    (is.character(x) && is.finite(suppressWarnings(as.numeric(gsub(",", ".", trimws(x), fixed = TRUE)))))
+  current <- NULL
+  prev <- "blank"        # the column header row sits above the first row
+  last_row <- NULL; last_cols <- NULL; after_blank <- FALSE
+  for (i in seq_along(row_vals)) {
+    cells <- row_vals[[i]]
+    if (!length(cells)) { prev <- "blank"; after_blank <- TRUE; next }
+    if (any(vapply(cells, numberish, logical(1)))) {
+      if (after_blank && !identical(names(cells), last_cols)) current <- NULL
+      if (!is.null(current)) row_vals[[i]] <- c(list(`_section` = current), cells)
+      last_row <- cells; last_cols <- names(cells); prev <- "data"; after_blank <- FALSE; next
+    }
+    vals <- unique(trimws(unlist(cells)))
+    if (length(vals) == 1L && nzchar(vals) && prev %in% c("blank", "heading")) {
+      current <- gsub(" +", " ", vals); prev <- "heading"; after_blank <- FALSE
+      last_cols <- NULL; next
+    }
+    first <- names(cells)[1]
+    continues <- !is.null(last_row) && prev %in% c("data", "valueless", "colnames") &&
+      !is.null(last_row[[first]]) && identical(trimws(as.character(last_row[[first]])),
+                                               trimws(as.character(cells[[first]])))
+    if (prev == "heading" && length(vals) > 1L) { last_row <- cells; prev <- "colnames"; next }
+    if (continues && !after_blank) { last_row <- cells; prev <- "valueless"; next }
+    current <- NULL; last_row <- cells; prev <- "other"; after_blank <- FALSE
+  }
+  row_vals
+}
+
 # 2026-06-11: 1000-row cap matches .translator_read_upload's ROW_CAP so we
 # never silently truncate below what the reader produced.
 .translator_table_to_json <- function(df, sheet_name = NA_character_) {
@@ -2186,6 +2245,7 @@ translator_cancel_clear <- function(tok) {
   # (sparse keys are already the design: the model looks rows up by number
   # rather than iterating, so omitting blanks changes nothing it relies on).
   nonempty <- vapply(row_vals, function(x) length(x) > 0L, logical(1))
+  row_vals <- .translator_add_sections(row_vals)
   rows <- setNames(row_vals[nonempty], row_keys[nonempty])
   jsonlite::toJSON(list(
     sheet = sheet_name,

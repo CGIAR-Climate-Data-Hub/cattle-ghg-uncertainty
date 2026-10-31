@@ -4372,6 +4372,37 @@ section_F <- function() {
              notes = if (f69_ok) "restart on a broken tool stream, no restart on a text stream"
                      else paste(f69_fail, collapse = "; "))
 
+  # F70 -- every data row carries the heading above it (2026-10-31). The
+  # Zambia sheets name the parameter only in a heading row, so the Weight
+  # and Mature weight blocks of the MoE sheet look identical and the AI took
+  # row 162 (MW) for row 154 (BW). A text row that is not clearly a heading
+  # (here a value-less label straight under data) clears the label.
+  f70_fail <- tryCatch({
+    rv <- list(list(a = "Weight (kg)"), list(a = "cows", v = 1), list(),
+               list(a = "Mature weight (kg)"), list(a = "cows", v = 2),
+               list(a = "Slurry, 1 month"), list(a = "Slurry, 12 month", v = 3))
+    got <- vapply(.translator_add_sections(rv)[c(2, 5, 7)], function(r) r[["_section"]] %||% "", "")
+    want <- c("Weight (kg)", "Mature weight (kg)", "")
+    f <- if (identical(unname(got), want)) character(0) else paste("sections", paste(got, collapse = " / "))
+    # kept: a value-less row continuing the block, a blank between groups
+    # with the same columns, numbers stored as text; cleared: a table with
+    # other columns after a blank
+    rv2 <- list(list(a = "Weight gain"), list(a = "dairy", b = "cows"),
+                list(a = "dairy", b = "heifers", v = 0.3), list(),
+                list(a = "beef", b = "heifers", v = "0.2"), list(),
+                list(x = "other table", y = 5))
+    got2 <- vapply(.translator_add_sections(rv2)[c(3, 5, 7)], function(r) r[["_section"]] %||% "", "")
+    if (!identical(unname(got2), c("Weight gain", "Weight gain", "")))
+      f <- c(f, paste("block rules", paste(got2, collapse = " / ")))
+    f
+  }, error = function(e) conditionMessage(e))
+  f70_ok <- length(f70_fail) == 0L
+  check_bool("F70", "F",
+             "Translator upload JSON: each data row carries the nearest heading above it as _section; an ambiguous text row clears the label instead of passing a wrong one on",
+             f70_ok,
+             notes = if (f70_ok) "Weight and Mature weight blocks labelled; rows under an ambiguous text row unlabelled"
+                     else paste(f70_fail, collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without
