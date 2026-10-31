@@ -1667,7 +1667,10 @@ translator_cancel_clear <- function(tok) {
                                          extra_issues = NULL, force = FALSE) {
   # 2026-10-23: what the server can settle from the catalogue is settled
   # before anything is written (an uncertainty given as a fraction of 1)
-  fixed <- tryCatch(.translator_fix_piece_json(json), error = function(e) NULL)
+  # 2026-10-30: with the source scan, so GE and DMI go when the file lacks them
+  src_fp <- isolate(state$source_fp)
+  fams <- if (!is.null(src_fp)) src_fp$families %||% character(0) else NULL
+  fixed <- tryCatch(.translator_fix_piece_json(json, families = fams), error = function(e) NULL)
   if (!is.null(fixed) && !identical(fixed, json)) {
     json <- fixed
     state$last_template_json <- fixed
@@ -2050,7 +2053,17 @@ translator_cancel_clear <- function(tok) {
     "Frac_GasMS (volatilisation)"     = c("frac_?gas", "volatilis", "volatiliz", "nh3 or nox", "fracci[oó]n.*volatil"),
     "Frac_LeachMS (leaching)"         = c("frac_?leach", "leaching", "lixiviation", "lixivia"),
     "EF3_PRP (pasture N2O EF)"        = c("ef3_?prp", "pasture.*n2o", "range.*paddock"),
-    "EF4 / EF5 (indirect N2O EFs)"    = c("\\bef4\\b", "\\bef5\\b", "indirect n2o")
+    "EF4 / EF5 (indirect N2O EFs)"    = c("\\bef4\\b", "\\bef5\\b", "indirect n2o"),
+    # 2026-10-30: measured intake, which may appear in the template only when
+    # the file has it (.translator_drop_unsourced_intake, check C14)
+    # By name or by unit (Lolita): MJ per head or per day for GE, except on a
+    # net, metabolisable or digestible energy line; kg of dry matter for DMI.
+    "GE (gross energy intake)"        = c("^ge$", "^ge\\s*\\(", "gross_?energy", "energ[ií]a bruta", "[eé]nergie brute",
+                                          "^(?!.*\\b(net|ne[mgl]?|metaboli[sz]able|me|digestible|de)\\b).*\\bmj\\s*(/|per)\\s*(head|hd|animal|an|day|d)\\b",
+                                          "^(?!.*\\b(net|ne[mgl]?|metaboli[sz]able|me|digestible|de)\\b).*\\bmj\\s*(head|hd|an)\\s*-?1"),
+    "DMI (dry matter intake)"         = c("^dmi$", "^dmi\\s*\\(", "dry_?matter_?intake", "dry matter intake", "feed intake",
+                                          "consumo de materia seca", "ingesti[oó]n de materia seca", "mati[eè]re s[eè]che ing",
+                                          "\\bkg\\s*(of\\s*)?dm\\b", "kg\\s*(of\\s*)?dry\\s*matter", "\\bkg\\s*ms\\s*(/|per)")
   )
   found <- character(0); where <- character(0)
   for (sheet in sheets) {

@@ -320,13 +320,41 @@ translator_source_fingerprint <- function(parsed) {
   piece
 }
 
+# 2026-10-30 (Lolita, hard rule): an optional input (GE, DMI: measured
+# intake) appears in the template only when the uploaded file has it. The
+# AI wrote GE = DMI = 0 for every Zambia group from about 22 October, and a
+# value it invents would replace the energy balance. `families` is the
+# source scan (NULL when the source is unknown: nothing is removed then).
+.translator_drop_unsourced_intake <- function(piece, families = NULL) {
+  ps <- piece$parameters
+  if (is.null(families) || !is.data.frame(ps) || !nrow(ps) || !"parameter" %in% names(ps)) return(piece)
+  opt <- PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier %in% "optional"]
+  drop <- ps$parameter %in% setdiff(opt, families)
+  if (!any(drop)) return(piece)
+  corr <- do.call(rbind, lapply(split(which(drop), ps$parameter[drop]), function(i) {
+    p <- ps$parameter[i[1]]
+    data.frame(where = "Parameters", issue = sprintf(paste0(
+      "%s is not in your file, so it was removed from %d row(s) and left blank: ",
+      "the tool calculates feed intake from the energy balance. Fill %s in only ",
+      "if you measured it."), p, length(i), p),
+      sheet = "Parameters", group = NA_character_, parameter = p,
+      check = "measured intake not in the file (removed)", stringsAsFactors = FALSE)
+  }))
+  rownames(corr) <- NULL
+  piece$parameters <- ps[!drop, , drop = FALSE]
+  piece$server_corrections <- if (is.data.frame(piece$server_corrections) && nrow(piece$server_corrections))
+    rbind(piece$server_corrections, corr) else corr
+  piece
+}
+
 # The template JSON after the server-side corrections; the same text when
 # there was nothing to correct, so the caller can tell.
-.translator_fix_piece_json <- function(json) {
+.translator_fix_piece_json <- function(json, families = NULL) {
   if (is.null(json) || !nzchar(json)) return(json)
   piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
   if (is.null(piece) || !is.data.frame(piece$parameters)) return(json)
   before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
+  piece <- tryCatch(.translator_drop_unsourced_intake(piece, families), error = function(e) piece)
   piece <- .translator_fix_uncertainty_scale(piece)
   piece <- tryCatch(.translator_fix_year_from_timeseries(piece), error = function(e) piece)
   piece <- tryCatch(.translator_apply_relative_ranges(piece), error = function(e) piece)
@@ -980,6 +1008,27 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
               sheet = "Parameters", group = gkey(ps, i), parameter = "N", check = "duplicate population")
         }
       }
+    }
+
+    # C14 (2026-10-30, Lolita). GE or DMI carries a value while the uploaded
+    # file has neither: a measured intake nobody measured, which replaces the
+    # energy balance for the group. The server removes these before writing
+    # (.translator_drop_unsourced_intake); this catches anything that slips.
+    opt_p <- PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier %in% "optional"]
+    opt_v <- suppressWarnings(as.numeric(ps$mean))
+    # Any value counts, 0 included: the rule is that the input is not there.
+    bad_i <- which(ps$parameter %in% setdiff(opt_p, source$families %||% character(0)) &
+                   !is.na(opt_v))
+    for (pn in unique(ps$parameter[bad_i])) {
+      i <- bad_i[ps$parameter[bad_i] == pn]
+      for (j in i)
+        add("measured intake", sprintf(paste0(
+          "%s has a value on %d row(s) (%s), but your file has no %s. Leave the ",
+          "value blank unless it was measured: a value here replaces the energy ",
+          "balance for the group (before 31 October, a 0 did as well)."),
+          pn, length(i), paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn),
+          severity = "fail", sheet = "Parameters", group = gkey(ps, j), parameter = pn,
+          check = "measured intake not in the file")
     }
 
     # C4. The template says a parameter was gap-filled, while the scan found

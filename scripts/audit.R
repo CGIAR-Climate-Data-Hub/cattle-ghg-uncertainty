@@ -4285,6 +4285,42 @@ section_F <- function() {
              notes = if (f67_ok) "each planted case found once with its severity; unit change not double-counted as a jump; one year gives no rows; review request carries the series"
                      else paste(f67_fail, collapse = "; "))
 
+  # F68 -- measured intake (GE, DMI) only from the source (2026-10-30). The
+  # AI wrote GE = DMI = 0 for every Zambia group; the sampler lifted the 0 to
+  # its floor and used it as a measured intake (total 11.3 instead of 15.4
+  # Mt CO2e). Four guards: the scan recognises GE and DMI by name and unit
+  # (not net or metabolisable energy), the server removes them when the file
+  # lacks them, check C14 flags any value left (0 included), and the sampler
+  # keeps a 0 at 0.
+  f68_fail <- tryCatch({
+    f <- character(0)
+    scan1 <- function(l) sub(" .*$", "", .translator_scan_param_labels(list(list(name = "s",
+      preview = data.frame(label = l, v = 2, stringsAsFactors = FALSE)))))
+    if (!"GE"  %in% scan1("Gross energy intake (MJ/head/day)")) f <- c(f, "GE label not recognised")
+    if (!"DMI" %in% scan1("Feed intake kg DM/head/day"))         f <- c(f, "DMI unit not recognised")
+    if ("GE" %in% scan1("Net energy for maintenance (MJ/day)"))  f <- c(f, "net energy taken for GE")
+    pc <- list(parameters = data.frame(cattle_type = "dairy", aggregation_level = "a", sub_category = "dairy_cows",
+                                       parameter = c("N", "GE", "DMI"), mean = c(100, 0, 7)))
+    if (!identical(.translator_drop_unsourced_intake(pc, c("N"))$parameters$parameter, "N")) f <- c(f, "GE/DMI kept without source")
+    if (!identical(.translator_drop_unsourced_intake(pc, c("N", "DMI"))$parameters$parameter, c("N", "DMI"))) f <- c(f, "sourced DMI removed")
+    if (nrow(.translator_drop_unsourced_intake(pc, NULL)$parameters) != 3L) f <- c(f, "removed with unknown source")
+    ps <- data.frame(cattle_type = "dairy", aggregation_level = "a", sub_category = "dairy_cows",
+                     parameter = c("N", "GE", "DMI"), mean = c(100, 0, NA), data_source = "user_file")
+    iss <- translator_consistency_checks(ps, source = list(families = "N", numbers = 100))
+    c14 <- iss[iss$check %in% "measured intake not in the file", ]
+    if (nrow(c14) != 1L || !identical(c14$severity, "fail") || !identical(c14$parameter, "GE"))
+      f <- c(f, sprintf("C14 rows %d (want 1 fail on GE with value 0)", nrow(c14)))
+    cl <- .clamp_physical_bounds(data.frame(GE = c(0, 0), DMI = c(0, 0), DE = c(30, 60)))
+    if (any(cl$GE != 0) || any(cl$DMI != 0) || cl$DE[1] != 45) f <- c(f, "sampler floor lifted a 0 GE/DMI (or DE floor gone)")
+    f
+  }, error = function(e) conditionMessage(e))
+  f68_ok <- length(f68_fail) == 0L
+  check_bool("F68", "F",
+             "Measured intake (GE, DMI) only from the source: recognised by name and unit, removed when absent, flagged by C14 (0 included), and a 0 is not lifted to the sampler floor",
+             f68_ok,
+             notes = if (f68_ok) "scan, removal, C14 and sampler floor all as intended"
+                     else paste(f68_fail, collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without
