@@ -3058,10 +3058,18 @@ translator_cancel_clear <- function(tok) {
   }
   fail <- function(msg) {
     state$last_error <- msg
+    # 2026-10-31: a failed run left no trace in the server log.
+    message("translator: job ", job_id, " ended without a template: ", msg)
     jb <- translator_job_read(job_id)
-    if (!is.null(jb) && identical(jb$status, "running"))
-      translator_job_update(job_id, status = if (grepl("^Stopped", msg)) "stopped" else "failed",
+    if (!is.null(jb) && identical(jb$status, "running")) {
+      stopped <- grepl("^Stopped", msg)
+      translator_job_update(job_id, status = if (stopped) "stopped" else "failed",
                             error = msg, stage_label = msg)
+      # nobody is watching: say so by email, as a finished run does
+      if (!stopped && is.null(translator_job_open_session(job_id)))
+        tryCatch(translator_job_email_failure(job_id, ctx$user_email, msg),
+                 error = function(e) message("translator: failure email failed (", conditionMessage(e), ")"))
+    }
     done()
   }
   # Every continuation runs from a later() callback, so each one has to

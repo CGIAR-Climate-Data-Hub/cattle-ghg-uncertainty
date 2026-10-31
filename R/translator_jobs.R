@@ -284,6 +284,24 @@ translator_job_finish <- function(job_id, state, session) {
   invisible(job)
 }
 
+# A run that failed while no page was open (2026-10-31): the user is told
+# by email instead of finding a clock still running when they come back.
+translator_job_email_failure <- function(job_id, to, msg) {
+  if (is.null(to) || !nzchar(to)) return(invisible(NULL))
+  body <- c(
+    "Your AI translator run stopped before the template was produced.",
+    "",
+    paste0("Reason: ", msg),
+    "",
+    "Sign in again and open the AI translator. Your conversation and answers are kept, and the production systems that were already finished are reused, so clicking 'Produce template now' only repeats the rest.")
+  res <- tryCatch(.auth_send_email(to, "Your AI translator run stopped", paste(body, collapse = "\n")),
+                  error = function(e) list(ok = FALSE, attempts = conditionMessage(e)))
+  translator_job_update(job_id, delivery = list(mode = "email_failure",
+    email_sent_at = if (isTRUE(res$ok)) .translator_now() else NULL))
+  if (!isTRUE(res$ok)) message("translator: failure email failed: ", paste(res$attempts, collapse = "; "))
+  invisible(res)
+}
+
 # Email the outputs to the signed-in address: data workbook, checks, then
 # the conversation, dropping from the end while the encoded total exceeds
 # the first provider's limit (Brevo, 10 MB). If even the data workbook is

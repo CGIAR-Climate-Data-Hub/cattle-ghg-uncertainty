@@ -4321,6 +4321,57 @@ section_F <- function() {
              notes = if (f68_ok) "scan, removal, C14 and sampler floor all as intended"
                      else paste(f68_fail, collapse = "; "))
 
+  # F69 -- a broken tool stream is issued again (2026-10-31). On a Zambia run
+  # the fifth system's stream broke after data had arrived; the transport
+  # retried only untouched calls, so the run failed silently while the page
+  # clock went on counting. Tool calls (restart_ok) now start over; a text
+  # call that already showed text still reports the error.
+  f69_fail <- tryCatch({
+    f <- character(0)
+    nl <- intToUtf8(10L)
+    ev <- function(type, obj) charToRaw(paste0("event: ", type, nl, "data: ",
+      jsonlite::toJSON(c(list(type = type), obj), auto_unbox = TRUE), nl, nl))
+    head_ev <- c(ev("message_start", list(message = list(usage = list(input_tokens = 5L)))),
+                 ev("content_block_start", list(index = 0L, content_block = list(type = "tool_use", id = "t", name = "x", input = list()))),
+                 ev("content_block_delta", list(index = 0L, delta = list(type = "input_json_delta", partial_json = '{"a":'))))
+    tail_ev <- c(ev("content_block_delta", list(index = 0L, delta = list(type = "input_json_delta", partial_json = '1}'))),
+                 ev("message_delta", list(delta = list(stop_reason = "tool_use"), usage = list(output_tokens = 3L))),
+                 ev("message_stop", list()))
+    run_case <- function(restart_ok) {
+      calls <- 0L; out <- NULL
+      old_fn <- .anthropic_stream_async; old_d <- .ANTHROPIC_ASYNC_RETRY_DELAYS
+      old_key <- Sys.getenv("ANTHROPIC_API_KEY")
+      on.exit({ assign(".anthropic_stream_async", old_fn, envir = globalenv())
+                assign(".ANTHROPIC_ASYNC_RETRY_DELAYS", old_d, envir = globalenv())
+                Sys.setenv(ANTHROPIC_API_KEY = old_key) })
+      Sys.setenv(ANTHROPIC_API_KEY = "test")
+      assign(".ANTHROPIC_ASYNC_RETRY_DELAYS", c(0, 0), envir = globalenv())
+      assign(".anthropic_stream_async", function(url, headers, body_json, timeout_sec, on_data, on_done, on_error, ...) {
+        calls <<- calls + 1L
+        if (calls == 1L) later::later(function() { on_data(head_ev); on_error("Operation too slow") }, 0)
+        else later::later(function() { on_data(c(head_ev, tail_ev)); on_done(list(status_code = 200L)) }, 0)
+        list(cancel = function() invisible(TRUE), is_done = function() TRUE)
+      }, envir = globalenv())
+      anthropic_chat_stream_async(list(list(role = "user", content = "hi")),
+                                  on_result = function(r) out <<- r, restart_ok = restart_ok)
+      for (k in 1:50) { if (!is.null(out)) break; later::run_now(0.05) }
+      list(out = out, calls = calls)
+    }
+    a <- run_case(TRUE)
+    if (a$calls != 2L) f <- c(f, sprintf("tool call issued %d time(s), want 2", a$calls))
+    if (is.null(a$out) || !is.null(a$out$error) || !identical(a$out$reply, '{"a":1}'))
+      f <- c(f, "restarted tool call did not return the complete JSON")
+    b <- run_case(FALSE)
+    if (b$calls != 1L || is.null(b$out$error)) f <- c(f, "text call with output was retried or lost its error")
+    f
+  }, error = function(e) conditionMessage(e))
+  f69_ok <- length(f69_fail) == 0L
+  check_bool("F69", "F",
+             "A tool stream that breaks after data has arrived is issued again from the start; a text call that already showed text reports the error",
+             f69_ok,
+             notes = if (f69_ok) "restart on a broken tool stream, no restart on a text stream"
+                     else paste(f69_fail, collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

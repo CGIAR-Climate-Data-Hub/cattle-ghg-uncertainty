@@ -434,7 +434,12 @@ anthropic_chat_stream_async <- function(messages,
                                         tools = NULL,
                                         tool_choice = NULL,
                                         cache_ttl = "auto",
-                                        on_retry = function(attempt, delay, why) {}) {
+                                        on_retry = function(attempt, delay, why) {},
+                                        # 2026-10-31: TRUE for the tool calls,
+                                        # whose partial JSON is never shown, so
+                                        # a stream that breaks halfway can be
+                                        # issued again from the start.
+                                        restart_ok = FALSE) {
   api_key <- .anthropic_api_key_for(model)
   if (!nzchar(api_key)) {
     on_result(list(reply = NULL,
@@ -503,7 +508,7 @@ anthropic_chat_stream_async <- function(messages,
   # Returns TRUE when a new attempt was scheduled.
   try_again <- function(why, wait = NA_real_) {
     delays <- .ANTHROPIC_ASYNC_RETRY_DELAYS
-    if (st$stopped || st$attempt > length(delays) || !untouched()) return(FALSE)
+    if (st$stopped || st$attempt > length(delays) || (!restart_ok && !untouched())) return(FALSE)
     delay <- if (is.finite(wait)) wait else delays[st$attempt]
     message(sprintf("translator async: %s; retrying in %.0f s (attempt %d of %d)",
                     why, delay, st$attempt + 1L, length(delays) + 1L))
@@ -563,6 +568,11 @@ anthropic_chat_stream_async <- function(messages,
                                if (identical(se$type, "overloaded_error")) 529L else 500L,
                                se$message %||% ""))))
         }
+        # 2026-10-31: a tool stream that closed before message_delta
+        # (no stop_reason) was cut off; its JSON is incomplete.
+        if (restart_ok && is.null(consumer$state$stop_reason) &&
+            try_again("stream ended before the reply was complete"))
+          return(invisible(NULL))
         report(consumer$result(model))
       },
       on_error = function(msg) {
@@ -1469,7 +1479,10 @@ anthropic_translator_tools <- function() {
     timeout_sec = timeout_sec,
     tools       = anthropic_translator_tools(),
     tool_choice = tc,
-    on_result   = cb)
+    on_result   = cb,
+    # Zambia, 2026-10-31: the fifth system's stream broke after data had
+    # arrived; without a restart the whole run failed after 15 minutes.
+    restart_ok  = TRUE)
 
   call_once(tool_choice, function(resp) {
     if (identical(tool_choice, .ANTHROPIC_TOOL_CHOICE_AUTO) &&

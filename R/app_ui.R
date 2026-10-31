@@ -667,6 +667,29 @@ app_ui <- function(request = NULL) {
              fill.style.width = Math.round(d.progress * 100) + '%';
            bubble._translatorLast = { label: (d && d.label) || '', eta: (d && d.eta) || '', real: true };
          });
+         // 2026-10-31: when the page loses the server, the clock used to go
+         // on counting (111 minutes on a Zambia run whose request had already
+         // failed). It now stops and says what to do. A reloaded page joins
+         // the running job again; the server keeps it only while some page
+         // is connected (about 15 minutes after the last one closes).
+         $(document).on('shiny:disconnected', function() {
+           var slot = document.getElementById('translator_stream_target');
+           if (!slot || !slot.firstElementChild) return;
+           var bubble = slot.firstElementChild;
+           if (!bubble._translatorProgressInterval) return;
+           clearInterval(bubble._translatorProgressInterval);
+           bubble._translatorProgressInterval = null;
+           var spin = bubble.querySelector('div div');
+           if (spin) spin.style.animation = 'none';
+           var lbl = bubble.querySelector('[data-elapsed-label=true]');
+           if (lbl) {
+             lbl.style.color = '#B71C1C';
+             lbl.style.fontSize = '0.85rem';
+             lbl.textContent = 'The connection to the server was lost, so this page no longer shows progress. ' +
+               'Reload the page within 15 minutes: the translation continues on the server and appears again when it is done. ' +
+               'If no page is open, the result (or the reason it stopped) is sent to your sign-in email.';
+           }
+         });
          // 2026-10-22 (WP6): the files are ready. With a folder chosen
          // earlier (Chrome/Edge) every file is written there; otherwise
          // the data workbook downloads by itself (a second automatic
