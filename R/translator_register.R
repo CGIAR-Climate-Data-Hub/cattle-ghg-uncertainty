@@ -581,7 +581,10 @@ translator_register_df <- function(register) {
     q <- questions[[i]]
     first <- strsplit(q$text, "\n", fixed = TRUE)[[1]][1]
     a <- q$answer %||% ""
-    if (!nzchar(a)) a <- "(no answer: use the IPCC default and say so)"
+    # 2026-10-31: silence keeps the file's value. "Use the IPCC default"
+    # replaced a file value with a default whenever the question was about
+    # which rows a value belongs to.
+    if (!nzchar(a)) a <- "(no answer: keep what the file says, do not replace it with a default, and ask this question again if it still matters)"
     lines <- c(lines, "", sprintf("%d. %s", i, first), sprintf("   Answer: %s", a))
   }
   paste(lines, collapse = "\n")

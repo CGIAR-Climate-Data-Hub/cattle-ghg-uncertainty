@@ -39,6 +39,13 @@
 # must be tagged user_chat, which exempts them from the verbatim check.
 .TRANSLATOR_VALUE_TRANSFORMS <- c(1, 100, 1/100, 18.45, 1/18.45, 365, 1/1000)
 
+# One tolerance for "the same number": relative 1e-6 with a floor of 1e-9,
+# plus an absolute allowance where the caller has one (1 head for N).
+# 2026-10-31; the checks used an absolute floor of 5e-4 that let an EF of
+# 0.0095 pass against a file value of 0.009.
+.translator_near <- function(cand, v, tol_abs = 0)
+  abs(cand - v) <= max(1e-6 * abs(v), 1e-9, tol_abs)
+
 # Every numeric reading of a column, including cells that store the number
 # as TEXT. A Spanish or French workbook writes 10,78 for ten point seven
 # eight, and as.numeric() returns NA for it, so the value is invisible to
@@ -875,9 +882,26 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           grp <- unique(key[sel][round(v[sel], 6) == x])
           sprintf("%s in %s", fmt(x), paste(utils::head(grp, 3), collapse = ", "))
         }, character(1))
-        add(mt, sprintf("%s takes %d different values for the same manure system%s: %s. Check which one the source file gives.",
-                        col, length(vals), if (nzchar(ct_i)) paste0(" (", ct_i, ")") else "", paste(by_val, collapse = "; ")),
-            sheet = "Manure_Management", parameter = col, check = "manure coefficient consistency")
+        # 2026-10-31: when every value is in the file, these are variants of
+        # one system (Zambia: slurry stored 1 month at MCF 25 and 12 months
+        # at 73, both mapped to liquid_slurry). An info with its own name,
+        # which the AI review is not asked to "correct": asked to, it set
+        # the 12-month row to 25.
+        pool <- if (is.null(source)) numeric(0) else
+          c(source$numbers %||% numeric(0), source$family_values[[col]] %||% numeric(0))
+        pool <- pool[is.finite(pool)]
+        in_file <- length(pool) > 0 && all(vapply(vals, function(x)
+          any(.translator_near(pool, x) | .translator_near(pool * 100, x) | .translator_near(pool / 100, x)),
+          logical(1)))
+        if (in_file)
+          add(mt, sprintf("%s takes %d values for %s%s: %s. All are in your file, so these are probably two variants of the system (for example a different storage time). Check that each row carries the variant the file gives it.",
+                          col, length(vals), mt, if (nzchar(ct_i)) paste0(" (", ct_i, ")") else "", paste(by_val, collapse = "; ")),
+              severity = "info", sheet = "Manure_Management", parameter = col,
+              check = "manure coefficient differs (in file)")
+        else
+          add(mt, sprintf("%s takes %d different values for the same manure system%s: %s. Check which one the source file gives.",
+                          col, length(vals), if (nzchar(ct_i)) paste0(" (", ct_i, ")") else "", paste(by_val, collapse = "; ")),
+              sheet = "Manure_Management", parameter = col, check = "manure coefficient consistency")
       }
     }
 
@@ -1015,19 +1039,27 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     # energy balance for the group. The server removes these before writing
     # (.translator_drop_unsourced_intake); this catches anything that slips.
     opt_p <- PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier %in% "optional"]
-    opt_v <- suppressWarnings(as.numeric(ps$mean))
+    # 2026-10-31: on the AI's own rows when the piece is given. The check
+    # used to run on the written workbook, where the writer has already
+    # blanked these values, so it could never fire in production.
+    ps14 <- if (!is.null(piece) && is.data.frame(piece$parameters) && nrow(piece$parameters) &&
+                all(c("parameter", "mean") %in% names(piece$parameters))) piece$parameters else ps
+    for (cn in c("cattle_type", "aggregation_level", "sub_category"))
+      if (!cn %in% names(ps14)) ps14[[cn]] <- ""
+    opt_v <- suppressWarnings(as.numeric(ps14$mean))
+    lvl14 <- as.character(ps14$aggregation_level); lvl14[is.na(lvl14)] <- ""
     # Any value counts, 0 included: the rule is that the input is not there.
-    bad_i <- which(ps$parameter %in% setdiff(opt_p, source$families %||% character(0)) &
+    bad_i <- which(ps14$parameter %in% setdiff(opt_p, source$families %||% character(0)) &
                    !is.na(opt_v))
-    for (pn in unique(ps$parameter[bad_i])) {
-      i <- bad_i[ps$parameter[bad_i] == pn]
+    for (pn in unique(ps14$parameter[bad_i])) {
+      i <- bad_i[ps14$parameter[bad_i] == pn]
       for (j in i)
         add("measured intake", sprintf(paste0(
           "%s has a value on %d row(s) (%s), but your file has no %s. Leave the ",
           "value blank unless it was measured: a value here replaces the energy ",
           "balance for the group (before 31 October, a 0 did as well)."),
-          pn, length(i), paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn),
-          severity = "fail", sheet = "Parameters", group = gkey(ps, j), parameter = pn,
+          pn, length(i), paste(utils::head(unique(lvl14[i]), 4), collapse = ", "), pn),
+          severity = "fail", sheet = "Parameters", group = gkey(ps14, j), parameter = pn,
           check = "measured intake not in the file")
     }
 

@@ -148,7 +148,7 @@
       parameter = parameter, check = "corrected by the AI review", stringsAsFactors = FALSE)
   as_df <- function(x) {
     if (is.data.frame(x)) return(x)
-    if (is.list(x) && length(x)) return(tryCatch(jsonlite::fromJSON(jsonlite::toJSON(x, auto_unbox = TRUE)), error = function(e) NULL))
+    if (is.list(x) && length(x)) return(tryCatch(jsonlite::fromJSON(jsonlite::toJSON(x, auto_unbox = TRUE, digits = NA)), error = function(e) NULL))
     NULL
   }
   keyof <- function(d, keys) {
@@ -268,9 +268,11 @@
   req <- .translator_review_request(targets, piece, register)
   message(sprintf("translator review: %d item(s), request %d characters", nrow(targets), nchar(req)))
   msgs <- anthropic_build_messages(system_prompt, history = history, new_user_message = req)
+  # 2026-10-31: whatever happens inside the continuation, on_done runs once;
+  # an error used to leave the job "running" with the template unsent.
   anthropic_chat_batch_template_force_async(
     msgs, on_chunk = on_chunk, on_tick = on_tick, should_stop = should_stop,
-    on_result = function(resp) inseq({
+    on_result = function(resp) inseq(tryCatch({
       if (isTRUE(resp$stopped) || !is.null(resp$error)) {
         message("translator review: the call failed (", resp$error %||% "stopped", ")")
         info(paste0("The review could not be completed (", resp$error %||% "stopped",
@@ -307,6 +309,12 @@
       info(sprintf("Review done: %d correction(s) made, %d item(s) explained as not errors, %d still flagged for you to check.",
                    nrow(ap$changes), nrow(ap$dismissed), n_left))
       on_done()
-    }))
+    }, error = function(e) {
+      message("translator review: failed (", conditionMessage(e), "); delivering the template as it was")
+      tryCatch(info(paste0("The review step failed (", conditionMessage(e),
+                           "). The template is kept as it was, with the checks listed.")),
+               error = function(e2) NULL)
+      on_done()
+    })))
   invisible(NULL)
 }

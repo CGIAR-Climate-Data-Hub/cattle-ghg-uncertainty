@@ -89,7 +89,10 @@ translator_job_find <- function(user_email, max_age_hours = 48) {
 
 # A job still "running" that has not been touched for a while was lost
 # with its process (a container recycle, a crash). Called at session start.
-translator_job_mark_lost <- function(stale_min = 5) {
+# 2026-10-31: 15 minutes, not 5. The first token of a discovery call on a
+# 170K prefix, the assembly and the review's wait each approach 5 minutes,
+# and the run also touches the file every 60 s during assembly now.
+translator_job_mark_lost <- function(stale_min = 15) {
   d <- .translator_jobs_dir()
   for (f in list.files(d, pattern = "^job_.*[.]json$", full.names = TRUE)) {
     j <- tryCatch(jsonlite::read_json(f, simplifyVector = FALSE), error = function(e) NULL)

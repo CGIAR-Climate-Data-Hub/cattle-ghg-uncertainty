@@ -24,12 +24,14 @@
 # the June objection to the 1-hour cache was only that this rate was
 # missing and the log under-reported.
 .ANTHROPIC_PRICING <- list(
-  "claude-opus-4-8"   = list(input = 15.00, output = 75.00,
-                                cache_read = 1.50, cache_write = 18.75, cache_write_1h = 30.00),
-  "claude-opus-4-7"   = list(input = 15.00, output = 75.00,
-                                cache_read = 1.50, cache_write = 18.75, cache_write_1h = 30.00),
-  "claude-opus-4-6"   = list(input = 15.00, output = 75.00,
-                                cache_read = 1.50, cache_write = 18.75, cache_write_1h = 30.00),
+  # Opus 4.6 and later list at $5 / $25 per 1M (corrected 2026-10-31; the
+  # 15 / 75 rows were the Opus 4.1 prices and overstated the cost 3x).
+  "claude-opus-4-8"   = list(input = 5.00, output = 25.00,
+                                cache_read = 0.50, cache_write = 6.25, cache_write_1h = 10.00),
+  "claude-opus-4-7"   = list(input = 5.00, output = 25.00,
+                                cache_read = 0.50, cache_write = 6.25, cache_write_1h = 10.00),
+  "claude-opus-4-6"   = list(input = 5.00, output = 25.00,
+                                cache_read = 0.50, cache_write = 6.25, cache_write_1h = 10.00),
   "claude-sonnet-4-6" = list(input = 3.00,  output = 15.00,
                                 cache_read = 0.30, cache_write = 3.75, cache_write_1h = 6.00),
   "claude-haiku-4-5-20251001" = list(input = 1.00, output = 5.00,
@@ -466,10 +468,31 @@ anthropic_chat_stream_async <- function(messages,
   st$t0       <- Sys.time()   # the async result carries its duration too (2026-10-23)
   st$reported <- FALSE
   st$handle   <- NULL
+  st$timeout  <- timeout_sec  # raised once after a hard timeout (2026-10-31)
+  st$timeouts <- 0L
+  # Usage of the attempts that were abandoned (2026-10-31): their input
+  # tokens were billed and their partial output too; they used to be
+  # discarded with consumer$reset(), so the log under-reported exactly
+  # when a run was expensive.
+  st$usage_prev <- list(prompt_tokens = 0L, completion_tokens = 0L, cached_tokens = 0L,
+                        cache_write_tokens = 0L, cache_write_1h_tokens = 0L)
+  bank_usage <- function() {
+    u <- tryCatch(consumer$result(model)$usage, error = function(e) NULL)
+    if (!is.list(u)) return(invisible(NULL))
+    for (k in names(st$usage_prev))
+      st$usage_prev[[k]] <- st$usage_prev[[k]] + (suppressWarnings(as.integer(u[[k]] %||% 0L)) %||% 0L)
+    invisible(NULL)
+  }
 
   report <- function(res) {
     if (st$reported) return(invisible(NULL))
     st$reported <- TRUE
+    if (is.list(res) && is.list(res$usage) && st$attempt > 1L) {
+      for (k in names(st$usage_prev))
+        res$usage[[k]] <- (res$usage[[k]] %||% 0L) + st$usage_prev[[k]]
+      res$usage$total_tokens <- sum(unlist(res$usage[names(st$usage_prev)]))
+      res$attempts <- st$attempt
+    }
     # The usage log's latency was NA on every async call, so the job
     # estimator never saw a measured rate and fell back to 35 tokens/s
     # (a third of the real speed).
@@ -519,16 +542,20 @@ anthropic_chat_stream_async <- function(messages,
         st$stopped <- TRUE
         return(report(stopped_result()))
       }
+      bank_usage()
       consumer$reset()
       start()
     }, delay)
     TRUE
   }
+  # curl's own messages for the two kinds of timeout: the wall clock
+  # ("Timeout was reached") and the stall detector ("Operation too slow").
+  is_hard_timeout <- function(msg) grepl("Timeout was reached|timed out", msg, ignore.case = TRUE)
 
   start <- function() {
     st$handle <- .anthropic_stream_async(
       url = .ANTHROPIC_ENDPOINT, headers = headers, body_json = body_json,
-      timeout_sec = timeout_sec,
+      timeout_sec = st$timeout,
       on_data = function(raw) {
         # Checked per chunk, exactly as the synchronous on_data does, but the
         # abort is a cancel on the handle rather than returning FALSE.
@@ -573,11 +600,31 @@ anthropic_chat_stream_async <- function(messages,
         if (restart_ok && is.null(consumer$state$stop_reason) &&
             try_again("stream ended before the reply was complete"))
           return(invisible(NULL))
-        report(consumer$result(model))
+        res <- consumer$result(model)
+        # 2026-10-31: a reply cut at the output limit is reported as such,
+        # so the caller can say so and never memoise it. Repeating the
+        # same request would cut it at the same place.
+        if (identical(res$stop_reason, "max_tokens")) res$truncated <- TRUE
+        report(res)
       },
       on_error = function(msg) {
         if (st$stopped) return(report(stopped_result()))
-        if (try_again(paste("connection failed:", msg))) return(invisible(NULL))
+        # 2026-10-31: a wall-clock timeout is retried once, with half as
+        # much time again; repeating it four times with the same limit
+        # cost 75 minutes to fail. A stall (no bytes for 45 s) and a
+        # dropped connection are retried as before.
+        if (is_hard_timeout(msg)) {
+          if (st$timeouts >= 1L) {
+            acc <- consumer$state$accumulated
+            return(report(list(reply = if (nzchar(acc)) acc else NULL,
+                               error = paste0("The request took longer than ", round(st$timeout),
+                                              " seconds twice. The inventory may be too large for one call."))))
+          }
+          st$timeouts <- st$timeouts + 1L
+          st$timeout <- ceiling(st$timeout * 1.5)
+          if (try_again(sprintf("timed out after %s s; the next attempt gets %d s", msg, st$timeout)))
+            return(invisible(NULL))
+        } else if (try_again(paste("connection failed:", msg))) return(invisible(NULL))
         acc <- consumer$state$accumulated
         report(list(reply = if (nzchar(acc)) acc else NULL,
                     error = paste0("Streaming failed (", msg,
@@ -1467,7 +1514,8 @@ anthropic_translator_tools <- function() {
                                        max_tokens, timeout_sec,
                                        tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
                                        should_stop = function() FALSE,
-                                       on_result = function(res) {}) {
+                                       on_result = function(res) {},
+                                       on_retry = function(attempt, delay, why) {}) {
   call_once <- function(tc, cb) anthropic_chat_stream_async(
     messages    = messages,
     on_chunk    = on_chunk,
@@ -1480,6 +1528,7 @@ anthropic_translator_tools <- function() {
     tools       = anthropic_translator_tools(),
     tool_choice = tc,
     on_result   = cb,
+    on_retry    = on_retry,
     # Zambia, 2026-10-31: the fifth system's stream broke after data had
     # arrived; without a restart the whole run failed after 15 minutes.
     restart_ok  = TRUE)
@@ -1502,18 +1551,20 @@ anthropic_chat_enumerate_aggregation_levels_async <- function(
     messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
     model = .ANTHROPIC_DEFAULT_MODEL, max_tokens = 4000, timeout_sec = 120,
     tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
-    should_stop = function() FALSE, on_result = function(res) {}) {
+    should_stop = function() FALSE, on_result = function(res) {},
+    on_retry = function(attempt, delay, why) {}) {
   .anthropic_tool_call_async(messages, on_chunk, on_tick, model, max_tokens,
-                             timeout_sec, tool_choice, should_stop, on_result)
+                             timeout_sec, tool_choice, should_stop, on_result, on_retry)
 }
 
 anthropic_chat_batch_template_force_async <- function(
     messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
     model = .ANTHROPIC_DEFAULT_MODEL, max_tokens = 48000, timeout_sec = 900,
     tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
-    should_stop = function() FALSE, on_result = function(res) {}) {
+    should_stop = function() FALSE, on_result = function(res) {},
+    on_retry = function(attempt, delay, why) {}) {
   .anthropic_tool_call_async(messages, on_chunk, on_tick, model, max_tokens,
-                             timeout_sec, tool_choice, should_stop, on_result)
+                             timeout_sec, tool_choice, should_stop, on_result, on_retry)
 }
 
 # --- Force-template variant (tool_use) -----------------------------------------

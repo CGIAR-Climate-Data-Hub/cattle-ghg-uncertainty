@@ -4403,6 +4403,198 @@ section_F <- function() {
              notes = if (f70_ok) "Weight and Mature weight blocks labelled; rows under an ambiguous text row unlabelled"
                      else paste(f70_fail, collapse = "; "))
 
+  # ---- Stage 1 of the 31 October plan: the quick fixes ------------------------------
+  # One temporary runtime folder for the memo, job and history files of
+  # F71 to F76, so nothing lands in runtime/.
+  .s1_rt <- tempfile("s1rt"); dir.create(.s1_rt)
+  .s1_old_rt <- Sys.getenv("APP_RUNTIME_DIR", unset = NA)
+  Sys.setenv(APP_RUNTIME_DIR = .s1_rt)
+  .s1_restore <- function() if (is.na(.s1_old_rt)) Sys.unsetenv("APP_RUNTIME_DIR") else Sys.setenv(APP_RUNTIME_DIR = .s1_old_rt)
+
+  # F71 -- the response memo keeps only replies that pass the piece validation
+  # (2026-10-31). It used to keep anything that parsed as JSON, so a batch
+  # without its time series was replayed on every later click at no cost and
+  # with no way out.
+  f71_fail <- tryCatch({
+    f <- character(0)
+    msgs <- list(list(role = "user", content = "F71 memo test"))
+    good <- '{"mode":"batch","aggregation_level":"a","parameters":[{"sub_category":"bulls","parameter":"N","mean":1}],"parameter_timeseries":[]}'
+    badr <- '{"mode":"batch","aggregation_level":"a","parameters":[{"sub_category":"bulls","parameter":"N","mean":1}]}'
+    mk <- function(reply) function(cb) cb(list(reply = reply, error = NULL, model = "stub",
+      usage = list(prompt_tokens = 1L, completion_tokens = 1L)))
+    got <- NULL
+    .translator_memo_call_async(msgs, "sig", start = mk(badr), on_result = function(r) got <<- r, mode = "batch")
+    key <- .translator_memo_key(msgs, "sig")
+    if (file.exists(.translator_memo_path(key))) f <- c(f, "an invalid batch reply was memoised")
+    .translator_memo_call_async(msgs, "sig", start = mk(good), on_result = function(r) got <<- r, mode = "batch")
+    if (!file.exists(.translator_memo_path(key))) f <- c(f, "a valid batch reply was not memoised")
+    calls <- 0L
+    .translator_memo_call_async(msgs, "sig", start = function(cb) { calls <<- calls + 1L; mk(good)(cb) },
+                                on_result = function(r) got <<- r, mode = "batch")
+    if (calls != 0L || !isTRUE(got$memo_hit)) f <- c(f, "a valid memo was not replayed")
+    # a stored reply that no longer passes validation is dropped and the call goes out
+    jsonlite::write_json(list(reply = badr, model = "stub"), .translator_memo_path(key), auto_unbox = TRUE)
+    calls <- 0L
+    .translator_memo_call_async(msgs, "sig", start = function(cb) { calls <<- calls + 1L; mk(good)(cb) },
+                                on_result = function(r) got <<- r, mode = "batch")
+    if (calls != 1L) f <- c(f, "an invalid stored reply was replayed")
+    # a truncated reply is never memoised
+    unlink(.translator_memo_path(key))
+    .translator_memo_call_async(msgs, "sig", start = function(cb) cb(list(reply = good, error = NULL, model = "stub",
+      truncated = TRUE, usage = list(prompt_tokens = 1L, completion_tokens = 1L))),
+      on_result = function(r) got <<- r, mode = "batch")
+    if (file.exists(.translator_memo_path(key))) f <- c(f, "a truncated reply was memoised")
+    # forget removes the file
+    .translator_memo_call_async(msgs, "sig", start = mk(good), on_result = function(r) got <<- r, mode = "batch")
+    .translator_memo_forget(msgs, "sig")
+    if (file.exists(.translator_memo_path(key))) f <- c(f, "forget left the memo file")
+    f
+  }, error = function(e) conditionMessage(e))
+  f71_ok <- length(f71_fail) == 0L
+  check_bool("F71", "F",
+             "Response memo: only a reply that passes the piece validation is kept; an invalid or truncated reply is not, a stale invalid memo is dropped, forget() removes the file",
+             f71_ok,
+             notes = if (f71_ok) "memo written, replayed, dropped and forgotten as intended"
+                     else paste(f71_fail, collapse = "; "))
+
+  # F72 -- a second Produce while a run is pending is refused (2026-10-31);
+  # two chains used to assemble two templates at once (the OOM of 30 October).
+  f72_fail <- tryCatch({
+    f <- character(0)
+    st <- shiny::reactiveValues(user_email = "f72@local", messages = list(), batch_parts = list(),
+                                batch_parts_key = NULL, last_template_json = "old", last_error = NULL,
+                                pending = TRUE, register = list(), source_fp = NULL, job_id = NULL)
+    ses <- shiny::MockShinySession$new()
+    n0 <- length(list.files(.translator_jobs_dir(), pattern = "^job_"))
+    shiny::isolate(.translator_force_template_async(st, ses))
+    n1 <- length(list.files(.translator_jobs_dir(), pattern = "^job_"))
+    if (n1 != n0) f <- c(f, "a second run started a job while one was pending")
+    if (!identical(shiny::isolate(st$last_template_json), "old")) f <- c(f, "the refused run touched the state")
+    f
+  }, error = function(e) conditionMessage(e))
+  f72_ok <- length(f72_fail) == 0L
+  check_bool("F72", "F",
+             "A Produce while a run is pending starts nothing and touches nothing",
+             f72_ok,
+             notes = if (f72_ok) "no job file, state untouched" else paste(f72_fail, collapse = "; "))
+
+  # F73 -- the upload JSON keeps every digit (2026-10-31): jsonlite's default
+  # of 4 decimals turned 0.00004 into 0 and 0.00042 into 0.0004.
+  f73_fail <- tryCatch({
+    j <- as.character(.translator_table_to_json(data.frame(label = "EF5", v = c(0.00004, 0.00042, 0.0095)), "s"))
+    r <- jsonlite::fromJSON(j, simplifyVector = FALSE)$rows
+    vals <- vapply(r, function(x) as.numeric(x$v), numeric(1))
+    if (!isTRUE(all.equal(unname(vals), c(0.00004, 0.00042, 0.0095)))) paste("values", paste(vals, collapse = ", ")) else character(0)
+  }, error = function(e) conditionMessage(e))
+  f73_ok <- length(f73_fail) == 0L
+  check_bool("F73", "F", "Upload JSON keeps 0.00004 and 0.00042 as they are", f73_ok,
+             notes = if (f73_ok) "digits = NA" else paste(f73_fail, collapse = "; "))
+
+  # F74 -- C14 fires on a written workbook (2026-10-31). The writer blanks a
+  # GE of 0 before the checks read the file back, so the check never fired in
+  # production; it now reads the AI's rows from the piece.
+  f74_fail <- tryCatch({
+    f <- character(0)
+    g <- function(sc) data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = sc,
+      parameter = c("N", "DE", "GE"), mean = c(100, 55, 0), uncertainty_pct = c(10, 15, NA), lower = NA, upper = NA,
+      distribution = "normal", param_type = c("activity_data", "coefficient", "coefficient"),
+      data_source = "user_file", stringsAsFactors = FALSE)
+    piece <- list(parameters = g("bulls"), manure_management = data.frame(),
+                  inventory_metadata = list(country = "Z", year = 2024L, species = "cattle_non_dairy"))
+    tmp <- tempfile(fileext = ".xlsx"); on.exit(unlink(tmp), add = TRUE)
+    .translator_write_official_template(piece, tmp)
+    pu <- suppressMessages(parse_uploaded_template(tmp))
+    ge <- pu$param_specs[pu$param_specs$parameter == "GE", ]
+    if (nrow(ge) && any(is.finite(suppressWarnings(as.numeric(ge$mean))))) f <- c(f, "the writer kept GE = 0 in the workbook")
+    src <- list(numbers = c(100, 55), families = c("N", "DE"), family_values = list())
+    pc <- .translator_precheck_file(tmp, source = src, piece = piece)
+    c14 <- pc$issues[pc$issues$check %in% "measured intake not in the file", ]
+    if (nrow(c14) != 1L || !identical(c14$severity, "fail") || !identical(c14$parameter, "GE"))
+      f <- c(f, sprintf("C14 rows on the written workbook: %d (want 1 fail on GE)", nrow(c14)))
+    pc0 <- .translator_precheck_file(tmp, source = src)
+    if (any(pc0$issues$check %in% "measured intake not in the file")) f <- c(f, "without the piece the check fired on blank cells")
+    f
+  }, error = function(e) conditionMessage(e))
+  f74_ok <- length(f74_fail) == 0L
+  check_bool("F74", "F",
+             "C14 (measured intake not in the file) fires through the written workbook when the piece is given",
+             f74_ok,
+             notes = if (f74_ok) "1 fail on GE after write and read-back" else paste(f74_fail, collapse = "; "))
+
+  # F75 -- two legitimate values of one manure coefficient (2026-10-31): the
+  # Zambia slurry rows (1 month at MCF 25, 12 months at 73) are an info with
+  # their own name, and the AI review is not asked to "correct" them. Two
+  # values of which one is not in the file stay a warning.
+  f75_fail <- tryCatch({
+    f <- character(0)
+    g <- function(sc) data.frame(cattle_type = "non_dairy", aggregation_level = sc, sub_category = "bulls",
+      parameter = c("N", "DE"), mean = c(100, 55), uncertainty_pct = c(10, 15), lower = NA, upper = NA,
+      distribution = "normal", param_type = c("activity_data", "coefficient"), data_source = "user_file",
+      stringsAsFactors = FALSE)
+    ps <- rbind(g("dairy_sys"), g("ext_sys"))
+    mm <- data.frame(cattle_type = "non_dairy", aggregation_level = c("dairy_sys", "ext_sys"), sub_category = "bulls",
+      mms_type = "liquid_slurry", fraction_pct = 100, MCF_pct = c(25, 73), EF3 = 0.02,
+      Frac_GasMS_pct = 30, Frac_LeachMS_pct = 5, stringsAsFactors = FALSE)
+    iss <- translator_consistency_checks(ps, mm, source = list(numbers = c(100, 55, 25, 73), families = "MCF", family_values = list()))
+    a <- iss[iss$check %in% "manure coefficient differs (in file)", ]
+    if (nrow(a) != 1L || !identical(a$severity, "info")) f <- c(f, sprintf("in-file variants: %d row(s), want 1 info", nrow(a)))
+    if (any(iss$check %in% "manure coefficient consistency")) f <- c(f, "in-file variants still flagged as a conflict")
+    if (any(translator_review_targets(iss)$check %in% "manure coefficient differs (in file)")) f <- c(f, "the info was sent to the review")
+    iss2 <- translator_consistency_checks(ps, mm, source = list(numbers = c(100, 55, 25), families = "MCF", family_values = list()))
+    if (sum(iss2$check %in% "manure coefficient consistency") != 1L) f <- c(f, "a value not in the file is no longer a conflict")
+    f
+  }, error = function(e) conditionMessage(e))
+  f75_ok <- length(f75_fail) == 0L
+  check_bool("F75", "F",
+             "Two manure coefficient values both in the file are an info outside the review; one not in the file stays a warning",
+             f75_ok,
+             notes = if (f75_ok) "25 and 73 in file: info; 73 absent: warn" else paste(f75_fail, collapse = "; "))
+
+  # F76 -- an error inside a continuation ends the run (2026-10-31): status
+  # failed, pending FALSE, the error in the panel. It used to be logged by the
+  # transport and nothing else happened: spinner on, job "running", no email.
+  f76_fail <- tryCatch({
+    f <- character(0)
+    old_stream <- anthropic_chat_stream_async; old_val <- .translator_validate_piece
+    old_key <- Sys.getenv("ANTHROPIC_API_KEY")
+    on.exit({ assign("anthropic_chat_stream_async", old_stream, envir = globalenv())
+              assign(".translator_validate_piece", old_val, envir = globalenv())
+              Sys.setenv(ANTHROPIC_API_KEY = old_key) }, add = TRUE)
+    Sys.setenv(ANTHROPIC_API_KEY = "stub-key")
+    assign("anthropic_chat_stream_async", function(messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
+                                                   should_stop = function() FALSE, on_result = function(res) {}, ...) {
+      resp <- list(reply = '{"mode":"enumerate","aggregation_levels":["a"],"inventory_metadata":{"country":"Z","year":2024}}',
+                   tool_used = TRUE, error = NULL, stopped = FALSE, model = "stub", cost_usd = 0, latency_sec = 0.1,
+                   usage = list(prompt_tokens = 1L, completion_tokens = 1L, cached_tokens = 0L, cache_write_tokens = 0L,
+                                cache_write_1h_tokens = 0L, total_tokens = 2L))
+      later::later(function() on_result(resp), 0.01)
+      invisible(NULL)
+    }, envir = globalenv())
+    assign(".translator_validate_piece", function(parsed, mode) stop("boom in the continuation"), envir = globalenv())
+    st <- shiny::reactiveValues(user_email = "f76@local", messages = list(
+        list(role = "user", content = "UPLOADED FILE f76.xlsx", display = "up", source = "server_upload"),
+        list(role = "assistant", content = "Noted.", display = "Noted.")),
+      batch_parts = list(), batch_parts_key = NULL, last_template_json = NULL, last_error = NULL,
+      pending = FALSE, prompt_stale = FALSE, register = list(), source_fp = NULL, job_id = NULL,
+      precheck = NULL, template_file = NULL, pending_questions = list(), review = NULL)
+    ses <- shiny::MockShinySession$new()
+    shiny::isolate(.translator_force_template_async(st, ses))
+    t0 <- Sys.time()
+    while (isTRUE(shiny::isolate(st$pending)) && as.numeric(Sys.time() - t0, units = "secs") < 20) later::run_now(0.05)
+    if (isTRUE(shiny::isolate(st$pending))) f <- c(f, "pending stayed TRUE")
+    err <- shiny::isolate(st$last_error)
+    if (!is.character(err) || !grepl("boom in the continuation", err)) f <- c(f, paste("last_error:", err %||% "NULL"))
+    jb <- translator_job_read(shiny::isolate(st$job_id))
+    if (is.null(jb) || !identical(jb$status, "failed")) f <- c(f, paste("job status:", jb$status %||% "no job"))
+    f
+  }, error = function(e) conditionMessage(e))
+  f76_ok <- length(f76_fail) == 0L
+  check_bool("F76", "F",
+             "An error thrown inside an async continuation ends the run: pending FALSE, job failed, the message in the panel",
+             f76_ok,
+             notes = if (f76_ok) "fail() reached through inseq's guard" else paste(f76_fail, collapse = "; "))
+  .s1_restore()
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without

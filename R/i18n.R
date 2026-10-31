@@ -592,6 +592,8 @@ lang_state_take <- function(token) {
     en = "A few points need your confirmation before the template is produced. Answer them above, one at a time; the template starts by itself after the last one.",
     fr = "Quelques points doivent être confirmés avant de produire le modèle. Répondez ci-dessus, un à la fois ; le modèle démarre de lui-même après le dernier."),
   ai_qa_answer_first = list(en = "Please answer the questions above first.", fr = "Merci de répondre d'abord aux questions ci-dessus."),
+  ai_busy_notice = list(en = "The AI is still working on the previous request. Wait for it to finish, or click Stop.",
+                        fr = "L'IA travaille encore sur la demande précédente. Attendez la fin, ou cliquez sur Arrêter."),
   ai_qa_bubble_only_questions = list(en = "Please answer the questions below, one at a time.",
                                      fr = "Merci de répondre aux questions ci-dessous, une à la fois."),
   ai_reg_title = list(en = "What the AI will apply", fr = "Ce que l'IA appliquera"),

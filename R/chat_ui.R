@@ -156,16 +156,19 @@ translator_chat_ui <- function() {
 # messages (uploads, answers, decisions) and the prompt they were held under.
 # Assistant turns and server notices are left out so that a download hint
 # appended after a merge does not invalidate the parts it just validated.
-.translator_emission_key <- function(state) {
-  user_txt <- vapply(state$messages, function(m) {
+.translator_emission_key_from <- function(messages, register = NULL) {
+  user_txt <- vapply(messages, function(m) {
     if (!identical(m$role, "user")) return("")
     c_ <- m$content
     if (!is.character(c_)) c_ <- paste(vapply(c_, function(b) b$text %||% "", ""), collapse = " ")
     c_ %||% ""
   }, character(1))
   user_txt <- user_txt[nzchar(user_txt)]
-  .tp_sha256(c(user_txt, tryCatch(translator_system_prompt_hash(), error = function(e) "")))
+  reg <- tryCatch(translator_register_digest(register), error = function(e) "")
+  .tp_sha256(c(user_txt, tryCatch(translator_system_prompt_hash(), error = function(e) ""), reg %||% ""))
 }
+.translator_emission_key <- function(state)
+  .translator_emission_key_from(state$messages, state$register)
 
 translator_chat_server <- function(input, output, session) {
   state <- .translator_init_state()
@@ -300,6 +303,13 @@ translator_chat_server <- function(input, output, session) {
   # a reactive write here would schedule a flush in the middle of a stream.
   observeEvent(input$translator_stop, {
     translator_cancel_request(session$userData$translator_tok)
+    # 2026-10-31: after a page reload the session has no token of its own;
+    # the job file carries the running job's token.
+    jid <- isolate(state$job_id)
+    if (!is.null(jid)) {
+      jtok <- tryCatch(translator_job_read(jid)$cancel_token, error = function(e) NULL)
+      if (is.character(jtok) && nzchar(jtok)) translator_cancel_request(jtok)
+    }
     message("translator: stop requested by ", session$userData$email %||% "user")
   }, ignoreInit = TRUE)
 
@@ -587,6 +597,12 @@ translator_chat_server <- function(input, output, session) {
   # chat round (clarifying questions, mapping discussion).
   observeEvent(input$translator_send, {
     req(state$user_email)
+    # 2026-10-31: one request at a time. A second Send while the AI is
+    # answering used to start a second stream into the same state.
+    if (isTRUE(state$pending)) {
+      showNotification(t("ai_busy_notice"), type = "warning", duration = 5)
+      return()
+    }
     txt <- trimws(input$translator_input %||% "")
     if (!nzchar(txt)) return()
     updateTextAreaInput(session, "translator_input", value = "")
@@ -660,6 +676,13 @@ translator_chat_server <- function(input, output, session) {
   # Refused while the saved conversation predates the live prompt (plan B5).
   observeEvent(input$translator_force_template, {
     req(state$user_email)
+    # 2026-10-31: a second click while a run is going used to start a
+    # second chain into the same state (two templates assembled at once,
+    # which is the out-of-memory crash seen on 30 October).
+    if (isTRUE(state$pending)) {
+      showNotification(t("ai_busy_notice"), type = "warning", duration = 5)
+      return()
+    }
     if (length(state$messages) < 2L) {
       showNotification(
         "Upload a file and answer the AI's clarifying questions before producing the template.",
@@ -735,6 +758,10 @@ translator_chat_server <- function(input, output, session) {
   observeEvent(input$translator_dlv_continue, .translator_after_ack())
 
   .translator_start_produce <- function(state, session) {
+    if (isTRUE(state$pending)) {
+      showNotification(t("ai_busy_notice"), type = "warning", duration = 5)
+      return(invisible(NULL))
+    }
     session$sendCustomMessage("translatorAppendInfoBubble",
       "Generating the full template now. A small inventory takes 1 to 3 minutes; a large one with several production systems takes 10 to 40 minutes, one production system at a time, and this panel stays busy throughout. The Download button appears when it finishes.")
     .translator_force_template(state, session)
@@ -1471,14 +1498,36 @@ translator_cancel_clear <- function(tok) {
 # Asynchronous twin of .translator_memo_call(). A memo hit still arrives
 # through the callback, so the chain has one completion path rather than
 # an instant branch and a slow branch.
-.translator_memo_call_async <- function(msgs, tools_sig, start, on_result) {
-  key <- tryCatch(.tp_sha256(c(jsonlite::toJSON(msgs, auto_unbox = TRUE), tools_sig)),
-                  error = function(e) NULL)
+# 2026-10-31: the memo is written only when the reply passes the piece
+# validation for its mode. It used to store anything that parsed as JSON,
+# so a batch missing its time series (or an enumerate reply without
+# levels) was replayed on every later click, at no cost and with no way
+# out short of changing the conversation. The model id is in the key: a
+# model change must not replay the previous model's reply.
+.translator_memo_key <- function(msgs, tools_sig)
+  tryCatch(.tp_sha256(c(jsonlite::toJSON(msgs, auto_unbox = TRUE), tools_sig,
+                        .ANTHROPIC_DEFAULT_MODEL)), error = function(e) NULL)
+.translator_memo_valid <- function(reply, mode) {
+  if (is.null(reply) || !nzchar(reply)) return(FALSE)
+  parsed <- tryCatch(jsonlite::fromJSON(reply, simplifyVector = TRUE), error = function(e) NULL)
+  if (is.null(parsed)) return(FALSE)
+  if (is.null(mode)) return(TRUE)
+  is.null(tryCatch(.translator_validate_piece(parsed, mode), error = function(e) "error"))
+}
+# A memo hit that fails validation downstream is removed, so the next click
+# calls the API again.
+.translator_memo_forget <- function(msgs, tools_sig) {
+  key <- .translator_memo_key(msgs, tools_sig)
+  if (!is.null(key)) unlink(.translator_memo_path(key))
+  invisible(NULL)
+}
+.translator_memo_call_async <- function(msgs, tools_sig, start, on_result, mode = NULL) {
+  key <- .translator_memo_key(msgs, tools_sig)
   if (!is.null(key)) {
     pth <- .translator_memo_path(key)
     if (file.exists(pth)) {
       hit <- tryCatch(jsonlite::read_json(pth, simplifyVector = FALSE), error = function(e) NULL)
-      if (!is.null(hit) && !is.null(hit$reply) && nzchar(hit$reply)) {
+      if (!is.null(hit) && .translator_memo_valid(hit$reply, mode)) {
         message("translator: response memo hit for ", substr(key, 1, 12))
         return(on_result(list(
           reply = hit$reply,
@@ -1488,11 +1537,12 @@ translator_cancel_clear <- function(tok) {
           model = hit$model %||% "memo", cost_usd = 0, error = NULL,
           latency_sec = 0, memo_hit = TRUE)))
       }
+      unlink(pth)
     }
   }
   start(function(resp) {
-    if (!is.null(key) && is.null(resp$error) && !is.null(resp$reply) &&
-        nzchar(resp$reply) && .translator_template_json_parses(resp$reply)) {
+    if (!is.null(key) && is.null(resp$error) && !isTRUE(resp$truncated) &&
+        .translator_memo_valid(resp$reply, mode)) {
       tryCatch(jsonlite::write_json(
         list(reply = resp$reply, model = resp$model %||% ""),
         .translator_memo_path(key), auto_unbox = TRUE),
@@ -1503,25 +1553,25 @@ translator_cancel_clear <- function(tok) {
   invisible(NULL)
 }
 
-.translator_memo_call <- function(msgs, tools_sig, fn) {
-  key <- tryCatch(.tp_sha256(c(jsonlite::toJSON(msgs, auto_unbox = TRUE), tools_sig)),
-                  error = function(e) NULL)
+.translator_memo_call <- function(msgs, tools_sig, fn, mode = NULL) {
+  key <- .translator_memo_key(msgs, tools_sig)
   if (!is.null(key)) {
     p <- .translator_memo_path(key)
     if (file.exists(p)) {
       hit <- tryCatch(jsonlite::read_json(p, simplifyVector = FALSE), error = function(e) NULL)
-      if (!is.null(hit) && !is.null(hit$reply) && nzchar(hit$reply)) {
+      if (!is.null(hit) && .translator_memo_valid(hit$reply, mode)) {
         message("translator: response memo hit for ", substr(key, 1, 12))
         return(list(reply = hit$reply, usage = list(prompt_tokens = 0L, completion_tokens = 0L,
                     cached_tokens = 0L, cache_write_tokens = 0L, cache_write_1h_tokens = 0L,
                     total_tokens = 0L), model = hit$model %||% "memo", cost_usd = 0,
                     error = NULL, latency_sec = 0, memo_hit = TRUE))
       }
+      unlink(p)
     }
   }
   resp <- fn()
-  if (!is.null(key) && is.null(resp$error) && !is.null(resp$reply) && nzchar(resp$reply) &&
-      .translator_template_json_parses(resp$reply)) {
+  if (!is.null(key) && is.null(resp$error) && !isTRUE(resp$truncated) &&
+      .translator_memo_valid(resp$reply, mode)) {
     tryCatch(jsonlite::write_json(list(reply = resp$reply, model = resp$model,
                                        saved_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")),
                                   .translator_memo_path(key), auto_unbox = TRUE),
@@ -1559,7 +1609,7 @@ translator_cancel_clear <- function(tok) {
   werr <- tryCatch({ .translator_write_official_template(parsed, tmp); NULL },
                    error = function(e) conditionMessage(e))
   if (!is.null(werr)) return(fail(paste("the workbook could not be written:", werr)))
-  .translator_precheck_file(tmp, source = source)
+  .translator_precheck_file(tmp, source = source, piece = parsed)
 }
 
 # Same checks on a workbook that already exists (about 4 s for 800 rows).
@@ -2221,7 +2271,7 @@ translator_cancel_clear <- function(tok) {
       n_rows = 0L, n_cols = 0L,
       headers = character(0),
       rows = setNames(list(), character(0))
-    ), auto_unbox = TRUE, na = "null", pretty = FALSE))
+    ), auto_unbox = TRUE, na = "null", pretty = FALSE, digits = NA))
   }
   headers <- names(df)
   n <- min(nrow(df), 1000L)
@@ -2247,13 +2297,15 @@ translator_cancel_clear <- function(tok) {
   nonempty <- vapply(row_vals, function(x) length(x) > 0L, logical(1))
   row_vals <- .translator_add_sections(row_vals)
   rows <- setNames(row_vals[nonempty], row_keys[nonempty])
+  # digits = NA (2026-10-31): jsonlite's default of 4 decimals turned
+  # 0.00004 into 0 and 0.00042 into 0.0004 before the AI saw the file.
   jsonlite::toJSON(list(
     sheet = sheet_name,
     n_rows = nrow(df),
     n_cols = ncol(df),
     headers = headers,
     rows = rows
-  ), auto_unbox = TRUE, na = "null", pretty = FALSE)
+  ), auto_unbox = TRUE, na = "null", pretty = FALSE, digits = NA)
 }
 
 # Make the API call from the current message stack, stream the reply
@@ -2711,8 +2763,11 @@ translator_cancel_clear <- function(tok) {
 # Stage 3 of the emission: merge the per-level pieces, validate, store and
 # tell the user. Lifted out of .translator_force_template() so the
 # synchronous loop and the asynchronous chain end the same way.
+# Returns TRUE when a template was stored, FALSE when the merge was refused
+# (2026-10-31; the caller used to test state$last_template_json, which could
+# still hold an earlier run's template).
 .translator_emit_finish <- function(state, session, inventory_metadata,
-                                    parts, agg_levels, info, model_id = NULL) {
+                                    parts, agg_levels, info, model_id = NULL, ctx = NULL) {
   # ---- Stage 3: merge + validate + store --------------------------------
   info("Assembling final template...")
   merged <- .translator_merge_batches(.translator_metadata_list(inventory_metadata), parts, agg_levels)
@@ -2761,13 +2816,14 @@ translator_cancel_clear <- function(tok) {
     # Nothing is cached from a failed merge (plan A3): the parts that
     # produced it must not be replayed on the retry.
     state$batch_parts <- list()
+    state$batch_parts_key <- NULL
     .translator_persist(state)
     state$last_error <- paste(
       "Merged template failed the well-formedness check: the batches",
       "returned JSON but the merge produced an empty parameters array.",
       if (length(merge_warnings)) paste(merge_warnings, collapse = " ") else "",
       "Click 'Produce template now' to retry.")
-    return()
+    return(FALSE)
   }
 
   # Validated: cache every part for a later retry (plan A3, F5). The cache
@@ -2776,9 +2832,15 @@ translator_cancel_clear <- function(tok) {
   # next Produce discards these parts instead of replaying them. Until
   # then an answer given after a first template never reached a production
   # system that was already cached.
+  # 2026-10-31: the key is taken from the run's snapshot (ctx), not from the
+  # live state: a message typed during the run is not in the parts, so it
+  # must not be in their key either. The register is part of the key, so an
+  # edited decision without a chat message also invalidates the parts.
   for (p in parts) if (!is.null(p$.requested_aggregation_level))
     state$batch_parts[[p$.requested_aggregation_level]] <- p
-  state$batch_parts_key <- tryCatch(.translator_emission_key(state), error = function(e) NULL)
+  state$batch_parts_key <- tryCatch(
+    if (!is.null(ctx)) .translator_emission_key_from(ctx$messages, ctx$register)
+    else .translator_emission_key(state), error = function(e) NULL)
 
   state$last_template_json <- merged_json
   state$last_error <- if (length(merge_warnings)) paste(merge_warnings, collapse = " ") else NULL
@@ -2818,7 +2880,7 @@ translator_cancel_clear <- function(tok) {
   # re-emitted from the new transcript; the cache is keyed by level only
   # as a resume aid, and cleared when the conversation changes shape).
   .translator_persist(state)
-  invisible(NULL)
+  invisible(TRUE)
 }
 
 .translator_force_template <- function(state, session) {
@@ -2892,7 +2954,7 @@ translator_cancel_clear <- function(tok) {
   enum_resp <- .translator_memo_call(discovery_msgs, tools_sig, function()
     anthropic_chat_enumerate_aggregation_levels(
       discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-      should_stop = function() translator_cancelled(tok)))
+      should_stop = function() translator_cancelled(tok)), mode = "enumerate")
 
   # A stop is not a failure, and must not trigger the fallback: starting a
   # monolithic emission here would be the opposite of what was asked for,
@@ -2988,7 +3050,7 @@ translator_cancel_clear <- function(tok) {
     batch_resp <- .translator_memo_call(batch_msgs, tools_sig, function()
       anthropic_chat_batch_template_force(
         batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = function() translator_cancelled(tok)))
+        should_stop = function() translator_cancelled(tok)), mode = "batch")
 
     if (isTRUE(batch_resp$stopped) || translator_cancelled(tok)) {
       state$last_error <- sprintf(
@@ -3071,8 +3133,15 @@ translator_cancel_clear <- function(tok) {
 # i-1 has been accepted. What changed is that waiting for a level no
 # longer blocks anybody else.
 .translator_force_template_async <- function(state, session) {
+  if (isTRUE(state$pending)) {
+    message("translator: a run is already in progress; the new request is ignored")
+    return(invisible(NULL))
+  }
   state$pending <- TRUE
   state$last_error <- NULL
+  # 2026-10-31: a template left from an earlier run must not be delivered
+  # as this run's result when the merge fails.
+  state$last_template_json <- NULL
   tok <- .translator_begin_request(session)
 
   # 2026-10-22 (WP6): everything the run reads is taken now. Typing or
@@ -3109,7 +3178,18 @@ translator_cancel_clear <- function(tok) {
     invisible(NULL)
   }
 
+  # 2026-10-31: while the server assembles, checks and reviews (minutes
+  # without a tick from the API), the job file is touched every 60 s so a
+  # reload does not mark the job lost.
+  heartbeat_on <- FALSE
+  heartbeat <- function() {
+    if (!heartbeat_on) return(invisible(NULL))
+    tryCatch(translator_job_update(job_id), error = function(e) NULL)
+    later::later(heartbeat, 60)
+    invisible(NULL)
+  }
   done <- function() {
+    heartbeat_on <<- FALSE
     translator_cancel_clear(tok)
     state$pending <- FALSE
     tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
@@ -3134,7 +3214,15 @@ translator_cancel_clear <- function(tok) {
   }
   # Every continuation runs from a later() callback, so each one has to
   # re-enter the session's reactive domain before touching `state`.
-  inseq <- function(expr) shiny::withReactiveDomain(session, shiny::isolate(expr))
+  # 2026-10-31: an error thrown inside a continuation used to vanish (the
+  # transport only logs it): the run stayed "running", the spinner stayed
+  # on, no email went out. It now ends the run through fail().
+  inseq <- function(expr) shiny::withReactiveDomain(session, shiny::isolate(
+    tryCatch(expr, error = function(e) {
+      message("translator: continuation failed: ", conditionMessage(e))
+      fail(paste0("Internal error: ", conditionMessage(e),
+                  ". Click 'Produce template now' to retry; the batches already produced are kept."))
+    })))
 
   if (budget_would_exceed())
     return(fail(paste0("The AI translator is temporarily unavailable. ",
@@ -3165,6 +3253,14 @@ translator_cancel_clear <- function(tok) {
     tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
               error = function(e) NULL)
   }
+  # 2026-10-31: a retried call starts its output again, so the bytes of
+  # the abandoned attempt leave the progress count; the user is told.
+  on_retry_cb <- function(attempt, delay, why) {
+    level_bytes <<- 0
+    tryCatch(info(sprintf("The AI's connection was interrupted (%s). Retrying in %d seconds (attempt %d).",
+                          why, as.integer(round(delay)), as.integer(attempt) + 1L)),
+             error = function(e) NULL)
+  }
   info <- function(txt) {
     translator_job_update(job_id, stage_label = txt)
     tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
@@ -3191,9 +3287,11 @@ translator_cancel_clear <- function(tok) {
     # log and in the job record, because "$ operator is invalid for atomic
     # vectors" on its own said nothing about where (a three-system run).
     stack_txt <- NULL
+    heartbeat_on <<- TRUE; heartbeat()
     ok <- tryCatch(withCallingHandlers({
-                     .translator_emit_finish(state, session, inventory_metadata,
-                                             parts, agg_levels, info, model_id = model_id); TRUE },
+                     isTRUE(.translator_emit_finish(state, session, inventory_metadata,
+                                                    parts, agg_levels, info, model_id = model_id,
+                                                    ctx = ctx)) },
                      error = function(e) {
                        sc <- tryCatch(sys.calls(), error = function(.e) NULL)
                        if (!is.null(sc)) stack_txt <<- paste(utils::tail(vapply(sc, function(cl)
@@ -3212,7 +3310,10 @@ translator_cancel_clear <- function(tok) {
       # 2026-10-30: before the files are delivered, the flagged items go
       # back to the AI once (R/translator_review.R): it corrects them from
       # the file or explains why they are not errors.
+      wrapped <- FALSE
       wrap_up <- function() {
+        if (wrapped) return(invisible(NULL))
+        wrapped <<- TRUE
         .translator_persist(state)
         tryCatch(translator_job_finish(job_id, state, session),
                  error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
@@ -3228,6 +3329,9 @@ translator_cancel_clear <- function(tok) {
         }))
     } else if (ok) {
       translator_job_update(job_id, status = "failed", error = state$last_error %||% "no template produced")
+    } else if (!is.null(state$last_error)) {
+      # the merge refused the parts (.translator_emit_finish returned FALSE)
+      translator_job_update(job_id, status = "failed", error = state$last_error)
     }
     done()
   }
@@ -3317,7 +3421,8 @@ translator_cancel_clear <- function(tok) {
       .translator_memo_call_async(batch_msgs, tools_sig,
         start = function(cb) anthropic_chat_batch_template_force_async(
           batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-          should_stop = stopper, on_result = cb),
+          should_stop = stopper, on_result = cb, on_retry = on_retry_cb),
+        mode = "batch",
         on_result = function(batch_resp) inseq({
           if (isTRUE(batch_resp$stopped) || translator_cancelled(tok))
             return(fail(sprintf(
@@ -3333,10 +3438,18 @@ translator_cancel_clear <- function(tok) {
           batch_parsed <- tryCatch(jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
                                    error = function(e) NULL)
           bad <- .translator_validate_piece(batch_parsed, "batch")
-          if (!is.null(bad))
+          if (!is.null(bad)) {
+            .translator_memo_forget(batch_msgs, tools_sig)
+            # 2026-10-31: a reply cut at the output limit is named as such;
+            # repeating the identical request would cut at the same place.
+            if (isTRUE(batch_resp$truncated))
+              return(fail(sprintf(
+                "Batch %d (%s) was cut at the AI's output limit (%s). This production system has too many rows for one call; please tell the administrator (the system can be split in two).",
+                i, level, bad)))
             return(fail(sprintf(
               "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
               i, level, bad, length(state$batch_parts))))
+          }
 
           # Defaults-only retry (plan C1): one more call, so one more
           # continuation rather than an inline second request.
@@ -3385,7 +3498,8 @@ translator_cancel_clear <- function(tok) {
   .translator_memo_call_async(discovery_msgs, tools_sig,
     start = function(cb) anthropic_chat_enumerate_aggregation_levels_async(
       discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-      should_stop = stopper, on_result = cb),
+      should_stop = stopper, on_result = cb, on_retry = on_retry_cb),
+    mode = "enumerate",
     on_result = function(enum_resp) inseq({
       if (isTRUE(enum_resp$stopped) || translator_cancelled(tok))
         return(fail(enum_resp$error %||%
@@ -3406,6 +3520,7 @@ translator_cancel_clear <- function(tok) {
       bad <- .translator_validate_piece(enum_parsed, "enumerate")
       if (!is.null(bad)) {
         message("translator: discovery reply incomplete (", bad, ")")
+        .translator_memo_forget(discovery_msgs, tools_sig)
         return(fail(paste0("The first step (reading the structure of the inventory) came back incomplete: ",
                            bad, ". Please click Produce again.")))
       }

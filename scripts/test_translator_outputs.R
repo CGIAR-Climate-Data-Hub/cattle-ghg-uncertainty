@@ -54,10 +54,15 @@ piece <- list(parameters = data.frame(cattle_type = "non_dairy", aggregation_lev
               manure_management = data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = "bulls",
                                              mms_type = "pasture", fraction_pct = 100, MCF_pct = 1.5, EF3 = 0.02, stringsAsFactors = FALSE))
 d9 <- .translator_defaults_applied(piece)
-ok(nrow(d9) == 3 && any(grepl("BW", d9$where) & grepl("range and distribution", d9$issue)) && any(grepl("MCF_pct", d9$where)) && any(grepl("EF3", d9$where)),
-   "C9: a value without a range or distribution, and manure coefficients without ranges, are listed")
+# 2026-10-30: BW has no published default range, so it gets a flagged
+# placeholder (warn) and the default distribution (info); MCF likewise a
+# placeholder; EF3's range is computed by the server (not listed here).
+ok(nrow(d9) == 3 && sum(grepl("BW", d9$where) & grepl("default distribution", d9$issue) & d9$severity == "info") == 1 &&
+   sum(grepl("BW", d9$where) & grepl("placeholder range", d9$issue) & d9$severity == "warn") == 1 &&
+   sum(grepl("MCF_pct", d9$where) & grepl("placeholder", d9$issue) & d9$severity == "warn") == 1,
+   "C9: a value without a range gets a placeholder warning, one without a distribution an info; MCF without a range a placeholder warning")
 iss9 <- translator_consistency_checks(ps, NULL, source = src, piece = piece)
-ok(sum(iss9$severity == "info" & grepl("was applied", iss9$issue)) == 3, "C9 rows join the issues as info")
+ok(sum(grepl("default distribution was applied|placeholder range", iss9$issue)) == 3, "C9 rows join the issues")
 
 # ---- the source fingerprint and the label scan (2026-10-23) -----------------------------
 pop_sheet <- data.frame(Description = c("Total cattle", "cows", "bulls", "ALL DAIRY", "notes"), `1990` = c(300, 100, 200, 300, NA), `1991` = c(330, 110, 220, 330, NA),
