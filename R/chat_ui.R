@@ -4079,6 +4079,13 @@ translator_cancel_clear <- function(tok) {
                               startRow = r, startCol = col_idx,
                               colNames = FALSE)
         }
+        # 2026-10-30: a GE or DMI row the AI wrote with 0 (it does so since
+        # about 22 October, tagged ipcc_default or biological_zero) is a gap,
+        # not a measurement: written blank like an omitted row, below.
+        if (!is.null(ai) && identical(PARAM_CATALOGUE$param_tier[i], "optional")) {
+          ai_v <- suppressWarnings(as.numeric(.translator_scalar(ai$mean %||% ai$value)))
+          if (length(ai_v) != 1L || is.na(ai_v) || ai_v <= 0) ai <- NULL
+        }
         if (!is.null(ai)) {
           # Clear the skeleton's cells first (plan A1). The blank template
           # pre-fills block 1 with catalogue values AND numeric lower/upper
