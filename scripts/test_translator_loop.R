@@ -200,5 +200,37 @@ shiny::testServer(translator_chat_server, {
   session$setInputs(translator_past_file = list(datapath = csv, name = "raw.csv", size = file.size(csv)))
   stopifnot(is.null(state$pending_upload))
   cat("past translation: taken next to the source, the source fingerprint kept, a raw file refused\n")
+
+  # ---- the source_values gate (2026-10-31, Stage 3) -----------------------------------
+  # Back to a plain conversation: a template-free state with a source_values
+  # block and the sheets to check it against.
+  state$revising <- FALSE; state$last_template_json <- NULL; state$pending_upload <- NULL
+  state$pending_questions <- list(); state$produce_after_answers <- FALSE; state$delivery_ack <- TRUE
+  df_g <- data.frame(a = c("Sys A", "Weight (kg)", "Cows", NA, "Sys A", "Mature weight (kg)", "Cows"),
+                     `2022` = c(NA, NA, 410, NA, NA, NA, 450), check.names = FALSE, stringsAsFactors = FALSE)
+  state$source_sheets <- list(list(name = "Data", json = .translator_table_to_json(df_g, "Data"), n_rows = nrow(df_g)))
+  e_good <- list(system = "Sys A", label = "Cows", section = "Weight (kg)", sheet = "Data", row = 4L, col = "2022", mean = 410,
+                 parameter = "BW", sub_category = "other_cows", aggregation_level = "sys_a")
+  e_bad <- modifyList(e_good, list(row = 8L, mean = 450))   # the MW row offered as BW
+  state$source_values <- list(e_good, e_bad); state$source_fix_done <- FALSE; state$source_gate <- NULL
+  n_chat <- sum(ai_calls == "chat"); p0 <- produce_calls
+  session$setInputs(translator_force_template = 2)
+  pump(state); session$flushReact()
+  # one corrective call went out (the stub replies without a block), Produce did not start
+  fix_msg <- Filter(function(m) identical(m$source, "server_correction"), state$messages)
+  stopifnot(sum(ai_calls == "chat") == n_chat + 1L, length(fix_msg) == 1L,
+            grepl("^SOURCE CHECK: 1 entry", fix_msg[[1]]$content), produce_calls == p0, isTRUE(state$source_fix_done))
+  # the block did not change, so after the round the gate fails again and the list is shown
+  stopifnot(is.data.frame(state$source_gate) && nrow(state$source_gate) == 1L, produce_calls == p0,
+            grepl("translator_produce_anyway", as.character(output$translator_source_gate$html), fixed = TRUE))
+  session$setInputs(translator_produce_anyway = 1)
+  stopifnot(produce_calls == p0 + 1L, is.null(state$source_gate))
+  # a correct block passes the gate straight into Produce
+  state$source_values <- list(e_good); state$source_fix_done <- FALSE
+  session$setInputs(translator_force_template = 3)
+  pump(state); session$flushReact()
+  stopifnot(produce_calls == p0 + 2L, sum(ai_calls == "chat") == n_chat + 1L,
+            any(vapply(state$messages, function(m) identical(m$source, "server_notice") && grepl("Source check: all 1", m$display %||% ""), logical(1))))
+  cat("source gate: one corrective round, then the list and Produce anyway; a right block goes straight through\n")
   cat("LOOP TEST PASSED\n")
 })

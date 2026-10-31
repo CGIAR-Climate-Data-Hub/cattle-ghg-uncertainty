@@ -110,6 +110,14 @@ translator_chat_ui <- function() {
     # (label, system, mapped sub-category, mapped level, merge_into,
     # confidence), from the explore reply's source_categories block.
     source_categories = NULL,
+    # 2026-10-31 (Stage 3): the explore reply's source_values block, the
+    # sheets it is checked against, the gate's last findings, and whether
+    # the one corrective round has been used
+    source_values = NULL,
+    source_sheets = NULL,
+    source_gate = NULL,
+    source_fix_done = FALSE,
+    produce_after_fix = FALSE,
     # 2026-10-22 (WP6): the job this session started or reconnected to,
     # and the folder the user chose for the results (Chrome/Edge).
     job_id = NULL,
@@ -147,6 +155,8 @@ translator_chat_ui <- function() {
                  revising = isTRUE(state$revising),
                  q_index = state$q_index,
                  source_categories = if (length(state$source_categories)) state$source_categories else NULL,
+                 source_values = if (length(state$source_values)) state$source_values else NULL,
+                 source_fix_done = isTRUE(state$source_fix_done),
                  last_template_json = state$last_template_json,
                  job_id = state$job_id)),
     error = function(e) NULL)
@@ -205,6 +215,9 @@ translator_chat_server <- function(input, output, session) {
         if (is.list(rg) && length(rg) > 0) state$register <- rg
         sc_ <- saved$extra$source_categories
         if (is.list(sc_) && length(sc_) > 0) state$source_categories <- sc_
+        sv_ <- saved$extra$source_values
+        if (is.list(sv_) && length(sv_) > 0) state$source_values <- sv_
+        state$source_fix_done <- isTRUE(saved$extra$source_fix_done)
         # 2026-10-22 (WP6): a finished template and the job it came from
         # survive a reload; the job file says whether it is still running.
         ltj <- saved$extra$last_template_json
@@ -431,6 +444,9 @@ translator_chat_server <- function(input, output, session) {
                    length(state$messages) > 1L
     if (!is_template) {
       state$source_categories <- NULL
+      state$source_values <- NULL
+      state$source_gate <- NULL
+      state$source_fix_done <- FALSE
       state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
                                   error = function(e) NULL)
       # 2026-10-22 (WP1): a column whose header says percent while its values
@@ -566,6 +582,12 @@ translator_chat_server <- function(input, output, session) {
     parsed$sheets <- parsed$sheets[idx]
     parsed$n_total_sheets <- length(idx)
     state$pending_upload <- NULL
+    # 2026-10-31 (Stage 3): the sheets as the model sees them, kept for the
+    # source_values check at Produce (in memory only; after a restart the
+    # check is skipped with a notice)
+    if (!isTRUE(pu$is_template))
+      state$source_sheets <- lapply(parsed$sheets, function(s)
+        list(name = s$name, json = s$json, n_rows = s$n_rows))
     # Inline typing-indicator in the conversation while we wait for the
     # AI's first reply; cleared by translatorStreamStart.
     session$sendCustomMessage("translatorAppendTypingBubble", "")
@@ -716,6 +738,80 @@ translator_chat_server <- function(input, output, session) {
       .translator_persist(state)
       return()
     }
+    # 2026-10-31 (Stage 3): the source_values block against the file,
+    # before the first batch is paid for
+    if (!.translator_source_gate()) return()
+    .translator_produce_or_ask_delivery()
+  })
+  # The gate. TRUE when Produce may go on. On the first failure the entries
+  # go back to the AI once (a corrective clarify call) and Produce resumes
+  # by itself; on a second failure the list is shown with a "Produce
+  # anyway" button.
+  .translator_source_gate <- function() {
+    sv <- state$source_values; sh <- state$source_sheets
+    if (!length(sv) || !length(sh)) {
+      if (length(sv) && !length(sh))
+        showNotification(t("ai_source_gate_skipped"), type = "message", duration = 6)
+      state$source_gate <- NULL
+      return(TRUE)
+    }
+    chk <- tryCatch(translator_source_values_check(sv, sh), error = function(e) NULL)
+    if (is.null(chk)) { state$source_gate <- NULL; return(TRUE) }
+    bad <- chk[!chk$ok & !chk$cap, , drop = FALSE]
+    n_cap <- sum(chk$cap)
+    message(sprintf("translator: source check: %d entries, %d do not match, %d beyond the rows sent",
+                    nrow(chk), nrow(bad), n_cap))
+    if (!nrow(bad)) {
+      state$source_gate <- NULL
+      state$messages[[length(state$messages) + 1L]] <- list(
+        role = "assistant", source = "server_notice", content = "(source check)",
+        display = sprintf(t("ai_source_gate_ok"), nrow(chk)), ts = .translator_now())
+      return(TRUE)
+    }
+    if (!isTRUE(state$source_fix_done)) {
+      state$source_fix_done <- TRUE
+      state$produce_after_fix <- TRUE
+      msg <- .translator_source_fix_message(chk, sv)
+      state$messages[[length(state$messages) + 1L]] <- list(
+        role = "user", content = msg, source = "server_correction",
+        display = sprintf(t("ai_source_gate_fixing"), nrow(bad), nrow(chk)), ts = .translator_now())
+      .translator_persist(state)
+      session$sendCustomMessage("translatorAppendTypingBubble", "")
+      .translator_send(state, session, stage = "source_fix")
+      return(FALSE)
+    }
+    state$source_gate <- bad
+    showNotification(sprintf(t("ai_source_gate_failed"), nrow(bad)), type = "warning", duration = 8)
+    FALSE
+  }
+  # After the corrective round: check again, then produce or show the list.
+  observeEvent({ state$source_values; state$pending }, {
+    if (!isTRUE(state$produce_after_fix) || isTRUE(state$pending)) return()
+    state$produce_after_fix <- FALSE
+    if (.translator_source_gate()) .translator_produce_or_ask_delivery()
+  }, ignoreInit = TRUE)
+  output$translator_source_gate <- renderUI({
+    bad <- state$source_gate
+    if (!is.data.frame(bad) || !nrow(bad)) return(NULL)
+    sv <- state$source_values
+    rows <- lapply(seq_len(min(nrow(bad), 40L)), function(k) {
+      e <- sv[[bad$idx[k]]]
+      tags$li(sprintf("%s!%s %s, %s (%s / %s): %s", e$sheet, e$row, e$col %||% "", e$parameter, e$system %||% "",
+                      e$label %||% "", bad$what[k]))
+    })
+    tags$div(
+      style = "text-align:left; margin:0 auto 10px auto; max-width:720px; padding:10px 14px; background:#FEF2F2; border:1px solid #FCA5A5; border-left:4px solid #DC2626; border-radius:8px; font-size:0.85rem; color:#7F1D1D;",
+      tags$strong(sprintf(t("ai_source_gate_title"), nrow(bad))),
+      tags$div(style = "margin:4px 0;", t("ai_source_gate_body")),
+      tags$ul(style = "margin:6px 0 0 0; padding-left:18px; max-height:220px; overflow:auto;", rows),
+      if (nrow(bad) > 40L) tags$div(sprintf("... %d more", nrow(bad) - 40L)),
+      actionButton("translator_produce_anyway", t("ai_source_gate_anyway"), class = "btn-outline-danger btn-sm",
+                   style = "margin-top:8px;"))
+  })
+  observeEvent(input$translator_produce_anyway, {
+    req(state$user_email)
+    if (isTRUE(state$pending)) return()
+    state$source_gate <- NULL
     .translator_produce_or_ask_delivery()
   })
   # 2026-10-22: before the first run of a session, say where the files
@@ -1277,6 +1373,7 @@ translator_chat_server <- function(input, output, session) {
       condition = "!output.translator_template_ready",
     # 2026-10-22 (WP1): the register and the current question sit above
     # the free-text row.
+    uiOutput("translator_source_gate"),
     uiOutput("translator_job_panel"),
     uiOutput("translator_past_upload"),
     tags$div(
@@ -1921,9 +2018,16 @@ translator_cancel_clear <- function(tok) {
     "- `reference-table`: vocab / dropdown lists / catalogues, NOT data to extract\n",
     "- `calc-sheet`: derived / computed (e.g. NRC calculations behind an aggregated value)\n\n",
     "### B. Inventory of values found\n\n",
-    "For EVERY (parameter, production system, sub-category) triple you can identify, list:\n",
-    "`parameter | production system (label as in file) | sub-category (raw label as in file) | block heading (the row's _section) | sheet | row | col | mean | lower (if present) | upper (if present) | distribution (as in file, if any) | units | qualifier (e.g. 'Local breed only', or blank)`.\n\n",
-    "Use a markdown table. The production system and the block heading tell look-alike rows apart ",
+    "Not a prose table: ONE fenced block labelled `source_values` holding a JSON array, one object per line, ",
+    "one object per value you will emit from the file, with the fields: `system` (the production-system label exactly as ",
+    "written in the file), `label` (the sub-category label exactly as written on that row), `section` (the row's `_section`, ",
+    "copied verbatim), `sheet`, `row` (the JSON row key, an integer), `col` (the header name from `headers`, or the Excel letter), ",
+    "`mean`, `lower`, `upper` (numbers or null), `unit`, `distribution` (as in the file, or null), `year_col` (the year header ",
+    "the mean was read from, or null), `parameter` (catalogue code), `sub_category` and `aggregation_level` (template codes). ",
+    "A lower/upper read from another sheet (a margin-of-error sheet) comes with `bounds_sheet` and `bounds_row`. ",
+    "Write one line of text before the block: \"source_values: N entries\".\n\n",
+    "The server checks every entry against the file cell by cell (sheet, row, column, value, `_section`, labels) and sends ",
+    "back any that does not match. The production system and the block heading tell look-alike rows apart ",
     "(the same sub-category in several systems; the Weight, Mature weight and Weight gain blocks): take the ",
     "parameter of a value from its row's `_section`, never from a neighbouring row. Cover every parameter from the server-side ",
     "scan above. If you cannot find a row a label points to, say so ",
@@ -2431,6 +2535,16 @@ translator_cancel_clear <- function(tok) {
                                                         note = sc$sub_category %||% "")
     reply_vis <- .translator_strip_source_categories(reply_vis)
   }
+  # 2026-10-31 (Stage 3): the source_values block (section B). A block in a
+  # continuation or in the corrective round replaces the previous one; the
+  # Produce observer checks it against the file.
+  svals <- if (!isTRUE(resp$tool_used)) .translator_extract_source_values(reply_text) else NULL
+  if (!is.null(svals)) {
+    state$source_values <- svals
+    reply_vis <- .translator_strip_source_values(reply_vis)
+    if (!nzchar(trimws(reply_vis %||% ""))) reply_vis <- sprintf(t("ai_source_values_noted"), length(svals))
+    message("translator: source_values block with ", length(svals), " entries")
+  }
   # 2026-10-23: a reply cut off by the output length limit is kept as it
   # is and one continuation is requested; its questions, incomplete, are
   # not put to the user, the continuation brings them.
@@ -2504,12 +2618,15 @@ translator_cancel_clear <- function(tok) {
 # (sections A to C) before its questions; at 16,000 output tokens the
 # Zambia file's reply was cut off inside section D twice. 32,000 covers
 # it, and a reply that still hits the limit gets one continuation request.
-.TRANSLATOR_CHAT_MAX_TOKENS <- 32000L
+# 2026-10-31: 40,000 (was 32,000): section B is now a JSON block of about
+# 500 entries, roughly twice the prose table it replaces.
+.TRANSLATOR_CHAT_MAX_TOKENS <- 40000L
 .TRANSLATOR_CONTINUE_TEXT <- paste(
   "Your previous reply was cut off by the output length limit. Do not repeat",
-  "sections A, B or C. Continue with section D only: every numbered question",
-  "in full, numbered from 1, then the decisions block and the",
-  "source_categories block.")
+  "what you already wrote. If the source_values block was cut, continue it",
+  "in a new source_values block starting from the entry after the last",
+  "complete one. Then section D: every numbered question in full, numbered",
+  "from 1, then the decisions block and the source_categories block.")
 
 .translator_send <- function(state, session, stage = "clarify") {
   state$pending <- TRUE
@@ -2728,7 +2845,7 @@ translator_cancel_clear <- function(tok) {
     sep = "\n")
 }
 
-.translator_batch_nudge <- function(i, n_levels, level, register = NULL) {
+.translator_batch_nudge <- function(i, n_levels, level, register = NULL, scope = NULL) {
       block <- translator_register_block(register, level = level)
       out <- sprintf(paste(
       "STEP 3 OF 3: BATCH %d OF %d (aggregation_level = '%s').",
@@ -2760,9 +2877,11 @@ translator_cancel_clear <- function(tok) {
       sep = "\n"),
           i, n_levels, level, level, level, level,
           sum(!PARAM_CATALOGUE$param_tier %in% "optional"))
-      # 2026-10-31: the checklist, then the binding decisions. Both sit in
-      # the nudge, the uncached tail of the request, where the model weighs
-      # text most; the decisions stay last.
+      # 2026-10-31: the system's rows (Stage 3), the checklist, then the
+      # binding decisions. All sit in the nudge, the uncached tail of the
+      # request, where the model weighs text most; the decisions stay last.
+      sc_txt <- tryCatch(.translator_scope_text(scope), error = function(e) "")
+      if (nzchar(sc_txt %||% "")) out <- paste0(out, "\n\n", sc_txt)
       out <- paste0(out, "\n\n", translator_emission_checklist())
       if (nzchar(block)) paste0(out, "\n\n", block) else out
 }
@@ -3156,7 +3275,10 @@ translator_cancel_clear <- function(tok) {
   # and the chain does not depend on the session being there.
   ctx <- list(messages = .translator_api_history(state$messages), register = state$register,
               batch_parts = state$batch_parts, user_email = state$user_email,
-              source_fp = state$source_fp)
+              source_fp = state$source_fp,
+              # Stage 3: what each batch is told about its system
+              source_values = state$source_values, source_categories = state$source_categories,
+              source_sheets = state$source_sheets)
   job <- translator_job_new(state$user_email,
                             prompt_hash = tryCatch(translator_system_prompt_hash(), error = function(e) NULL),
                             emission_key = state$batch_parts_key)
@@ -3348,7 +3470,8 @@ translator_cancel_clear <- function(tok) {
   }
 
   # ---- Stage 2: one level at a time -------------------------------------
-  run_levels <- function(agg_levels, inventory_metadata, model_id = NULL) {
+  run_levels <- function(agg_levels, inventory_metadata, model_id = NULL, subcats_by_level = NULL) {
+    subcats_by_level <- subcats_by_level %||% list()
     parts <- vector("list", length(agg_levels))
     step <- function(i) {
       if (i > length(agg_levels)) return(finish(inventory_metadata, parts, agg_levels, model_id))
@@ -3365,9 +3488,14 @@ translator_cancel_clear <- function(tok) {
       push_progress(TRUE)
       info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
       total_chars <<- 0L
+      # 2026-10-31 (Stage 3): the file's rows and the expected
+      # sub-categories of this system, from the run's snapshot
+      scope <- tryCatch(translator_level_rows(level, ctx$source_values, ctx$source_categories, ctx$source_sheets,
+                                             expected_subcats = subcats_by_level[[level]]),
+                        error = function(e) NULL)
       batch_msgs <- anthropic_build_messages(
         system_prompt, history = ctx$messages,
-        new_user_message = .translator_batch_nudge(i, length(agg_levels), level, ctx$register))
+        new_user_message = .translator_batch_nudge(i, length(agg_levels), level, ctx$register, scope = scope))
 
       accept_raw <- function(batch_parsed) {
         batch_parsed$.requested_aggregation_level <- level
@@ -3389,6 +3517,38 @@ translator_cancel_clear <- function(tok) {
       # register is re-emitted once with the violated decision quoted; if it
       # still contradicts, the better of the two is kept and the decision is
       # marked "not applied" (shown above the download and in the checks).
+      # 2026-10-31 (Stage 3): the batch's sub-categories against the
+      # expected set; one re-emit on a mismatch, the better piece kept.
+      accept_scope <- function(batch_parsed, retried = FALSE) {
+        chk_s <- tryCatch(translator_level_subcats_check(batch_parsed, scope), error = function(e) NULL)
+        if (is.null(scope) || is.null(chk_s) || isTRUE(chk_s$ok) || retried) {
+          if (!is.null(chk_s) && !isTRUE(chk_s$ok))
+            info(sprintf("Batch %s still has %d sub-categories where %d were expected; kept as it is and listed in the checks.",
+                         level, chk_s$found, chk_s$expected))
+          return(accept(batch_parsed))
+        }
+        message("translator: batch '", level, "' sub-categories differ from the expected set (missing: ",
+                chk_s$missing, "; extra: ", chk_s$extra, "); re-emitting once")
+        info(sprintf("Batch %s came back with %d sub-categories where %d were expected; asking the AI once more...",
+                     level, chk_s$found, chk_s$expected))
+        retry_msgs <- c(batch_msgs, list(list(role = "user", content = .translator_subcat_rejection(level, chk_s))))
+        anthropic_chat_batch_template_force_async(
+          retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb, should_stop = stopper, on_retry = on_retry_cb,
+          on_result = function(rr) inseq({
+            best <- batch_parsed
+            if (is.null(rr$error)) {
+              .translator_log_usage(state, rr, stage = "retry_scope", expect_warm = TRUE)
+              rp <- tryCatch(jsonlite::fromJSON(rr$reply, simplifyVector = TRUE), error = function(e) NULL)
+              if (is.null(.translator_validate_piece(rp, "batch"))) {
+                c2 <- tryCatch(translator_level_subcats_check(rp, scope), error = function(e) NULL)
+                n_bad <- function(c_) if (is.null(c_)) Inf else length(strsplit(c_$missing, ", ")[[1]][nzchar(strsplit(c_$missing, ", ")[[1]])]) +
+                  length(strsplit(c_$extra, ", ")[[1]][nzchar(strsplit(c_$extra, ", ")[[1]])])
+                if (n_bad(c2) < n_bad(chk_s)) best <- rp
+              }
+            }
+            accept_scope(best, retried = TRUE)
+          }))
+      }
       accept <- function(batch_parsed, retried = FALSE) {
         chk <- tryCatch(translator_register_check(ctx$register, batch_parsed, level),
                         error = function(e) NULL)
@@ -3490,10 +3650,10 @@ translator_cancel_clear <- function(tok) {
                       count_user_rows(rp) > 0L)
                     batch_parsed <- rp
                 }
-                accept(batch_parsed)
+                accept_scope(batch_parsed)
               })))
           }
-          accept(batch_parsed)
+          accept_scope(batch_parsed)
         }))
     }
     step(1L)
@@ -3566,7 +3726,8 @@ translator_cancel_clear <- function(tok) {
                         length(cached_levels), paste(cached_levels, collapse = ", ")))
       message(sprintf("translator: dispatching %d force-template call(s): %s",
                       length(fresh_levels), paste(fresh_levels, collapse = ", ")))
-      run_levels(agg_levels, enum_parsed$inventory_metadata, enum_resp$model)
+      run_levels(agg_levels, enum_parsed$inventory_metadata, enum_resp$model,
+                 subcats_by_level = tryCatch(as.list(enum_parsed$sub_categories_by_level), error = function(e) list()))
     }))
 
   invisible(NULL)

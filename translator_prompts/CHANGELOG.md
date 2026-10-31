@@ -2,6 +2,15 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-10-31, Stage 3 of the review plan: the verified exploration table
+
+Reason: the batches copied from a prose table (section B) that had no production-system column and no block-heading column and that the server could not check; the Zambia misreadings (a mature-weight range on a body-weight row, a per-system DE fix on the wrong system) came from it.
+
+- **Section B is a `source_values` block** (rule 13 in the in-app rules; Step 2 and Step 9 of system_instructions.md; the upload block): a JSON array, one object per value the model will emit, with the system label, the sub-category label, the row's `_section`, sheet, row, column, mean, lower, upper, unit, distribution, year column, parameter and template codes. Sections A and C are lists.
+- **The server checks every entry** against the sheets as the model saw them (`R/translator_source.R`): sheet, row, column, value, heading, labels, bounds. On the first mismatch the entries go back once (a SOURCE CHECK message, the model re-emits the whole block); on a second mismatch the list is shown with a "Produce anyway" button. Production does not start before.
+- **Every batch request names its system's rows** ("SOURCE ROWS FOR THIS BATCH": the file's label for the system, the row ranges per sheet, the expected sub-categories) before the checklist and the decisions; a batch whose sub-categories differ from the expected set is re-requested once.
+- Chat output limit 40,000 tokens (the block is larger than the table); a cut block is continued in a new block.
+
 ## 2026-10-31, Stage 2 of the review plan: one rule per subject
 
 Reason: the technical review of 31 October found the same rule stated in several places with different wording, and three contradictions that explain errors seen on the Zambia runs.

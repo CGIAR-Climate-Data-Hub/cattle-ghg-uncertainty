@@ -55,7 +55,10 @@ calls <- character()
   if (grepl("mode = 'batch'", last, fixed = TRUE)) {
     lv <- levels[vapply(levels, function(l) grepl(paste0("'", l, "'"), last, fixed = TRUE), logical(1))][1]
     rejected <- grepl("REJECTED for", last, fixed = TRUE)
-    calls <<- c(calls, paste0(if (rejected) "retry:" else "batch:", lv))
+    # 2026-10-31 (Stage 3): a sub-category rejection is told apart from a
+    # decision rejection by its wording
+    scope_rej <- rejected && grepl("the batch carries", last, fixed = TRUE)
+    calls <<- c(calls, paste0(if (scope_rej) "retry_scope:" else if (rejected) "retry:" else "batch:", lv))
     # 2026-10-22 (WP1): the binding decisions must be the last paragraph of
     # every batch request and name this batch's level.
     if (!rejected)
@@ -66,13 +69,23 @@ calls <- character()
                 # sit in every batch request, before the decisions
                 grepl("EMISSION CHECKLIST", last, fixed = TRUE),
                 grepl("no GE or DMI row", last, fixed = TRUE),
-                regexpr("EMISSION CHECKLIST", last, fixed = TRUE) < regexpr("BINDING DECISIONS", last, fixed = TRUE))
+                regexpr("EMISSION CHECKLIST", last, fixed = TRUE) < regexpr("BINDING DECISIONS", last, fixed = TRUE),
+                # Stage 3: the system's rows and expected sub-categories, before the checklist
+                grepl("SOURCE ROWS FOR THIS BATCH", last, fixed = TRUE),
+                grepl(sprintf("Expected sub-categories (%d)", length(unique(ps$sub_category[ps$aggregation_level == lv]))), last, fixed = TRUE),
+                regexpr("SOURCE ROWS FOR THIS BATCH", last, fixed = TRUE) < regexpr("EMISSION CHECKLIST", last, fixed = TRUE))
     nudge_checked <<- nudge_checked + 1L
     # On a decision re-emit (WP1 step 4) the stub honours the pooled-calves
     # decision: the male half is dropped, the female half stands for the
     # pooled group.
     ps_lv <- ps[ps$aggregation_level == lv, param_cols]
-    if (rejected) ps_lv <- ps_lv[ps_lv$sub_category != "calves_male", ]
+    if (rejected && !scope_rej) ps_lv <- ps_lv[ps_lv$sub_category != "calves_male", ]
+    # Stage 3: the first batch of the run drops one sub-category once; the
+    # server must ask again and the stub then gives the full set
+    if (scope_drop_once && !rejected && lv == levels[1]) {
+      scope_drop_once <<- FALSE
+      ps_lv <- ps_lv[ps_lv$sub_category != unique(ps_lv$sub_category)[1], ]
+    }
     piece <- sprintf('{"mode":"batch","aggregation_level":"%s","inventory_metadata":%s,"parameters":%s,"manure_management":%s,"parameter_timeseries":%s}',
                      lv, jsonlite::toJSON(meta, auto_unbox = TRUE),
                      rows_json(ps_lv),
@@ -102,13 +115,20 @@ calls <- character()
   # scenario 3; from then on it is "pooled" and the batches violate it.
   pooled <- grepl("keep calves pooled", last, fixed = TRUE)
   calves_dec <- if (pooled) "pooled: one calves category per system" else "split into calves_male and calves_female, 50/50"
-  txt <- paste0("Thanks. Before I can produce, please answer:\n\n1. Which year?\n2. Split calves?\n\n",
+  # Stage 3: section B as a source_values block built from the fixture
+  sv_json <- jsonlite::toJSON(lapply(seq_len(nrow(ps)), function(i) list(
+    system = ps$aggregation_level[i], label = ps$sub_category[i], section = "Parameters", sheet = "Data",
+    row = i + 1L, col = "value", mean = ps$mean[i], parameter = ps$parameter[i],
+    sub_category = ps$sub_category[i], aggregation_level = ps$aggregation_level[i])), auto_unbox = TRUE, na = "null", digits = NA)
+  txt <- paste0("Thanks. Before I can produce, please answer:\n\n### B. Inventory of values found\nsource_values: ", nrow(ps),
+                " entries\n```source_values\n", sv_json, "\n```\n\n### D. Ambiguities to ask the user\n\n1. Which year?\n2. Split calves?\n\n",
                 "```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"Year 2022\"},",
                 " {\"topic\": \"calves_handling\", \"decision\": \"", calves_dec, "\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"calves\"}]\n```")
   on_chunk(txt)
   c(list(reply = txt, tool_used = FALSE), base)
 }
 nudge_checked <- 0L
+scope_drop_once <- TRUE
 anthropic_chat_stream_async <- function(messages, on_chunk = function(text) {}, on_tick = function(n = 0L) {},
                                         should_stop = function() FALSE, model = "stub", max_tokens = 1,
                                         temperature = 0, timeout_sec = 1, tools = NULL, tool_choice = NULL,
@@ -176,6 +196,8 @@ stopifnot(nrow(out$param_specs) == n_groups * nrow(PARAM_CATALOGUE), state$prech
           length(state$batch_parts) == length(levels), !is.null(state$batch_parts_key))
 n_batch_1 <- sum(grepl("^batch:", calls))
 stopifnot(n_batch_1 == length(levels))
+# Stage 3: the batch that dropped a sub-category was asked again once
+stopifnot(sum(grepl("^retry_scope:", calls)) == 1L, length(state$source_values) == nrow(ps))
 # 2026-10-30: the review ran once, its correction is in the workbook and
 # both the correction and the explanation are listed with the checks.
 stopifnot(sum(calls == "review") == 1L, !is.null(state$review), state$review$corrected >= 1L,

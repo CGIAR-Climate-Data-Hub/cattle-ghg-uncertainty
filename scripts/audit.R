@@ -4595,6 +4595,87 @@ section_F <- function() {
              notes = if (f76_ok) "fail() reached through inseq's guard" else paste(f76_fail, collapse = "; "))
   .s1_restore()
 
+  # F77 -- the source_values block (2026-10-31, Stage 3): the extractor keeps
+  # the complete entries of a block cut at the output limit, and the server
+  # check flags a wrong row (the MW row offered as BW), a wrong heading and
+  # a wrong system label on synthetic sheets laid out like the Zambia file.
+  f77_fail <- tryCatch({
+    f <- character(0)
+    body <- '[{"system": "Sys A", "label": "Cows", "section": "Weight (kg)", "sheet": "Data", "row": 4, "col": "2020", "mean": 410, "parameter": "BW", "aggregation_level": "sys_a"},\n {"system": "Sys A", "label": "Bulls", "sheet": "Data", "row": 5, "co'
+    ev <- .translator_extract_source_values(paste0("### B.\n```source_values\n", body, "\n```"))
+    if (length(ev) != 1L || ev[[1]]$row != 4L) f <- c(f, "cut block not recovered")
+    df <- data.frame(a = c("Sys A", "Weight (kg)", "Cows", "Bulls", NA, "Sys A", "Mature weight (kg)", "Cows", "Bulls"),
+                     `2019` = c(NA, NA, 400, 500, NA, NA, NA, 440, 540), `2020` = c(NA, NA, 410, 510, NA, NA, NA, 450, 550),
+                     check.names = FALSE, stringsAsFactors = FALSE)
+    sheets <- list(list(name = "Data", json = .translator_table_to_json(df, "Data"), n_rows = nrow(df)))
+    e_ok <- list(system = "Sys A", label = "Cows", section = "Weight (kg)", sheet = "Data", row = 4L, col = "2020", mean = 410, parameter = "BW")
+    chk <- translator_source_values_check(list(e_ok, modifyList(e_ok, list(row = 9L, mean = 450)),
+                                               modifyList(e_ok, list(section = "Mature weight (kg)")),
+                                               modifyList(e_ok, list(system = "Sys Z"))), sheets)
+    if (!isTRUE(chk$ok[1])) f <- c(f, paste("right entry failed:", chk$what[1]))
+    if (isTRUE(chk$ok[2]) || !grepl("section", chk$what[2])) f <- c(f, "wrong row not caught by the section")
+    if (isTRUE(chk$ok[3]) || !grepl("section", chk$what[3])) f <- c(f, "wrong heading not caught")
+    if (isTRUE(chk$ok[4]) || !grepl("system", chk$what[4])) f <- c(f, "wrong system not caught")
+    msg <- .translator_source_fix_message(chk, list(e_ok, e_ok, e_ok, e_ok))
+    if (!grepl("^SOURCE CHECK: 3 entries", msg)) f <- c(f, "corrective message count")
+    f
+  }, error = function(e) conditionMessage(e))
+  f77_ok <- length(f77_fail) == 0L
+  check_bool("F77", "F",
+             "source_values: a cut block keeps its complete entries; the check flags a wrong row, a wrong heading and a wrong system; the corrective message counts them",
+             f77_ok,
+             notes = if (f77_ok) "extractor and verifier as intended" else paste(f77_fail, collapse = "; "))
+
+  # F78 -- the per-system rows for the batch nudge, the sub-category check
+  # and the rejection text (2026-10-31, Stage 3).
+  f78_fail <- tryCatch({
+    f <- character(0)
+    e <- function(row, lab, sub, p = "BW", lv = "sys_a", sys = "Sys A")
+      list(system = sys, label = lab, sheet = "Data", row = row, mean = 1, parameter = p, sub_category = sub, aggregation_level = lv)
+    sv <- list(e(4L, "Cows", "other_cows"), e(5L, "Bulls", "bulls"), e(9L, "Cows", "other_cows", "MW"), e(30L, "Cows", "other_cows", "N", "sys_b", "Sys B"))
+    sc <- translator_level_rows("sys_a", sv, NULL, NULL, expected_subcats = c("other_cows", "bulls"))
+    if (!identical(sc$systems, "Sys A") || sc$n_entries != 3L || nrow(sc$ranges) != 1L || sc$ranges$from != 4L || sc$ranges$to != 9L)
+      f <- c(f, "level rows")
+    txt <- .translator_scope_text(sc)
+    if (!grepl("SOURCE ROWS FOR THIS BATCH", txt, fixed = TRUE) || !grepl("Expected sub-categories (2)", txt, fixed = TRUE) || nchar(txt) / 3.6 > 300)
+      f <- c(f, "nudge paragraph")
+    c2 <- translator_level_subcats_check(list(parameters = data.frame(sub_category = c("other_cows", "calves"), parameter = "N", mean = 1)), sc)
+    if (isTRUE(c2$ok) || c2$missing != "bulls" || c2$extra != "calves") f <- c(f, "sub-category check")
+    if (!grepl("the batch carries 2 sub-categories but the file has 2", .translator_subcat_rejection("sys_a", c2), fixed = TRUE)) f <- c(f, "rejection text")
+    if (!isTRUE(translator_level_subcats_check(list(parameters = data.frame(sub_category = c("other_cows", "bulls"), parameter = "N", mean = 1)), sc)$ok)) f <- c(f, "right set rejected")
+    f
+  }, error = function(e) conditionMessage(e))
+  f78_ok <- length(f78_fail) == 0L
+  check_bool("F78", "F",
+             "Batch scope: the system's rows and expected sub-categories from the source_values entries; a missing or extra sub-category is named and rejected once",
+             f78_ok,
+             notes = if (f78_ok) "level rows, nudge paragraph, sub-category check" else paste(f78_fail, collapse = "; "))
+
+  # F79 -- the scope paragraph sits in the uncached tail: two batch nudges
+  # for different systems differ only in the nudge itself, and the
+  # paragraph comes before the checklist and the binding decisions.
+  f79_fail <- tryCatch({
+    f <- character(0)
+    reg <- translator_register_set_user(list(), "inventory_year", "2024")
+    sc_a <- list(level = "sys_a", systems = "Sys A", ranges = data.frame(sheet = "Data", from = 4L, to = 9L), n_entries = 3L,
+                 sub_categories = c("other_cows", "bulls"), n_expected = 2L, from = "source_values")
+    sc_b <- modifyList(sc_a, list(level = "sys_b", systems = "Sys B"))
+    na <- .translator_batch_nudge(1L, 2L, "sys_a", reg, scope = sc_a)
+    nb <- .translator_batch_nudge(2L, 2L, "sys_b", reg, scope = sc_b)
+    p_rows <- regexpr("SOURCE ROWS FOR THIS BATCH", na, fixed = TRUE); p_chk <- regexpr("EMISSION CHECKLIST", na, fixed = TRUE)
+    p_dec <- regexpr("BINDING DECISIONS", na, fixed = TRUE)
+    if (p_rows < 0 || p_chk < 0 || p_dec < 0 || !(p_rows < p_chk && p_chk < p_dec)) f <- c(f, "order in the nudge")
+    if (!grepl("Sys A", na, fixed = TRUE) || grepl("Sys B", na, fixed = TRUE) || !grepl("Sys B", nb, fixed = TRUE)) f <- c(f, "each nudge names its own system only")
+    if (!grepl("Expected sub-categories (2): other_cows, bulls", na, fixed = TRUE)) f <- c(f, "expected sub-categories")
+    if (nzchar(.translator_scope_text(NULL))) f <- c(f, "no scope should give no paragraph")
+    f
+  }, error = function(e) conditionMessage(e))
+  f79_ok <- length(f79_fail) == 0L
+  check_bool("F79", "F",
+             "Batch nudge order: the system's rows, then the checklist, then the binding decisions; each nudge names its own system only",
+             f79_ok,
+             notes = if (f79_ok) "rows < checklist < decisions; systems not mixed" else paste(f79_fail, collapse = "; "))
+
   # F34 -- the translator kit generator can still run. It does NOT source R/
   # alphabetically the way the app does; it names three or four files
   # explicitly, so a new load-order dependency in R/ breaks it without
