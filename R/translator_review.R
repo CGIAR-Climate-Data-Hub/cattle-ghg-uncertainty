@@ -281,8 +281,8 @@
   if (is.null(piece)) { message("translator review: the template JSON could not be read"); return(on_done()) }
   info(sprintf("The checks flagged %d item(s). The AI is now looking at each one against your file, to correct it or explain it...",
                nrow(targets)))
-  translator_job_update(job_id, stage = "review", progress = 0.96,
-                        stage_label = "Reviewing the flagged items with the AI")
+  translator_job_update(job_id, stage = "review", progress = 0.97,
+                        stage_label = sprintf("AI review of the %d flagged item(s) (1 to 5 minutes); the files come when it is done", nrow(targets)))
   req <- .translator_review_request(targets, piece, register)
   message(sprintf("translator review: %d item(s), request %d characters", nrow(targets), nchar(req)))
   msgs <- anthropic_build_messages(system_prompt, history = history, new_user_message = req)

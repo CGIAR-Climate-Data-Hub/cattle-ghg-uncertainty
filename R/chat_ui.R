@@ -852,7 +852,10 @@ translator_chat_server <- function(input, output, session) {
       secs <- if (is.na(started)) NA else max(0, floor(as.numeric(difftime(Sys.time(), started, units = "secs"))))
       el <- if (is.na(secs)) "" else sprintf(t("ai_job_elapsed"), secs %/% 60, secs %% 60)
       lv <- unlist(jb$levels); li <- as.integer(jb$level_index %||% 0)
-      lab <- if (length(lv) && li >= 1) sprintf(t("ai_job_system"), li, length(lv), lv[min(li, length(lv))]) else (jb$stage_label %||% "")
+      # 2026-10-31: after the last system the panel names the stage
+      # (assembly, review) instead of staying on "System 5 of 5".
+      final_stage <- (jb$stage %||% "") %in% c("assemble", "review", "deliver")
+      lab <- if (!final_stage && length(lv) && li >= 1) sprintf(t("ai_job_system"), li, length(lv), lv[min(li, length(lv))]) else (jb$stage_label %||% "")
       tags$div(style = "margin:8px 0; padding:10px 14px; background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; font-size:0.85rem; color:#5D4037;",
         tags$div(style = "display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;",
                  tags$strong(t("ai_job_running")), tags$span(paste(c(el, eta_txt), collapse = " · "))),
@@ -986,8 +989,11 @@ translator_chat_server <- function(input, output, session) {
   # template JSON parses AND has a non-empty parameters array: so the
   # button never appears with a payload that would download as a
   # malformed .json.
+  # 2026-10-31: not while a run is still going. The template is written
+  # before the AI review and rewritten after it; the buttons used to appear
+  # at the first write, so the user downloaded the unreviewed files.
   output$translator_template_ready <- reactive({
-    .translator_template_is_well_formed(state$last_template_json)
+    !isTRUE(state$pending) && .translator_template_is_well_formed(state$last_template_json)
   })
   outputOptions(output, "translator_template_ready", suspendWhenHidden = FALSE)
 
@@ -999,7 +1005,7 @@ translator_chat_server <- function(input, output, session) {
   # few seconds on a 27-group inventory.
   output$translator_predownload_qa <- renderUI({
     js <- state$last_template_json
-    if (!.translator_template_is_well_formed(js)) return(NULL)
+    if (isTRUE(state$pending) || !.translator_template_is_well_formed(js)) return(NULL)
     key <- tryCatch(.tp_sha256(js), error = function(e) NULL)
     pc  <- state$precheck
     if (is.null(key) || !identical(state$precheck_key, key) || is.null(pc)) {
@@ -3164,7 +3170,9 @@ translator_cancel_clear <- function(tok) {
   done_tokens <- 0; last_push <- Sys.time() - 10
   level_started <- NULL; level_secs <- numeric(0)   # measured durations (2026-10-23)
   level_ratios <- numeric(0)   # actual / estimated tokens of finished systems: calibrates the rest
+  final_stage <- FALSE   # assembly and review: the estimator's progress no longer applies
   push_progress <- function(force = FALSE) {
+    if (final_stage) return(invisible(NULL))
     if (!force && as.numeric(difftime(Sys.time(), last_push, units = "secs")) < 2) return(invisible(NULL))
     last_push <<- Sys.time()
     el <- if (is.null(level_started)) NA_real_ else as.numeric(difftime(Sys.time(), level_started, units = "secs"))
@@ -3282,7 +3290,9 @@ translator_cancel_clear <- function(tok) {
 
   # ---- Stage 3 entry -----------------------------------------------------
   finish <- function(inventory_metadata, parts, agg_levels, model_id = NULL) {
-    translator_job_update(job_id, stage = "assemble", stage_label = "Assembling the template and running the checks",
+    final_stage <<- TRUE
+    translator_job_update(job_id, stage = "assemble",
+                          stage_label = "Assembling the template and running the checks (1 to 3 minutes)",
                           progress = 0.94)
     # 2026-10-29: the call stack is kept when assembly fails, in the server
     # log and in the job record, because "$ operator is invalid for atomic

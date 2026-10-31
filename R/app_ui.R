@@ -817,20 +817,9 @@ app_ui <- function(request = NULL) {
            txt.textContent = text || 'Translator is working…';
            topRow.appendChild(txt);
            bubble.appendChild(topRow);
-           // Progress bar: fake-determinate, animates 0 -> 90% over 60s.
-           // Gives a tangible 'something is happening' feel during the
-           // long non-streaming force-template call. Stays at 90% until
-           // the work actually completes (translatorStreamEnd clears
-           // the bubble). The label below the bar shows elapsed seconds.
-           var barOuter = document.createElement('div');
-           barOuter.style.cssText = 'height:6px; background:#FFE082;' +
-             'border-radius:3px; overflow:hidden; width:100%;';
-           var barFill = document.createElement('div');
-           barFill.style.cssText = 'height:100%; width:0%;' +
-             'background:#FF6F00; transition:width 0.5s linear;';
-           barFill.dataset.barFill = 'true';
-           barOuter.appendChild(barFill);
-           bubble.appendChild(barOuter);
+           // 2026-10-31: no bar here. The job panel below the chat carries
+           // the one progress bar (it reads the job file and survives a
+           // reload); this bubble keeps the stage text and its clock.
            var elapsedLabel = document.createElement('div');
            elapsedLabel.style.cssText = 'font-size:0.78rem; color:#8D6E63;';
            elapsedLabel.textContent = '0s elapsed';
@@ -838,26 +827,15 @@ app_ui <- function(request = NULL) {
            elapsedLabel._translatorStart = Date.now();
            bubble.appendChild(elapsedLabel);
            slot.appendChild(bubble);
-           // The clock ticks every second on wall time for the whole run
-           // (2026-10-22: it used to stop at the first server progress
-           // message and then move only when data arrived, which looked
-           // frozen). Until the server reports real progress the bar
-           // creeps to 90% over a minute; after that the server owns it.
            var startTime = Date.now();
-           var targetSec = 60;
            bubble._translatorLast = { label: '', eta: '', real: false };
            var iv = setInterval(function() {
              var sec = Math.floor((Date.now() - startTime) / 1000);
              var last = bubble._translatorLast || {};
-             if (!last.real) {
-               var pct = Math.min(90, (sec / targetSec) * 90);
-               barFill.style.width = pct + '%';
-             }
              var m = Math.floor(sec / 60), s = sec % 60;
              var clock = (m > 0 ? m + ' min ' : '') + s + ' s elapsed';
              elapsedLabel.textContent = (last.label ? last.label + ' · ' : '') + clock +
-               (last.eta ? ' · ' + last.eta : '') +
-               (!last.real && sec >= targetSec ? ' · waiting for the first data from the AI' : '');
+               (last.eta ? ' · ' + last.eta : '');
            }, 1000);
            bubble._translatorProgressInterval = iv;
            var scroller = bubble.closest('[data-translator-scroller]');
