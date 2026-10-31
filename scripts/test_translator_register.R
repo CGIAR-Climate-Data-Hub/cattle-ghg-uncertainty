@@ -82,8 +82,8 @@ b <- translator_register_block(reg3, level = "emergent_dairy")
 ok(grepl("BINDING DECISIONS", b, fixed = TRUE) && grepl("inventory_year: 2022 [the user said (\"year 2022\")]", b, fixed = TRUE) &&
    grepl("For this batch ('emergent_dairy')", b, fixed = TRUE), "block lists decisions with their basis and the level")
 ok(grepl("UNRESOLVED calves_handling", translator_register_block(reg), fixed = TRUE), "unclear entries are flagged UNRESOLVED")
-ok(grepl("read the 2024 column for every row", translator_register_block(translator_register_set_user(list(), "inventory_year", "2024")), fixed = TRUE) &&
-   grepl("read the 2022 column", translator_register_block(translator_register_set_user(list(), "inventory_year", "the year 2022 please")), fixed = TRUE),
+ok(grepl("every row is read from the 2024 column", translator_register_block(translator_register_set_user(list(), "inventory_year", "2024")), fixed = TRUE) &&
+   grepl("read from the 2022 column", translator_register_block(translator_register_set_user(list(), "inventory_year", "the year 2022 please")), fixed = TRUE),
    "a decided year tells the model which column the single-year values come from")
 ok(identical(translator_register_block(list()), ""), "empty register -> empty block")
 ok(nchar(translator_register_digest(reg3)) == 12, "digest is 12 chars")
@@ -147,3 +147,20 @@ iss2 <- translator_consistency_checks(ps6, NULL, source = list(numbers = c(100, 
 ok(identical(iss2$severity[iss2$where == "category coverage"], "info"), "C6: a merge the user confirmed is accepted")
 ok(identical(resolve_subcat_default("calves", "Milk")$data_source, "biological_zero") && resolve_subcat_default("calves", "BW")$value == 60, "pooled calves resolve biological zeros and their own defaults")
 cat("REGISTER TESTS PASSED\n")
+
+# ---- scope and readings (2026-10-31) --------------------------------------------
+regs <- translator_register_set_user(list(), "value:DE:other_cows@emergent_beef", "55")
+regs <- translator_register_merge(regs, list(list(topic = "mms_split_source", decision = "herd-wide", basis = "file", confidence = "high", quote = "")), 2L)
+bs_e <- translator_register_block(regs, level = "emergent_beef"); bs_c <- translator_register_block(regs, level = "commercial_beef")
+ok(grepl("value:DE:other_cows@emergent_beef", bs_e, fixed = TRUE) && grepl("this production system only", bs_e, fixed = TRUE),
+   "a decision scoped with @ appears in its own system's block, marked as such")
+ok(!grepl("value:DE:other_cows@emergent_beef", bs_c, fixed = TRUE), "a scoped decision is left out of another system's block")
+ok(grepl("READINGS FROM THE FILE", bs_c, fixed = TRUE) && grepl("mms_split_source", bs_c, fixed = TRUE) && !grepl("- mms_split_source.*
+.*BINDING", bs_c),
+   "a file-basis entry is listed under readings, not as binding")
+pc_s <- list(parameters = data.frame(aggregation_level = "commercial_beef", sub_category = "other_cows", parameter = "DE", mean = 60, stringsAsFactors = FALSE))
+chk_s <- translator_register_check(regs, pc_s, level = "commercial_beef")
+ok(!any(grepl("^value:DE", chk_s$topic)), "a scoped numeric decision is not checked against another system")
+chk_e <- translator_register_check(regs, list(parameters = data.frame(aggregation_level = "emergent_beef", sub_category = "other_cows", parameter = "DE", mean = 60, stringsAsFactors = FALSE)), level = "emergent_beef")
+ok(any(grepl("^value:DE", chk_e$topic) & !chk_e$ok), "a scoped numeric decision is checked in its own system")
+ok(identical(.translator_norm_decision(list(topic = "DE range@Emergent Beef", decision = "x"))$topic, "de_range@emergent_beef"), "@ survives topic normalisation")

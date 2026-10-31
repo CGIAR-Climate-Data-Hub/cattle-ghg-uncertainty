@@ -25,7 +25,7 @@ Country X    2022   dairy_cows     500000       275              300            
 | `live_weight_kg` | → `BW` | `live_weight` is in PARAM_ALIASES |
 | `mature_wt_kg` | → `MW` | unit OK |
 | `adg_kg_d` | → `WG` | "average daily gain": adult dairy cow usually 0 |
-| `milk_kg_d` | → `Milk` | confirm "per lactating cow" not "herd total". Per lactating cow needs converting: × lactation length ÷ 365, because `Milk` is the annual average per head |
+| `milk_kg_d` | → `Milk` | confirm "per lactating cow" not "herd total". A per-lactating-cow value needs converting, because `Milk` is the annual average per head: value × lactation length ÷ 365. State the file's value, the lactation length and the result in your reply; the server recomputes it |
 | `milk_fat_pct` | → `Fat` | |
 | `digest_pct` | → `DE` | `DE_pct` is in PARAM_ALIASES |
 | `ym_pct` | → `Ym` | `Ym_pct` is in PARAM_ALIASES |
@@ -58,11 +58,11 @@ growing males 1-3yr         400,000      180            0.20           0        
 | `N` | → `N`, value cleaned of thousands separator | strip commas |
 | `Live_BW (kg)` | → `BW` | "Live_BW" → BW alias |
 | `ADG (kg/day)` | → `WG` | |
-| `Milk (L/d)` | → `Milk` (kg/day) | **unit check: L vs kg**, milk density ≈ 1.03 kg/L; for accuracy multiply L by 1.03, but for cattle inventory 1:1 is acceptable. Ask user if precision matters; report the choice. |
+| `Milk (L/d)` | → `Milk` (kg/day) | **unit check: L vs kg**, milk density 1.03 kg/L: kg = L × 1.03. One conversion, stated in the reply (file value, factor, result); the server recomputes it |
 | `DE %` | → `DE` | percent OK |
-| `Ym` | → `Ym` | confirm units: if value > 1 assume %, if value < 0.2 assume fraction |
+| `Ym` | → `Ym` | confirm units: a value above 1 is most likely a percentage and a value below 0.2 a fraction, but ask in section D; don't assume |
 
-**Decision flagged to user:** "I treated `Milk (L/d)` as kg/day 1:1. If you'd prefer kg = L × 1.03, say so and I'll redo it."
+**Conversion stated to the user:** "Milk (L/d) 1.5 was converted to kg/day: 1.5 × 1.03 = 1.545."
 
 ---
 
@@ -145,7 +145,7 @@ dairy_cows      120000    1320             0
 - `live_weight_lb = 1320` → `BW = 1320 × 0.4536 = 598.8` kg
 - `adg_lb_d = 0` → `WG = 0` (zero is unit-agnostic)
 
-**Sanity check:** 1320 lb ≈ 599 kg, plausible for a US Holstein. Report the conversion in the "Units I changed" list.
+**Sanity check:** 1320 lb ≈ 599 kg, plausible for a US Holstein. Report the conversion in the "Units I changed" list with the file's number and the factor (1320 lb × 0.4536 = 598.8 kg); the row stays `user_file` and the server recomputes it.
 
 ---
 
@@ -169,12 +169,6 @@ dairy_cows      120000    1320             0
 - `dry` → `other_cows` (mature non-lactating females)
 - `bulls` → `bulls`
 - `young stock` → ambiguous: could be `heifers`, `growing_males`, or both. **Ask the user**: "Is your 'young stock' all-female (heifers), all-male (growing males), or mixed? If mixed, I can either pool them as one group with sex = mixed, or split them, say which."
-
----
-
-## Example 9: User pastes a PDF table screenshot
-
-You can read images and PDFs. Extract the table to a markdown table first, show it back to the user for confirmation, then proceed with mapping as above. **Always confirm the extracted numbers before mapping**: OCR errors are silent and dangerous.
 
 ---
 
@@ -206,12 +200,12 @@ Note: a raw column for managed-storage volatilisation / leaching (e.g. `Frac_Gas
 
 ## Example 11: Pre-aggregated columns + parallel breakdown blocks
 
-This pattern bites repeatedly with real survey data, so call it out explicitly. Typical layout (real example from a 2026 Zambia inventory):
+This pattern bites repeatedly with real survey data, so call it out explicitly. Typical layout (synthetic values in the shape of a national livestock survey):
 
 ```
 | Param | Sub-cat | sex | Local breed % | mean | s.d. | n | DEFF | Cross breed % | mean | s.d. | n | DEFF | ... | Sub-category | mean | MoEcomb | Lower CI | Upper CI |
-| LW    | Cows    |     | 0.633         | 300  | 65   | 291 | 5.2  | 0.366         | 334  | 67   | 114 | 2.9 | ... | Cows         | 312.78 | 0.22    | 243.3    | 382.2    |
-| LW    | Bulls   |     | 0.652         | 319  | 119  | 91  | 4.8  | 0.347         | 445  | 137  | 41  | 2.0 | ... | Bulls        | 362.89 | 0.33    | 243.0    | 482.7    |
+| LW    | Cows    |     | 0.60          | 290  | 60   | 250 | 4.9  | 0.40          | 330  | 64   | 120 | 3.1 | ... | Cows         | 306.0  | 0.21    | 241.7    | 370.3    |
+| LW    | Bulls   |     | 0.65          | 310  | 110  | 90  | 4.6  | 0.35          | 430  | 130  | 45  | 2.2 | ... | Bulls        | 352.0  | 0.32    | 239.4    | 464.6    |
 ```
 
 The file has **two parallel breakdown blocks** (Local breed / Cross breed, each with mean / s.d. / n / DEFF) AND a final block with the **already-computed weighted aggregate** (mean / lower CI / upper CI, indexed by a second `Sub-category` label).
@@ -222,14 +216,16 @@ The file has **two parallel breakdown blocks** (Local breed / Cross breed, each 
 - carry the asymmetric CI bounds you want for `lower_bound` / `upper_bound`,
 - are the values the file author would put in a table if asked.
 
-For the Zambia example above, the correct mapping for `BW` is:
+For the example above, the correct mapping for `BW` is:
 
-| sub_category | value | lower_bound | upper_bound | distribution | data_source |
+| sub_category | mean | lower | upper | distribution | data_source |
 |---|---|---|---|---|---|
-| other_cows | 312.78 | 243.3 | 382.2 | pert | file |
-| bulls | 362.89 | 243.0 | 482.7 | pert | file |
+| other_cows | 306.0 | 241.7 | 370.3 | pert | user_file |
+| bulls | 352.0 | 239.4 | 464.6 | pert | user_file |
 
-**DO NOT** pick just the Local-breed mean (300) or the Cross-breed mean (334): that ignores 30%+ of the data and the file author's aggregation work.
+(`pert` here because the file names no distribution; a file that names one keeps it.)
+
+**DO NOT** pick just the Local-breed mean (290) or the Cross-breed mean (330): that ignores 30%+ of the data and the file author's aggregation work.
 
 **Signals that an aggregated column is present:** a repeated sub-category label sitting further right in the file; column names like `W-av`, `weighted_mean`, `combined`, `consolidated`, `pooled`, `mean (all)`, `aggregate`, or just `mean` sitting next to a `Sub-category` label after several breakdown blocks; a column named `MoEcomb` or `combined CI` nearby; presence of `Lower CI` / `Upper CI` columns *only on the aggregate side*, not on the breakdowns.
 

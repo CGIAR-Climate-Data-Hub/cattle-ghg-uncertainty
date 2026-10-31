@@ -196,6 +196,21 @@ translator_source_fingerprint <- function(parsed) {
 # it is 5 % or more and the row is below 1 with no explicit bounds, the row
 # is multiplied by 100 (never beyond 200 %) and the correction is listed
 # in piece$server_corrections for the checks.
+
+# One shape for piece$server_corrections whichever fix adds to it
+# (2026-10-31): a row may carry its own severity; the others take warn.
+.translator_add_corrections <- function(cur, corr) {
+  cols <- c("where", "issue", "severity", "sheet", "group", "parameter", "check")
+  fill <- function(d) {
+    if (!is.data.frame(d) || !nrow(d)) return(NULL)
+    for (cn in cols) if (!cn %in% names(d)) d[[cn]] <- if (cn == "severity") "warn" else NA_character_
+    d[cols]
+  }
+  out <- rbind(fill(cur), fill(corr))
+  if (!is.null(out)) rownames(out) <- NULL
+  out
+}
+
 .translator_fix_uncertainty_scale <- function(piece) {
   ps <- piece$parameters
   if (!is.data.frame(ps) || !nrow(ps) || !all(c("parameter", "uncertainty_pct") %in% names(ps)))
@@ -235,8 +250,7 @@ translator_source_fingerprint <- function(parsed) {
   ps$uncertainty_pct <- u
   piece$parameters <- ps
   corr <- do.call(rbind, rows); rownames(corr) <- NULL
-  piece$server_corrections <- if (is.data.frame(piece$server_corrections) && nrow(piece$server_corrections))
-    rbind(piece$server_corrections, corr) else corr
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
   piece
 }
 
@@ -288,8 +302,7 @@ translator_source_fingerprint <- function(parsed) {
   if ("upper" %in% names(ps)) ps$upper <- hi
   piece$parameters <- ps
   corr <- do.call(rbind, rows); rownames(corr) <- NULL
-  piece$server_corrections <- if (is.data.frame(piece$server_corrections) && nrow(piece$server_corrections))
-    rbind(piece$server_corrections, corr) else corr
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
   piece
 }
 
@@ -349,19 +362,76 @@ translator_source_fingerprint <- function(parsed) {
   }))
   rownames(corr) <- NULL
   piece$parameters <- ps[!drop, , drop = FALSE]
-  piece$server_corrections <- if (is.data.frame(piece$server_corrections) && nrow(piece$server_corrections))
-    rbind(piece$server_corrections, corr) else corr
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
   piece
 }
 
 # The template JSON after the server-side corrections; the same text when
 # there was nothing to correct, so the caller can tell.
+# 2026-10-31: a time-series row with a year and no value at all says
+# nothing and hides a dropped series (a blank feedlot MW column looked the
+# same as a missing one). Such rows are removed and listed.
+.translator_drop_empty_ts_rows <- function(piece) {
+  ts <- piece$parameter_timeseries
+  if (!is.data.frame(ts) || !nrow(ts) || !"year" %in% names(ts)) return(piece)
+  keys <- c("cattle_type", "aggregation_level", "sub_category", "year", ".requested_aggregation_level")
+  vcols <- setdiff(names(ts), keys)
+  if (!length(vcols)) return(piece)
+  has_val <- rep(FALSE, nrow(ts))
+  for (cn in vcols) has_val <- has_val | is.finite(suppressWarnings(as.numeric(ts[[cn]])))
+  if (all(has_val)) return(piece)
+  gone <- ts[!has_val, , drop = FALSE]
+  grp <- unique(paste(gone$aggregation_level %||% "", gone$sub_category %||% "", sep = " / "))
+  corr <- data.frame(
+    where = "Parameter_TimeSeries",
+    issue = sprintf(paste0("%d time-series row(s) carried a year and no value (%s) and were removed. ",
+                           "If the file has a series for these groups, it was not written: check the trend."),
+                    nrow(gone), paste(utils::head(grp, 6), collapse = "; ")),
+    severity = "warn", sheet = "Parameter_TimeSeries", group = NA_character_, parameter = NA_character_,
+    check = "time-series row without values removed", stringsAsFactors = FALSE)
+  piece$parameter_timeseries <- ts[has_val, , drop = FALSE]
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
+  piece
+}
+
+# 2026-10-31: a row with both a percentage and a bound pair says two
+# things. When the bounds are the percentage's own (mean x (1 +/- u/100))
+# nothing is lost; otherwise the bounds are the file's and the percentage
+# is dropped, and the row is listed.
+.translator_fix_double_spread <- function(piece) {
+  ps <- piece$parameters
+  if (!is.data.frame(ps) || !nrow(ps) || !all(c("uncertainty_pct", "lower", "upper", "mean") %in% names(ps)))
+    return(piece)
+  u <- suppressWarnings(as.numeric(ps$uncertainty_pct)); lo <- suppressWarnings(as.numeric(ps$lower))
+  hi <- suppressWarnings(as.numeric(ps$upper)); m <- suppressWarnings(as.numeric(ps$mean))
+  both <- which(is.finite(u) & u > 0 & is.finite(lo) & is.finite(hi))
+  if (!length(both)) return(piece)
+  own <- abs(lo[both] - m[both] * (1 - u[both] / 100)) <= 1e-6 * pmax(1, abs(m[both])) &
+         abs(hi[both] - m[both] * (1 + u[both] / 100)) <= 1e-6 * pmax(1, abs(m[both]))
+  fix <- both[!own]
+  if (!length(fix)) return(piece)
+  rows <- lapply(fix, function(i) data.frame(
+    where = sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], ps$parameter[i]),
+    issue = sprintf("The row carried both a percentage (%s%%) and bounds (%s to %s) that are not that percentage; the bounds were kept and the percentage dropped. Check which one the file gives.",
+                    format(signif(u[i], 4)), format(signif(lo[i], 6)), format(signif(hi[i], 6))),
+    severity = "warn", sheet = "Parameters",
+    group = paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i] %||% "", sep = "||"),
+    parameter = as.character(ps$parameter[i]), check = "percentage and bounds on one row", stringsAsFactors = FALSE))
+  ps$uncertainty_pct[fix] <- NA
+  piece$parameters <- ps
+  corr <- do.call(rbind, rows); rownames(corr) <- NULL
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
+  piece
+}
+
 .translator_fix_piece_json <- function(json, families = NULL) {
   if (is.null(json) || !nzchar(json)) return(json)
   piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
   if (is.null(piece) || !is.data.frame(piece$parameters)) return(json)
   before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
   piece <- tryCatch(.translator_drop_unsourced_intake(piece, families), error = function(e) piece)
+  piece <- tryCatch(.translator_drop_empty_ts_rows(piece), error = function(e) piece)
+  piece <- tryCatch(.translator_fix_double_spread(piece), error = function(e) piece)
   piece <- .translator_fix_uncertainty_scale(piece)
   piece <- tryCatch(.translator_fix_year_from_timeseries(piece), error = function(e) piece)
   piece <- tryCatch(.translator_apply_relative_ranges(piece), error = function(e) piece)
@@ -1438,8 +1508,10 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     sc <- piece$server_corrections
     if (is.data.frame(sc) && nrow(sc))
       for (i in seq_len(nrow(sc)))
-        add(sc$where[i], sc$issue[i], severity = "warn", sheet = sc$sheet[i],
-            group = sc$group[i], parameter = sc$parameter[i], check = sc$check[i] %||% "corrected by the tool")
+        add(sc$where[i], sc$issue[i],
+            severity = if ("severity" %in% names(sc) && !is.na(sc$severity[i]) && nzchar(sc$severity[i])) sc$severity[i] else "warn",
+            sheet = sc$sheet[i], group = sc$group[i], parameter = sc$parameter[i],
+            check = sc$check[i] %||% "corrected by the tool")
   }
 
   if (!length(out))

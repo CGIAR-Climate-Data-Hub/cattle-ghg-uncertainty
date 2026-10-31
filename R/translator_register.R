@@ -259,7 +259,8 @@ translator_register_assume_defaults <- function(register) {
 .translator_norm_decision <- function(e) {
   if (!is.list(e)) return(NULL)
   topic <- tolower(trimws(as.character(e$topic %||% "")))
-  topic <- gsub("[^a-z0-9_:!./ -]", "", topic)
+  # @ scopes a decision to one production system (2026-10-31)
+  topic <- gsub("[^a-z0-9_:!./@ -]", "", topic)
   topic <- gsub("[ -]+", "_", topic)
   decision <- trimws(as.character(e$decision %||% ""))
   if (!nzchar(topic) || !nzchar(decision)) return(NULL)
@@ -369,34 +370,67 @@ translator_register_missing <- function(register) {
 
 # The decided entries as the binding block appended to every emission
 # request; "" when there is nothing to say.
+# The production system a topic is scoped to ("value:DE:cows@emergent_beef"
+# gives "emergent_beef"), or "" for a decision that applies everywhere
+# (2026-10-31).
+.translator_topic_scope <- function(topic) {
+  if (!grepl("@", topic %||% "", fixed = TRUE)) return("")
+  .translator_norm_key(sub("^.*@", "", topic))
+}
+.translator_topic_in_scope <- function(topic, level = NULL) {
+  sc <- .translator_topic_scope(topic)
+  if (!nzchar(sc) || is.null(level) || !nzchar(level)) return(TRUE)
+  lv <- .translator_norm_key(level)
+  identical(sc, lv) || grepl(sc, lv, fixed = TRUE) || grepl(lv, sc, fixed = TRUE)
+}
+
 translator_register_block <- function(register, level = NULL) {
   register <- register %||% list()
   if (!length(register)) return("")
-  decided <- Filter(function(e) identical(e$status, "decided") && nzchar(e$decision), register)
-  unclear <- Filter(function(e) identical(e$status, "unclear"), register)
-  if (!length(decided) && !length(unclear)) return("")
-  lines <- c(
-    "BINDING DECISIONS (confirmed in this conversation). They override the",
-    "uploaded file, the catalogue defaults and anything you assumed earlier.",
-    "If a row would contradict one of them, follow the decision and tag that",
-    "row data_source = 'user_chat'.")
+  # 2026-10-31: a decision scoped to another production system is left out
+  # of this batch's block (a DE range meant for one system was applied to
+  # all five); a reading the model made from the file is listed apart, not
+  # as binding, so a wrong reading does not lock itself in.
+  in_scope <- Filter(function(e) .translator_topic_in_scope(e$topic, level), register)
+  decided <- Filter(function(e) identical(e$status, "decided") && nzchar(e$decision) &&
+                      !identical(e$basis, "file"), in_scope)
+  readings <- Filter(function(e) identical(e$status, "decided") && nzchar(e$decision) &&
+                       identical(e$basis, "file"), in_scope)
+  unclear <- Filter(function(e) identical(e$status, "unclear"), in_scope)
+  if (!length(decided) && !length(unclear) && !length(readings)) return("")
   fmt <- function(e) {
     src <- switch(e$basis, user = "the user said", file = "from the file",
                   default = "IPCC default", assumed = "assumed", server = "server")
     q <- if (nzchar(e$quote %||% "")) sprintf(' ("%s")', substr(e$quote, 1, 120)) else ""
-    sprintf("- %s: %s [%s%s]", e$topic, e$decision, src, q)
+    sc <- .translator_topic_scope(e$topic)
+    sprintf("- %s: %s [%s%s]%s", e$topic, e$decision, src, q,
+            if (nzchar(sc)) sprintf(" (this production system only: %s)", sc) else "")
   }
-  for (e in decided) lines <- c(lines, fmt(e))
-  # 2026-10-23: the single-year values come from the chosen year's column,
-  # not from the exploration table (built before the year was settled)
+  lines <- character(0)
+  if (length(decided) || length(unclear)) {
+    lines <- c(
+      "BINDING DECISIONS (confirmed in this conversation). They override the",
+      "uploaded file, the catalogue defaults and anything you assumed earlier.",
+      "If a row would contradict one of them, follow the decision and tag that",
+      "row data_source = 'user_chat'. A decision marked for one production",
+      "system applies to that system only.")
+    for (e in decided) lines <- c(lines, fmt(e))
+  }
+  # 2026-10-23: the single-year values come from the chosen year's column
   yr <- suppressWarnings(as.integer(sub("^.*?(\\d{4}).*$", "\\1", register$inventory_year$decision %||% "")))
   if (identical(register$inventory_year$status, "decided") && !is.na(yr))
     lines <- c(lines, sprintf(paste0("Single-year values (the Parameters sheet) are the file's values for %d: where the file ",
-                                     "has a column per year, read the %d column for every row, not the column used in your ",
-                                     "exploration table. The time series row for %d must carry the same numbers."), yr, yr, yr))
+                                     "has a column per year, every row is read from the %d column, and the time series ",
+                                     "row for %d carries the same numbers."), yr, yr, yr))
   for (e in unclear)
     lines <- c(lines, sprintf("- UNRESOLVED %s: %s. Do not resolve this yourself: follow the file literally and tag affected rows data_source = 'placeholder'.",
                               e$topic, e$decision))
+  if (length(readings)) {
+    lines <- c(lines, "",
+      "READINGS FROM THE FILE (what you read earlier; verify each against the",
+      "file as you emit, and where the file says otherwise the file wins):")
+    for (e in readings) lines <- c(lines, fmt(e))
+  }
   if (!is.null(level) && nzchar(level))
     lines <- c(lines, sprintf("For this batch ('%s') the decisions above apply unchanged.", level))
   paste(lines, collapse = "\n")
@@ -707,11 +741,12 @@ translator_register_check <- function(register, piece, level = NULL) {
     }
   }
 
-  # numeric decisions: topic value:<parameter>:<sub_category>
+  # numeric decisions: topic value:<parameter>:<sub_category>[@level]
   for (nm in names(register)) {
     e <- register[[nm]]
     if (!identical(e$status, "decided") || !grepl("^value:", nm)) next
-    parts <- strsplit(nm, ":", fixed = TRUE)[[1]]
+    if (!.translator_topic_in_scope(nm, level)) next
+    parts <- strsplit(sub("@.*$", "", nm), ":", fixed = TRUE)[[1]]
     if (length(parts) < 3L) next
     want <- suppressWarnings(as.numeric(gsub("[^0-9.eE+-]", "", e$decision)))
     if (!is.finite(want)) next

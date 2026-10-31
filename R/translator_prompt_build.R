@@ -493,6 +493,8 @@ build_worked_example_md <- function(partials_dir = .TP_PARTIALS_DIR) {
 #   {{default:PARAM:SUBCAT}}   the resolver's value for SUBCAT
 #   {{unc:PARAM}}              the catalogue suggested uncertainty %
 #   {{n_params}}               nrow(PARAM_CATALOGUE)
+#   {{n_params_required}}      the same without the optional tier (GE, DMI):
+#                              the rows every group carries (2026-10-31)
 #   {{params}}                 the comma-separated parameter codes
 #   {{subcats}}                the comma-separated sub-category codes
 #   {{subcats_non_dairy}}      the same minus dairy_cows
@@ -504,6 +506,7 @@ translator_prompt_fill_placeholders <- function(txt) {
     parts <- strsplit(tok, ":", fixed = TRUE)[[1]]
     switch(parts[1],
       "n_params" = as.character(nrow(PARAM_CATALOGUE)),
+      "n_params_required" = as.character(sum(!PARAM_CATALOGUE$param_tier %in% "optional")),
       "params"   = paste(PARAM_CATALOGUE$parameter, collapse = ", "),
       "subcats"  = paste(ANIMAL_SUBCATEGORIES, collapse = ", "),
       "subcats_non_dairy" = paste(setdiff(ANIMAL_SUBCATEGORIES, "dairy_cows"), collapse = ", "),

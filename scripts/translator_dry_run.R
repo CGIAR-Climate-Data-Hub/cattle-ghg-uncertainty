@@ -61,7 +61,12 @@ calls <- character()
     if (!rejected)
       stopifnot(grepl("BINDING DECISIONS", last, fixed = TRUE),
                 grepl(sprintf("For this batch ('%s')", lv), last, fixed = TRUE),
-                grepl("inventory_year: 2022", last, fixed = TRUE))
+                grepl("inventory_year: 2022", last, fixed = TRUE),
+                # 2026-10-31 (Stage 2): the checklist and the GE/DMI sentence
+                # sit in every batch request, before the decisions
+                grepl("EMISSION CHECKLIST", last, fixed = TRUE),
+                grepl("no GE or DMI row", last, fixed = TRUE),
+                regexpr("EMISSION CHECKLIST", last, fixed = TRUE) < regexpr("BINDING DECISIONS", last, fixed = TRUE))
     nudge_checked <<- nudge_checked + 1L
     # On a decision re-emit (WP1 step 4) the stub honours the pooled-calves
     # decision: the male half is dropped, the female half stands for the

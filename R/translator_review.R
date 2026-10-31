@@ -208,6 +208,24 @@
   }
   piece$parameters <- upd(piece$parameters, rv$parameters,
                           c("aggregation_level", "sub_category", "parameter"), "Parameters")
+  # 2026-10-31: a Parameters row the review gives a percentage for, without
+  # bounds, drops the bounds it had (as the manure rule below); otherwise
+  # the double-spread fix would keep the old bounds and drop the percentage.
+  rp_ <- as_df(rv$parameters); pp <- piece$parameters
+  if (is.data.frame(rp_) && nrow(rp_) && is.data.frame(pp) && nrow(pp) &&
+      all(c("aggregation_level", "sub_category", "parameter") %in% names(rp_)) &&
+      "uncertainty_pct" %in% names(rp_)) {
+    pk <- keyof(pp, c("aggregation_level", "sub_category", "parameter"))
+    rk <- keyof(rp_, c("aggregation_level", "sub_category", "parameter"))
+    u <- suppressWarnings(as.numeric(rp_$uncertainty_pct))
+    lo_r <- if ("lower" %in% names(rp_)) suppressWarnings(as.numeric(rp_$lower)) else rep(NA_real_, nrow(rp_))
+    hi_r <- if ("upper" %in% names(rp_)) suppressWarnings(as.numeric(rp_$upper)) else rep(NA_real_, nrow(rp_))
+    j <- match(rk[is.finite(u) & u > 0 & !is.finite(lo_r) & !is.finite(hi_r)], pk); j <- j[!is.na(j)]
+    if (length(j)) {
+      for (cl in c("lower", "upper")) if (cl %in% names(pp)) pp[[cl]][j] <- NA
+      piece$parameters <- pp
+    }
+  }
   piece$manure_management <- upd(piece$manure_management, rv$manure_management,
                                  c("aggregation_level", "sub_category", "mms_type"), "Manure_Management")
   # A row the review gives a relative spread for drops the bounds it had, so

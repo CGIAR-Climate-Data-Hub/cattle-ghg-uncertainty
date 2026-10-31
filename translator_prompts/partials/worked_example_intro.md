@@ -13,6 +13,6 @@ What the example demonstrates:
 - `param_type` is `activity_data` for the population parameter only. Every other parameter is a `coefficient`, no matter how measurable it is on-farm. This is the single most common mistake.
 - Asymmetric parameters carry absolute `lower` and `upper` bounds instead of a symmetric `uncertainty_pct`.
 - Strict JSON: no comments, no expressions, no trailing commas, no unquoted keys.
-- Every value is a literal. Never write `4.5*1.032`; compute `4.644` yourself before emitting.
+- Every value is a literal: never write an expression such as `4.5*1.032` in the JSON. A converted value is written as its result, and the file's number and the factor are stated in your reply so the server can recompute it.
 
 The country-specific values here (herd sizes, weights, milk yield, feed quality) are what a user would supply. Everything else is the IPCC default the tool would otherwise fill in for them.

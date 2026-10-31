@@ -124,8 +124,14 @@ ok(is.data.frame(fy$server_corrections) && nrow(fy$server_corrections) == 1 && f
    "the correction is listed")
 jy <- as.character(jsonlite::toJSON(pzy, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows"))
 jy2 <- jsonlite::fromJSON(.translator_fix_piece_json(jy), simplifyVector = TRUE)
-ok(jy2$parameters$mean[jy2$parameters$parameter == "N" & jy2$parameters$sub_category == "bulls"] == 150 && nrow(jy2$server_corrections) == 2,
-   "the JSON path applies the year fix together with the scale fix (the bulls N row has bounds, so only DE gets the scale fix)")
+# 2026-10-31: the bulls N row (10 %, 80 to 120 around 100) and the heifers Ym
+# row (0.3, 5 to 8) carry both a percentage and bounds that are not that
+# percentage, so the double-spread fix keeps the bounds, drops the
+# percentage and lists two more corrections.
+ok(jy2$parameters$mean[jy2$parameters$parameter == "N" & jy2$parameters$sub_category == "bulls"] == 150 && nrow(jy2$server_corrections) == 4 &&
+   sum(jy2$server_corrections$check == "percentage and bounds on one row") == 2 &&
+   is.na(jy2$parameters$uncertainty_pct[jy2$parameters$parameter == "N" & jy2$parameters$sub_category == "bulls"]),
+   "the JSON path applies the double-spread fix, the year fix and the scale fix (the bulls N row keeps its bounds, loses its percentage; only DE gets the scale fix)")
 # a manure coefficient that is not in the file, when the file carries that coefficient
 src_m <- list(numbers = c(100, 200, 55, 60, 25, 0.02), families = c("MCF", "EF3"), family_values = list())
 mm_v <- data.frame(cattle_type = "non_dairy", aggregation_level = "lvl", sub_category = c("bulls", "heifers"), mms_type = "pasture",

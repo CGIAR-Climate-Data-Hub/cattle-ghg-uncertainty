@@ -1456,6 +1456,42 @@ anthropic_chat_stream <- function(messages,
 # in the message text and checks `tool_used` on the reply; a call that
 # should have produced a piece but came back as text is repeated once with
 # tool_choice forced (.anthropic_tool_call below).
+# 2026-10-31: the controlled vocabularies are enums in the schema and
+# aggregation_level is required on every row. The vocabularies live in
+# files sourced after this one (DISTRIBUTION_TYPES, MMS_DEFAULTS), so they
+# are injected when the tool is built, not when this file is sourced. The
+# tool block is cached, so the enums cost nothing per call.
+.ANTHROPIC_SPECIES      <- c("cattle_dairy", "cattle_non_dairy", "cattle_mixed")
+.ANTHROPIC_IPCC_VERSIONS <- c("2006", "2019_refinement")
+.ANTHROPIC_CATTLE_TYPES <- c("dairy", "non_dairy")
+.anthropic_tool_input_schema_live <- function() {
+  s <- .ANTHROPIC_TOOL_INPUT_SCHEMA
+  dists <- if (exists("DISTRIBUTION_TYPES")) get("DISTRIBUTION_TYPES") else NULL
+  mms   <- if (exists("MMS_DEFAULTS")) tryCatch(as.character(get("MMS_DEFAULTS")$id), error = function(e) NULL) else NULL
+  p <- s$properties$parameters$items
+  if (length(dists)) p$properties$distribution$enum <- I(dists)
+  p$properties$cattle_type <- list(type = "string", enum = I(.ANTHROPIC_CATTLE_TYPES))
+  p$required <- I(unique(c("aggregation_level", p$required)))
+  s$properties$parameters$items <- p
+  m <- s$properties$manure_management$items
+  if (length(mms)) m$properties$mms_type$enum <- I(mms)
+  m$properties$cattle_type <- list(type = "string", enum = I(.ANTHROPIC_CATTLE_TYPES))
+  m$required <- I(unique(c("aggregation_level", m$required)))
+  s$properties$manure_management$items <- m
+  ts <- s$properties$parameter_timeseries$items
+  if (!is.null(ts)) {
+    ts$properties$aggregation_level <- list(type = "string")
+    ts$properties$sub_category <- list(type = "string")
+    ts$required <- I(unique(c("aggregation_level", "sub_category", ts$required)))
+    s$properties$parameter_timeseries$items <- ts
+  }
+  md <- s$properties$inventory_metadata
+  md$properties$species$enum <- I(.ANTHROPIC_SPECIES)
+  md$properties$ipcc_version$enum <- I(.ANTHROPIC_IPCC_VERSIONS)
+  s$properties$inventory_metadata <- md
+  s
+}
+
 anthropic_translator_tools <- function() {
   list(list(
     name         = .ANTHROPIC_TOOL_NAME,
@@ -1463,7 +1499,7 @@ anthropic_translator_tools <- function() {
       "Emit one piece of the user's filled IPCC cattle inventory template,",
       "as directed by the `mode` the server's message names. Called only",
       "when the server asks; never from a chat reply."),
-    input_schema = .ANTHROPIC_TOOL_INPUT_SCHEMA))
+    input_schema = .anthropic_tool_input_schema_live()))
 }
 .ANTHROPIC_TOOL_CHOICE_FORCE <- list(type = "tool", name = .ANTHROPIC_TOOL_NAME)
 .ANTHROPIC_TOOL_CHOICE_NONE  <- list(type = "none")
