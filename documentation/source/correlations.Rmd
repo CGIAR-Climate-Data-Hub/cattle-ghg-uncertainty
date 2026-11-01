@@ -17,7 +17,7 @@ params:
      a real national inventory, unnamed on request; its figures come from C:/tmp/g.R (log
      C:/tmp/shots/guide_grid_2026-10-30.log). The screenshots are from the app of 30 October. -->
 
-This guide explains, step by step, what correlations are and why they matter for your uncertainty analysis. It then shows where to set them in the tool, what each choice means, and what each choice changes in the results of a real inventory.
+This guide explains, step by step, what correlations are and why they matter for your uncertainty analysis. It then shows where to set them in the tool, what each choice means, what each choice changes in the results of a real inventory, and which option to choose for your own data.
 
 ## 1. What is a correlation?
 
@@ -95,7 +95,7 @@ The result of the check appears in a table under the option (Figure 6). Each row
 
 ![Figure 6. The check under "From template", for a series of 35 years.](img/corr/fig6_check.png){width=100%}
 
-In Figure 6, the series has 35 years. For digestibility and crude protein, the data show 0.71 and the link is clear (p below 0.001), so the run uses 0.71. For milk yield and digestibility, the data show −0.27, but this could be chance (p = 0.13) and it goes in the opposite direction to the literature, so the run keeps the literature value of 0.30. For the other five links, at least one of the two inputs is not in the series, and the run keeps the literature values.
+In the example inventory of section 5, the series has 35 years. Two links pass all four checks and take the value from the data: milk yield and body weight (+0.55 in the data, +0.30 in the literature; p below 0.001) and digestibility and crude protein (+0.79 against +0.20; p below 0.001). Two links are not clear enough: body weight and mature weight (−0.27, p = 0.12) and milk yield and digestibility (−0.16, p = 0.37), the second also in the opposite direction to the literature, so both keep the literature value. Two links cannot be tested because one of the two inputs does not vary in the series (weight gain, milk fat), and one because the methane conversion factor is not in the series. Figure 6 shows the table as the tool displays it, for an earlier version of the same file.
 
 **Advanced: manual entry.** This option lets you give your own table of correlations, for example from a study of your own herds. When you select it, two templates appear below the option. The first is a blank table with the names of all your inputs already in its rows and columns. The second is the same table filled with the seven structural-default links, as a starting point. Download one, fill it in Excel with values between −1 and +1 (the diagonal stays at 1), save it as CSV, and upload it. An input missing from your table is drawn on its own. Choose this option only if you have measured correlations.
 
@@ -109,23 +109,8 @@ The second card asks how you got the number of animals in each group (Figure 7).
 
 Choose **One national count, split into groups** when your group numbers come from one census or one official total, divided into groups by shares. If that count is 5% too low, every group is 5% too low at the same time, so the errors add up in the total. Choose **Partly** when your numbers come from one total, but some group numbers were then adjusted with their own surveys or data. Choose **Separate counts per group** only when each group was really counted with its own survey. Some groups will then be too high and others too low, so the errors partly cancel in the total.
 
-## 5. Trends
 
-In trend mode, you compare two years, for example 1990 and 2024. What matters then is the error **in the change** between the years, not only the error in each year.
-
-Suppose your animal numbers for 2024 come from a census, and your numbers for 1990 were estimated from the same census. If the census is 5% too low, both years are 5% too low, and the change between the two years is still right: the error cancels. Now suppose each year has its own survey. Each year then has its own error, the errors do not cancel, and the change is much more uncertain. The same is true for emission factors: if you use the same IPCC default value for every year, any error in it is the same every year, and it cancels in the change.
-
-This is why, in trend mode, the second card asks two more questions (Figure 8).
-
-![Figure 8. The two questions between years, shown on the second card of Tab 3 in trend mode only.](img/corr/fig8_years.png){width=100%}
-
-The first question is how your animal numbers change from year to year. Choose **One census, with the years in between filled in** when you have a census every five or ten years and the other years are estimated from it: the census error is then the same in all years, and it cancels when years are compared. Choose **A census every few years, adjusted in between** when you have regular counts and the years in between are updated with new information; this is the middle case. Choose **A new survey every year** when each year is really a fresh count: each year then has its own error, and nothing cancels.
-
-The second question is how your emission factors and coefficients were made. Choose **The same factors for every year** when you use IPCC defaults, or one national study for every year: the error is the same in every year and cancels in the change. Choose **Factors revised every few years** when your factors are updated from time to time and nearby years rely on the same data: the error then cancels in part. Choose **New factors every year** only when each year's factors were measured anew: nothing cancels.
-
-In both cases, choose the option that describes how your numbers and factors were really made.
-
-## 6. Example: what the choices change
+## 5. Example: what the choices change
 
 The example is a national cattle inventory with 27 groups of animals: dairy and other cattle, in five production systems, about 6.4 million animals in the inventory year 2024. The country gave its own uncertainty range for most inputs, and a series of 35 years for the inputs that change over time. Each run used 4,000 iterations and the same starting point for the random draws, so the only difference between two runs is the choice tested. The total emissions are 15.4 million t CO~2~e in every run; the choices change only the uncertainty around that total.
 
@@ -144,3 +129,26 @@ The table crosses the two cards of Tab 3: each row is an answer to "Do some inpu
 **Reading the columns: how the animal numbers were made changes the uncertainty by 15 points.** With separate counts, the 27 groups each have their own error. Some are too high and some too low, so the errors partly cancel in the total. With one national count split into groups, a count that is too low makes every group too low at the same time. Nothing cancels, so the range is much wider. Neither answer is better than the other: the right one is the one that describes how your numbers were made.
 
 These are the results expected from the method: the column effect is large because the animal numbers are the largest source of uncertainty and the column decides whether their errors add up; the row effect is small because the links are weak and partly cancel.
+
+## 6. Which option to choose
+
+The right option is the one that describes how your data were made, not the one that gives the narrowest range. Two short tables to decide.
+
+**Do some inputs move together?**
+
+| Your situation | Option |
+|---|---|
+| You have no information about links between your inputs, or your inputs come from different sources (a survey for the weights, a feed table for the digestibility, a default for the methane factor) | No correlations |
+| Your inputs come from data in which the biological links hold, for example one survey of the same animals, and you have no long series | Structural defaults |
+| Your template has a Parameter_TimeSeries sheet with 10 years or more | From template: the tool checks each link against your series and uses your value where the link is clear |
+| You have measured correlations from a study of your own herds | Advanced: manual entry |
+
+**Animal numbers between groups**
+
+| Your situation | Option |
+|---|---|
+| One census or one official total, divided into groups by shares | One national count, split into groups |
+| One total, but some groups adjusted afterwards with their own surveys or data | Partly |
+| Each group counted with its own survey | Separate counts per group |
+
+If you are not sure, "No correlations" and "One national count, split into groups" are the cautious choices: they do not narrow the range on the strength of a link you cannot support.
