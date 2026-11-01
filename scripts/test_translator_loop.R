@@ -172,6 +172,8 @@ shiny::testServer(translator_chat_server, {
   n_sheets <- length(state$pending_upload$parsed$sheets)
   session$setInputs(translator_sheets = as.character(seq_len(n_sheets)),
                     translator_upload_note = "Calves are one group; the year is 2022.")
+  # (a corrected template needs no year or country; a raw file does, see the
+  # required-fields check in the send observer)
   session$setInputs(translator_send_sheets = 1)
   pump(state)
   up <- Filter(function(m) identical(m$source, "server_upload"), state$messages)
@@ -192,7 +194,7 @@ shiny::testServer(translator_chat_server, {
   stopifnot(isTRUE(state$pending_upload$past), isTRUE(state$pending_upload$is_template), is.null(state$last_template_json),
             identical(state$source_fp, fp_before), !is.null(state$pending_upload$precheck))
   session$setInputs(translator_sheets = as.character(seq_len(n_sheets)), translator_upload_note = "Corrected the two adult cow populations.")
-  session$setInputs(translator_send_sheets = 2)
+  session$setInputs(translator_send_sheets = 3)
   pump(state)
   up2 <- Filter(function(m) identical(m$source, "server_upload"), state$messages)
   stopifnot(grepl("CORRECTED TEMPLATE", up2[[length(up2)]]$content, fixed = TRUE), grepl("two adult cow", up2[[length(up2)]]$content, fixed = TRUE))

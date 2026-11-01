@@ -74,7 +74,7 @@ The link in the email is valid for 30 days. Once you have clicked it, the browse
 
 The first step is to upload your data. Click the **Browse** button and choose your inventory file. We accept Excel files, with one or several sheets, and CSV files.
 
-Under the list of sheets, two small boxes take the inventory year and the country. Fill them in: the year decides which column of your file gives the point estimates, so the AI should know it before it reads the file. You also have the option to give some context to the AI, if needed, in the box below them: conventions, known errors, rows to ignore. What you write there is recorded as a decision and the AI does not ask about it again.
+Under the list of sheets, two boxes take the inventory year and the country. Both are required. The results are for one year, usually the most recent year with complete data; the year decides which column of your file gives the point estimates, so the AI knows it before it reads the file. The other years of your file are not lost: they go to the time series sheet, and the trend tab uses them. You also have the option to give some context to the AI, if needed, in the box below: conventions, known errors, rows to ignore. What you write there is recorded as a decision and the AI does not ask about it again.
 
 ![](img/translator_04_sheets_after_upload.png){width=100%}
 

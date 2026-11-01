@@ -807,10 +807,18 @@ lang_state_take <- function(token) {
     fr = "Votre modèle est prêt. Cliquez sur le bouton vert pour l'enregistrer, puis ouvrez-le et vérifiez le travail de l'IA avant de le charger dans l'onglet 1. Saisie des données."),
   btn_ai_revise = list(en = "Back to the conversation (your answers are kept)",
                          fr = "Retour à la conversation (vos réponses sont conservées)"),
-  ai_upload_year_label = list(en = "Inventory year (optional)", fr = "Année d'inventaire (facultatif)"),
+  ai_upload_fields_hint = list(
+    en = "Give the inventory year and the country before sending; both are required.",
+    fr = "Indiquez l'année d'inventaire et le pays avant d'envoyer ; les deux sont obligatoires."),
+  ai_upload_year_tip = list(
+    en = "The results are for one inventory year, usually the most recent year with complete data. The AI reads your file for that year: its column gives the point estimates. The other years of your file are not lost: they go to the time series sheet, and the trend tab uses them.",
+    fr = "Les résultats portent sur une seule année d'inventaire, en général l'année la plus récente aux données complètes. L'IA lit votre fichier pour cette année : sa colonne donne les estimations ponctuelles. Les autres années de votre fichier ne sont pas perdues : elles vont dans la feuille des séries temporelles, et l'onglet tendance les utilise."),
+  ai_upload_year_label = list(en = "Inventory year (required, one year)", fr = "Année d'inventaire (obligatoire, une seule)"),
   ai_upload_year_placeholder = list(en = "for example 2024", fr = "par exemple 2024"),
-  ai_upload_country_label = list(en = "Country (optional)", fr = "Pays (facultatif)"),
+  ai_upload_country_label = list(en = "Country (required)", fr = "Pays (obligatoire)"),
   ai_upload_country_placeholder = list(en = "for example Zambia", fr = "par exemple Zambie"),
+  ai_upload_fields_required = list(en = "Give the inventory year (one year, four digits) and the country before sending.",
+                                   fr = "Indiquez l'année d'inventaire (une seule, quatre chiffres) et le pays avant d'envoyer."),
   ai_year_fix_notice = list(
     en = "The AI's table of values was read from the %s column; the inventory year is %s, so the AI is re-reading it from that column.",
     fr = "La table des valeurs de l'IA a été lue dans la colonne %s ; l'année d'inventaire est %s, l'IA la relit donc dans cette colonne."),

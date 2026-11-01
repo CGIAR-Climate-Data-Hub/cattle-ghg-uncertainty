@@ -579,11 +579,16 @@ translator_chat_server <- function(input, output, session) {
       # exploration. The year decides which column every value of the
       # AI's table is read from; asked afterwards it cost a second table
       # (the Zambia run of 1 November had 2022 in every entry).
+      if (!isTRUE(pu$is_template)) tags$div(style = "font-size:0.85rem; margin:2px 0 6px 0;", t("ai_upload_fields_hint")),
       if (!isTRUE(pu$is_template)) tags$div(
         style = "display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px;",
-        tags$div(style = "flex:0 0 180px;",
-                 textInput("translator_upload_year", t("ai_upload_year_label"), value = "",
-                           placeholder = t("ai_upload_year_placeholder"), width = "100%")),
+        tags$div(style = "flex:0 0 220px;",
+                 textInput("translator_upload_year",
+                           tagList(t("ai_upload_year_label"), " ",
+                                   bslib::tooltip(
+                                     span(icon("circle-question"), style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
+                                     t("ai_upload_year_tip"), placement = "right")),
+                           value = "", placeholder = t("ai_upload_year_placeholder"), width = "100%")),
         tags$div(style = "flex:1 1 220px;",
                  textInput("translator_upload_country", t("ai_upload_country_label"), value = "",
                            placeholder = t("ai_upload_country_placeholder"), width = "100%"))),
@@ -602,6 +607,15 @@ translator_chat_server <- function(input, output, session) {
     idx <- idx[!is.na(idx) & idx >= 1L & idx <= length(pu$parsed$sheets)]
     if (length(idx) == 0L) {
       showNotification("Tick at least one sheet to send.", type = "warning", duration = 4)
+      return()
+    }
+    # 2026-11-01: the inventory year (one year) and the country are
+    # required for a raw file (the user's decision: the results are for one
+    # year, and the AI reads the file for it). Checked before anything is
+    # cleared, so the panel stays as it is.
+    if (!isTRUE(pu$is_template) &&
+        (!grepl("(19|20)[0-9]{2}", input$translator_upload_year %||% "") || !nzchar(trimws(input$translator_upload_country %||% "")))) {
+      showNotification(t("ai_upload_fields_required"), type = "warning", duration = 6)
       return()
     }
     parsed <- pu$parsed
