@@ -143,21 +143,34 @@ translator_rebuild_series <- function(piece, source_values, sheets, tol = 0.002)
       ts[[p]][r[1]] <- v
     }
     n_rebuilt <- n_rebuilt + 1L
-    yr_txt <- function(x) .translator_year_runs(sort(as.integer(x)))
-    issue <- if (!length(changed) && !length(added))
-      sprintf("The %s series of this group was taken from the file row (%s!%s, %d years)%s; the AI's values agreed.",
-              p, e$sheet, e$row, length(vals), if (f != 1) sprintf(", converted with the factor %s", format(signif(f, 6))) else "")
-    else sprintf("The %s series of this group was taken from the file row (%s!%s, %d years)%s. The AI's series %s%s%s.",
-                 p, e$sheet, e$row, length(vals), if (f != 1) sprintf(", converted with the factor %s", format(signif(f, 6))) else "",
-                 if (length(changed)) sprintf("differed in %d year(s) (%s)", length(changed), yr_txt(changed)) else "",
-                 if (length(changed) && length(added)) " and " else "",
-                 if (length(added)) sprintf("had no value in %d year(s) (%s)", length(added), yr_txt(added)) else "")
-    rows[[length(rows) + 1L]] <- data.frame(
-      where = "Parameter_TimeSeries", issue = issue, severity = if (length(changed) || length(added)) "warn" else "info",
-      sheet = "Parameter_TimeSeries", group = paste(ct, as.character(e$aggregation_level), S, sep = " / "), parameter = p,
-      check = "series taken from the file", stringsAsFactors = FALSE)
+    rows[[length(rows) + 1L]] <- list(level = as.character(e$aggregation_level), ct = ct, p = p, S = S, n = length(vals),
+                                      f = f, changed = changed, added = added)
   }
   if (!n_rebuilt) return(piece)
+  # one record per system and parameter (2026-11-01: 199 rows on the Zambia
+  # file said the same thing); a warning only when the AI's cells differed
+  # from the file, a note when it had written none or all agreed
+  yr_txt <- function(x) .translator_year_runs(sort(unique(as.integer(x))))
+  recs <- list()
+  for (k in unique(vapply(rows, function(r) paste(r$level, r$p, sep = "||"), character(1)))) {
+    rs <- rows[vapply(rows, function(r) paste(r$level, r$p, sep = "||") == k, logical(1))]
+    r1 <- rs[[1]]
+    g_diff <- rs[vapply(rs, function(r) length(r$changed) > 0, logical(1))]
+    g_none <- rs[vapply(rs, function(r) length(r$added) >= r$n, logical(1))]
+    g_part <- rs[vapply(rs, function(r) length(r$added) > 0 && length(r$added) < r$n && !length(r$changed), logical(1))]
+    conv <- if (r1$f != 1) sprintf(", converted with the factor %s", format(signif(r1$f, 6))) else ""
+    issue <- sprintf("The %s series of %d group(s) of %s were taken from their file rows (%d years each)%s.", r1$p, length(rs), r1$level, r1$n, conv)
+    if (length(g_diff)) issue <- paste0(issue, sprintf(" The AI's series differed from the file for %s (%s).",
+      paste(vapply(g_diff, function(r) r$S, character(1)), collapse = ", "),
+      paste(vapply(g_diff, function(r) sprintf("%s: %s", r$S, yr_txt(r$changed)), character(1)), collapse = "; ")))
+    if (length(g_none)) issue <- paste0(issue, sprintf(" The AI had written no series for %s.", paste(vapply(g_none, function(r) r$S, character(1)), collapse = ", ")))
+    if (length(g_part)) issue <- paste0(issue, sprintf(" The AI's series had gaps for %s.", paste(vapply(g_part, function(r) sprintf("%s (%s)", r$S, yr_txt(r$added)), character(1)), collapse = ", ")))
+    recs[[length(recs) + 1L]] <- data.frame(
+      where = "Parameter_TimeSeries", issue = issue, severity = if (length(g_diff)) "warn" else "info",
+      sheet = "Parameter_TimeSeries", group = NA_character_, parameter = r1$p,
+      check = "series taken from the file", stringsAsFactors = FALSE)
+  }
+  rows <- recs
   # two rows for one group and year (the AI's and a rebuilt one, or two of
   # the AI's) are merged: the first non-blank value of each column
   key <- paste(lv_ts, ts$sub_category, ts$year, sep = "||")

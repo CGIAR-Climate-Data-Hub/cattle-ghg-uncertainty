@@ -45,7 +45,8 @@
 # error the compiler can settle from the file, not a note.
 .TRANSLATOR_BLOCKING_CHECKS <- c("category coverage", "Parameters vs time series", "time-series coverage",
                                  "time-series year", "time-series value not in file", "unit conversion",
-                                 "range not in file", "value from another year", "same value within a system")
+                                 "range not in file", "value from another year", "same value within a system",
+                                 "time series: duplicate rows")
 
 # x within a relative tolerance of a member of the sorted vector s
 .translator_near_sorted <- function(x, s, tol = 1e-5) {
@@ -1132,13 +1133,9 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),
             sprintf("A log-normal distribution was assigned with a lower bound of %s (value %s). The app reads the spread on the log scale, so the value and the lower bound must be above 0.", fmt(lo[i]), fmt(mu[i])),
             sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "distribution fit")
-      if (all(c("lower", "upper") %in% names(ps))) {
-        bad_b <- which(!is.na(mu) & !is.na(lo) & !is.na(hi) & d != "constant" & (lo > mu | mu > hi))
-        for (i in bad_b)
-          add(sprintf("%s%s%s / %s", lvl[i], if (nzchar(lvl[i])) " / " else "", sc[i], ps$parameter[i]),
-              sprintf("The bounds %s to %s do not bracket the mean %s. Either the mean or the bounds came from a different year or group of the source file.", fmt(lo[i]), fmt(hi[i]), fmt(mu[i])),
-              sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "bounds bracket mean")
-      }
+      # (2026-11-01: the "bounds bracket mean" row that stood here was the
+      # app's own bounds_order check said twice; the QA rows in the checks
+      # workbook carry it as a failure.)
     }
   }
 
@@ -1299,6 +1296,17 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       sv_col <- if ("source_value" %in% names(ps)) suppressWarnings(as.numeric(ps$source_value)) else rep(NA_real_, nrow(ps))
       cv_col <- if ("conversion" %in% names(ps)) as.character(ps$conversion) else rep(NA_character_, nrow(ps))
       cv_col[is.na(cv_col)] <- ""
+      # the conversion fields live in the AI's JSON, not in the written
+      # workbook (2026-11-01: four verified milk values were flagged)
+      if (!is.null(piece) && is.data.frame(piece$parameters) && all(c("source_value", "conversion") %in% names(piece$parameters))) {
+        pp <- piece$parameters
+        kp <- paste(.translator_norm_level(pp$aggregation_level %||% ""), pp$sub_category, pp$parameter, sep = "||")
+        ks <- paste(.translator_norm_level(lvl2), ps$sub_category, ps$parameter, sep = "||")
+        m <- match(ks, kp)
+        svp <- suppressWarnings(as.numeric(pp$source_value))[m]; cvp <- as.character(pp$conversion)[m]
+        take <- is.finite(svp) & !is.na(cvp) & nzchar(cvp)
+        sv_col[take] <- svp[take]; cv_col[take] <- cvp[take]
+      }
       if (any(verbatim)) {
         nums <- sort(unique(source$numbers))
         hit_tr <- function(v, tr) {
@@ -1437,15 +1445,15 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       filled <- grepl("ipcc|default|auto", dsrc) & ps$parameter %in% source$families
       if (any(filled)) {
         by_p <- split(which(filled), ps$parameter[filled])
+        # one row per parameter (2026-11-01: 54 identical rows on the Zambia file)
         for (pn in names(by_p)) {
           i <- by_p[[pn]]
-          for (j in i)
-            add("source reconciliation", sprintf(paste0(
-              "%s was filled from the IPCC default on %d row(s) (%s), but %s is ",
-              "present in your file. Check whether the file's value should have ",
-              "been used."), pn, length(i),
-              paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn),
-              sheet = "Parameters", group = gkey(ps, j), parameter = pn, check = "default replaced file value")
+          add("source reconciliation", sprintf(paste0(
+            "%s was filled from the IPCC default on %d row(s) (%s), but %s is ",
+            "present in your file. Check whether the file's value should have ",
+            "been used."), pn, length(i),
+            paste(utils::head(unique(lvl2[i]), 4), collapse = ", "), pn),
+            sheet = "Parameters", group = NA_character_, parameter = pn, check = "default replaced file value")
         }
       }
     }
@@ -1676,6 +1684,28 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   # C12, year column: each series value must be in the file's column for
   # that year; a value found only in another year's column was copied from
   # the wrong column (emergent beef calves 2023 carried the 2024 count).
+  # 2026-11-01: two rows for one group and year on the series sheet (the
+  # 15:09 Zambia run had 70 rows per commercial dairy group: the AI's rows
+  # without a system label and the server's). The trend run reads the
+  # first; the sheet is wrong.
+  if (is.data.frame(population) && nrow(population) && all(c("sub_category", "year") %in% names(population))) {
+    lvd <- if ("aggregation_level" %in% names(population)) .translator_norm_level(population$aggregation_level) else rep("", nrow(population))
+    lvd[is.na(lvd)] <- ""
+    kd <- paste(lvd, population$sub_category, suppressWarnings(as.integer(population$year)), sep = "||")
+    dups <- unique(kd[duplicated(kd)])
+    if (length(dups)) {
+      by_g <- split(dups, sub("\\|\\|[^|]*$", "", dups))
+      for (g in names(by_g)) {
+        r0 <- which(sub("\\|\\|[^|]*$", "", kd) == g)[1]
+        yrs <- sort(as.integer(sub("^.*\\|\\|", "", by_g[[g]])))
+        add(sprintf("%s / %s", population$aggregation_level[r0] %||% "", population$sub_category[r0]),
+            sprintf("Parameter_TimeSeries has more than one row for this group in %d year(s) (%s). Keep one row per group and year.",
+                    length(yrs), .translator_year_runs(yrs)),
+            severity = "fail", sheet = "Parameter_TimeSeries", group = gkey(population, r0), parameter = NA_character_,
+            check = "time series: duplicate rows")
+      }
+    }
+  }
   tsp <- intersect(c("N", "BW", "MW", "WG", "Milk", "Fat", "pct_pregnant", "DE", "CP", "MilkPR"),
                    if (is.data.frame(population)) names(population) else character(0))
   # tol_abs: a head count split into halves is rounded (25,927 calves give

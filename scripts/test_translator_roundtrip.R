@@ -42,11 +42,12 @@ cw <- t2[t2$sub_category == "other_cows", ]; cw <- cw[order(cw$year), ]
 ok(isTRUE(all.equal(cw$Milk, c(4.1, 4.2, 4.2375) * f)), "the milk series is the file row converted with the row's factor, the missing year filled")
 ok(identical(cw$BW, c(400, 405, 410)), "a right series is unchanged")
 sc <- out$server_corrections
-ok(is.data.frame(sc) && sum(sc$check == "series taken from the file") == 3L, "one record per rebuilt series")
-ok(sc$severity[sc$parameter == "BW" & grepl("feedlot", sc$group)] == "warn" && grepl("differed in 2 year", sc$issue[sc$parameter == "BW" & grepl("feedlot", sc$group)]),
-   "a series that differed is a warning naming the years")
-ok(sc$severity[sc$parameter == "BW" & grepl("other_cows", sc$group)] == "info", "a series that agreed is an info row")
-ok(grepl("had no value in 1 year", sc$issue[sc$parameter == "Milk"]), "a missing year is named")
+ok(is.data.frame(sc) && sum(sc$check == "series taken from the file") == 2L, "one record per system and parameter")
+bw <- sc[sc$parameter == "BW", ]
+ok(bw$severity == "warn" && grepl("2 group", bw$issue) && grepl("differed from the file for feedlot_cattle", bw$issue) && grepl("2021 to 2022", bw$issue),
+   "a series that differed makes the record a warning naming the group and the years")
+mk <- sc[sc$parameter == "Milk", ]
+ok(mk$severity == "info" && grepl("gaps for other_cows \\(2021\\)", mk$issue) && grepl("factor", mk$issue), "a gap filled is a note naming the year and the factor")
 # the AI's rows without their system label (the writer fills it from the
 # requested level): matched on that level, no second row per year
 ts_nolab <- ts; ts_nolab$aggregation_level <- NA_character_; ts_nolab$.requested_aggregation_level <- "sys_a"
