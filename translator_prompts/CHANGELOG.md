@@ -2,6 +2,15 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-01, after the 16:18 run
+
+The 16:18 run (2026.11.02.2): 496/496 values, every series cell equal to its file row, no duplicate rows, milk conversions verified. Left: a normal ±35 % where the file's milk row says triangular 3 to 7.5; Frac_GasMS of solid storage at 30 for four commercial dairy groups and 45 (the file) for the cows, downgraded to a note because both numbers are in the file; 44 "range not in file" warnings on the IPCC catalogue bounds of EF3_PRP and EF4.
+
+- **Ranges and distributions from the table** (`translator_apply_table_ranges`, after the series rebuild): a Parameters row whose checked entry carries bounds or a distribution takes them (bounds times the row's conversion factor), recorded as "range taken from the file" / "distribution taken from the file" warnings.
+- The "(in file)" note for a coefficient that differs within a system applies to MCF only; Frac_GasMS, Frac_LeachMS and EF3 keep the warning.
+- The "range not in file" check skips bounds equal to the catalogue's own; the conversion verifier warns on a margin written for a converted value without the file's bounds.
+- The inventory year and the country are required at upload (a tooltip explains the one-year choice and the trend tab); the guide gained "Preparing your file" and "How to answer the AI's questions".
+
 ## 2026-11-01, late: after the 15:09 run
 
 - The series rebuild matches a row without its system label on the batch's requested level and merges duplicate (system, group, year) rows (the commercial dairy sheet had two rows per year).

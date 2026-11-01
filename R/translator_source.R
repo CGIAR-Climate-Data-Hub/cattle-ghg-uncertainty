@@ -209,6 +209,87 @@ translator_rebuild_series_json <- function(json, source_values, sheets) {
   as.character(jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
 }
 
+# ---------------------------------------------------------------------------
+# The ranges and distributions from the file, by the server (2026-11-01,
+# evening). The source check has confirmed each entry's lower, upper and
+# distribution against the file; a Parameters row that carries something
+# else (the 16:18 Zambia run: a normal +-35 % where the file's row says
+# triangular 3 to 7.5) takes the entry's, converted with the row's factor.
+# Recorded as "range taken from the file" / "distribution taken from the
+# file" warnings. Rows whose entry gives no bounds are left alone.
+# ---------------------------------------------------------------------------
+translator_apply_table_ranges <- function(piece, source_values, tol = 0.002) {
+  ps <- piece$parameters
+  if (!length(source_values) || !is.data.frame(ps) || !nrow(ps)) return(piece)
+  dists <- if (exists("DISTRIBUTION_TYPES")) tolower(get("DISTRIBUTION_TYPES")) else
+    c("normal", "lognormal", "beta", "triangular", "pert", "uniform", "constant")
+  for (cn in c("lower", "upper", "uncertainty_pct")) if (!cn %in% names(ps)) ps[[cn]] <- NA_real_
+  if (!"distribution" %in% names(ps)) ps$distribution <- NA_character_
+  lv_ps <- .translator_norm_level(ps$aggregation_level); lv_ps[is.na(lv_ps)] <- ""
+  fac <- if ("conversion_factor" %in% names(ps)) suppressWarnings(as.numeric(ps$conversion_factor)) else rep(NA_real_, nrow(ps))
+  rows <- list(); n_changed <- 0L
+  gk <- function(i) paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i], sep = " / ")
+  for (e in source_values) {
+    p <- as.character(e$parameter %||% ""); S <- as.character(e$sub_category %||% ""); L <- .translator_norm_level(e$aggregation_level %||% "")
+    if (!nzchar(p) || !nzchar(S) || !nzchar(L)) next
+    i <- which(ps$parameter == p & ps$sub_category == S & lv_ps == L)
+    if (length(i) != 1L) next
+    f <- fac[i]; if (!is.finite(f) || f == 0) f <- 1
+    lo <- suppressWarnings(as.numeric(e$lower %||% NA)); up <- suppressWarnings(as.numeric(e$upper %||% NA))
+    ed <- tolower(trimws(as.character(e$distribution %||% "")))
+    mu <- suppressWarnings(as.numeric(ps$mean[i]))
+    changed <- character(0)
+    if (is.finite(lo) && is.finite(up) && up > lo) {
+      elo <- lo * f; eup <- up * f
+      rlo <- suppressWarnings(as.numeric(ps$lower[i])); rup <- suppressWarnings(as.numeric(ps$upper[i]))
+      ru <- suppressWarnings(as.numeric(ps$uncertainty_pct[i]))
+      differs <- !is.finite(rlo) || !is.finite(rup) || abs(rlo - elo) > tol * max(1, abs(elo)) || abs(rup - eup) > tol * max(1, abs(eup))
+      if (differs && (is.finite(mu) && elo <= mu && mu <= eup || !is.finite(mu))) {
+        was <- if (is.finite(rlo) && is.finite(rup)) sprintf("%s to %s", format(signif(rlo, 6)), format(signif(rup, 6)))
+               else if (is.finite(ru)) sprintf("+-%s %%", format(signif(ru, 4))) else "no range"
+        ps$lower[i] <- elo; ps$upper[i] <- eup; ps$uncertainty_pct[i] <- NA_real_
+        changed <- c(changed, sprintf("the range %s became the file's %s to %s%s", was, format(signif(elo, 6)), format(signif(eup, 6)),
+                                      if (f != 1) sprintf(" (the file's %s to %s times %s)", format(signif(lo, 6)), format(signif(up, 6)), format(signif(f, 6))) else ""))
+      }
+    }
+    if (nzchar(ed) && ed %in% dists) {
+      rd <- tolower(trimws(as.character(ps$distribution[i] %||% "")))
+      if (!identical(rd, ed) && !identical(rd, "constant")) {
+        ps$distribution[i] <- ed
+        changed <- c(changed, sprintf("the distribution '%s' became the file's '%s'", if (nzchar(rd)) rd else "none", ed))
+      }
+    }
+    if (length(changed)) {
+      n_changed <- n_changed + 1L
+      rows[[length(rows) + 1L]] <- data.frame(
+        where = "Parameters", issue = sprintf("%s: %s (from the table of values the server checked against your file, %s!%s).",
+                                             p, paste(changed, collapse = "; "), e$sheet %||% "", as.character(e$row %||% "")),
+        severity = "warn", sheet = "Parameters", group = gk(i), parameter = p,
+        check = if (any(grepl("^the range", changed))) "range taken from the file" else "distribution taken from the file",
+        stringsAsFactors = FALSE)
+    }
+  }
+  if (!n_changed) return(piece)
+  piece$parameters <- ps
+  corr <- do.call(rbind, rows); rownames(corr) <- NULL
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
+  piece
+}
+
+translator_apply_table_ranges_json <- function(json, source_values) {
+  if (is.null(json) || !nzchar(json) || !length(source_values)) return(json)
+  piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
+  if (is.null(piece)) return(json)
+  out <- tryCatch(translator_apply_table_ranges(piece, source_values), error = function(e) {
+    message("translator: table ranges failed (", conditionMessage(e), ")"); NULL })
+  if (is.null(out)) return(json)
+  before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
+  after <- if (is.data.frame(out$server_corrections)) nrow(out$server_corrections) else 0L
+  if (after == before) return(json)
+  message("translator: ", after - before, " range(s) or distribution(s) taken from the table")
+  as.character(jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
+}
+
 # One entry against the file. Returns list(ok, what, cap).
 .translator_check_entry <- function(e, tables) {
   what <- character(0); cap <- FALSE

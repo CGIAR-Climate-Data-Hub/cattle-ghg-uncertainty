@@ -454,6 +454,15 @@ translator_source_fingerprint <- function(parsed) {
                      if (nzchar(unit)) paste0(" ", unit) else "", how, fmt(expected)), "info", "unit conversion verified")
     # the bounds: converted with the same factor when the file's bounds are stated
     lo <- num("lower", i); up <- num("upper", i); slo <- num("source_lower", i); sup <- num("source_upper", i)
+    u_i <- num("uncertainty_pct", i)
+    if (!is.finite(lo) && !is.finite(up) && is.finite(u_i) && u_i > 0 && !is.finite(slo) && !is.finite(sup)) {
+      # a margin on a converted value, with no file bounds stated: the
+      # 16:18 Zambia run wrote +-35 % where the file's row has 3 to 7.5
+      rows[[length(rows) + 1L]] <- row(sprintf(paste0(
+        "%s: a margin of +-%s %% was written for a converted value, and the file's bounds were not stated (source_lower, ",
+        "source_upper). If the file gives bounds for this row, they belong here, converted with the same factor (%s)."),
+        p, fmt(u_i), fmt(f)), "warn", "unit conversion not verified")
+    }
     if (is.finite(lo) || is.finite(up)) {
       if (is.finite(slo) || is.finite(sup)) {
         bad_lo <- is.finite(lo) && is.finite(slo) && abs(lo - slo * f) > .TRANSLATOR_CONVERSION_TOL * abs(slo * f)
@@ -1186,7 +1195,10 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         pool <- if (is.null(source)) numeric(0) else
           c(source$numbers %||% numeric(0), source$family_values[[col]] %||% numeric(0))
         pool <- pool[is.finite(pool)]
-        in_file <- length(pool) > 0 && all(vapply(vals, function(x)
+        # (2026-11-01: MCF only; a Frac_GasMS that differs between the
+        # groups of one system is a slip even when both numbers are in the
+        # file, as in the 16:18 Zambia run: 45 for the cows, 30 elsewhere)
+        in_file <- identical(col, "MCF_pct") && length(pool) > 0 && all(vapply(vals, function(x)
           any(.translator_near(pool, x) | .translator_near(pool * 100, x) | .translator_near(pool / 100, x)),
           logical(1)))
         if (in_file)
@@ -1361,8 +1373,14 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         cf_col[is.finite(cfp)] <- cfp[is.finite(cfp)]
       }
       nums <- sort(unique(source$numbers))
+      # the catalogue's own bounds (the IPCC range that belongs to an IPCC
+      # default value the file carries) are not looked for in the file
+      cat_lo <- suppressWarnings(as.numeric(PARAM_CATALOGUE$suggested_lower_bound[match(ps$parameter, PARAM_CATALOGUE$parameter)]))
+      cat_up <- suppressWarnings(as.numeric(PARAM_CATALOGUE$suggested_upper_bound[match(ps$parameter, PARAM_CATALOGUE$parameter)]))
       for (i in which(dsrc == "user_file" & !ph & is.finite(val))) {
         what <- character(0)
+        if (is.finite(cat_lo[i]) && is.finite(cat_up[i]) && is.finite(lo_col[i]) && is.finite(up_col[i]) &&
+            abs(lo_col[i] - cat_lo[i]) <= 1e-6 * max(1, abs(cat_lo[i])) && abs(up_col[i] - cat_up[i]) <= 1e-6 * max(1, abs(cat_up[i]))) next
         if (is.finite(u_col[i]) && u_col[i] > 0 &&
             !.translator_near_sorted(u_col[i], nums, 1e-5) && !.translator_near_sorted(u_col[i] / 100, nums, 1e-5) && !.translator_near_sorted(u_col[i] * 100, nums, 1e-5))
           what <- c(what, sprintf("the margin %s %%", fmt(u_col[i])))

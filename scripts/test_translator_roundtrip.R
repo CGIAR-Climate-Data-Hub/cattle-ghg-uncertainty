@@ -63,6 +63,24 @@ j2 <- translator_rebuild_series_json(json, sv, sheets)
 ok(!identical(j2, json) && is.data.frame(jsonlite::fromJSON(j2)$parameter_timeseries), "the JSON path rebuilds and re-serialises")
 ok(identical(translator_rebuild_series_json(json, list(), sheets), json), "no entries: the JSON is untouched")
 
+# ---- 1b. the ranges and distributions from the table -----------------------------
+sv_r <- list(
+  list(system = "Sys A", label = "Cows", sheet = "Data", row = 9L, col = "2022", mean = 4.2375, lower = 3, upper = 7.5,
+       distribution = "triangular", parameter = "Milk", sub_category = "other_cows", aggregation_level = "sys_a"),
+  list(system = "Sys A", label = "Cows", sheet = "Data", row = 4L, col = "2022", mean = 410, parameter = "BW",
+       sub_category = "other_cows", aggregation_level = "sys_a"))
+ps_r <- ps
+ps_r$uncertainty_pct <- c(NA, NA, 35); ps_r$distribution <- c("normal", "normal", "normal")
+out_r <- translator_apply_table_ranges(list(parameters = ps_r), sv_r)
+pr <- out_r$parameters
+ok(isTRUE(all.equal(pr$lower[3], 3 * f)) && isTRUE(all.equal(pr$upper[3], 7.5 * f)) && is.na(pr$uncertainty_pct[3]) && pr$distribution[3] == "triangular",
+   "a converted row takes the file's bounds times its factor and the file's distribution")
+ok(pr$distribution[1] == "normal" && is.na(pr$lower[1]), "a row whose entry has no bounds or distribution is left alone")
+scr <- out_r$server_corrections
+ok(is.data.frame(scr) && nrow(scr) == 1L && scr$check == "range taken from the file" && grepl("\\+-35 %", scr$issue) && grepl("triangular", scr$issue),
+   "one warning records the range and the distribution that changed")
+ok(identical(translator_apply_table_ranges(list(parameters = ps), sv_r[2])$parameters, ps), "nothing to apply: the piece is untouched")
+
 # ---- 2. the blocking failures through the workbook to the QA/QC tab ------------
 tmp <- tempfile(fileext = ".xlsx")
 piece2 <- list(

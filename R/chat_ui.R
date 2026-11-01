@@ -1959,6 +1959,9 @@ translator_cancel_clear <- function(tok) {
   rebuilt <- tryCatch(translator_rebuild_series_json(fixed %||% json, isolate(state$source_values), isolate(state$source_sheets)),
                       error = function(e) NULL)
   if (!is.null(rebuilt)) fixed <- rebuilt
+  # and the ranges and distributions the table carries for each row
+  ranged <- tryCatch(translator_apply_table_ranges_json(fixed %||% json, isolate(state$source_values)), error = function(e) NULL)
+  if (!is.null(ranged)) fixed <- ranged
   if (!is.null(fixed) && !identical(fixed, json)) {
     json <- fixed
     state$last_template_json <- fixed
