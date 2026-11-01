@@ -3463,9 +3463,10 @@ section_F <- function() {
         fraction_pct = c(80, 20, 11.25, 100), MCF_pct = c(0.47, 4, 25, 2),
         stringsAsFactors = FALSE)
       notes <- translator_consistency_checks(spec, mm)
+      # (2026-11-01: "do not bracket the mean" left this list; the app's QA
+      # bounds_order row in the same checks workbook says it, once)
       want <- c("calves carry different values for MW", "shares sum to 111.2",
-                "MCF_pct takes 2 different values", "log-normal distribution was assigned with a lower bound of 0",
-                "do not bracket the mean")
+                "MCF_pct takes 2 different values", "log-normal distribution was assigned with a lower bound of 0")
       for (w in want) if (!any(grepl(w, notes$issue, fixed = TRUE)))
         f <- c(f, paste("consistency check missing:", w))
       if (nrow(translator_consistency_checks(NULL, NULL)) != 0L) f <- c(f, "empty input gave notes")
