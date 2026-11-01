@@ -1563,6 +1563,10 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     if (length(yv)) {
       tr <- c(1, 0.5, 2, 100, 0.01)
       yrs_ts <- as.character(suppressWarnings(as.integer(population$year)))
+      not_found <- list()   # group||parameter -> the years whose value is in no column
+      src_sorted <- sort(unique(suppressWarnings(as.numeric(source$numbers))))
+      message(sprintf("translator checks: source has %d year column(s), %d varying row(s); %d series row(s) checked",
+                      length(yv), length(source$varying_rows %||% list()), nrow(population)))
       for (r in seq_len(nrow(population))) {
         y <- yrs_ts[r]; s0 <- yv[[y]]
         if (is.null(s0)) next
@@ -1576,7 +1580,30 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           if (any(mapply(function(cc, tt) near_in(cc, s0, tol_abs = tt), cand, ta))) next
           other <- names(yv)[vapply(names(yv), function(yy) yy != y &&
                                     any(vapply(cand, near_in, logical(1), s = yv[[yy]], tol_abs = 0)), logical(1))]
-          if (!length(other)) next
+          if (!length(other)) {
+            # 2026-11-01: a value in no year column at all. A converted
+            # parameter is checked by .translator_ts_conversion_issues;
+            # anything else is a number the file does not have (the
+            # feedlot BW series of the 13:31 Zambia run climbed by one
+            # kilogram a year where the file is uneven and then flat).
+            conv <- if (!is.null(piece) && is.data.frame(piece$parameters) && "conversion_factor" %in% names(piece$parameters)) {
+              pp <- piece$parameters
+              f <- suppressWarnings(as.numeric(pp$conversion_factor[pp$parameter == p & pp$sub_category == population$sub_category[r] &
+                                                                   .translator_norm_level(pp$aggregation_level) == .translator_norm_level(population$aggregation_level[r])]))
+              any(is.finite(f) & f != 1)
+            } else {
+              # without the AI's JSON (a template checked on its own): a
+              # group whose Parameters value is itself in no column was
+              # converted, and so was its series
+              mu0 <- suppressWarnings(as.numeric(ps$mean[ps$parameter == p & ps$sub_category == population$sub_category[r] &
+                                                          p_lv == .translator_norm_level(population$aggregation_level[r])]))
+              length(mu0) > 0 && is.finite(mu0[1]) && !near_in(mu0[1], src_sorted)
+            }
+            if (conv) next
+            nf_key <- paste(population$aggregation_level[r] %||% "", population$sub_category[r], p, sep = "||")
+            not_found[[nf_key]] <- c(not_found[[nf_key]], y)
+            next
+          }
           add(sprintf("%s / %s / %s / %s", population$aggregation_level[r] %||% "", population$sub_category[r], p, y),
               sprintf(paste0("The time series gives %s for %s in %s, but the file's %s column does not have this ",
                              "number; it is the file's value for %s. A neighbouring year's column was probably copied."),
@@ -1584,6 +1611,18 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
               severity = "fail", sheet = "Parameter_TimeSeries", group = gkey(population, r), parameter = p,
               check = "time-series year")
         }
+      }
+      # one row per series with values the file does not have anywhere
+      for (k in names(not_found)) {
+        parts <- strsplit(k, "||", fixed = TRUE)[[1]]
+        r0 <- which(paste(population$aggregation_level %||% "", population$sub_category, sep = "||") == paste(parts[1], parts[2], sep = "||"))[1]
+        yrs_bad <- sort(as.integer(not_found[[k]]))
+        add(sprintf("%s / %s / %s", parts[1], parts[2], parts[3]),
+            sprintf(paste0("The %s series of this group has %d value(s) that are in no year column of the file (%s). ",
+                           "They were not read from the file: a series was probably extended or smoothed. Replace them with the file's values."),
+                    parts[3], length(yrs_bad), .translator_year_runs(yrs_bad)),
+            severity = "fail", sheet = "Parameter_TimeSeries", group = if (!is.na(r0)) gkey(population, r0) else NA_character_,
+            parameter = parts[3], check = "time-series value not in file")
       }
     }
   }
