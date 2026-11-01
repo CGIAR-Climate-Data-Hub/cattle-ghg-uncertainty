@@ -366,6 +366,141 @@ translator_source_fingerprint <- function(parsed) {
   piece
 }
 
+# ---------------------------------------------------------------------------
+# Conversions declared by the AI, recomputed by the server (2026-11-01,
+# Stage 6). A converted Parameters row carries source_value, source_unit,
+# conversion (lactation_days for milk per lactating day, conversion_factor
+# for custom) and, when its bounds were converted too, source_lower and
+# source_upper. The mean is never overwritten: a difference above 0.2 % is
+# a failure listed for the compiler; a match is an info row that documents
+# the arithmetic; a milk conversion without the lactation length is a
+# warning. The factor is kept on the row (conversion_factor) for the
+# time-series check (.translator_ts_conversion_issues).
+# ---------------------------------------------------------------------------
+.TRANSLATOR_CONVERSION_FACTORS <- c(none = 1, lb_to_kg = 0.45359237, l_to_kg = 1.03, pct_to_fraction = 0.01,
+                                    fraction_to_pct = 100, per_year_to_per_day = 1 / 365)
+.TRANSLATOR_CONVERSION_TOL <- 0.002
+
+.translator_conversion_factor <- function(conv, lactation_days = NA, custom = NA) {
+  conv <- as.character(conv %||% ""); if (is.na(conv) || !nzchar(conv)) return(NA_real_)
+  if (identical(conv, "milk_lactating_to_head")) {
+    ld <- suppressWarnings(as.numeric(lactation_days))
+    return(if (length(ld) == 1L && is.finite(ld) && ld > 0) ld / 365 else NA_real_)
+  }
+  if (identical(conv, "custom")) {
+    f <- suppressWarnings(as.numeric(custom)); return(if (length(f) == 1L && is.finite(f) && f != 0) f else NA_real_)
+  }
+  f <- .TRANSLATOR_CONVERSION_FACTORS[conv]
+  if (length(f) == 1L && is.finite(f)) unname(f) else NA_real_
+}
+
+.translator_verify_conversions <- function(piece) {
+  ps <- piece$parameters
+  if (!is.data.frame(ps) || !nrow(ps) || !"conversion" %in% names(ps) || !"source_value" %in% names(ps)) return(piece)
+  num <- function(col, i) if (col %in% names(ps)) suppressWarnings(as.numeric(ps[[col]][i])) else NA_real_
+  chr <- function(col, i) if (col %in% names(ps)) as.character(ps[[col]][i] %||% "") else ""
+  fmt <- function(x) format(signif(x, 6), big.mark = ",", trim = TRUE)
+  gkey <- function(i) paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i], sep = " / ")
+  rows <- list(); factors <- rep(NA_real_, nrow(ps))
+  for (i in seq_len(nrow(ps))) {
+    conv <- chr("conversion", i); sv <- num("source_value", i); mu <- num("mean", i)
+    if (is.na(conv) || !nzchar(conv) || identical(conv, "none") || !is.finite(sv)) next
+    p <- as.character(ps$parameter[i]); unit <- chr("source_unit", i)
+    f <- .translator_conversion_factor(conv, num("lactation_days", i), num("conversion_factor", i))
+    row <- function(issue, severity, check) data.frame(
+      where = "Parameters", issue = issue, severity = severity, sheet = "Parameters",
+      group = gkey(i), parameter = p, check = check, stringsAsFactors = FALSE)
+    if (!is.finite(f)) {
+      rows[[length(rows) + 1L]] <- row(sprintf(paste0(
+        "%s = %s was converted from the file's %s%s (%s), but the factor is not known: %s. ",
+        "The conversion could not be verified."), p, fmt(mu), fmt(sv), if (nzchar(unit)) paste0(" ", unit) else "", conv,
+        if (identical(conv, "milk_lactating_to_head")) "no lactation length was given" else "no conversion factor was given"),
+        "warn", "unit conversion not verified")
+      next
+    }
+    factors[i] <- f
+    expected <- sv * f
+    how <- if (identical(conv, "milk_lactating_to_head")) sprintf("%s x %s / 365", fmt(sv), fmt(num("lactation_days", i)))
+           else sprintf("%s x %s", fmt(sv), fmt(f))
+    off <- is.finite(mu) && abs(mu - expected) > .TRANSLATOR_CONVERSION_TOL * abs(expected)
+    rows[[length(rows) + 1L]] <- if (off) row(sprintf(paste0(
+      "%s: the AI wrote %s, but the file's %s%s converted (%s) gives %s. Correct the value, or the lactation length, ",
+      "in the template."), p, fmt(mu), fmt(sv), if (nzchar(unit)) paste0(" ", unit) else "", how, fmt(expected)),
+      "fail", "unit conversion")
+    else row(sprintf("%s = %s is the file's %s%s converted: %s = %s (verified).", p, fmt(mu), fmt(sv),
+                     if (nzchar(unit)) paste0(" ", unit) else "", how, fmt(expected)), "info", "unit conversion verified")
+    # the bounds: converted with the same factor when the file's bounds are stated
+    lo <- num("lower", i); up <- num("upper", i); slo <- num("source_lower", i); sup <- num("source_upper", i)
+    if (is.finite(lo) || is.finite(up)) {
+      if (is.finite(slo) || is.finite(sup)) {
+        bad_lo <- is.finite(lo) && is.finite(slo) && abs(lo - slo * f) > .TRANSLATOR_CONVERSION_TOL * abs(slo * f)
+        bad_up <- is.finite(up) && is.finite(sup) && abs(up - sup * f) > .TRANSLATOR_CONVERSION_TOL * abs(sup * f)
+        if (bad_lo || bad_up) rows[[length(rows) + 1L]] <- row(sprintf(paste0(
+          "%s: the bounds %s to %s do not match the file's %s to %s converted with the same factor (%s to %s)."),
+          p, fmt(lo), fmt(up), fmt(slo), fmt(sup), fmt(slo * f), fmt(sup * f)), "fail", "unit conversion")
+      } else {
+        # the file's bounds were not stated, so the server cannot tell a
+        # converted pair from the file's pair copied as it is (the
+        # commercial beef milk bounds of 1 November, 3 to 7.5 per
+        # lactating day, were left unconverted)
+        rows[[length(rows) + 1L]] <- row(sprintf(paste0(
+          "%s: the bounds %s to %s belong to a converted value, but the file's bounds were not stated ",
+          "(source_lower, source_upper), so the server cannot verify that they were converted with the same ",
+          "factor (%s). Check them against the file."), p, fmt(lo), fmt(up), fmt(f)), "warn", "unit conversion not verified")
+      }
+    }
+  }
+  ps$conversion_factor <- ifelse(is.finite(factors), factors,
+                                 if ("conversion_factor" %in% names(ps)) suppressWarnings(as.numeric(ps$conversion_factor)) else NA_real_)
+  piece$parameters <- ps
+  if (length(rows)) {
+    corr <- do.call(rbind, rows); rownames(corr) <- NULL
+    piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
+  }
+  piece
+}
+
+# The time-series cells of a converted parameter (2026-11-01, Stage 6):
+# each year's cell must be that year's file value times the row's factor.
+# A cell that is itself a file value of that year was not converted; a
+# cell that matches nothing was converted from the wrong year's value (the
+# emergent dairy milk series of 31 October: every year carried the 2024
+# converted value). `yv` is source$year_values (numbers per year column).
+.translator_ts_conversion_issues <- function(ps, population, yv, near_in, fmt, gkey_fn) {
+  out <- list()
+  if (!is.data.frame(ps) || !nrow(ps) || !"conversion_factor" %in% names(ps) || !is.data.frame(population) ||
+      !nrow(population) || !length(yv)) return(out)
+  f_all <- suppressWarnings(as.numeric(ps$conversion_factor))
+  idx <- which(is.finite(f_all) & f_all != 1)
+  if (!length(idx)) return(out)
+  lv_ps <- if ("aggregation_level" %in% names(ps)) .translator_norm_level(ps$aggregation_level) else rep("", nrow(ps))
+  lv_ts <- if ("aggregation_level" %in% names(population)) .translator_norm_level(population$aggregation_level) else rep("", nrow(population))
+  yrs <- as.character(suppressWarnings(as.integer(population$year)))
+  for (i in idx) {
+    p <- as.character(ps$parameter[i]); if (!p %in% names(population)) next
+    f <- f_all[i]; S <- as.character(ps$sub_category[i])
+    rws <- which(lv_ts == lv_ps[i] & population$sub_category == S)
+    bad_unconv <- character(0); bad_other <- character(0)
+    for (r in rws) {
+      v <- suppressWarnings(as.numeric(population[[p]][r])); y <- yrs[r]
+      if (!is.finite(v) || v == 0 || is.na(y) || is.null(yv[[y]])) next
+      if (near_in(v / f, yv[[y]], tol = .TRANSLATOR_CONVERSION_TOL)) next
+      if (near_in(v, yv[[y]], tol = 1e-6)) bad_unconv <- c(bad_unconv, y) else bad_other <- c(bad_other, y)
+    }
+    if (length(bad_unconv)) out[[length(out) + 1L]] <- list(
+      where = sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", S, p),
+      issue = sprintf("The %s series of this group is not converted in %d year(s) (%s): each cell is the file's number as written, not that number x %s as on the Parameters sheet.",
+                      p, length(bad_unconv), .translator_year_runs(as.integer(bad_unconv)), fmt(f)),
+      severity = "fail", sheet = "Parameter_TimeSeries", group = gkey_fn(ps, i), parameter = p, check = "unit conversion")
+    if (length(bad_other)) out[[length(out) + 1L]] <- list(
+      where = sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", S, p),
+      issue = sprintf("The %s series of this group does not match the file in %d year(s) (%s): no value of those years' columns gives the cell when converted with the factor %s of the Parameters row (a series converted from one year's value, usually the inventory year's, looks like this).",
+                      p, length(bad_other), .translator_year_runs(as.integer(bad_other)), fmt(f)),
+      severity = "fail", sheet = "Parameter_TimeSeries", group = gkey_fn(ps, i), parameter = p, check = "unit conversion")
+  }
+  out
+}
+
 # The template JSON after the server-side corrections; the same text when
 # there was nothing to correct, so the caller can tell.
 # 2026-10-31: a time-series row with a year and no value at all says
@@ -430,6 +565,7 @@ translator_source_fingerprint <- function(parsed) {
   if (is.null(piece) || !is.data.frame(piece$parameters)) return(json)
   before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
   piece <- tryCatch(.translator_drop_unsourced_intake(piece, families), error = function(e) piece)
+  piece <- tryCatch(.translator_verify_conversions(piece), error = function(e) piece)
   piece <- tryCatch(.translator_drop_empty_ts_rows(piece), error = function(e) piece)
   piece <- tryCatch(.translator_fix_double_spread(piece), error = function(e) piece)
   piece <- .translator_fix_uncertainty_scale(piece)
@@ -1348,6 +1484,13 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     k <- findInterval(x, s)
     cand <- s[unique(pmax(1, pmin(length(s), c(k - 1L, k, k + 1L, k + 2L))))]
     any(abs(cand - x) <= max(tol * max(1, abs(x)), tol_abs))
+  }
+  # 2026-11-01 (Stage 6): the series cells of a converted parameter, each
+  # against its own year's file value times the row's factor
+  if (!is.null(piece) && is.data.frame(piece$parameters) && !is.null(source) && length(source$year_values)) {
+    for (it in tryCatch(.translator_ts_conversion_issues(piece$parameters, population, source$year_values, near_in, fmt, gkey),
+                        error = function(e) { message("translator checks: series conversion check failed (", conditionMessage(e), ")"); list() }))
+      add(it$where, it$issue, severity = it$severity, sheet = it$sheet, group = it$group, parameter = it$parameter, check = it$check)
   }
   ts_flagged <- character(0)   # level||sub_category||parameter rows C11 reported
   if (length(tsp) && nrow(population) > 0 && "year" %in% names(population) &&

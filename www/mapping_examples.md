@@ -25,7 +25,7 @@ Country X    2022   dairy_cows     500000       275              300            
 | `live_weight_kg` | → `BW` | `live_weight` is in PARAM_ALIASES |
 | `mature_wt_kg` | → `MW` | unit OK |
 | `adg_kg_d` | → `WG` | "average daily gain": adult dairy cow usually 0 |
-| `milk_kg_d` | → `Milk` | confirm "per lactating cow" not "herd total". A per-lactating-cow value needs converting, because `Milk` is the annual average per head: value × lactation length ÷ 365. State the file's value, the lactation length and the result in your reply; the server recomputes it |
+| `milk_kg_d` | → `Milk` | confirm "per lactating cow" not "herd total". A per-lactating-cow value needs converting, because `Milk` is the annual average per head: value × lactation length ÷ 365. The row carries `source_value`, `source_unit = "kg/lactating day"`, `conversion = "milk_lactating_to_head"`, `lactation_days`, and `source_lower`/`source_upper` when the file gives bounds (converted with the same factor); every year of the series is converted from its own year's value. The server recomputes all of it |
 | `milk_fat_pct` | → `Fat` | |
 | `digest_pct` | → `DE` | `DE_pct` is in PARAM_ALIASES |
 | `ym_pct` | → `Ym` | `Ym_pct` is in PARAM_ALIASES |
@@ -58,7 +58,7 @@ growing males 1-3yr         400,000      180            0.20           0        
 | `N` | → `N`, value cleaned of thousands separator | strip commas |
 | `Live_BW (kg)` | → `BW` | "Live_BW" → BW alias |
 | `ADG (kg/day)` | → `WG` | |
-| `Milk (L/d)` | → `Milk` (kg/day) | **unit check: L vs kg**, milk density 1.03 kg/L: kg = L × 1.03. One conversion, stated in the reply (file value, factor, result); the server recomputes it |
+| `Milk (L/d)` | → `Milk` (kg/day) | **unit check: L vs kg**, milk density 1.03 kg/L: kg = L × 1.03. One conversion, declared on the row (`source_value`, `source_unit = "L/day"`, `conversion = "l_to_kg"`); the server recomputes it |
 | `DE %` | → `DE` | percent OK |
 | `Ym` | → `Ym` | confirm units: a value above 1 is most likely a percentage and a value below 0.2 a fraction, but ask in section D; don't assume |
 
@@ -145,7 +145,7 @@ dairy_cows      120000    1320             0
 - `live_weight_lb = 1320` → `BW = 1320 × 0.4536 = 598.8` kg
 - `adg_lb_d = 0` → `WG = 0` (zero is unit-agnostic)
 
-**Sanity check:** 1320 lb ≈ 599 kg, plausible for a US Holstein. Report the conversion in the "Units I changed" list with the file's number and the factor (1320 lb × 0.4536 = 598.8 kg); the row stays `user_file` and the server recomputes it.
+**Sanity check:** 1320 lb ≈ 599 kg, plausible for a US Holstein. The row stays `user_file` and declares the conversion: `source_value = 1320`, `source_unit = "lb"`, `conversion = "lb_to_kg"` (the server recomputes 1320 × 0.45359 = 598.74 and flags a difference above 0.2 %).
 
 ---
 

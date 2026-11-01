@@ -4661,6 +4661,40 @@ section_F <- function() {
              f78_ok,
              notes = if (f78_ok) "level rows, nudge paragraph, sub-category check" else paste(f78_fail, collapse = "; "))
 
+  # F80 -- conversions declared by the AI and recomputed by the server
+  # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
+  # is verified, one off by 1 % fails, a missing lactation length warns, the
+  # schema and the prompt carry the fields, and a series copied from the
+  # inventory year's converted value fails for the other years.
+  f80_fail <- tryCatch({
+    f <- character(0)
+    ps <- data.frame(cattle_type = "dairy", aggregation_level = "s", sub_category = c("a", "b", "c"), parameter = "Milk",
+                     mean = c(2.9836, 2.95, 3), distribution = "normal", param_type = "coefficient", data_source = "user_file",
+                     source_value = 4.2375, source_unit = "kg/lactating day", conversion = "milk_lactating_to_head",
+                     lactation_days = c(257, 257, NA), stringsAsFactors = FALSE)
+    out <- .translator_verify_conversions(list(parameters = ps))
+    sc <- out$server_corrections
+    sev <- vapply(c("a", "b", "c"), function(g) sc$severity[grepl(paste0("/ ", g, "$"), sc$group)][1], character(1))
+    if (!identical(unname(sev), c("info", "fail", "warn"))) f <- c(f, paste("severities:", paste(sev, collapse = ",")))
+    if (!isTRUE(all.equal(out$parameters$conversion_factor[1], 257 / 365))) f <- c(f, "factor not kept")
+    sch <- .ANTHROPIC_PARAMETER_ITEM_SCHEMA$properties
+    if (!all(c("source_value", "conversion", "lactation_days", "source_lower") %in% names(sch))) f <- c(f, "schema fields")
+    si <- readLines("translator_prompts/system_instructions.md", warn = FALSE)
+    if (!any(grepl("source_value", si, fixed = TRUE))) f <- c(f, "prompt does not name source_value")
+    yv <- list("2023" = c(4.2, 51), "2024" = c(4.2375, 52))
+    tsd <- data.frame(aggregation_level = "s", sub_category = "a", year = c(2023L, 2024L), Milk = rep(4.2375 * 257 / 365, 2))
+    near_in <- function(x, s, tol = 1e-6, tol_abs = 0) any(abs(s - x) <= max(tol * max(1, abs(x)), tol_abs))
+    iss <- .translator_ts_conversion_issues(out$parameters[1, , drop = FALSE], tsd, yv, near_in, function(x) format(x),
+                                            function(ps, i) ps$sub_category[i])
+    if (length(iss) != 1L || !grepl("1 year", iss[[1]]$issue) || iss[[1]]$severity != "fail") f <- c(f, "series from one year not caught")
+    f
+  }, error = function(e) conditionMessage(e))
+  f80_ok <- length(f80_fail) == 0L
+  check_bool("F80", "F",
+             "Conversions declared by the AI are recomputed: a verified milk conversion is info, 1 % off is a failure, a missing lactation length warns; the schema and the prompt carry the fields; a series copied from one year's converted value fails",
+             f80_ok,
+             notes = if (f80_ok) "verifier, schema, prompt and series check as intended" else paste(f80_fail, collapse = "; "))
+
   # F79 -- the scope paragraph sits in the uncached tail: two batch nudges
   # for different systems differ only in the nudge itself, and the
   # paragraph comes before the checklist and the binding decisions.

@@ -1311,7 +1311,21 @@ anthropic_chat_stream <- function(messages,
                              description = paste(
                                "Where the mean came from: user_file (uploaded file),",
                                "user_chat (typed in chat), ipcc_default (catalogue),",
-                               "biological_zero (structural zero), placeholder."))
+                               "biological_zero (structural zero), placeholder.")),
+    # 2026-11-01 (Stage 6): a converted value declares the file's number and
+    # the conversion; the server recomputes the mean (and the bounds, and
+    # every time-series cell of the parameter) and flags a difference above
+    # 0.2 %. Absent on a value copied as it is.
+    source_value      = list(type = c("number", "null"), description = "the file's number before conversion"),
+    source_unit       = list(type = c("string", "null"), description = "the file's unit, e.g. kg/lactating day, lb, L/day"),
+    conversion        = list(type = c("string", "null"),
+                             enum = I(c("none", "milk_lactating_to_head", "lb_to_kg", "l_to_kg", "pct_to_fraction",
+                                        "fraction_to_pct", "per_year_to_per_day", "custom")),
+                             description = "the conversion applied to source_value to get mean"),
+    conversion_factor = list(type = c("number", "null"), description = "the factor, for conversion = custom only"),
+    lactation_days    = list(type = c("number", "null"), description = "lactation length in days, for milk_lactating_to_head"),
+    source_lower      = list(type = c("number", "null"), description = "the file's lower bound before conversion, when the bounds were converted too"),
+    source_upper      = list(type = c("number", "null"), description = "the file's upper bound before conversion")
   ),
   required = I(c("sub_category", "parameter", "mean", "distribution",
                  "param_type", "data_source"))

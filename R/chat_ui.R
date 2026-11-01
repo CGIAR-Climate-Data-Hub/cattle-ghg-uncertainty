@@ -121,6 +121,10 @@ translator_chat_ui <- function() {
     # 2026-11-01: the one re-emit of the table when the inventory year
     # decided differs from the column it was built on
     year_fix_done = FALSE,
+    # the check of the current table (key + result) and the key whose
+    # result was posted in the chat
+    source_check = NULL,
+    source_posted = NULL,
     # 2026-10-22 (WP6): the job this session started or reconnected to,
     # and the folder the user chose for the results (Chrome/Edge).
     job_id = NULL,
@@ -450,6 +454,9 @@ translator_chat_server <- function(input, output, session) {
       state$source_values <- NULL
       state$source_gate <- NULL
       state$source_fix_done <- FALSE
+      state$source_check <- NULL
+      state$source_posted <- NULL
+      state$year_fix_done <- FALSE
       state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
                                   error = function(e) NULL)
       # 2026-10-22 (WP1): a column whose header says percent while its values
@@ -771,7 +778,11 @@ translator_chat_server <- function(input, output, session) {
       return()
     }
     # 2026-10-31 (Stage 3): the source_values block against the file,
-    # before the first batch is paid for
+    # before the first batch is paid for (2026-11-01: normally already
+    # checked when the table arrived; a notice covers the 30 s otherwise)
+    if (length(state$source_values) && length(state$source_sheets) &&
+        !identical(state$source_check$key, .translator_sv_key(state$source_values)))
+      showNotification(t("ai_source_gate_checking"), type = "message", duration = 40)
     if (!.translator_source_gate()) return()
     .translator_produce_or_ask_delivery()
   })
@@ -779,30 +790,55 @@ translator_chat_server <- function(input, output, session) {
   # go back to the AI once (a corrective clarify call) and Produce resumes
   # by itself; on a second failure the list is shown with a "Produce
   # anyway" button.
-  .translator_source_gate <- function() {
+  # 2026-11-01: the check runs once per table (a key per block) and its
+  # result is kept for the click, which then only starts production.
+  .translator_sv_key <- function(sv) tryCatch(digest::digest(sv, algo = "md5"), error = function(e) as.character(length(sv)))
+  .translator_source_check_cached <- function() {
+    sv <- state$source_values; sh <- state$source_sheets
+    if (!length(sv) || !length(sh)) return(NULL)
+    key <- .translator_sv_key(sv)
+    cached <- state$source_check
+    if (is.list(cached) && identical(cached$key, key)) return(cached$chk)
+    chk <- tryCatch(translator_source_values_check(sv, sh), error = function(e) NULL)
+    state$source_check <- list(key = key, chk = chk)
+    if (!is.null(chk)) {
+      bad <- chk[!chk$ok & !chk$cap, , drop = FALSE]
+      message(sprintf("translator: source check: %d entries, %d do not match, %d beyond the rows sent",
+                      nrow(chk), nrow(bad), sum(chk$cap)))
+    }
+    chk
+  }
+  # `auto` is the observer's call (a table has just arrived): it posts the
+  # result, sends the correction only when no question is open, and never
+  # starts production.
+  .translator_source_gate <- function(auto = FALSE) {
     sv <- state$source_values; sh <- state$source_sheets
     if (!length(sv) || !length(sh)) {
-      if (length(sv) && !length(sh))
+      if (length(sv) && !length(sh) && !auto)
         showNotification(t("ai_source_gate_skipped"), type = "message", duration = 6)
       state$source_gate <- NULL
       return(TRUE)
     }
-    chk <- tryCatch(translator_source_values_check(sv, sh), error = function(e) NULL)
+    chk <- .translator_source_check_cached()
     if (is.null(chk)) { state$source_gate <- NULL; return(TRUE) }
     bad <- chk[!chk$ok & !chk$cap, , drop = FALSE]
-    n_cap <- sum(chk$cap)
-    message(sprintf("translator: source check: %d entries, %d do not match, %d beyond the rows sent",
-                    nrow(chk), nrow(bad), n_cap))
+    key <- state$source_check$key
+    post <- function(txt) state$messages[[length(state$messages) + 1L]] <- list(
+      role = "assistant", source = "server_notice", content = "(source check)", display = txt, ts = .translator_now())
     if (!nrow(bad)) {
       state$source_gate <- NULL
-      state$messages[[length(state$messages) + 1L]] <- list(
-        role = "assistant", source = "server_notice", content = "(source check)",
-        display = sprintf(t("ai_source_gate_ok"), nrow(chk)), ts = .translator_now())
+      if (!identical(state$source_posted, key)) { state$source_posted <- key; post(sprintf(t("ai_source_gate_ok"), nrow(chk))) }
       return(TRUE)
     }
     if (!isTRUE(state$source_fix_done)) {
+      if (auto && length(state$pending_questions)) {
+        # the correction waits for the answers (one exchange at a time)
+        if (!identical(state$source_posted, key)) { state$source_posted <- key; post(sprintf(t("ai_source_gate_pending"), nrow(bad), nrow(chk))) }
+        return(FALSE)
+      }
       state$source_fix_done <- TRUE
-      state$produce_after_fix <- TRUE
+      state$produce_after_fix <- !auto
+      state$source_posted <- key
       msg <- .translator_source_fix_message(chk, sv)
       state$messages[[length(state$messages) + 1L]] <- list(
         role = "user", content = msg, source = "server_correction",
@@ -813,14 +849,36 @@ translator_chat_server <- function(input, output, session) {
       return(FALSE)
     }
     state$source_gate <- bad
-    showNotification(sprintf(t("ai_source_gate_failed"), nrow(bad)), type = "warning", duration = 8)
+    if (!auto) showNotification(sprintf(t("ai_source_gate_failed"), nrow(bad)), type = "warning", duration = 8)
     FALSE
   }
-  # After the corrective round: check again, then produce or show the list.
+  # Whenever a table arrives and the AI is idle: Produce resumes after a
+  # correction the click asked for; otherwise the year check first (the
+  # table re-read on the decided year's column, once, when no question is
+  # open), then the source check of the new table.
   observeEvent({ state$source_values; state$pending }, {
-    if (!isTRUE(state$produce_after_fix) || isTRUE(state$pending)) return()
-    state$produce_after_fix <- FALSE
-    if (.translator_source_gate()) .translator_produce_or_ask_delivery()
+    if (isTRUE(state$pending)) return()
+    if (isTRUE(state$produce_after_fix)) {
+      state$produce_after_fix <- FALSE
+      if (.translator_source_gate()) .translator_produce_or_ask_delivery()
+      return()
+    }
+    if (!length(state$source_values) || !length(state$source_sheets)) return()
+    if (!length(state$pending_questions) && !isTRUE(state$year_fix_done)) {
+      yfix <- tryCatch(.translator_year_fix_message(state$register, state$source_values), error = function(e) NULL)
+      if (!is.null(yfix)) {
+        state$year_fix_done <- TRUE
+        state$messages[[length(state$messages) + 1L]] <- list(
+          role = "user", content = yfix$text, source = "server_correction",
+          display = sprintf(t("ai_year_fix_notice"), yfix$table_year, yfix$year), ts = .translator_now())
+        message("translator: year check, table on ", yfix$table_year, ", inventory year ", yfix$year, "; re-emit requested")
+        .translator_persist(state)
+        session$sendCustomMessage("translatorAppendTypingBubble", "")
+        .translator_send(state, session, stage = "source_fix")
+        return()
+      }
+    }
+    .translator_source_gate(auto = TRUE)
   }, ignoreInit = TRUE)
   output$translator_source_gate <- renderUI({
     bad <- state$source_gate
@@ -2662,26 +2720,9 @@ translator_cancel_clear <- function(tok) {
   # message is the clear next step.
   if (template_just_ready) .translator_append_download_hint(state)
 
-  # 2026-11-01: the table was built on one year column; when the
-  # inventory year now decided is another one, the block is asked again
-  # on that column, once, when no question is open and nothing else is
-  # being continued.
-  if (!continue_now && !length(qs) && !isTRUE(resp$tool_used) && !template_just_ready &&
-      !isTRUE(state$year_fix_done)) {
-    yfix <- tryCatch(.translator_year_fix_message(state$register, state$source_values), error = function(e) NULL)
-    if (!is.null(yfix)) {
-      state$year_fix_done <- TRUE
-      state$messages[[length(state$messages) + 1L]] <-
-        list(role = "user", content = yfix$text,
-             display = sprintf(t("ai_year_fix_notice"), yfix$table_year, yfix$year),
-             source = "server_correction", ts = .translator_now())
-      message("translator: year check, table on ", yfix$table_year, ", inventory year ", yfix$year, "; re-emit requested")
-      .translator_persist(state)
-      later::later(function() shiny::withReactiveDomain(session, shiny::isolate(
-        tryCatch(.translator_send(state, session, stage = "source_fix"),
-                 error = function(e) message("translator: year fix not sent (", conditionMessage(e), ")")))), 0.2)
-    }
-  }
+  # (2026-11-01: the year check on the table and the automatic source
+  # check run from the observer on {source_values, pending} in the server
+  # function, once this callback has cleared `pending`.)
 
   # Persist so a refresh / reload resumes where we left off.
   .translator_persist(state)
@@ -2695,6 +2736,10 @@ translator_cancel_clear <- function(tok) {
 # 2026-10-31: 40,000 (was 32,000): section B is now a JSON block of about
 # 500 entries, roughly twice the prose table it replaces.
 .TRANSLATOR_CHAT_MAX_TOKENS <- 40000L
+# 2026-11-01: the AI review of the flagged checks after assembly is off
+# (the user's decision: the checks are for the compiler to settle). The
+# code stays in R/translator_review.R.
+.TRANSLATOR_AI_REVIEW <- FALSE
 .TRANSLATOR_CONTINUE_TEXT <- paste(
   "Your previous reply was cut off by the output length limit. Do not repeat",
   "what you already wrote. If the source_values block was cut, continue it",
@@ -2950,7 +2995,18 @@ translator_cancel_clear <- function(tok) {
       "each year's value read from that year's own column, for every",
       "parameter that changes across the years (a parameter that is the",
       "same in every year may be left blank: the server drops constant",
-      "columns). When the file has one year only, return [].",
+      "columns). The source_values block lists the inventory-year values",
+      "only: the series are read from the file's year columns regardless,",
+      "for EVERY sub-category of '%s' whose value changes, including the",
+      "groups that share one series with the cows (DE, CP) and the",
+      "feedlot weights. When the file has one year only, return [].",
+      "",
+      "A converted value (milk per lactating day to per head, lb to kg,",
+      "L to kg) carries source_value, source_unit, conversion (and",
+      "lactation_days or conversion_factor), and source_lower and",
+      "source_upper when its bounds were converted with the same factor;",
+      "every time-series cell of that parameter is converted the same way",
+      "from its own year's value. The server recomputes all of them.",
       "",
       "All other emission rules from the system prompt still apply:",
       "source-of-truth hierarchy (user_file > user_chat >",
@@ -2959,7 +3015,7 @@ translator_cancel_clear <- function(tok) {
       "DMI row unless the file measured it), biological zeros with",
       "distribution='constant'.",
       sep = "\n"),
-          i, n_levels, level, level, level, level,
+          i, n_levels, level, level, level, level, level,
           sum(!PARAM_CATALOGUE$param_tier %in% "optional"))
       # 2026-10-31: the system's rows (Stage 3), the checklist, then the
       # binding decisions. All sit in the nudge, the uncached tail of the
@@ -3527,6 +3583,11 @@ translator_cancel_clear <- function(tok) {
       # 2026-10-30: before the files are delivered, the flagged items go
       # back to the AI once (R/translator_review.R): it corrects them from
       # the file or explains why they are not errors.
+      # 2026-11-01: switched off (.TRANSLATOR_AI_REVIEW). The user's
+      # decision: the checks are listed for the compiler, who settles them
+      # (their file can be the thing that is wrong); the files are
+      # delivered right after the checks. The last live review was cut at
+      # its output limit trying to rewrite whole series and applied nothing.
       wrapped <- FALSE
       wrap_up <- function() {
         if (wrapped) return(invisible(NULL))
@@ -3536,6 +3597,7 @@ translator_cancel_clear <- function(tok) {
                  error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
         done()
       }
+      if (!isTRUE(.TRANSLATOR_AI_REVIEW)) return(wrap_up())
       return(tryCatch(
         .translator_review_async(state, system_prompt, ctx$messages, ctx$register,
                                  on_chunk_cb, on_tick_cb, stopper, info, inseq, job_id,

@@ -595,6 +595,10 @@ lang_state_take <- function(token) {
   # 2026-10-31 (Stage 3): the source_values check before Produce
   ai_source_gate_skipped = list(en = "The file is no longer in memory on the server (it restarted), so the table of values could not be checked against it before producing.",
                                 fr = "Le fichier n'est plus en memoire sur le serveur (il a redemarre) : la table des valeurs n'a pas pu etre verifiee avant la production."),
+  ai_source_gate_checking = list(en = "Checking the AI's table of values against your file (about 30 seconds)...",
+                                 fr = "Verification de la table des valeurs de l'IA contre votre fichier (environ 30 secondes)..."),
+  ai_source_gate_pending = list(en = "Source check: %d of %d values did not match your file at the sheet, row and column the AI noted. The AI will correct them after your answers; then click Produce template now.",
+                                fr = "Verification de la source : %d valeurs sur %d ne correspondent pas a votre fichier. L'IA les corrigera apres vos reponses ; cliquez ensuite sur Produire le modele."),
   ai_source_gate_ok = list(en = "Source check: all %d values the AI will use were found in your file at the sheet, row and column it noted.",
                            fr = "Verification de la source : les %d valeurs que l'IA utilisera ont toutes ete retrouvees dans votre fichier, a la feuille, la ligne et la colonne notees."),
   ai_source_gate_fixing = list(en = "Source check: %d of %d values did not match your file at the sheet, row and column the AI noted. The AI is re-reading them; production starts by itself when the table is right.",

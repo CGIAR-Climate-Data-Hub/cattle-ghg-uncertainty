@@ -206,13 +206,19 @@ stopifnot(n_batch_1 == length(levels))
 stopifnot(sum(grepl("^retry_scope:", calls)) == 1L, length(state$source_values) == nrow(ps))
 # 2026-10-30: the review ran once, its correction is in the workbook and
 # both the correction and the explanation are listed with the checks.
-stopifnot(sum(calls == "review") == 1L, !is.null(state$review), state$review$corrected >= 1L,
-          any(state$precheck$issues$check %in% "corrected by the AI review"),
-          any(state$precheck$issues$check %in% "reviewed: not an error"))
-rv_ps <- suppressMessages(parse_uploaded_template(state$template_file))$param_specs
-stopifnot(any(abs(num(rv_ps$uncertainty_pct[rv_ps$aggregation_level == levels[1] & rv_ps$parameter == "BW"]) - 12.34) < 1e-6, na.rm = TRUE))
-cat("review: flagged", state$review$flagged, " corrected", state$review$corrected, " not errors", state$review$not_errors,
-    " still flagged", state$review$still_flagged, "\n")
+if (isTRUE(.TRANSLATOR_AI_REVIEW)) {
+  stopifnot(sum(calls == "review") == 1L, !is.null(state$review), state$review$corrected >= 1L,
+            any(state$precheck$issues$check %in% "corrected by the AI review"),
+            any(state$precheck$issues$check %in% "reviewed: not an error"))
+  rv_ps <- suppressMessages(parse_uploaded_template(state$template_file))$param_specs
+  stopifnot(any(abs(num(rv_ps$uncertainty_pct[rv_ps$aggregation_level == levels[1] & rv_ps$parameter == "BW"]) - 12.34) < 1e-6, na.rm = TRUE))
+  cat("review: flagged", state$review$flagged, " corrected", state$review$corrected, " not errors", state$review$not_errors,
+      " still flagged", state$review$still_flagged, "\n")
+} else {
+  # 2026-11-01: the review is off; the files come right after the checks
+  stopifnot(sum(calls == "review") == 0L, file.exists(state$template_file))
+  cat("review: off (the files came right after the checks)\n")
+}
 
 # ---- scenario 2: Produce again, nothing changed: parts reused -----------------
 calls <- character(); state$last_template_json <- NULL
