@@ -277,7 +277,7 @@ resolve_sub_category_matches <- function(param_specs, manure_data) {
 }
 
 run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global",
-                     manure_data = NULL) {
+                     manure_data = NULL, translator_checks = NULL) {
   ps <- param_specs
 
   # Build reference lookup from catalogue
@@ -666,6 +666,24 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
         level     = mm$level,
         stringsAsFactors = FALSE))
     }
+  }
+
+  # 2026-11-01 (Stage 4.8): the AI translator's blocking failures, read from
+  # the hidden Translator_Checks sheet of its template. Each is a fail row
+  # here, ignorable like any other, so the run waits until the compiler has
+  # fixed the value in the template or ticked the row.
+  if (is.data.frame(translator_checks) && nrow(translator_checks) && "check" %in% names(translator_checks)) {
+    tc <- translator_checks
+    grp <- as.character(tc$group %||% ""); grp[is.na(grp)] <- ""
+    lvl <- vapply(strsplit(grp, " / ", fixed = TRUE), function(p) if (length(p) >= 2L) trimws(p[2]) else NA_character_, character(1))
+    result <- rbind(result, data.frame(
+      group     = ifelse(nzchar(grp), grp, "Translator"),
+      parameter = ifelse(is.na(tc$parameter %||% NA) | !nzchar(tc$parameter %||% ""), "(translator)", as.character(tc$parameter)),
+      check     = paste0("translator_", gsub("[^a-z0-9]+", "_", tolower(as.character(tc$check)))),
+      status    = "fail",
+      message   = sprintf(t("qa_msg_translator_fail"), as.character(tc$issue %||% "")),
+      level     = lvl,
+      stringsAsFactors = FALSE))
   }
 
   result$id <- qaqc_row_id(result)

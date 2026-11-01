@@ -64,6 +64,111 @@
   txt[nzchar(txt)]
 }
 
+# ---------------------------------------------------------------------------
+# The time series taken from the file by the server (2026-11-01). Once the
+# source check has confirmed which row of the file a group's parameter is
+# read from (an entry whose `col` is a year header), the row's values in
+# every year column are the series: they replace what the AI wrote for
+# that group and parameter, converted with the Parameters row's factor
+# where the value is converted (milk per lactating day). The AI extended
+# and smoothed the feedlot BW series of the 13:31 Zambia run and left the
+# MW series out; copying the row is deterministic. Each rebuilt series is
+# recorded: info when the AI's cells agreed, warn when some differed or
+# were missing, with the years.
+# ---------------------------------------------------------------------------
+.TRANSLATOR_TS_PARAMS <- c("N", "BW", "MW", "WG", "Milk", "Fat", "pct_pregnant", "DE", "CP", "MilkPR")
+
+translator_rebuild_series <- function(piece, source_values, sheets, tol = 0.002) {
+  ps <- piece$parameters
+  if (!length(source_values) || !length(sheets) || !is.data.frame(ps) || !nrow(ps)) return(piece)
+  tables <- .translator_source_tables(sheets)
+  if (!length(tables)) return(piece)
+  tnames <- vapply(tables, function(t) .translator_fold(t$name), character(1))
+  ts <- piece$parameter_timeseries
+  if (!is.data.frame(ts)) ts <- data.frame()
+  if (!nrow(ts)) ts <- data.frame(cattle_type = character(0), aggregation_level = character(0),
+                                  sub_category = character(0), year = integer(0), stringsAsFactors = FALSE)
+  for (cn in c("cattle_type", "aggregation_level", "sub_category", "year")) if (!cn %in% names(ts)) ts[[cn]] <- NA
+  ts$year <- suppressWarnings(as.integer(ts$year))
+  lv_ts <- .translator_norm_level(ts$aggregation_level); lv_ps <- .translator_norm_level(ps$aggregation_level)
+  fac <- if ("conversion_factor" %in% names(ps)) suppressWarnings(as.numeric(ps$conversion_factor)) else rep(NA_real_, nrow(ps))
+  rows <- list(); n_rebuilt <- 0L
+  for (e in source_values) {
+    p <- as.character(e$parameter %||% ""); col <- trimws(as.character(e$col %||% ""))
+    S <- as.character(e$sub_category %||% ""); L <- .translator_norm_level(e$aggregation_level %||% "")
+    if (!p %in% .TRANSLATOR_TS_PARAMS || !grepl("^(19|20)[0-9]{2}$", col) || !nzchar(S) || !nzchar(L)) next
+    k <- which(tnames == .translator_fold(e$sheet %||% ""))
+    if (!length(k) && length(tables) == 1L) k <- 1L
+    if (!length(k)) next
+    tb <- tables[[k[1]]]; row <- tb$rows[[as.character(suppressWarnings(as.integer(e$row)))]]
+    if (is.null(row)) next
+    yh <- tb$headers[grepl("^(19|20)[0-9]{2}$", trimws(tb$headers))]
+    vals <- vapply(yh, function(h) { v <- row[[h]]; n <- if (is.null(v)) numeric(0) else tryCatch(.translator_cell_numbers(unlist(v)), error = function(err) numeric(0))
+                                     if (length(n)) n[1] else NA_real_ }, numeric(1))
+    names(vals) <- trimws(yh)
+    vals <- vals[is.finite(vals)]
+    if (length(vals) < 2L) next
+    i_ps <- which(ps$parameter == p & ps$sub_category == S & lv_ps == L)
+    if (!length(i_ps)) next
+    f <- fac[i_ps[1]]; if (!is.finite(f) || f == 0) f <- 1
+    ct <- as.character(ps$cattle_type[i_ps[1]] %||% "")
+    if (!p %in% names(ts)) ts[[p]] <- NA_real_
+    changed <- character(0); added <- character(0)
+    for (y in names(vals)) {
+      yi <- as.integer(y); v <- unname(vals[[y]]) * f
+      r <- which(lv_ts == L & ts$sub_category == S & ts$year == yi)
+      if (!length(r)) {
+        ts[nrow(ts) + 1L, ] <- NA
+        r <- nrow(ts)
+        ts$cattle_type[r] <- ct; ts$aggregation_level[r] <- as.character(e$aggregation_level); ts$sub_category[r] <- S; ts$year[r] <- yi
+        lv_ts <- c(lv_ts, L)
+        added <- c(added, y)
+      } else {
+        old <- suppressWarnings(as.numeric(ts[[p]][r[1]]))
+        if (!is.finite(old)) added <- c(added, y)
+        else if (abs(old - v) > tol * max(1, abs(v))) changed <- c(changed, y)
+      }
+      ts[[p]][r[1]] <- v
+    }
+    n_rebuilt <- n_rebuilt + 1L
+    yr_txt <- function(x) .translator_year_runs(sort(as.integer(x)))
+    issue <- if (!length(changed) && !length(added))
+      sprintf("The %s series of this group was taken from the file row (%s!%s, %d years)%s; the AI's values agreed.",
+              p, e$sheet, e$row, length(vals), if (f != 1) sprintf(", converted with the factor %s", format(signif(f, 6))) else "")
+    else sprintf("The %s series of this group was taken from the file row (%s!%s, %d years)%s. The AI's series %s%s%s.",
+                 p, e$sheet, e$row, length(vals), if (f != 1) sprintf(", converted with the factor %s", format(signif(f, 6))) else "",
+                 if (length(changed)) sprintf("differed in %d year(s) (%s)", length(changed), yr_txt(changed)) else "",
+                 if (length(changed) && length(added)) " and " else "",
+                 if (length(added)) sprintf("had no value in %d year(s) (%s)", length(added), yr_txt(added)) else "")
+    rows[[length(rows) + 1L]] <- data.frame(
+      where = "Parameter_TimeSeries", issue = issue, severity = if (length(changed) || length(added)) "warn" else "info",
+      sheet = "Parameter_TimeSeries", group = paste(ct, as.character(e$aggregation_level), S, sep = " / "), parameter = p,
+      check = "series taken from the file", stringsAsFactors = FALSE)
+  }
+  if (!n_rebuilt) return(piece)
+  ts <- ts[order(lv_ts, ts$sub_category, ts$year), , drop = FALSE]
+  rownames(ts) <- NULL
+  piece$parameter_timeseries <- ts
+  corr <- do.call(rbind, rows); rownames(corr) <- NULL
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
+  piece
+}
+
+# The JSON text after the rebuild; the same text when nothing was rebuilt.
+translator_rebuild_series_json <- function(json, source_values, sheets) {
+  if (is.null(json) || !nzchar(json) || !length(source_values) || !length(sheets)) return(json)
+  piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
+  if (is.null(piece)) return(json)
+  out <- tryCatch(translator_rebuild_series(piece, source_values, sheets), error = function(e) {
+    message("translator: series rebuild failed (", conditionMessage(e), ")"); NULL })
+  if (is.null(out)) return(json)
+  before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
+  after <- if (is.data.frame(out$server_corrections)) nrow(out$server_corrections) else 0L
+  if (after == before) return(json)
+  message("translator: ", after - before, " series taken from the file rows")
+  as.character(jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
+}
+
 # One entry against the file. Returns list(ok, what, cap).
 .translator_check_entry <- function(e, tables) {
   what <- character(0); cap <- FALSE

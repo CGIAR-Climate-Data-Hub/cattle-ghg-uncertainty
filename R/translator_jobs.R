@@ -116,9 +116,17 @@ translator_job_mark_lost <- function(stale_min = 15) {
 
 translator_job_register_session <- function(id, session) {
   if (is.null(id) || is.null(session)) return(invisible(NULL))
-  cur <- .TRANSLATOR_JOB_SESSIONS[[id]] %||% list()
+  # 2026-11-01 (Stage 4.4): closed sessions are dropped on every
+  # registration, so a long-lived worker does not keep every session it
+  # ever saw; jobs older than a day are dropped from the store as well.
+  cur <- Filter(.translator_session_open, .TRANSLATOR_JOB_SESSIONS[[id]] %||% list())
   cur[[length(cur) + 1L]] <- session
   .TRANSLATOR_JOB_SESSIONS[[id]] <- cur
+  for (old in setdiff(ls(.TRANSLATOR_JOB_SESSIONS), id)) {
+    st <- regmatches(old, regexpr("[0-9]{8}", old))
+    if (length(st) == 1L && !is.na(d <- suppressWarnings(as.Date(st, "%Y%m%d"))) && Sys.Date() - d > 1)
+      rm(list = old, envir = .TRANSLATOR_JOB_SESSIONS)
+  }
   invisible(NULL)
 }
 

@@ -2,6 +2,16 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-01, night: the series from the file, the checks of Stage 5, the rest of Stage 4
+
+Reason: the 13:31 run's feedlot BW series was invented and its MW series left out; the ±20 % milk bounds replaced the file's; ten questions on a file whose note answered eight.
+
+- **Series copied by the server** (`translator_rebuild_series`, after the fix-up, before the write): for every group and parameter whose file row the source check confirmed (an entry read from a year column), the row's values in every year column replace the AI's series, converted with the row's factor; recorded as "series taken from the file" (info when the AI's cells agreed, warn with the years when they differed or were missing). The batch request says a series cell is a cell of the file, never extended, smoothed, interpolated or rounded.
+- **Stage 5 checks**: the value match is relative, 1e-5, and a match through a unit transform is an info row ("derived by unit transform"); a converted row is tested on its `source_value`; the ranges of a `user_file` row are looked for in the file ("range not in file", warn); a Parameters value of a series parameter found only in another year's column is a failure ("value from another year"); one value per system for DE, CP, Fat, MilkPR, pct_pregnant and Ym ("same value within a system": warn under 2 % spread, info above).
+- **Stage 4**: the blocking failures travel on the hidden `Translator_Checks` sheet to the app's QA/QC tab (`run_qaqc(translator_checks)`, "Translator check: ..." fail rows, ignorable); the writer's silent fills are listed (`.translator_writer_diff`: gaps filled from the catalogue, optional values blanked, cattle_type filled, duplicate rows); a batch cut at the output limit is asked again in two halves of its sub-categories and merged; closed sessions and day-old jobs are dropped from the job store.
+- **Questions**: what the notes or the upload settings settle is recorded as a decision and not asked (rule 10; the notes block).
+- Tests: scripts/test_translator_roundtrip.R (audit F81).
+
 ## 2026-11-01, evening: conversions verified (Stage 6), series regardless of the table, no AI review
 
 Reason: the 11:25 Zambia run. Nine series were missing (emergent dairy DE and CP for the non-cow groups, the feedlot MW, the commercial dairy heifers' MW): the table now lists the inventory year only and the emission rule said "a mechanical translation of the table", so the AI left series out. The emergent dairy milk series again started from the 2024 converted value, and the commercial beef cows' milk bounds were left per lactating day. The AI review of the 100 flagged items hit its output limit and applied nothing; the user chose to drop it.

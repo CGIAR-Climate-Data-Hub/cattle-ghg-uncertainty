@@ -1929,6 +1929,12 @@ translator_cancel_clear <- function(tok) {
   src_fp <- isolate(state$source_fp)
   fams <- if (!is.null(src_fp)) src_fp$families %||% character(0) else NULL
   fixed <- tryCatch(.translator_fix_piece_json(json, families = fams), error = function(e) NULL)
+  # 2026-11-01: the time series of every group and parameter whose file
+  # row the source check confirmed are copied from that row by the server
+  # (R/translator_source.R, translator_rebuild_series)
+  rebuilt <- tryCatch(translator_rebuild_series_json(fixed %||% json, isolate(state$source_values), isolate(state$source_sheets)),
+                      error = function(e) NULL)
+  if (!is.null(rebuilt)) fixed <- rebuilt
   if (!is.null(fixed) && !identical(fixed, json)) {
     json <- fixed
     state$last_template_json <- fixed
@@ -1957,6 +1963,16 @@ translator_cancel_clear <- function(tok) {
   state$precheck     <- if (ok) .translator_precheck_file(path, source = src, piece = piece)
   # 2026-10-30: what the AI review corrected, and what it explained as not
   # an error, is listed with the checks (see R/translator_review.R).
+  # 2026-11-01 (Stage 4.7): what the writer changed without saying, read
+  # back from the workbook and listed with the checks
+  wdiff <- if (ok) tryCatch(.translator_writer_diff(piece, path), error = function(e) {
+    message("translator: writer diff failed (", conditionMessage(e), ")"); NULL }) else NULL
+  if (is.data.frame(wdiff) && nrow(wdiff))
+    extra_issues <- if (is.data.frame(extra_issues) && nrow(extra_issues)) {
+      for (cl in setdiff(names(extra_issues), names(wdiff))) wdiff[[cl]] <- NA
+      for (cl in setdiff(names(wdiff), names(extra_issues))) extra_issues[[cl]] <- NA
+      rbind(extra_issues, wdiff[, names(extra_issues), drop = FALSE])
+    } else wdiff
   if (ok && is.data.frame(extra_issues) && nrow(extra_issues)) {
     pcx <- isolate(state$precheck)
     if (!is.null(pcx) && is.data.frame(pcx$issues)) {
@@ -2187,7 +2203,8 @@ translator_cancel_clear <- function(tok) {
   # corrected-template header when the file is a template coming back.
   note_block <- if (nzchar(note)) paste0(
     "## NOTES FROM THE USER ABOUT THIS FILE\n\n", note,
-    "\n\nThese notes are binding: record them in your decisions block.\n\n---\n\n") else ""
+    "\n\nThese notes are binding: record each point as a decision (basis user) in your decisions block, ",
+    "and do not ask a question about anything they settle.\n\n---\n\n") else ""
   # 2026-11-01: the inventory year and the country given at upload
   settings_block <- if (!is.null(settings$year) || !is.null(settings$country)) paste0(
     "## SETTINGS GIVEN BY THE USER AT UPLOAD\n\n",
@@ -2850,7 +2867,7 @@ translator_cancel_clear <- function(tok) {
   # emission calls below.
   stopper <- function() translator_cancelled(tok)
 
-  if (isTRUE(.TRANSLATOR_ASYNC)) {
+  {
     # Hand off and return. The worker is free from here until Anthropic
     # answers, which is the whole point: a 154-second call no longer locks
     # every other user out of the app.
@@ -2884,16 +2901,6 @@ translator_cancel_clear <- function(tok) {
     return(invisible(NULL))
   }
 
-  resp <- anthropic_chat_stream(
-    msgs,
-    on_chunk    = on_chunk_cb,
-    should_stop = stopper,
-    tools       = anthropic_translator_tools(),
-    tool_choice = .ANTHROPIC_TOOL_CHOICE_AUTO,
-    max_tokens  = .TRANSLATOR_CHAT_MAX_TOKENS
-  )
-
-  .translator_handle_result(state, session, resp, stage)
 }
 
 # One place to log a call's usage (plan F11). `stage` names the pipeline
@@ -3016,7 +3023,11 @@ translator_cancel_clear <- function(tok) {
       "only: the series are read from the file's year columns regardless,",
       "for EVERY sub-category of '%s' whose value changes, including the",
       "groups that share one series with the cows (DE, CP) and the",
-      "feedlot weights. When the file has one year only, return [].",
+      "feedlot weights. A series cell is a cell of the file: copy each",
+      "year's value as it is, never extend a trend, smooth, interpolate",
+      "or round a series (the server copies the file row over yours and",
+      "reports every difference). When the file has one year only,",
+      "return [].",
       "",
       "A converted value (milk per lactating day to per head, lb to kg,",
       "L to kg) carries source_value, source_unit, conversion (and",
@@ -3175,227 +3186,7 @@ translator_cancel_clear <- function(tok) {
     state$batch_parts <- list()
     state$batch_parts_key <- NULL
   }
-  if (isTRUE(.TRANSLATOR_ASYNC))
-    return(.translator_force_template_async(state, session))
-  state$pending <- TRUE
-  state$last_error <- NULL
-  tok <- .translator_begin_request(session)
-  on.exit({
-    translator_cancel_clear(tok)
-    state$pending <- FALSE
-    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
-              error = function(e) NULL)
-  })
-
-  if (budget_would_exceed()) {
-    state$last_error <- paste0(
-      "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly: ",
-      "please try again later or contact the administrator.")
-    return()
-  }
-
-  system_prompt <- tryCatch(assemble_translator_system_prompt(),
-                             error = function(e) NULL)
-  if (is.null(system_prompt)) {
-    state$last_error <- "Couldn't load the translator instructions."
-    return()
-  }
-  tools_sig <- tryCatch(jsonlite::toJSON(anthropic_translator_tools(), auto_unbox = TRUE),
-                        error = function(e) "tools")
-
-  # Stream-aware progress callback shared across discovery + batch calls.
-  total_chars <- 0L
-  on_chunk_cb <- function(text) {
-    total_chars <<- total_chars + nchar(text)
-    tryCatch(session$sendCustomMessage("translatorProgressTick",
-                                         list(chars = total_chars)),
-              error = function(e) NULL)
-  }
-  # Keep-alive for tool_use streams (input_json_delta events): the text
-  # path never fires during emission, so this keeps the typing bubble alive.
-  on_tick_cb <- function(n = 0L) {
-    tryCatch(session$sendCustomMessage("translatorStreamTick", ""),
-              error = function(e) NULL)
-    # Give the blocked event loop a chance to receive a Stop click. Without
-    # this the click sits in the socket until the whole call has finished,
-    # which is why Stop used to reload the page and leave the call running.
-    tryCatch(later::run_now(0), error = function(e) NULL)
-  }
-  info <- function(txt) tryCatch(session$sendCustomMessage("translatorAppendInfoBubble", txt),
-                                 error = function(e) NULL)
-
-  # ---- Stage 1: discovery call ------------------------------------------
-  # Cheap (~200 output tokens). mode = enumerate. Memoised on the exact
-  # conversation (plan F6): a second click on Produce with nothing changed
-  # costs nothing.
-  info("Analysing your inventory structure...")
-  discovery_request <- .translator_discovery_request(state$register)
-  discovery_msgs <- anthropic_build_messages(
-    system_prompt, history = .translator_api_history(state$messages),
-    new_user_message = discovery_request)
-  enum_resp <- .translator_memo_call(discovery_msgs, tools_sig, function()
-    anthropic_chat_enumerate_aggregation_levels(
-      discovery_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-      should_stop = function() translator_cancelled(tok)), mode = "enumerate")
-
-  # A stop is not a failure, and must not trigger the fallback: starting a
-  # monolithic emission here would be the opposite of what was asked for,
-  # and the expensive path at that.
-  if (isTRUE(enum_resp$stopped) || translator_cancelled(tok)) {
-    state$last_error <- enum_resp$error %||%
-      "Stopped at your request. Nothing was produced from this call."
-    return()
-  }
-  if (!is.null(enum_resp$error)) {
-    # Discovery itself failed: fall back to the monolithic path.
-    message("translator: discovery call failed (", enum_resp$error,
-            "), falling back to monolithic emission")
-    .translator_force_template_single(state, session)
-    return()
-  }
-  if (!isTRUE(enum_resp$memo_hit))
-    .translator_log_usage(state, enum_resp, stage = "enumerate", expect_warm = TRUE)
-
-  enum_parsed <- tryCatch(
-    jsonlite::fromJSON(enum_resp$reply, simplifyVector = TRUE),
-    error = function(e) NULL)
-  bad <- .translator_validate_piece(enum_parsed, "enumerate")
-  if (!is.null(bad)) {
-    message("translator: discovery reply incomplete (", bad, "); using single-call path")
-    .translator_force_template_single(state, session)
-    return()
-  }
-  # Distinct, non-blank labels (plan C7): a duplicate would have re-used
-  # the cached part and doubled every row; a blank would have keyed the
-  # cache on "".
-  agg_levels <- unique(trimws(as.character(enum_parsed$aggregation_levels)))
-  agg_levels <- agg_levels[!is.na(agg_levels) & nzchar(agg_levels)]
-  enum_parsed$inventory_metadata <- .translator_metadata_list(enum_parsed$inventory_metadata)
-  fix <- tryCatch(translator_register_apply_metadata(state$register, enum_parsed$inventory_metadata),
-                  error = function(e) NULL)
-  if (!is.null(fix)) { enum_parsed$inventory_metadata <- fix$metadata; state$register <- fix$register }
-  inventory_metadata <- enum_parsed$inventory_metadata
-
-  # Decision: fall back to the monolithic path when batching wouldn't
-  # buy us anything (small inventories, or empty enumeration).
-  if (length(agg_levels) <= 2L) {
-    message(sprintf("translator: discovery returned %d aggregation_level(s); using single-call path",
-                     length(agg_levels)))
-    .translator_force_template_single(state, session)
-    return()
-  }
-
-  # ---- Stage 2: per-aggregation-level batch emission ---------------------
-  # state$batch_parts holds parts that a PREVIOUS merge validated (plan
-  # A3); the memo (plan F6) covers the "same call, same answer" case. Both
-  # survive a Stop, because the parts are persisted with the conversation
-  # (plan F5) and the memo is on disk.
-  cached_levels <- intersect(agg_levels, names(state$batch_parts))
-  fresh_levels  <- setdiff(agg_levels, cached_levels)
-  if (length(cached_levels) > 0)
-    message(sprintf("translator: reusing %d validated batch(es): %s",
-                     length(cached_levels), paste(cached_levels, collapse = ", ")))
-  message(sprintf("translator: dispatching %d force-template call(s): %s",
-                   length(fresh_levels), paste(fresh_levels, collapse = ", ")))
-
-  # Did the user upload a file with values? Drives the per-batch
-  # defaults-only check (plan C1).
-  file_was_uploaded <- any(vapply(state$messages, function(m)
-    identical(m$source, "server_upload") ||
-      grepl("Parameter labels DETECTED IN THIS FILE", m$content %||% "", fixed = TRUE),
-    logical(1)))
-  count_user_rows <- function(pj) {
-    if (is.null(pj) || !is.data.frame(pj$parameters)) return(0L)
-    ds <- pj$parameters$data_source
-    if (is.null(ds)) return(0L)
-    sum(grepl("^user[_ ]?(file|chat)$", ds, ignore.case = TRUE), na.rm = TRUE)
-  }
-
-  parts <- list()
-  for (i in seq_along(agg_levels)) {
-    level <- agg_levels[i]
-
-    if (!is.null(state$batch_parts[[level]])) {
-      info(sprintf("Reusing %d of %d: %s (validated on a previous attempt)...",
-                   i, length(agg_levels), level))
-      parts[[i]] <- state$batch_parts[[level]]
-      next
-    }
-
-    info(sprintf("Processing %d of %d: %s...", i, length(agg_levels), level))
-    total_chars <- 0L
-
-    batch_nudge <- .translator_batch_nudge(i, length(agg_levels), level, state$register)
-    batch_msgs <- anthropic_build_messages(
-      system_prompt, history = .translator_api_history(state$messages),
-      new_user_message = batch_nudge)
-    batch_resp <- .translator_memo_call(batch_msgs, tools_sig, function()
-      anthropic_chat_batch_template_force(
-        batch_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = function() translator_cancelled(tok)), mode = "batch")
-
-    if (isTRUE(batch_resp$stopped) || translator_cancelled(tok)) {
-      state$last_error <- sprintf(
-        "Stopped at your request during batch %d of %d (%s). The %d batch(es) already produced are kept and will not be re-billed; click 'Produce template now' to carry on from there.",
-        i, length(agg_levels), level, length(state$batch_parts))
-      return()
-    }
-    if (!is.null(batch_resp$error)) {
-      state$last_error <- sprintf(
-        "Batch %d of %d (%s) failed: %s. Click 'Produce template now' to retry, the %d batch(es) that already succeeded are kept and won't be re-billed.",
-        i, length(agg_levels), level, batch_resp$error, length(state$batch_parts))
-      return()
-    }
-    if (!isTRUE(batch_resp$memo_hit))
-      .translator_log_usage(state, batch_resp, stage = "batch", expect_warm = TRUE)
-
-    batch_parsed <- tryCatch(
-      jsonlite::fromJSON(batch_resp$reply, simplifyVector = TRUE),
-      error = function(e) NULL)
-    bad <- .translator_validate_piece(batch_parsed, "batch")
-    if (!is.null(bad)) {
-      state$last_error <- sprintf(
-        "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
-        i, level, bad, length(state$batch_parts))
-      return()
-    }
-
-    # Per-batch defaults-only check (plan C1): a file was uploaded, this
-    # level's rows carry no user_file / user_chat provenance at all, so the
-    # model has fallen back to the catalogue for a whole production system.
-    # One retry with the rejection message; only the nudge changes, so the
-    # prefix is a cache read.
-    if (file_was_uploaded && count_user_rows(batch_parsed) == 0L &&
-        is.data.frame(batch_parsed$parameters) && nrow(batch_parsed$parameters) > 0) {
-      message("translator: batch '", level, "' has ZERO user_file rows; retrying once")
-      info(sprintf("Batch %s came back with catalogue defaults only; asking the AI to use the file values...", level))
-      retry_msgs <- c(batch_msgs, list(list(role = "user", content = paste0(
-        "REJECTED: every parameters row you emitted for '", level, "' is tagged ",
-        "data_source = 'ipcc_default' or lacks the tag, yet the uploaded file ",
-        "carries values for this production system. Re-emit the batch for '",
-        level, "' now: for every parameter present in the file use the file's ",
-        "value with data_source = 'user_file' (and its bounds if given), use ",
-        "catalogue defaults ONLY for parameters the file does not supply, and ",
-        "biological_zero where it applies. Same tool, mode = 'batch', same ",
-        "aggregation_level."))))
-      retry_resp <- anthropic_chat_batch_template_force(
-        retry_msgs, on_chunk = on_chunk_cb, on_tick = on_tick_cb,
-        should_stop = function() translator_cancelled(tok))
-      if (is.null(retry_resp$error)) {
-        .translator_log_usage(state, retry_resp, stage = "retry_defaults_only", expect_warm = TRUE)
-        rp <- tryCatch(jsonlite::fromJSON(retry_resp$reply, simplifyVector = TRUE), error = function(e) NULL)
-        if (is.null(.translator_validate_piece(rp, "batch")) && count_user_rows(rp) > 0L)
-          batch_parsed <- rp
-      }
-    }
-
-    batch_parsed$.requested_aggregation_level <- level
-    parts[[i]] <- batch_parsed
-  }
-
-  .translator_emit_finish(state, session, inventory_metadata, parts,
-                          agg_levels, info, model_id = enum_resp$model)
+  .translator_force_template_async(state, session)
 }
 
 # Legacy single-call force-template path. Used by .translator_force_template()
@@ -3776,10 +3567,60 @@ translator_cancel_clear <- function(tok) {
             .translator_memo_forget(batch_msgs, tools_sig)
             # 2026-10-31: a reply cut at the output limit is named as such;
             # repeating the identical request would cut at the same place.
-            if (isTRUE(batch_resp$truncated))
+            if (isTRUE(batch_resp$truncated)) {
+              # 2026-11-01 (Stage 4.3): the system is asked again in two
+              # halves of its sub-categories, each in its own call; the two
+              # pieces are merged and go through the same checks.
+              subs <- as.character(scope$sub_categories %||% character(0))
+              if (length(subs) >= 2L && !isTRUE(batch_resp$split)) {
+                h1 <- subs[seq_len(ceiling(length(subs) / 2))]; h2 <- setdiff(subs, h1)
+                info(sprintf("Batch %d (%s) was cut at the AI's output limit; asking for it in two halves (%d and %d sub-categories)...",
+                             i, level, length(h1), length(h2)))
+                message("translator: batch '", level, "' cut at max_tokens; split into ", length(h1), " + ", length(h2), " sub-categories")
+                half_msgs <- function(h) c(batch_msgs, list(list(role = "user", content = paste0(
+                  "SPLIT CALL: this call covers ONLY these sub-categories of '", level, "': ", paste(h, collapse = ", "),
+                  ". Emit their parameters, manure_management and parameter_timeseries rows and nothing for the other sub-categories ",
+                  "(they come in a separate call). mode = 'batch', aggregation_level = '", level, "'."))))
+                merge_halves <- function(a, b) {
+                  rb <- function(x, y) {
+                    if (!is.data.frame(x) || !nrow(x)) return(y); if (!is.data.frame(y) || !nrow(y)) return(x)
+                    for (cl in setdiff(names(x), names(y))) y[[cl]] <- NA
+                    for (cl in setdiff(names(y), names(x))) x[[cl]] <- NA
+                    rbind(x, y[names(x)])
+                  }
+                  out <- a
+                  for (nm in c("parameters", "manure_management", "parameter_timeseries", "server_corrections"))
+                    out[[nm]] <- rb(a[[nm]], b[[nm]])
+                  out
+                }
+                anthropic_chat_batch_template_force_async(
+                  half_msgs(h1), on_chunk = on_chunk_cb, on_tick = on_tick_cb, should_stop = stopper,
+                  on_result = function(r1) inseq({
+                    if (!is.null(r1$error) || isTRUE(r1$stopped))
+                      return(fail(sprintf("Batch %d (%s), first half: %s.", i, level, r1$error %||% "stopped")))
+                    .translator_log_usage(state, r1, stage = "batch_split", expect_warm = TRUE)
+                    p1 <- tryCatch(jsonlite::fromJSON(r1$reply, simplifyVector = TRUE), error = function(e) NULL)
+                    anthropic_chat_batch_template_force_async(
+                      half_msgs(h2), on_chunk = on_chunk_cb, on_tick = on_tick_cb, should_stop = stopper,
+                      on_result = function(r2) inseq({
+                        if (!is.null(r2$error) || isTRUE(r2$stopped))
+                          return(fail(sprintf("Batch %d (%s), second half: %s.", i, level, r2$error %||% "stopped")))
+                        .translator_log_usage(state, r2, stage = "batch_split", expect_warm = TRUE)
+                        p2 <- tryCatch(jsonlite::fromJSON(r2$reply, simplifyVector = TRUE), error = function(e) NULL)
+                        if (is.null(p1) || is.null(p2))
+                          return(fail(sprintf("Batch %d (%s): a half of the split call could not be read.", i, level)))
+                        merged <- merge_halves(p1, p2)
+                        bad2 <- .translator_validate_piece(merged, "batch")
+                        if (!is.null(bad2)) return(fail(sprintf("Batch %d (%s) came back incomplete after the split (%s).", i, level, bad2)))
+                        accept_scope(merged)
+                      }))
+                  }))
+                return(invisible(NULL))
+              }
               return(fail(sprintf(
-                "Batch %d (%s) was cut at the AI's output limit (%s). This production system has too many rows for one call; please tell the administrator (the system can be split in two).",
+                "Batch %d (%s) was cut at the AI's output limit (%s). This production system has too many rows for one call; please tell the administrator.",
                 i, level, bad)))
+            }
             return(fail(sprintf(
               "Batch %d (%s) came back incomplete (%s). Click 'Produce template now' to retry: the %d batch(es) that already succeeded are kept and won't be re-billed.",
               i, level, bad, length(state$batch_parts))))
@@ -3896,479 +3737,7 @@ translator_cancel_clear <- function(tok) {
   invisible(NULL)
 }
 
-.translator_force_template_single <- function(state, session, job_id = NULL) {
-  state$pending <- TRUE
-  state$last_error <- NULL
-  on.exit({
-    state$pending <- FALSE
-    # Hide the JS spinner: force-template is non-streaming so
-    # translatorStreamStart never fires; we have to clear the spinner
-    # explicitly. translatorStreamEnd is a safe no-op when there's no
-    # active bubble.
-    tryCatch(session$sendCustomMessage("translatorStreamEnd", ""),
-              error = function(e) NULL)
-  })
-
-  if (budget_would_exceed()) {
-    # With MONTHLY_BUDGET_CAP_USD set to a sentinel "no cap" value
-    # (0/none/unlimited/unset), this branch never fires. Kept as a
-    # safety net for the case where an administrator explicitly sets
-    # a numeric cap and wants the in-app gate.
-    state$last_error <- paste0(
-      "The AI translator is temporarily unavailable. ",
-      "We've been notified and will restore service shortly: ",
-      "please try again later or contact the administrator.")
-    return()
-  }
-
-  system_prompt <- tryCatch(assemble_translator_system_prompt(),
-                             error = function(e) NULL)
-  if (is.null(system_prompt)) {
-    state$last_error <- "Couldn't load the translator instructions."
-    return()
-  }
-
-  # Build the message list and inject the hard-requirements prompt as
-  # the FINAL user turn (not stored in state$messages: keeps the chat
-  # visible to the user clean, just nudges the API call). Includes the
-  # explicit row-count + completeness + strict-JSON checklist that
-  # previously lived in the (now-removed) force-template button's
-  # observeEvent.
-  hard_requirements <- paste(
-    "STEP 3 OF 3: EMISSION. Produce the final filled template JSON now.",
-    "",
-    "Earlier in this conversation you produced an exploration report",
-    "with FOUR sections (A: file shape, B: inventory of values found,",
-    "C: gaps, D: ambiguities to ask the user). The user has answered",
-    "section D's questions in subsequent messages. NOW produce the JSON",
-    "template as a MECHANICAL TRANSLATION of B + C + biological zeros -",
-    "not a re-derivation from scratch.",
-    "",
-    "The translation rule, applied row-by-row:",
-    "  (1) Every (parameter, sub-cat) pair in your section B inventory →",
-    "      one row with: mean = file mean, lower = file lower (if listed),",
-    "      upper = file upper (if listed), distribution = the file's named",
-    "      distribution if it gives one, else the catalogue's suggested one,",
-    "      data_source = 'user_file'. Apply the user's clarifications",
-    "      from section D (e.g. unit conversions, sub-cat vocabulary",
-    "      mapping, biological-zero overrides).",
-    "  (2) Every (parameter, sub-cat) pair in your section C gaps →",
-    "      one row with the catalogue default value + distribution,",
-    "      data_source = 'ipcc_default'.",
-    "  (3) Biological zeros confirmed by the user (Milk=0 in males,",
-    "      hours=0 in non-oxen, pct_pregnant=0 in males, etc.) →",
-    "      mean = 0, distribution = constant,",
-    "      data_source = 'biological_zero'.",
-    "",
-    "Total row count = |B| + |C| + |biological_zeros| per sub-category,",
-    "summed across the sub-categories you mapped in section B. Do NOT",
-    "skip rows. Do NOT substitute defaults for B-list entries.",
-    "",
-    "THIS IS NOT A DEFERRAL (system prompt Step 6). The user pressed 'Produce template",
-    "now' after explicit exploration + clarification. Their request is",
-    "'emit the B/C/zero translation', NOT 'fill everything with catalogue",
-    "defaults'. If you emit an all-IPCC-defaults grid, your output is",
-    "REJECTED and the user gets a failure message: your work is wasted.",
-    "",
-    "HARD REQUIREMENTS: your output is rejected if any of these fail:",
-    "",
-    "1. SOURCE-OF-TRUTH HIERARCHY (most important rule). For every",
-    "   parameter x sub-category, your `mean` field MUST come from",
-    "   exactly one of three places, in this priority order:",
-    "     (a) the user's file (if it contains a value for that pair),",
-    "     (b) a number the user typed in the chat (overrides the file",
-    "         or fills in something the file is missing),",
-    "     (c) an IPCC default from param_catalogue.md (ONLY when",
-    "         neither the file nor the chat supplies a value).",
-    "   The most common failure is: you confirm the user's data in",
-    "   chat, then silently emit an IPCC default for the same",
-    "   parameter. THIS IS NOT ACCEPTABLE. Before emitting each row,",
-    "   ask yourself: did the user provide this value? If yes, am I",
-    "   using their number, not a default? If no on the second",
-    "   question, fix the row.",
-    "",
-    "   You MUST set `data_source` on EVERY parameters row to ONE of:",
-    "     - \"user_file\"          (value from the uploaded file)",
-    "     - \"user_chat\"          (value the user typed in chat)",
-    "     - \"ipcc_default\"       (catalogue default: only when neither",
-    "                              file nor chat provided a value)",
-    "     - \"biological_zero\"    (e.g. Milk=0 for bulls, hours=0 for cows)",
-    "     - \"placeholder\"        (e.g. N=1 for sub-categories the user",
-    "                              hasn't supplied a population for)",
-    "   An output where every row's data_source is \"ipcc_default\" or",
-    "   missing/blank is automatically REJECTED.",
-    "",
-    "   Call the emit_inventory_piece tool exactly once with mode = 'full'.",
-    "",
-    "2. SUB-CATEGORIES. Emit EXACTLY the sub-categories the user mapped",
-    sprintf("   in chat: not the canonical %d from the catalogue. If the user",
-            length(.translator_subcategory_vocab())),
-    "   corrected 'Cows' to `other_cows` (not `dairy_cows`), then",
-    "   `dairy_cows` MUST NOT appear anywhere in `parameters` or",
-    "   `manure_management`. The post-processor strips dairy_cows from",
-    "   any cattle_non_dairy inventory; the post-processor strips",
-    "   non-dairy sub-cats from any cattle_dairy inventory. Match the",
-    "   species you set in `inventory_metadata.species` to the",
-    "   sub-categories you actually emit.",
-    "",
-    "3. SPECIES. Set `inventory_metadata.species` from the sub-cats:",
-    "     - any `dairy_cows` mapped + any non-dairy sub-cat → cattle_mixed",
-    "     - `dairy_cows` only                              → cattle_dairy",
-    "     - NO `dairy_cows` (only non-dairy sub-cats)      → cattle_non_dairy",
-    "   For beef-only and smallholder African inventories (no",
-    "   dairy_cows) the answer is `cattle_non_dairy`. NEVER default to",
-    "   `cattle_mixed` as a hedge.",
-    "",
-    # GE and DMI are the measured-intake override and are deliberately NOT
-    # in this list. A blank value there means "derive gross energy from the
-    # energy balance", which is the right answer unless the user's own file
-    # measured intake. Asking the model to fill them would invent a
-    # measurement and silently bypass the IPCC energy chain.
-    sprintf("4. For each sub-category, fill ALL %d parameters from the IPCC",
-            sum(PARAM_CATALOGUE$param_tier != "optional")),
-    paste0("   catalogue (",
-           paste(PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier != "optional"],
-                 collapse = ", "), ")"),
-    "  : but honour rule 1: user-supplied values OVERRIDE defaults.",
-    paste0("   Do NOT emit rows for ",
-           paste(PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier == "optional"],
-                 collapse = " or "),
-           " unless the user's own file gives a measured intake for that"),
-    "   sub-category. Leaving them out is correct and expected.",
-    "",
-    "5. ASYMMETRIC BOUNDS. If the user's file has explicit lower /",
-    "   upper bounds (Lower CI / Upper CI / lower / upper / ci_lower",
-    "   / ci_upper / p2.5 / p97.5), USE those as `lower` and `upper`",
-    "   directly, keep the file's named distribution if it gives one",
-    "   (else the catalogue's suggested one for that parameter), and",
-    "   leave `uncertainty_pct` blank. Do NOT fall back to a symmetric",
-    "   ±% from the catalogue.",
-    "",
-    "6. Manure_Management must contain rows for EVERY sub-category,",
-    "   not just one. If the user's raw data has a single herd-wide",
-    "   MMS allocation, copy that same allocation to every",
-    "   sub-category. Each MMS row must have fraction_pct, MCF_pct,",
-    "   EF3, Frac_GasMS_pct, AND Frac_LeachMS_pct filled.",
-    "",
-    "   If the user's file gives BOUNDS for the MMS allocation (e.g.",
-    "   'pasture 35% (range 28-42%)'), include them as lower_fraction /",
-    "   upper_fraction with distribution_fraction='pert'. Without these,",
-    "   MMS allocation contributes zero uncertainty to the simulation -",
-    "   which silently throws away a real source of inventory",
-    "   uncertainty. Same applies to the coefficients: if the user has",
-    "   country-specific bounds for MCF, EF3, Frac_GasMS_pct, or",
-    "   Frac_LeachMS_pct, include them as lower_mcf/upper_mcf,",
-    "   lower_ef3/upper_ef3, lower_frac_gas/upper_frac_gas,",
-    "   lower_frac_leach/upper_frac_leach with their respective",
-    "   distribution_* fields. A RELATIVE spread (e.g. 'all shares",
-    "   +/-50 %', 'every MCF +/-25 %') goes in fraction_unc_pct,",
-    "   mcf_unc_pct, ef3_unc_pct, frac_gas_unc_pct or frac_leach_unc_pct",
-    "   with the bounds null: the server computes each row's bounds.",
-    "   A line labelled 'all ...' applies to every row it names.",
-    "   When the user has no bounds, leave the",
-    "   bounds fields null. The app then uses the IPCC range for EF3",
-    "   and for the Table 10.22 fractions when the value is the IPCC",
-    "   default; any other blank range (MCF always) gets a placeholder,",
-    "   marked as such, which the user should replace.",
-    "",
-    "7. STRICT JSON: no comments, no expressions like 4.5*1.032, no",
-    "   'for brevity not shown' placeholders, no trailing commas.",
-    "",
-    "Do not ask any more questions. Just emit the complete",
-    "template-ready JSON matching the schema.",
-    sep = "\n")
-  msgs <- anthropic_build_messages(system_prompt, history = .translator_api_history(state$messages),
-                                  new_user_message = paste0(
-                                    hard_requirements, "\n\n", translator_emission_checklist(),
-                                    local({ b <- translator_register_block(state$register)
-                                            if (nzchar(b)) paste0("\n\n", b) else "" })))
-
-  # Try once; if the JSON parses, use it. If not (truncation, schema
-  # mismatch, etc.), retry ONCE before giving up. Two attempts is a
-  # reasonable trade-off between robustness and budget: strict json_schema
-  # mode almost always returns valid JSON; failures are usually max_tokens
-  # truncation on very large inventories, which a retry won't fix but a
-  # retry is cheap and catches transient OpenAI hiccups.
-  # Stream-aware progress callback: forward each JSON chunk's size to
-  # the client so the progress bubble's elapsed counter can also show
-  # 'X chars received': gives the user concrete feedback that the AI
-  # is producing output (not stuck waiting on OpenAI).
-  total_chars <- 0L
-  on_chunk_cb <- function(text) {
-    total_chars <<- total_chars + nchar(text)
-    tryCatch(session$sendCustomMessage("translatorProgressTick",
-                                         list(chars = total_chars)),
-              error = function(e) NULL)
-  }
-  resp <- NULL
-  for (attempt in seq_len(2)) {
-    resp <- anthropic_chat_template_force(msgs, on_chunk = on_chunk_cb)
-    if (!is.null(resp$error)) break  # hard error: don't retry
-    if (.translator_template_is_well_formed(resp$reply)) break
-    if (attempt == 1L)
-      message("translator: force-template attempt 1 produced unparseable JSON, retrying once.")
-  }
-
-  if (!is.null(resp$error)) {
-    state$last_error <- resp$error
-    return()
-  }
-
-  # Log the spend regardless of whether the JSON parsed: we still paid
-  # for the tokens.
-  .translator_log_usage(state, resp, stage = "full", expect_warm = TRUE)
-
-  if (!.translator_template_is_well_formed(resp$reply)) {
-    # Both attempts produced unparseable / incomplete JSON. Don't set
-    # last_template_json: the download button stays hidden, so the user
-    # never gets the malformed .json file with the warning toast.
-    # Diagnostic hint: if completion_tokens is near the 64K tool-output
-    # ceiling, the response was almost certainly truncated.
-    near_cap <- (resp$usage$completion_tokens %||% 0L) >= 60000L
-    hint <- if (near_cap)
-      paste0(" The response hit the output-size ceiling (~", resp$usage$completion_tokens,
-             " tokens): the inventory is too large for one response. ",
-             "Reset the conversation and translate the dairy sub-categories ",
-             "first, then start a new conversation for the beef ones (or ",
-             "vice versa). The two .xlsx files can be merged by hand afterwards.")
-    else
-      " Click 'Produce template now' again: this is sometimes a transient AI-service hiccup."
-    state$last_error <- paste0(
-      "Couldn't produce a complete template from the AI's response.",
-      hint)
-    return()
-  }
-
-  # Valid JSON. Coverage check + auto-retry: the AI very often emits a
-  # single representative sub-category (usually dairy_cows) and treats
-  # the rest as "implied", even when the conversation listed all 8. We
-  # scan the conversation history for canonical sub-category names, and
-  # if the output is missing any that were discussed, do ONE extra
-  # force-template call with an explicit list of the missing ones.
-  parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE),
-                            error = function(e) NULL)
-  history_subcats <- .translator_detect_subcategories_in_history(state$messages)
-  # Filter history_subcats against the declared species. Without this,
-  # a chat message saying "no dairy_cows" or "species = cattle_non_dairy"
-  # would falsely flag dairy_cows as a missing sub-category, producing
-  # the spurious "skipped dairy_cows" warning (and an unnecessary retry).
-  # Same logic as the post-JSON sub-cat strip below.
-  declared_species <- if (!is.null(parsed_check))
-    .translator_metadata_list(parsed_check$inventory_metadata)$species %||% "" else ""
-  if (identical(declared_species, "cattle_non_dairy")) {
-    history_subcats <- setdiff(history_subcats, "dairy_cows")
-  } else if (identical(declared_species, "cattle_dairy")) {
-    history_subcats <- setdiff(history_subcats, .translator_non_dairy_subcats())
-  }
-  output_subcats <- if (!is.null(parsed_check) &&
-                          is.data.frame(parsed_check$parameters))
-    unique(parsed_check$parameters$sub_category) else character(0)
-  missing_subcats <- setdiff(history_subcats, output_subcats)
-
-  if (length(missing_subcats) > 0 && length(output_subcats) > 0) {
-    message("translator: force-template missing sub-categories: ",
-            paste(missing_subcats, collapse = ", "),
-            ": retrying with explicit list.")
-    # Push an extra user message that NAMES every missing sub-category.
-    msgs_retry <- c(msgs, list(list(
-      role    = "user",
-      content = paste0(
-        "You just emitted parameters for: ",
-        paste(output_subcats, collapse = ", "),
-        ". But this inventory has ", length(history_subcats),
-        " sub-categories total: ",
-        paste(history_subcats, collapse = ", "),
-        ". You missed: ", paste(missing_subcats, collapse = ", "),
-        ". Emit the COMPLETE template now with all ",
-        length(history_subcats),
-        " sub-categories x ", sum(PARAM_CATALOGUE$param_tier != "optional"),
-        " parameters = ",
-        sum(PARAM_CATALOGUE$param_tier != "optional") * length(history_subcats),
-        " parameter rows, plus manure_management for ALL ",
-        length(history_subcats),
-        " sub-categories. Use the user's file values for parameters ",
-        "they supplied (data_source = 'user_file' on those rows); use ",
-        "IPCC catalogue defaults ONLY for parameters the file does not ",
-        "supply (data_source = 'ipcc_default' on those rows). ",
-        "Strict JSON, no comments, no shortcuts. List every row."))))
-    resp2 <- anthropic_chat_template_force(msgs_retry)
-    if (is.null(resp2$error) && .translator_template_is_well_formed(resp2$reply)) {
-      # Re-log the spend for the retry call.
-      .translator_log_usage(state, resp2, stage = "retry_coverage", expect_warm = TRUE)
-      resp <- resp2  # promote the better attempt
-      parsed_check <- tryCatch(jsonlite::fromJSON(resp$reply,
-                                                    simplifyVector = TRUE),
-                                error = function(e) NULL)
-      output_subcats <- if (!is.null(parsed_check) &&
-                              is.data.frame(parsed_check$parameters))
-        unique(parsed_check$parameters$sub_category) else character(0)
-      missing_subcats <- setdiff(history_subcats, output_subcats)
-    }
-  }
-
-  # NEW: defaults-only rejection. If a file was uploaded but the AI's
-  # output has zero rows tagged data_source = "user_file" (or similar),
-  # the AI did the Step-5b failure: emitted an all-IPCC-defaults grid
-  # and threw away every value from the file. Retry ONCE with a stronger
-  # error message, then surface the failure to the user if it persists.
-  file_was_uploaded <- any(vapply(state$messages, function(m) {
-    content <- m$content %||% ""
-    grepl("Parameter labels DETECTED IN THIS FILE", content, fixed = TRUE)
-  }, logical(1)))
-  count_user_file_rows <- function(pj) {
-    if (is.null(pj) || !is.data.frame(pj$parameters)) return(0L)
-    ds <- pj$parameters$data_source
-    if (is.null(ds)) return(0L)
-    sum(grepl("^user[_ ]?(file|chat)$|^file$|^chat$", ds,
-              ignore.case = TRUE), na.rm = TRUE)
-  }
-  user_file_rows <- count_user_file_rows(parsed_check)
-  if (file_was_uploaded && user_file_rows == 0L &&
-        length(output_subcats) > 0L) {
-    message("translator: force-template emitted ZERO user_file rows ",
-            "despite uploaded file: retrying with explicit demand.")
-    msgs_retry_vals <- c(msgs, list(list(
-      role    = "user",
-      content = paste0(
-        "REJECTED: your output has ZERO rows tagged ",
-        "data_source = 'user_file'. The user uploaded a file with ",
-        "specific values for parameters like BW / MW / WG / pct_pregnant ",
-        "/ DE / CP / Milk / Fat / hours / MMS allocation. You did NOT ",
-        "use any of those values: you emitted catalogue defaults across ",
-        "the board. This is the Step-5b failure mode the system prompt ",
-        "warns about. Re-emit the complete template-ready JSON now and: ",
-        "(1) For EVERY parameter present in the user's uploaded file: ",
-        "    - value = the file's mean value (NOT the catalogue default) ",
-        "    - lower / upper = the file's Lower CI / Upper CI ",
-        "    - distribution = 'pert' ",
-        "    - data_source = 'user_file' ",
-        "(2) For parameters the file does NOT supply: ",
-        "    - use the catalogue default ",
-        "    - data_source = 'ipcc_default' ",
-        "(3) For biological zeros (Milk=0 for males/calves, hours=0 for ",
-        "    non-oxen, etc.): data_source = 'biological_zero', ",
-        "    distribution = 'constant'. ",
-        "Strict JSON. No shortcuts. Every row must have data_source set."))))
-    resp_v <- anthropic_chat_template_force(msgs_retry_vals)
-    if (is.null(resp_v$error) &&
-          .translator_template_is_well_formed(resp_v$reply)) {
-      .translator_log_usage(state, resp_v, stage = "retry_defaults_only", expect_warm = TRUE)
-      pcheck_v <- tryCatch(jsonlite::fromJSON(resp_v$reply,
-                                              simplifyVector = TRUE),
-                            error = function(e) NULL)
-      if (count_user_file_rows(pcheck_v) > user_file_rows) {
-        resp <- resp_v               # promote
-        parsed_check <- pcheck_v
-        output_subcats <- if (is.data.frame(parsed_check$parameters))
-          unique(parsed_check$parameters$sub_category) else character(0)
-        missing_subcats <- setdiff(history_subcats, output_subcats)
-        user_file_rows <- count_user_file_rows(parsed_check)
-      }
-    }
-  }
-
-  # NEW: strip sub-categories that contradict the declared species. If
-  # species = "cattle_non_dairy" then dairy_cows must not appear; if
-  # species = "cattle_dairy" then beef sub-cats must not appear. The AI
-  # frequently emits the full canonical 8-block grid regardless of what
-  # the user mapped; this filter prevents the orphan blocks from
-  # reaching the .xlsx.
-  NON_DAIRY_SC <- .translator_non_dairy_subcats()
-  DAIRY_SC     <- c("dairy_cows")
-  if (!is.null(parsed_check) && is.data.frame(parsed_check$parameters)) {
-    species <- .translator_metadata_list(parsed_check$inventory_metadata)$species %||% ""
-    drop_subcats <- character(0)
-    if (identical(species, "cattle_non_dairy")) {
-      drop_subcats <- intersect(output_subcats, DAIRY_SC)
-    } else if (identical(species, "cattle_dairy")) {
-      drop_subcats <- intersect(output_subcats, NON_DAIRY_SC)
-    }
-    if (length(drop_subcats) > 0L) {
-      message("translator: stripping sub-cats incompatible with species=",
-              species, ": ", paste(drop_subcats, collapse = ", "))
-      keep <- !(parsed_check$parameters$sub_category %in% drop_subcats)
-      parsed_check$parameters <- parsed_check$parameters[keep, , drop = FALSE]
-      if (is.data.frame(parsed_check$manure_management)) {
-        keep_mm <- !(parsed_check$manure_management$sub_category %in%
-                       drop_subcats)
-        parsed_check$manure_management <-
-          parsed_check$manure_management[keep_mm, , drop = FALSE]
-      }
-      resp$reply <- jsonlite::toJSON(parsed_check, auto_unbox = TRUE,
-                                       na = "null", null = "null",
-                                       dataframe = "rows")
-      output_subcats <- unique(parsed_check$parameters$sub_category)
-      missing_subcats <- setdiff(history_subcats, output_subcats)
-    }
-  }
-
-  # Final coverage messages (after auto-retry). Only surface a warning
-  # if something is STILL wrong: the retry may have fixed everything.
-  coverage_msgs <- character(0)
-  if (!is.null(parsed_check)) {
-    if (length(missing_subcats) > 0)
-      coverage_msgs <- c(coverage_msgs, paste0(
-        "Heads up: the AI emitted parameters for ",
-        paste(output_subcats, collapse = ", "),
-        " but skipped ", paste(missing_subcats, collapse = ", "),
-        " (mentioned earlier in the chat). The download is still valid ",
-        "for what's present, but emissions for the missing sub-categories ",
-        "will be zero. Hit 'Produce template now' again to retry, or ",
-        "open the .xlsx and add the missing rows by hand."))
-
-    sc_param <- output_subcats
-    sc_mm <- if (is.data.frame(parsed_check$manure_management))
-      unique(parsed_check$manure_management$sub_category) else character(0)
-    missing_in_mm <- setdiff(sc_param, sc_mm)
-    if (length(missing_in_mm) > 0 && length(sc_mm) > 0)
-      coverage_msgs <- c(coverage_msgs, paste0(
-        "Manure_Management only covers ", paste(sc_mm, collapse = ", "),
-        ": manure CH4/N2O for ", paste(missing_in_mm, collapse = ", "),
-        " will be zero. Retry 'Produce template now' or add the MMS ",
-        "rows yourself."))
-  }
-  if (length(coverage_msgs) > 0)
-    state$last_error <- paste(coverage_msgs, collapse = " ")
-
-  # Record the model that produced it, for the workbook stamp (plan B6).
-  parsed_stamp <- tryCatch(jsonlite::fromJSON(resp$reply, simplifyVector = TRUE), error = function(e) NULL)
-  if (!is.null(parsed_stamp)) {
-    # 2026-10-22 (WP1 step 4): the decisions are checked on the full piece
-    # and marked; this path (two or fewer production systems) has no
-    # targeted re-emit, the violation is listed above the download.
-    chk <- tryCatch(translator_register_check(state$register, parsed_stamp), error = function(e) NULL)
-    if (!is.null(chk) && nrow(chk)) {
-      for (k in seq_len(nrow(chk)))
-        state$register <- translator_register_mark(state$register, chk$topic[k], isTRUE(chk$ok[k]),
-                                                   if (isTRUE(chk$ok[k])) NULL else sprintf("%s: %s", chk$where[k], chk$found[k]))
-    }
-    parsed_stamp$.model <- resp$model
-    parsed_stamp$.register_digest <- translator_register_digest(state$register)
-    resp$reply <- jsonlite::toJSON(parsed_stamp, auto_unbox = TRUE, na = "null",
-                                   null = "null", dataframe = "rows", digits = NA)
-  }
-  state$last_template_json <- resp$reply
-  .translator_finalise_template(state, resp$reply, function(txt)
-    session$sendCustomMessage("translatorAppendInfoBubble", txt))
-  if (!is.null(job_id)) {
-    .translator_persist(state)
-    tryCatch(translator_job_finish(job_id, state, session),
-             error = function(e) message("translator: job finish failed (", conditionMessage(e), ")"))
-  }
-  # Two messages: a short one whose `payload` carries the raw JSON for the
-  # expander (kept OUT of `content`, so it is never re-sent to the API on
-  # later turns, plan C6), and a separate guidance bubble pointing at the
-  # green Download button.
-  state$messages[[length(state$messages) + 1]] <-
-    list(role    = "assistant",
-         content = sprintf("Template generated: %d parameter rows, %d manure rows.",
-                           if (is.data.frame(parsed_check$parameters)) nrow(parsed_check$parameters) else 0L,
-                           if (is.data.frame(parsed_check$manure_management)) nrow(parsed_check$manure_management) else 0L),
-         display = "Template generated.",
-         payload = resp$reply)
-  .translator_append_download_hint(state)
-  .translator_persist(state)
-}
+# (2026-11-01, Stage 4.6: the synchronous emission path that lived here, .translator_force_template_single, was removed; every run goes through .translator_force_template_async.)
 
 # Write the AI's template-ready JSON to an .xlsx that LOOKS LIKE THE
 # OFFICIAL INPUT TEMPLATE: same column ordering, header colours,

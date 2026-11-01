@@ -1877,10 +1877,18 @@ parse_uploaded_template <- function(path) {
     }
   }
 
+  # 2026-11-01 (Stage 4.8): the translator's blocking failures, on a hidden
+  # sheet of a template the AI translator produced; the QA/QC tab reports
+  # them as failures until each is fixed or ignored.
+  translator_checks <- if ("Translator_Checks" %in% sheet_names) tryCatch({
+    tc <- as.data.frame(readxl::read_excel(path, sheet = "Translator_Checks", col_types = "text"), stringsAsFactors = FALSE)
+    if (nrow(tc) && all(c("check", "issue") %in% names(tc))) tc else NULL
+  }, error = function(e) NULL) else NULL
   list(param_specs=params, metadata=metadata,
        manure=manure, population=population,
        corr_matrix=corr_matrix_from_ts,
-       warnings=warnings_list)
+       warnings=warnings_list,
+       translator_checks=translator_checks)
 }
 
 

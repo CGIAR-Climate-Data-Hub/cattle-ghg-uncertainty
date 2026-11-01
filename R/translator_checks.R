@@ -39,6 +39,28 @@
 # must be tagged user_chat, which exempts them from the verbatim check.
 .TRANSLATOR_VALUE_TRANSFORMS <- c(1, 100, 1/100, 18.45, 1/18.45, 365, 1/1000)
 
+# 2026-11-01 (Stage 4.8): the failures that travel with the workbook on
+# the hidden Translator_Checks sheet and stop the app's run until the
+# compiler fixes or ignores them on the QA/QC tab. Each is a translation
+# error the compiler can settle from the file, not a note.
+.TRANSLATOR_BLOCKING_CHECKS <- c("category coverage", "Parameters vs time series", "time-series coverage",
+                                 "time-series year", "time-series value not in file", "unit conversion",
+                                 "range not in file", "value from another year", "same value within a system")
+
+# x within a relative tolerance of a member of the sorted vector s
+.translator_near_sorted <- function(x, s, tol = 1e-5) {
+  if (!length(s) || length(x) != 1L || !is.finite(x)) return(FALSE)
+  k <- findInterval(x, s)
+  cand <- s[unique(pmax(1L, pmin(length(s), c(k, k + 1L))))]
+  any(abs(cand - x) <= tol * max(1, abs(x)))
+}
+
+# Parameters whose value is one per production system in a file like
+# Zambia's (the diet and the milk composition): near-identical values
+# across the groups of one system are usually a different year or a
+# rounding, and shared draws need identical values (Stage 5.5).
+.TRANSLATOR_PER_SYSTEM <- c("DE", "CP", "Fat", "MilkPR", "pct_pregnant", "Ym")
+
 # One tolerance for "the same number": relative 1e-6 with a floor of 1e-9,
 # plus an absolute allowance where the caller has one (1 head for N).
 # 2026-10-31; the checks used an absolute floor of 5e-4 that let an EF of
@@ -498,6 +520,77 @@ translator_source_fingerprint <- function(parsed) {
                       p, length(bad_other), .translator_year_runs(as.integer(bad_other)), fmt(f)),
       severity = "fail", sheet = "Parameter_TimeSeries", group = gkey_fn(ps, i), parameter = p, check = "unit conversion")
   }
+  out
+}
+
+# ---------------------------------------------------------------------------
+# What the writer changed without saying (2026-11-01, Stage 4.7): the
+# written workbook read back and compared with the AI's JSON. Gaps filled
+# from the catalogue (info, one row per group), optional intake values
+# blanked (warn), a cattle type filled in (info), duplicate rows of one
+# key (warn, the discarded means named). Listed with the checks.
+# ---------------------------------------------------------------------------
+.translator_writer_diff <- function(piece, path) {
+  ps <- piece$parameters
+  if (!is.data.frame(ps) || !nrow(ps) || is.null(path) || !file.exists(path)) return(NULL)
+  pu <- tryCatch(suppressMessages(suppressWarnings(parse_uploaded_template(path))), error = function(e) NULL)
+  wp <- pu$param_specs
+  if (!is.data.frame(wp) || !nrow(wp)) return(NULL)
+  rows <- list()
+  rowf <- function(issue, severity, group, parameter, check) data.frame(
+    where = "Parameters", issue = issue, severity = severity, sheet = "Parameters", group = group,
+    parameter = parameter, check = check, stringsAsFactors = FALSE)
+  nl <- function(x) { x <- .translator_norm_level(x %||% ""); x[is.na(x)] <- ""; x }
+  ct_p <- as.character(ps$cattle_type %||% ""); ct_p[is.na(ct_p)] <- ""
+  key_p <- paste(nl(ps$aggregation_level), ps$sub_category, ps$parameter, sep = "||")
+  ct_w <- as.character(wp$cattle_type %||% ""); ct_w[is.na(ct_w)] <- ""
+  key_w <- paste(nl(wp$aggregation_level), wp$sub_category, wp$parameter, sep = "||")
+  ds_w <- as.character(wp$data_source %||% ""); ds_w[is.na(ds_w)] <- ""
+  mu_w <- suppressWarnings(as.numeric(wp$mean)); mu_p <- suppressWarnings(as.numeric(ps$mean))
+  gkey_w <- function(i) paste(ct_w[i], wp$aggregation_level[i] %||% "", wp$sub_category[i], sep = " / ")
+  # gaps filled from the catalogue: rows in the workbook the AI did not write
+  new_rows <- which(!key_w %in% key_p & ds_w == "ipcc_default")
+  if (length(new_rows)) {
+    for (g in unique(paste(nl(wp$aggregation_level[new_rows]), wp$sub_category[new_rows], sep = "||"))) {
+      i <- new_rows[paste(nl(wp$aggregation_level[new_rows]), wp$sub_category[new_rows], sep = "||") == g]
+      rows[[length(rows) + 1L]] <- rowf(sprintf("The AI wrote no row for %d parameter(s) of this group (%s); the writer filled them from the IPCC catalogue, tagged ipcc_default.",
+                                                length(i), paste(sort(unique(as.character(wp$parameter[i]))), collapse = ", ")),
+                                        "info", gkey_w(i[1]), NA_character_, "gap filled from the catalogue")
+    }
+  }
+  # optional intake values blanked
+  opt <- PARAM_CATALOGUE$parameter[PARAM_CATALOGUE$param_tier %in% "optional"]
+  for (i in which(ps$parameter %in% opt & is.finite(mu_p))) {
+    j <- match(key_p[i], key_w)
+    if (is.na(j) || !is.finite(mu_w[j]))
+      rows[[length(rows) + 1L]] <- rowf(sprintf("%s = %s from the AI was blanked by the writer: the tool derives intake from the energy balance unless the file measured it.",
+                                                ps$parameter[i], format(signif(mu_p[i], 6))),
+                                        "warn", paste(ct_p[i], ps$aggregation_level[i] %||% "", ps$sub_category[i], sep = " / "),
+                                        as.character(ps$parameter[i]), "optional value blanked")
+  }
+  # cattle type filled in
+  blank_ct <- which(!nzchar(ct_p))
+  if (length(blank_ct)) {
+    for (g in unique(paste(nl(ps$aggregation_level[blank_ct]), ps$sub_category[blank_ct], sep = "||"))) {
+      i <- blank_ct[paste(nl(ps$aggregation_level[blank_ct]), ps$sub_category[blank_ct], sep = "||") == g][1]
+      j <- match(key_p[i], key_w)
+      if (!is.na(j) && nzchar(ct_w[j]))
+        rows[[length(rows) + 1L]] <- rowf(sprintf("The AI left cattle_type blank for this group; the writer set it to '%s' from the sub-category.", ct_w[j]),
+                                          "info", gkey_w(j), NA_character_, "cattle_type filled by the writer")
+    }
+  }
+  # duplicate rows of one key: the first is kept
+  dup <- key_p[duplicated(key_p)]
+  for (k in unique(dup)) {
+    i <- which(key_p == k)
+    if (length(unique(signif(mu_p[i], 9))) > 1L)
+      rows[[length(rows) + 1L]] <- rowf(sprintf("The AI wrote %d rows for %s of this group with different values (%s); the writer kept the first.",
+                                                length(i), ps$parameter[i[1]], paste(format(signif(mu_p[i], 6)), collapse = ", ")),
+                                        "warn", paste(ct_p[i[1]], ps$aggregation_level[i[1]] %||% "", ps$sub_category[i[1]], sep = " / "),
+                                        as.character(ps$parameter[i[1]]), "duplicate row: first kept")
+  }
+  if (!length(rows)) return(NULL)
+  out <- do.call(rbind, rows); rownames(out) <- NULL
   out
 }
 
@@ -1196,24 +1289,83 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     # C3. A row tagged user_file claims the number appears in the file as
     # written. Anything else is either a transcription error or invented.
     # Derived values are tagged user_chat and are exempt by design.
+    # 2026-11-01 (Stage 5): the tolerance is relative, 1e-5 (598.8 against
+    # a file's 598.752 fails; 55.018 against 55.01795 passes); a match
+    # through a unit transform (x100, /100, x365 ...) is reported as such;
+    # a row that declares a conversion (Stage 6) is tested on its
+    # source_value with x1 only, the converted mean being the verifier's.
     if (length(source$numbers)) {
       verbatim <- dsrc == "user_file" & is.finite(val) & val != 0
+      sv_col <- if ("source_value" %in% names(ps)) suppressWarnings(as.numeric(ps$source_value)) else rep(NA_real_, nrow(ps))
+      cv_col <- if ("conversion" %in% names(ps)) as.character(ps$conversion) else rep(NA_character_, nrow(ps))
+      cv_col[is.na(cv_col)] <- ""
       if (any(verbatim)) {
-        cand <- unique(as.vector(outer(source$numbers,
-                                       .TRANSLATOR_VALUE_TRANSFORMS, "*")))
-        seen <- vapply(val[verbatim], function(v)
-          any(abs(cand - v) <= 5e-4 * max(1, abs(v))), logical(1))
-        if (any(!seen)) {
-          miss <- which(verbatim)[!seen]
-          for (i in miss)
-            add(sprintf("%s%s%s / %s", lvl2[i], ifelse(nzchar(lvl2[i]), " / ", ""), ps$sub_category[i], ps$parameter[i]),
-                sprintf(paste0(
-                  "%s = %s is marked as taken from your file but no matching number is in it ",
-                  "(%d such value(s) in all). Either the value was altered, or it was computed ",
-                  "and should be marked user_chat rather than user_file."),
-                  ps$parameter[i], fmt(val[i]), length(miss)),
-                sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "value not in file")
+        nums <- sort(unique(source$numbers))
+        hit_tr <- function(v, tr) {
+          for (f in tr) if (.translator_near_sorted(v / f, nums, 1e-5)) return(f)
+          NA_real_
         }
+        miss <- integer(0); derived <- list()
+        for (i in which(verbatim)) {
+          if (is.finite(sv_col[i]) && nzchar(cv_col[i]) && cv_col[i] != "none") {
+            if (!.translator_near_sorted(sv_col[i], nums, 1e-5)) miss <- c(miss, i)
+            next
+          }
+          f <- hit_tr(val[i], .TRANSLATOR_VALUE_TRANSFORMS)
+          if (is.na(f)) miss <- c(miss, i) else if (f != 1) derived[[length(derived) + 1L]] <- c(i, f)
+        }
+        for (i in miss)
+          add(sprintf("%s%s%s / %s", lvl2[i], ifelse(nzchar(lvl2[i]), " / ", ""), ps$sub_category[i], ps$parameter[i]),
+              sprintf(paste0(
+                "%s = %s is marked as taken from your file but no matching number is in it ",
+                "(%d such value(s) in all). Either the value was altered, or it was computed ",
+                "and should be marked user_chat rather than user_file."),
+                ps$parameter[i], fmt(if (is.finite(sv_col[i]) && nzchar(cv_col[i])) sv_col[i] else val[i]), length(miss)),
+              sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "value not in file")
+        for (d in derived) {
+          i <- d[1]; f <- d[2]
+          add(sprintf("%s%s%s / %s", lvl2[i], ifelse(nzchar(lvl2[i]), " / ", ""), ps$sub_category[i], ps$parameter[i]),
+              sprintf("%s = %s is the file's %s %s %s (a unit transform, not a copy). Check that the unit is the template's.",
+                      ps$parameter[i], fmt(val[i]), fmt(val[i] / f), if (f > 1) "x" else "/", fmt(if (f > 1) f else 1 / f)),
+              severity = "info", sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i],
+              check = "derived by unit transform")
+        }
+      }
+      # 2026-11-01 (Stage 5.3): the ranges of a user_file row come from the
+      # file too. A percentage is looked for as a fraction or a percent; a
+      # bound is looked for as it is, or as the file's number times the
+      # row's conversion factor; bounds that are the mean times (1 +- u/100)
+      # are the writer's own and are not tested. A range in no column is
+      # a range from elsewhere (an MW range on a BW row, a recomputed
+      # pair): warn.
+      ph <- grepl("placeholder", dsrc, fixed = TRUE)
+      u_col  <- if ("uncertainty_pct" %in% names(ps)) suppressWarnings(as.numeric(ps$uncertainty_pct)) else rep(NA_real_, nrow(ps))
+      lo_col <- if ("lower" %in% names(ps)) suppressWarnings(as.numeric(ps$lower)) else rep(NA_real_, nrow(ps))
+      up_col <- if ("upper" %in% names(ps)) suppressWarnings(as.numeric(ps$upper)) else rep(NA_real_, nrow(ps))
+      cf_col <- if ("conversion_factor" %in% names(ps)) suppressWarnings(as.numeric(ps$conversion_factor)) else rep(NA_real_, nrow(ps))
+      nums <- sort(unique(source$numbers))
+      for (i in which(dsrc == "user_file" & !ph & is.finite(val))) {
+        what <- character(0)
+        if (is.finite(u_col[i]) && u_col[i] > 0 &&
+            !.translator_near_sorted(u_col[i], nums, 1e-5) && !.translator_near_sorted(u_col[i] / 100, nums, 1e-5) && !.translator_near_sorted(u_col[i] * 100, nums, 1e-5))
+          what <- c(what, sprintf("the margin %s %%", fmt(u_col[i])))
+        if (!is.finite(u_col[i]) || u_col[i] <= 0) {
+          f <- if (is.finite(cf_col[i]) && cf_col[i] != 0) cf_col[i] else 1
+          for (b in c("lower", "upper")) {
+            bv <- if (b == "lower") lo_col[i] else up_col[i]
+            if (!is.finite(bv) || bv == 0 || abs(bv - val[i]) <= 1e-9) next
+            symmetric <- is.finite(val[i]) && val[i] != 0 && abs(abs(bv / val[i] - 1) - abs((if (b == "lower") up_col[i] else lo_col[i]) / val[i] - 1)) < 1e-6
+            if (symmetric && .translator_near_sorted(abs(bv / val[i] - 1) * 100, nums, 1e-4)) next
+            found <- .translator_near_sorted(bv, nums, 1e-5) || .translator_near_sorted(bv / 100, nums, 1e-5) || .translator_near_sorted(bv * 100, nums, 1e-5) ||
+                     (f != 1 && .translator_near_sorted(bv / f, nums, 1e-4))
+            if (!found) what <- c(what, sprintf("the %s bound %s", b, fmt(bv)))
+          }
+        }
+        if (length(what))
+          add(sprintf("%s%s%s / %s", lvl2[i], ifelse(nzchar(lvl2[i]), " / ", ""), ps$sub_category[i], ps$parameter[i]),
+              sprintf("%s: %s %s in no cell of your file (as a fraction, a percentage or a converted number). The range may come from another row or have been computed; check it against the file.",
+                      ps$parameter[i], paste(what, collapse = " and "), if (length(what) > 1) "are" else "is"),
+              severity = "warn", sheet = "Parameters", group = gkey(ps, i), parameter = ps$parameter[i], check = "range not in file")
       }
     }
 
@@ -1465,6 +1617,46 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     }
   }
 
+  # C15 (2026-11-01, Stage 5.5): one parameter that the file gives once
+  # per production system (DE, CP, Fat, MilkPR, pct_pregnant, Ym) should
+  # carry one value across the groups of that system. Values that differ
+  # by under 2 % are usually a different year or a rounding (the mixed-
+  # year DE of 30 October): a warning per group off the modal value.
+  # Larger differences are a note per system.
+  if (!is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 && all(c("parameter", "mean") %in% names(ps))) {
+    lv15 <- if ("aggregation_level" %in% names(ps)) as.character(ps$aggregation_level) else rep("", nrow(ps))
+    lv15[is.na(lv15)] <- ""
+    ct15 <- if ("cattle_type" %in% names(ps)) as.character(ps$cattle_type) else rep("", nrow(ps)); ct15[is.na(ct15)] <- ""
+    ds15 <- as.character(ps$data_source %||% ""); ds15[is.na(ds15)] <- ""
+    m15 <- suppressWarnings(as.numeric(ps$mean))
+    for (p in intersect(.TRANSLATOR_PER_SYSTEM, unique(as.character(ps$parameter)))) {
+      for (L in unique(lv15)) {
+        idx <- which(ps$parameter == p & lv15 == L & ds15 %in% c("user_file", "user_chat") & is.finite(m15) & m15 != 0)
+        if (length(idx) < 2L) next
+        vals <- signif(m15[idx], 9)
+        if (length(unique(vals)) < 2L) next
+        spread <- (max(vals) - min(vals)) / mean(vals)
+        tb <- table(vals); modal <- as.numeric(names(tb)[which.max(tb)])
+        if (spread < 0.02) {
+          # a note, not a warning: a group can have its own row in the file
+          # (the Zambia feedlot's CP, 10.2156 against 10.0625 elsewhere);
+          # a value copied from another year is the year check's
+          for (i in idx[vals != modal])
+            add(sprintf("%s / %s / %s", L, ps$sub_category[i], p),
+                sprintf(paste0("%s is %s for %s but %s in the other groups of %s. If the file gives one %s per system, ",
+                               "this is a different year or a rounding, and shared draws need identical values; if the group has its own row, it is right."),
+                        p, fmt(m15[i]), ps$sub_category[i], fmt(modal), if (nzchar(L)) L else "this system", p),
+                severity = "info", sheet = "Parameters", group = gkey(ps, i), parameter = p, check = "same value within a system")
+        } else {
+          add(sprintf("%s / %s", L, p),
+              sprintf("%s takes %d different values across the groups of %s (%s). If the file gives one per system, the groups should share it.",
+                      p, length(unique(vals)), if (nzchar(L)) L else "this system", paste(fmt(sort(unique(m15[idx]))), collapse = ", ")),
+              severity = "info", sheet = "Parameters", parameter = p, check = "same value within a system")
+        }
+      }
+    }
+  }
+
   # C11 and C12 (2026-10-30): the time series against the source.
   # C11, coverage: a value the file gives year by year must have a series
   # for that group. On the Zambia file of 30 October the series covered the
@@ -1623,6 +1815,32 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
                     parts[3], length(yrs_bad), .translator_year_runs(yrs_bad)),
             severity = "fail", sheet = "Parameter_TimeSeries", group = if (!is.na(r0)) gkey(population, r0) else NA_character_,
             parameter = parts[3], check = "time-series value not in file")
+      }
+      # 2026-11-01 (Stage 5.4): the Parameters value of a time-series
+      # parameter, read from the file, must be in the inventory year's
+      # column; one found only in another year's column was copied from
+      # the wrong column (the mixed-year DE of 30 October). A converted
+      # row is tested on its source_value.
+      y0 <- as.character(suppressWarnings(as.integer(inventory_year)))
+      if (!is.na(y0) && nzchar(y0) && !is.null(yv[[y0]]) && is.data.frame(ps) && nrow(ps)) {
+        ds <- as.character(ps$data_source %||% ""); ds[is.na(ds)] <- ""
+        sv_p <- if ("source_value" %in% names(ps)) suppressWarnings(as.numeric(ps$source_value)) else rep(NA_real_, nrow(ps))
+        for (i in which(ps$parameter %in% tsp & ds == "user_file")) {
+          v <- if (is.finite(sv_p[i])) sv_p[i] else suppressWarnings(as.numeric(ps$mean[i]))
+          if (!is.finite(v) || v == 0) next
+          p <- as.character(ps$parameter[i])
+          cand <- v / tr
+          ta <- if (identical(p, "N")) ifelse(tr %in% c(1, 0.5, 2), 1.01, 0) else rep(0, length(tr))
+          if (any(mapply(function(cc, tt) near_in(cc, yv[[y0]], tol_abs = tt), cand, ta))) next
+          other <- names(yv)[vapply(names(yv), function(yy) yy != y0 &&
+                                    any(vapply(cand, near_in, logical(1), s = yv[[yy]], tol_abs = 0)), logical(1))]
+          if (!length(other)) next
+          add(sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], p),
+              sprintf(paste0("Parameters gives %s for %s, which is not in the file's %s column; it is the file's value for %s. ",
+                             "The inventory year's column is the one to copy."),
+                      fmt(v), p, y0, paste(utils::head(other, 3), collapse = ", ")),
+              severity = "fail", sheet = "Parameters", group = gkey(ps, i), parameter = p, check = "value from another year")
+        }
       }
     }
   }

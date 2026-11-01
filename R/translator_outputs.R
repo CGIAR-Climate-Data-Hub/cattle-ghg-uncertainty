@@ -199,6 +199,21 @@ translator_output_filename <- function(piece, kind = c("template", "checks", "co
       openxlsx::addStyle(wb, sh, sev_style[[h[3]]], rows = hdr + as.integer(h[1]),
                          cols = as.integer(h[2]), gridExpand = TRUE, stack = TRUE)
   }
+  # 2026-11-01 (Stage 4.8): the failures the compiler has to settle travel
+  # with the workbook on a hidden sheet; the app's QA/QC tab reads it on
+  # upload and stops the run until each is fixed or ignored there.
+  if ("Translator_Checks" %in% names(wb)) openxlsx::removeWorksheet(wb, "Translator_Checks")
+  blocking <- if (is.data.frame(issues) && nrow(issues)) {
+    sev <- as.character(issues$severity %||% "")
+    issues[sev == "fail" & as.character(issues$check %||% "") %in% .TRANSLATOR_BLOCKING_CHECKS, , drop = FALSE]
+  } else NULL
+  if (!is.null(blocking) && nrow(blocking)) {
+    tc <- data.frame(sheet = as.character(blocking$sheet %||% ""), group = as.character(blocking$group %||% ""),
+                     parameter = as.character(blocking$parameter %||% ""), check = as.character(blocking$check),
+                     issue = as.character(blocking$issue %||% ""), stringsAsFactors = FALSE)
+    openxlsx::addWorksheet(wb, "Translator_Checks", visible = FALSE)
+    openxlsx::writeData(wb, "Translator_Checks", tc, headerStyle = hdr_style)
+  }
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   invisible(TRUE)
 }

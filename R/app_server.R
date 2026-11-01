@@ -169,6 +169,7 @@ app_server <- function(input, output, session) {
       # the controls alone until a file is uploaded. A custom upload stays.
       if (!isTRUE(rv$has_custom_upload) && !is.null(rv$param_specs)) {
         rv$param_specs  <- NULL
+      rv$translator_checks <- NULL
         rv$inv_metadata <- NULL
         rv$manure_data  <- NULL
         rv$population   <- NULL
@@ -244,6 +245,7 @@ app_server <- function(input, output, session) {
     # smallholder vs pastoral non-dairy). No real-country attribution.
     if (name == "country_x") {
       rv$param_specs <- fill_bounds(generate_country_x_example())
+      rv$translator_checks <- NULL
       .qa_reset_caveats()
       # R2.2: built-in example now ships with synthetic 5-year time-series so
       # that Tab 4's "From template (auto)" correlation mode works without
@@ -258,6 +260,7 @@ app_server <- function(input, output, session) {
       rv$sim_log <- "Country X (hypothetical dairy smallholder) example data loaded: 15 parameters, dairy / cows; 4 MMS types (pasture / solid_storage / liquid_slurry / anaerobic_digester); 5-year synthetic time-series populated for correlation auto-mode.\n"
     } else if (name == "country_y") {
       rv$param_specs <- fill_bounds(generate_country_y_example())
+      rv$translator_checks <- NULL
       .qa_reset_caveats()
       rv$population  <- generate_country_y_timeseries()
       rv$corr_matrix <- .compute_corr_now(rv$population)
@@ -298,6 +301,9 @@ app_server <- function(input, output, session) {
              "(see the Vocab sheet of the template).")
 
       rv$param_specs    <- parsed$param_specs
+      # 2026-11-01 (Stage 4.8): the AI translator's blocking failures, if
+      # the template carries them; NULL for any other template
+      rv$translator_checks <- parsed$translator_checks
       .qa_reset_caveats()
       rv$inv_metadata   <- parsed$metadata
       rv$manure_data    <- parsed$manure
@@ -467,7 +473,8 @@ app_server <- function(input, output, session) {
     # reconciliation (auto-match / ambiguous / no-match) surfaces in the same
     # QAQC table as the per-parameter checks (Andreas 28/5/26 follow-up).
     run_qaqc(rv$param_specs, region = region,
-             manure_data = rv$manure_data)
+             manure_data = rv$manure_data,
+             translator_checks = rv$translator_checks)
   })
 
   # --- QA/QC ignore + repair (2026-09-18) ---

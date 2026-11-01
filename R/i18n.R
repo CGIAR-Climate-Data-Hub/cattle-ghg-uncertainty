@@ -1609,6 +1609,8 @@ lang_state_take <- function(token) {
 
   # QA verdict messages: sprintf templates keyed by check id + verdict.
   # Use `qa_msg(key, ...)` (see helper below) to fetch the right language.
+  qa_msg_translator_fail = list(en = "Translator check: %s",
+                                fr = "Verification du traducteur : %s"),
   qa_msg_bounds_order_fail_lo = list(
     en = "Lower (%.4g) > mean (%.4g). Bounds must bracket the mean.",
     fr = "Borne inférieure (%.4g) > moyenne (%.4g). Les bornes doivent encadrer la moyenne."

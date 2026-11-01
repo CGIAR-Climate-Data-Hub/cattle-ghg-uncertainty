@@ -4661,6 +4661,17 @@ section_F <- function() {
              f78_ok,
              notes = if (f78_ok) "level rows, nudge paragraph, sub-category check" else paste(f78_fail, collapse = "; "))
 
+  # F81 -- the round trip (2026-11-01, Stage 7): the series rebuilt from the
+  # file row, the blocking failures through the hidden sheet to run_qaqc;
+  # scripts/test_translator_roundtrip.R, about 40 s.
+  f81_out <- tryCatch(suppressWarnings(system2(file.path(R.home("bin"), "Rscript"), "scripts/test_translator_roundtrip.R",
+                                               stdout = TRUE, stderr = TRUE)), error = function(e) conditionMessage(e))
+  f81_ok <- any(grepl("ROUNDTRIP TESTS PASSED", f81_out, fixed = TRUE))
+  check_bool("F81", "F",
+             "Round trip: a group's series is copied from its file row (converted where the row is), the blocking failures reach run_qaqc through the hidden Translator_Checks sheet",
+             f81_ok,
+             notes = if (f81_ok) "scripts/test_translator_roundtrip.R passed" else paste(utils::tail(f81_out, 4), collapse = " | "))
+
   # F80 -- conversions declared by the AI and recomputed by the server
   # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
   # is verified, one off by 1 % fails, a missing lactation length warns, the
