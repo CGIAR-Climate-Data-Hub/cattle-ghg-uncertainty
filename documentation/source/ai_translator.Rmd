@@ -35,6 +35,22 @@ The Cattle Uncertainty App expects its data in a specific Excel template, so tha
 
 The AI translator converts raw inventory data, in whatever shape it arrives, into the exact template the tool needs. This will save you a lot of time as converting your data to the right template would be very time consuming.
 
+## Preparing your file
+
+The translator reads your file the way a colleague would. It finds the values faster, and makes fewer mistakes, when the file explains itself. Before you upload, check these points.
+
+- **A README sheet.** One sheet that says what the file is: the country, the inventory year, what each sheet holds, the units, and where the uncertainty ranges are. Two or three lines per sheet are enough. The translator reads it first.
+- **Clear headings.** Each block of values has a heading that names the parameter and its unit: "Live weight (kg)", "Mature weight (kg)", "Digestibility of feed, DE (%)". Two blocks with the same label and no unit are the first source of confusion.
+- **The production system and the animal group on each block.** The system name above its block ("Commercial dairy farms") and the group name on each row ("Adult cows (>3 years)"). Use the same spelling everywhere: "Heifer" on one sheet and "Heifers" on another are two different labels to the translator.
+- **One value per cell.** No "12.5 (2023 estimate)" in a number cell. Put the remark in a notes column.
+- **Years as column headers.** For a series, one column per year, with the year as the header (1990, 1991, ...). The inventory year is one of them.
+- **Units stated once per block, and the same throughout.** Milk per lactating day or per head per year, fractions or percentages: say which, in the heading or in the README. A column that mixes the two conventions is the most common error.
+- **Uncertainty next to the value, or in one clearly labelled sheet.** Each range says what it is: a 95 % margin in percent, a lower and an upper bound, a distribution name. "0.5" alone can mean 50 % or 0.5 %.
+- **Values, not hidden formulas.** The translator reads the value a cell shows, not the formula behind it. If a cell is computed from another sheet, the number it shows is what gets used.
+- **Fill in the fields at upload.** The inventory year and the country go in the two boxes next to the file. The note box takes what a reader would need: known errors in the file, conventions, rows to ignore.
+
+A file that meets these points usually needs three to five questions. A file that does not can need twelve, and more errors are possible.
+
 ## Step by step
 
 ### 1. Accessing the AI translator
@@ -58,7 +74,7 @@ The link in the email is valid for 30 days. Once you have clicked it, the browse
 
 The first step is to upload your data. Click the **Browse** button and choose your inventory file. We accept Excel files, with one or several sheets, and CSV files.
 
-You also have the option to give some context to the AI, if needed, in the box under the list of sheets.
+Under the list of sheets, two small boxes take the inventory year and the country. Fill them in: the year decides which column of your file gives the point estimates, so the AI should know it before it reads the file. You also have the option to give some context to the AI, if needed, in the box below them: conventions, known errors, rows to ignore. What you write there is recorded as a decision and the AI does not ask about it again.
 
 ![](img/translator_04_sheets_after_upload.png){width=100%}
 
@@ -76,7 +92,30 @@ Once all the questions are answered (up to 12), the answers are sent to the AI a
 
 ![](img/translator_07_answers_recorded.png){width=100%}
 
-If it still has doubts, it asks other questions, and so on until everything is clear.
+If it still has doubts, it asks other questions, and so on until everything is clear. When nothing is open, the last message of the conversation says that everything is recorded and that the AI's table of values matches your file, and tells you to click **Produce template now**.
+
+### How to answer the AI's questions
+
+The AI asks when the file leaves a doubt. Your answer becomes a rule it applies to every row concerned, so:
+
+- **Answer the question, then give the rule.** Not "yes" or "no" alone. Say what the value is, which rows it applies to, and what happens to the other rows.
+- **Give numbers and row references** when you have them. "Row 57 is for all groups except calves; calves are row 58."
+- **Say when the file is wrong.** If a value in the file is a known error, give the right value, or say "keep the file's value, I will correct it afterwards". The translator never changes a value on its own.
+- **Say when you do not know.** "Keep what the file says" is a valid answer. The row stays as it is and the checks list it.
+
+Three examples.
+
+*Question:* "The Milk column is labelled kg/head/day, but a lactation length row exists. Is the value per lactating day or an annual average?"
+*Weak answer:* "Per lactating day."
+*Good answer:* "Per lactating day. Convert it: value × lactation length ÷ 365, with each system's own length (275, 257, 255, 180 and 254.9 days). Apply the same to every year of the series and to the bounds."
+
+*Question:* "The MoE sheet gives 0.5, 0.18, 0.177. Are these fractions or percentages?"
+*Weak answer:* "Fractions."
+*Good answer:* "Fractions: 0.5 means a 95 % margin of 50 %. Multiply by 100 everywhere in that sheet. The manure shares are fractions too. pct_pregnant stays a fraction, as the template expects."
+
+*Question:* "The DE bounds for emergent beef are 56 to 58.4 but the 2024 value is 55.0. Should I adjust a bound?"
+*Weak answer:* "No."
+*Good answer:* "Keep both as written: the value 55.0 and the bounds 56 to 58.4. This is an inconsistency in our file; the check will list it and we will correct the file afterwards."
 
 ### 4. Template production
 
@@ -88,7 +127,7 @@ A pop-up appears.
 
 Right now, if nothing happens on the page for about 30 minutes, you are disconnected from the app. The AI is working, but that takes time, so if you are doing something else while the template is being produced, you could be disconnected and lose everything. So you have the option to authorise in advance where the outputs will go: create a folder somewhere, click **Choose a folder and start**, and give the app access to download the files there.
 
-Then the file creation starts. You see a loading bar showing what the AI is doing, with a time estimate. This is a heavy task and can easily take up to 30 minutes.
+Then the file creation starts. You see a loading bar showing what the AI is doing, with a time estimate. This is a heavy task and can easily take up to 30 minutes. The AI writes one production system at a time; the server then copies every time series from your file's own rows, runs the checks and writes the files.
 
 ![](img/translator_09_progress.png){width=100%}
 
