@@ -126,6 +126,7 @@ translator_chat_ui <- function() {
     source_check = NULL,
     source_posted = NULL,
     source_status = NULL,
+    allset_posted = NULL,
     # 2026-10-22 (WP6): the job this session started or reconnected to,
     # and the folder the user chose for the results (Chrome/Edge).
     job_id = NULL,
@@ -458,6 +459,7 @@ translator_chat_server <- function(input, output, session) {
       state$source_check <- NULL
       state$source_posted <- NULL
       state$source_status <- NULL
+      state$allset_posted <- NULL
       state$year_fix_done <- FALSE
       state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
                                   error = function(e) NULL)
@@ -830,8 +832,16 @@ translator_chat_server <- function(input, output, session) {
     # landed between two questions
     post <- function(txt) state$source_status <- txt
     if (!nrow(bad)) {
+      # 2026-11-01, evening: a clean check shows nothing; once the answers
+      # are in, the conversation ends on one bubble that says what to do
       state$source_gate <- NULL
-      if (!identical(state$source_posted, key)) { state$source_posted <- key; post(sprintf(t("ai_source_gate_ok"), nrow(chk))) }
+      state$source_status <- NULL
+      if (!length(state$pending_questions) && !identical(state$allset_posted, key)) {
+        state$allset_posted <- key
+        state$messages[[length(state$messages) + 1L]] <- list(
+          role = "assistant", source = "server_notice", content = "(all set)", display = t("ai_all_set"), ts = .translator_now())
+        .translator_persist(state)
+      }
       return(TRUE)
     }
     if (!isTRUE(state$source_fix_done)) {

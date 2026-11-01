@@ -47,6 +47,16 @@ ok(sc$severity[sc$parameter == "BW" & grepl("feedlot", sc$group)] == "warn" && g
    "a series that differed is a warning naming the years")
 ok(sc$severity[sc$parameter == "BW" & grepl("other_cows", sc$group)] == "info", "a series that agreed is an info row")
 ok(grepl("had no value in 1 year", sc$issue[sc$parameter == "Milk"]), "a missing year is named")
+# the AI's rows without their system label (the writer fills it from the
+# requested level): matched on that level, no second row per year
+ts_nolab <- ts; ts_nolab$aggregation_level <- NA_character_; ts_nolab$.requested_aggregation_level <- "sys_a"
+out2 <- translator_rebuild_series(list(parameters = ps, parameter_timeseries = ts_nolab), sv, sheets)
+t3 <- out2$parameter_timeseries
+ok(nrow(t3) == 6L && all(t3$aggregation_level == "sys_a") && !any(duplicated(paste(t3$sub_category, t3$year))),
+   "rows without a system label are matched on the requested level, not duplicated")
+ts_dup <- rbind(ts, ts[ts$sub_category == "other_cows" & ts$year == 2021L, ])   # the AI wrote a year twice
+out3 <- translator_rebuild_series(list(parameters = ps, parameter_timeseries = ts_dup), sv, sheets)
+ok(!any(duplicated(paste(out3$parameter_timeseries$sub_category, out3$parameter_timeseries$year))), "a year the AI wrote twice is merged into one row")
 json <- as.character(jsonlite::toJSON(piece, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
 j2 <- translator_rebuild_series_json(json, sv, sheets)
 ok(!identical(j2, json) && is.data.frame(jsonlite::fromJSON(j2)$parameter_timeseries), "the JSON path rebuilds and re-serialises")

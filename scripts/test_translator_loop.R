@@ -230,7 +230,8 @@ shiny::testServer(translator_chat_server, {
   session$setInputs(translator_force_template = 3)
   pump(state); session$flushReact()
   stopifnot(produce_calls == p0 + 2L, sum(ai_calls == "chat") == n_chat + 1L,
-            grepl("Source check: all 1", state$source_status %||% ""))   # 2026-11-01: a status line, not a bubble
+            is.null(state$source_status),   # 2026-11-01, evening: a clean check shows no line
+            any(vapply(state$messages, function(m) identical(m$content, "(all set)"), logical(1))))   # the closing bubble
   cat("source gate: one corrective round, then the list and Produce anyway; a right block goes straight through\n")
   cat("LOOP TEST PASSED\n")
 })

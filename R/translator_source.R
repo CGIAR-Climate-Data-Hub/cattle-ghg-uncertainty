@@ -90,7 +90,19 @@ translator_rebuild_series <- function(piece, source_values, sheets, tol = 0.002)
                                   sub_category = character(0), year = integer(0), stringsAsFactors = FALSE)
   for (cn in c("cattle_type", "aggregation_level", "sub_category", "year")) if (!cn %in% names(ts)) ts[[cn]] <- NA
   ts$year <- suppressWarnings(as.integer(ts$year))
-  lv_ts <- .translator_norm_level(ts$aggregation_level); lv_ps <- .translator_norm_level(ps$aggregation_level)
+  # a series row without its system label (the AI omits it in some batches;
+  # the writer fills it from the batch's requested level) is matched on the
+  # requested level, else on the piece's only level. 2026-11-01, 15:09 run:
+  # the commercial dairy rows were not recognised and were written twice.
+  lv_ts <- .translator_norm_level(ts$aggregation_level); lv_ts[is.na(lv_ts)] <- ""
+  if (".requested_aggregation_level" %in% names(ts)) {
+    rq <- .translator_norm_level(ts$.requested_aggregation_level); rq[is.na(rq)] <- ""
+    lv_ts[!nzchar(lv_ts)] <- rq[!nzchar(lv_ts)]
+  }
+  lv_ps <- .translator_norm_level(ps$aggregation_level); lv_ps[is.na(lv_ps)] <- ""
+  if (any(!nzchar(lv_ts)) && length(unique(lv_ps[nzchar(lv_ps)])) == 1L) lv_ts[!nzchar(lv_ts)] <- unique(lv_ps[nzchar(lv_ps)])
+  ts$aggregation_level[!nzchar(as.character(ts$aggregation_level %||% "")) | is.na(ts$aggregation_level)] <-
+    lv_ts[!nzchar(as.character(ts$aggregation_level %||% "")) | is.na(ts$aggregation_level)]
   fac <- if ("conversion_factor" %in% names(ps)) suppressWarnings(as.numeric(ps$conversion_factor)) else rep(NA_real_, nrow(ps))
   rows <- list(); n_rebuilt <- 0L
   for (e in source_values) {
@@ -146,6 +158,21 @@ translator_rebuild_series <- function(piece, source_values, sheets, tol = 0.002)
       check = "series taken from the file", stringsAsFactors = FALSE)
   }
   if (!n_rebuilt) return(piece)
+  # two rows for one group and year (the AI's and a rebuilt one, or two of
+  # the AI's) are merged: the first non-blank value of each column
+  key <- paste(lv_ts, ts$sub_category, ts$year, sep = "||")
+  if (any(duplicated(key))) {
+    vcols <- setdiff(names(ts), c("cattle_type", "aggregation_level", "sub_category", "year", ".requested_aggregation_level"))
+    for (k in unique(key[duplicated(key)])) {
+      idx <- which(key == k); first <- idx[1]
+      for (cn in vcols) { v <- ts[[cn]][idx]; v <- v[!is.na(v)]; if (length(v)) ts[[cn]][first] <- v[1] }
+      if (is.na(ts$cattle_type[first]) || !nzchar(ts$cattle_type[first])) {
+        ctv <- ts$cattle_type[idx]; ctv <- ctv[!is.na(ctv) & nzchar(ctv)]; if (length(ctv)) ts$cattle_type[first] <- ctv[1]
+      }
+    }
+    keep <- !duplicated(key)
+    ts <- ts[keep, , drop = FALSE]; lv_ts <- lv_ts[keep]
+  }
   ts <- ts[order(lv_ts, ts$sub_category, ts$year), , drop = FALSE]
   rownames(ts) <- NULL
   piece$parameter_timeseries <- ts

@@ -1343,6 +1343,15 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       lo_col <- if ("lower" %in% names(ps)) suppressWarnings(as.numeric(ps$lower)) else rep(NA_real_, nrow(ps))
       up_col <- if ("upper" %in% names(ps)) suppressWarnings(as.numeric(ps$upper)) else rep(NA_real_, nrow(ps))
       cf_col <- if ("conversion_factor" %in% names(ps)) suppressWarnings(as.numeric(ps$conversion_factor)) else rep(NA_real_, nrow(ps))
+      # the factor lives in the AI's JSON, not in the written workbook
+      # (2026-11-01, 15:09 run: converted milk bounds were flagged)
+      if (!is.null(piece) && is.data.frame(piece$parameters) && "conversion_factor" %in% names(piece$parameters)) {
+        pp <- piece$parameters
+        kp <- paste(.translator_norm_level(pp$aggregation_level %||% ""), pp$sub_category, pp$parameter, sep = "||")
+        ks <- paste(.translator_norm_level(lvl2), ps$sub_category, ps$parameter, sep = "||")
+        cfp <- suppressWarnings(as.numeric(pp$conversion_factor))[match(ks, kp)]
+        cf_col[is.finite(cfp)] <- cfp[is.finite(cfp)]
+      }
       nums <- sort(unique(source$numbers))
       for (i in which(dsrc == "user_file" & !ph & is.finite(val))) {
         what <- character(0)

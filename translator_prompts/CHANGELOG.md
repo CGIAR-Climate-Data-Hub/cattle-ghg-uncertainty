@@ -2,6 +2,12 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-01, late: after the 15:09 run
+
+- The series rebuild matches a row without its system label on the batch's requested level and merges duplicate (system, group, year) rows (the commercial dairy sheet had two rows per year).
+- The "range not in file" check takes the conversion factor from the AI's JSON (the converted milk bounds were flagged).
+- A clean source check shows nothing; once the answers are in and the table matches, the conversation ends on one bubble: "Everything is recorded and the AI's table of values matches your file. Click Produce template now." A mismatch still shows its line and the correction.
+
 ## 2026-11-01, night: the series from the file, the checks of Stage 5, the rest of Stage 4
 
 Reason: the 13:31 run's feedlot BW series was invented and its MW series left out; the ±20 % milk bounds replaced the file's; ten questions on a file whose note answered eight.
