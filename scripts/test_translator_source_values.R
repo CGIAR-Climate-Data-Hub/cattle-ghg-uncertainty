@@ -56,6 +56,47 @@ merged <- .translator_merge_source_values(.translator_extract_source_values(cut2
 ok(length(merged) == 3L && merged[[3]]$parameter == "N", "the continuation's rows are appended; a row written twice is kept once")
 ok(is.null(.translator_merge_source_values(NULL, NULL)), "merging nothing gives NULL")
 
+# ---- the loosened label rules (2026-11-01) -----------------------------------------
+# rows that cover several groups, rows under no heading, singular/plural and spacing
+df2 <- data.frame(a = c("Dairy cattle", "Cows", "Heifer (1 - 3 years)", "Oxen (> 3 years)", NA,
+                        "Coefficients for growth (_C)", "All production systems", "Growing males", NA,
+                        "Sys A", "Methane conversion (Ym)", "all categories except calves", "Adult bulls, heifers and growing males", "Cows"),
+                  v = c(NA, 100, 200, 300, NA, NA, NA, 1.2, NA, NA, NA, 6.5, 7, 55), check.names = FALSE, stringsAsFactors = FALSE)
+# a sheet whose first data row sits under no heading (the Zambia population rows)
+df3 <- data.frame(Description = c("Dairy cattle", "Dairy cattle"), b = c("Cows", "Bulls"), v = c(100, 110), check.names = FALSE, stringsAsFactors = FALSE)
+sh2 <- list(list(name = "Data", json = .translator_table_to_json(df2, "Data"), n_rows = nrow(df2)),
+            list(name = "Pop", json = .translator_table_to_json(df3, "Pop"), n_rows = nrow(df3)))
+l_nosec <- list(system = "Dairy", label = "Cows", section = "Dairy cattle", sheet = "Pop", row = 2L, col = "v", mean = 100, parameter = "N")
+l_plur  <- list(system = "Dairy", label = "Heifers (1 - 3 years)", section = "Dairy cattle", sheet = "Data", row = 4L, col = "v", mean = 200, parameter = "N")
+l_space <- list(system = "Dairy", label = "Oxen (>3 years)", section = "Dairy cattle", sheet = "Data", row = 5L, col = "v", mean = 300, parameter = "N")
+l_allsys <- list(system = "Commercial beef farms", label = "Growing males", section = "All production systems", sheet = "Data", row = 9L, col = "v", mean = 1.2, parameter = "C")
+l_allcat <- list(system = "Sys A", label = "Adult cows (>3 years)", section = "Methane conversion (Ym)", sheet = "Data", row = 13L, col = "v", mean = 6.5, parameter = "Ym")
+l_except <- modifyList(l_allcat, list(label = "Calves (0 - 1 year)"))
+l_multi  <- list(system = "Sys A", label = "Heifers (1 - 3 years)", section = "Methane conversion (Ym)", sheet = "Data", row = 14L, col = "v", mean = 7, parameter = "Ym")
+l_multi_cows <- modifyList(l_multi, list(label = "Adult cows (>3 years)"))
+l_wrongsec <- list(system = "Sys A", label = "Cows", section = "Weight (kg)", sheet = "Data", row = 15L, col = "v", mean = 55, parameter = "BW")
+c2 <- translator_source_values_check(list(l_nosec, l_plur, l_space, l_allsys, l_allcat, l_except, l_multi, l_multi_cows, l_wrongsec), sh2)
+ok(isTRUE(c2$ok[1]), "a row under no heading accepts the entry's section")
+ok(isTRUE(c2$ok[2]), "'Heifers' matches the file's 'Heifer'")
+ok(isTRUE(c2$ok[3]), "'Oxen (>3 years)' matches 'Oxen (> 3 years)'")
+ok(isTRUE(c2$ok[4]), "a system is accepted on an 'All production systems' row")
+ok(isTRUE(c2$ok[5]), "a label is accepted on an 'all categories except calves' row")
+ok(!isTRUE(c2$ok[6]) && grepl("label", c2$what[6]), "a calves label is refused on an 'all categories except calves' row")
+ok(isTRUE(c2$ok[7]), "'Heifers' is accepted on 'Adult bulls, heifers and growing males'")
+ok(!isTRUE(c2$ok[8]) && grepl("label", c2$what[8]), "'Adult cows' is refused on 'Adult bulls, heifers and growing males'")
+ok(!isTRUE(c2$ok[9]) && grepl("section", c2$what[9]), "a row under a heading still has to name it")
+
+# ---- the year check (2026-11-01) ---------------------------------------------------
+reg24 <- translator_register_set_user(list(), "inventory_year", "2024")
+tab22 <- list(list(sheet = "Data", row = 3L, col = "2022", parameter = "N"), list(sheet = "Data", row = 4L, col = "2022", parameter = "N"),
+              list(sheet = "Coefficients", row = 9L, col = "value", parameter = "C"))
+yf <- .translator_year_fix_message(reg24, tab22)
+ok(!is.null(yf) && yf$year == "2024" && yf$table_year == "2022" && grepl("^YEAR CHECK: your source_values block reads 2 of its values from the 2022 column", yf$text),
+   "a table on 2022 with the year decided 2024 gets the re-emit request")
+ok(is.null(.translator_year_fix_message(translator_register_set_user(list(), "inventory_year", "the 2022 column"), tab22)), "same year: nothing to do")
+ok(is.null(.translator_year_fix_message(reg24, tab22[3])), "no year column in the table: nothing to do")
+ok(is.null(.translator_year_fix_message(translator_register_add_pending(list(), "inventory_year"), tab22)), "year still pending: nothing to do")
+
 # ---- the check on synthetic sheets ------------------------------------------------
 # the layout of the Zambia sheets: the system label above the block heading
 df <- data.frame(a = c("Sys A", "Weight (kg)", "Cows", "Bulls", NA, "Sys A", "Mature weight (kg)", "Cows", "Bulls"),

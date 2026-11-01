@@ -800,6 +800,13 @@ lang_state_take <- function(token) {
     fr = "Votre modèle est prêt. Cliquez sur le bouton vert pour l'enregistrer, puis ouvrez-le et vérifiez le travail de l'IA avant de le charger dans l'onglet 1. Saisie des données."),
   btn_ai_revise = list(en = "Back to the conversation (your answers are kept)",
                          fr = "Retour à la conversation (vos réponses sont conservées)"),
+  ai_upload_year_label = list(en = "Inventory year (optional)", fr = "Année d'inventaire (facultatif)"),
+  ai_upload_year_placeholder = list(en = "for example 2024", fr = "par exemple 2024"),
+  ai_upload_country_label = list(en = "Country (optional)", fr = "Pays (facultatif)"),
+  ai_upload_country_placeholder = list(en = "for example Zambia", fr = "par exemple Zambie"),
+  ai_year_fix_notice = list(
+    en = "The AI's table of values was read from the %s column; the inventory year is %s, so the AI is re-reading it from that column.",
+    fr = "La table des valeurs de l'IA a été lue dans la colonne %s ; l'année d'inventaire est %s, l'IA la relit donc dans cette colonne."),
   ai_upload_note_label = list(en = "Anything the AI should know about this file? (optional)",
                               fr = "Quelque chose que l'IA doit savoir sur ce fichier ? (facultatif)"),
   ai_upload_note_placeholder = list(en = "For example: the MoE column is a fraction; calves are one group; the inventory year is 2022.",

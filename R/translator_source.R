@@ -18,8 +18,10 @@
 # punctuation collapsed.
 .translator_fold <- function(x) {
   x <- tolower(trimws(as.character(x %||% "")))
-  x <- gsub("[[:space:]]+", " ", x)
-  gsub("[^[:alnum:] ]+", "", x)
+  # punctuation first, then the spaces: "Oxen (> 3 years)" and
+  # "Oxen (>3 years)" fold to the same text (2026-11-01)
+  x <- gsub("[^[:alnum:][:space:]]+", "", x)
+  trimws(gsub("[[:space:]]+", " ", x))
 }
 
 # The sheets as the model saw them: list(name, rows (by row key), headers,
@@ -129,12 +131,14 @@
       else what <- c(what, sprintf("mean %s not on row %s", format(mean_v), rk))
     }
   }
-  # section
+  # section: a row under no heading (no `_section`) accepts whatever the
+  # entry says (2026-11-01: the population rows of the Zambia file have
+  # none and were all flagged); a row under a heading must name it.
   sec <- as.character(e$section %||% "")
   rsec <- as.character(row[["_section"]] %||% "")
-  if (nzchar(sec) || nzchar(rsec)) {
+  if (nzchar(rsec)) {
     if (.translator_fold(sec) != .translator_fold(rsec))
-      what <- c(what, sprintf("section (row: %s; entry: %s)", if (nzchar(rsec)) rsec else "none", if (nzchar(sec)) sec else "none"))
+      what <- c(what, sprintf("section (row: %s; entry: %s)", rsec, if (nzchar(sec)) sec else "none"))
   }
   # label and system: on the row, or forward-filled from up to 8 rows above
   texts_up <- function(n_up = 8L) {
@@ -145,13 +149,41 @@
     }
     .translator_fold(out)
   }
+  # 2026-11-01: a label or system is also accepted when (a) a text near
+  # the row covers several groups ("all production systems", "all
+  # categories except calves", "adult bulls, heifers and growing males")
+  # and names no exception matching the entry, or (b) every content word
+  # of the entry's label is found near the row as a word stem ("heifer"
+  # for "Heifers (1 - 3 years)"). The entry carries the group the value
+  # is used for; the file's row says which groups it covers.
   tx <- NULL
+  stop_words <- c("adult", "year", "years", "and", "the", "of", "farms", "farm", "system", "systems")
   for (fld in c("label", "system")) {
     want <- .translator_fold(e[[fld]] %||% "")
     if (!nzchar(want)) next
     if (is.null(tx)) tx <- texts_up()
-    if (!any(grepl(want, tx, fixed = TRUE) | vapply(tx, function(t) nzchar(t) && grepl(t, want, fixed = TRUE), logical(1))))
-      what <- c(what, sprintf("%s '%s' not near row %s", fld, e[[fld]], rk))
+    hit <- any(grepl(want, tx, fixed = TRUE) | vapply(tx, function(t) nzchar(t) && grepl(t, want, fixed = TRUE), logical(1)))
+    if (!hit) {
+      # every word of the label (bare numbers and stop words aside) near
+      # the row: a long word as a stem ("heifer" matches "heifers"), a
+      # short one whole ("z" does not match "a")
+      words <- setdiff(regmatches(want, gregexpr("[a-z][a-z0-9]*", want))[[1]], stop_words)
+      stems <- unique(ifelse(nchar(words) > 3L, sub("s$", "", words), words))
+      pats <- ifelse(nchar(words) > 3L, paste0("\\b", stems), paste0("\\b", stems, "\\b"))
+      # a text that names the group after "except" does not count for it
+      not_excepted <- function(s) !grepl(paste0("except[^;]*\\b", s), tx, perl = TRUE)
+      if (length(stems))
+        hit <- all(vapply(seq_along(stems), function(k) any(grepl(pats[k], tx, perl = TRUE) & not_excepted(stems[k])), logical(1)))
+      if (!hit) {
+        # a blanket text counts only on the row itself or in its heading
+        # (an "All production systems" block a few rows up is another block)
+        own <- .translator_fold(c(.translator_row_texts(row), rsec))
+        blanket <- grepl("^all\\b|\\ball (production )?systems\\b|\\ball categories\\b", own, perl = TRUE)
+        if (length(stems)) for (s in stems) blanket <- blanket & !grepl(paste0("except[^;]*\\b", s), own, perl = TRUE)
+        hit <- any(blanket)
+      }
+    }
+    if (!hit) what <- c(what, sprintf("%s '%s' not near row %s", fld, e[[fld]], rk))
   }
   # bounds
   for (fld in c("lower", "upper")) {

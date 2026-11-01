@@ -2,6 +2,15 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-01, afternoon: the year before the table, and a less strict source check
+
+Reason: the second Zambia run of the day. The AI built its table on the 2022 column during the exploration and the inventory year (2024) was decided in the questions afterwards; the check passed the table because every entry matched its 2022 cell. The check also flagged 61 entries whose labels were right: population rows under no heading, "All production systems" and "all categories except calves" rows, "Heifers" against the file's "Heifer", "Oxen (>3 years)" against "Oxen (> 3 years)". And the re-emitted table listed every year (1,038 rows).
+
+- **Inventory year and country at upload** (optional fields next to the file): stated in the upload message under SETTINGS GIVEN BY THE USER AT UPLOAD, recorded in the register before the exploration (topics `inventory_year`, `country`), so the table is built on that column and the question is not asked.
+- **Year check** (`.translator_year_fix_message`): when the year decided in the chat differs from the column most of the table's entries read, the server asks once for the whole block re-read on that column (a YEAR CHECK message, stage `source_fix`).
+- **The table lists the inventory year only**: one row per parameter and group; the other years of a series are not listed and are checked after production (rule 13, Step 2, the upload block).
+- **Source check**: a row under no heading accepts any section; a label or system is accepted when every content word of it is found near the row as a word stem ("heifer", "oxen 3 years" after folding punctuation), or when the row itself or its heading covers several groups ("all production systems", "all categories ...") and names no exception matching the entry ("except calves" refuses a calves entry).
+
 ## 2026-11-01, the source_values block in compact form
 
 Reason: the first Zambia run of Stage 3 wrote the block as one object per value with fifteen named fields; the explore reply reached the 40,000-token output limit inside the block (run 1's prose table had taken 25,500 tokens), the server's pattern wanted a closing fence and extracted nothing, and the continuation's 77 entries replaced the lost block. The streamed reply also dropped the browser connection.

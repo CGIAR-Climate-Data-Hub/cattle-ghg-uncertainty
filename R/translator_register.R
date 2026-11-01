@@ -972,6 +972,30 @@ translator_register_mark <- function(register, topic, applied, note = NULL) {
   out
 }
 
+# The table is built on one year column. When the inventory year decided
+# afterwards is another one, the block has to be read again from that
+# column (2026-11-01: the Zambia run had 2022 in every entry and 2024 in
+# the register; the batches copy from the block). NULL when nothing is
+# to be done; else list(year, table_year, text) for the corrective message.
+.translator_year_fix_message <- function(register, entries) {
+  if (!length(entries)) return(NULL)
+  dec <- (register %||% list())[["inventory_year"]]
+  if (is.null(dec) || identical(dec$status, "pending")) return(NULL)
+  yr <- regmatches(dec$decision %||% "", regexpr("(19|20)[0-9]{2}", dec$decision %||% ""))
+  if (length(yr) != 1L) return(NULL)
+  cols <- vapply(entries, function(e) trimws(as.character(e$col %||% "")), character(1))
+  yc <- cols[grepl("^(19|20)[0-9]{2}$", cols)]
+  if (!length(yc)) return(NULL)
+  tab <- names(sort(table(yc), decreasing = TRUE))[1]
+  if (identical(tab, yr)) return(NULL)
+  list(year = yr, table_year = tab, text = sprintf(paste0(
+    "YEAR CHECK: your source_values block reads %d of its values from the %s column, but the inventory ",
+    "year decided is %s. Re-emit the WHOLE source_values block with col = \"%s\" and the %s value of every ",
+    "entry that has a year column (the other entries unchanged), in the same form, keeping every label and ",
+    "section exactly as it appears in the file. Nothing else: no other section, no questions, no decisions block."),
+    sum(yc == tab), tab, yr, yr, yr))
+}
+
 # A continuation's block appended to the block it continues; an entry
 # written in both (the model restarted a group) is kept once, the later
 # one.

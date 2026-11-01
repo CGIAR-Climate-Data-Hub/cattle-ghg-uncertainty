@@ -118,6 +118,9 @@ translator_chat_ui <- function() {
     source_gate = NULL,
     source_fix_done = FALSE,
     produce_after_fix = FALSE,
+    # 2026-11-01: the one re-emit of the table when the inventory year
+    # decided differs from the column it was built on
+    year_fix_done = FALSE,
     # 2026-10-22 (WP6): the job this session started or reconnected to,
     # and the folder the user chose for the results (Chrome/Edge).
     job_id = NULL,
@@ -561,6 +564,18 @@ translator_chat_server <- function(input, output, session) {
                  sprintf(t("ai_upload_corrected"), sm$n_fail %||% 0L, sm$n_warn %||% 0L,
                          if (is.null(pc$issues)) 0L else nrow(pc$issues)))
       },
+      # 2026-11-01: the inventory year and the country, asked before the
+      # exploration. The year decides which column every value of the
+      # AI's table is read from; asked afterwards it cost a second table
+      # (the Zambia run of 1 November had 2022 in every entry).
+      if (!isTRUE(pu$is_template)) tags$div(
+        style = "display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px;",
+        tags$div(style = "flex:0 0 180px;",
+                 textInput("translator_upload_year", t("ai_upload_year_label"), value = "",
+                           placeholder = t("ai_upload_year_placeholder"), width = "100%")),
+        tags$div(style = "flex:1 1 220px;",
+                 textInput("translator_upload_country", t("ai_upload_country_label"), value = "",
+                           placeholder = t("ai_upload_country_placeholder"), width = "100%"))),
       textAreaInput("translator_upload_note", t("ai_upload_note_label"),
                     placeholder = t("ai_upload_note_placeholder"), rows = 2, width = "100%"),
       actionButton("translator_send_sheets",
@@ -592,9 +607,26 @@ translator_chat_server <- function(input, output, session) {
     # AI's first reply; cleared by translatorStreamStart.
     session$sendCustomMessage("translatorAppendTypingBubble", "")
     note <- trimws(input$translator_upload_note %||% "")
+    # 2026-11-01: the inventory year and the country given at upload are
+    # decisions from the start (the AI builds its table on that column and
+    # does not ask), recorded in the register before the exploration.
+    settings <- list(year = NULL, country = NULL)
+    if (!isTRUE(pu$is_template)) {
+      yr <- regmatches(input$translator_upload_year %||% "", regexpr("(19|20)[0-9]{2}", input$translator_upload_year %||% ""))
+      if (length(yr) == 1L) settings$year <- yr
+      ctry <- trimws(input$translator_upload_country %||% "")
+      if (nzchar(ctry)) settings$country <- ctry
+      if (!is.null(settings$year))
+        state$register <- translator_register_set_user(state$register, "inventory_year", settings$year,
+                                                       quote = "given at upload", msg_index = length(state$messages) + 1L)
+      if (!is.null(settings$country))
+        state$register <- translator_register_set_user(state$register, "country", settings$country,
+                                                       quote = "given at upload", msg_index = length(state$messages) + 1L)
+    }
+    state$year_fix_done <- FALSE
     built <- .translator_build_upload_message(parsed, pu$name, note = note,
                                               corrected = isTRUE(pu$is_template),
-                                              precheck = pu$precheck)
+                                              precheck = pu$precheck, settings = settings)
     if (isTRUE(pu$is_template)) {
       state$register <- translator_register_set_user(
         state$register, "corrected_template",
@@ -1971,7 +2003,8 @@ translator_cancel_clear <- function(tok) {
 # ticked). Returns list(content = what the model sees, display = what the
 # user sees in their own bubble).
 .translator_build_upload_message <- function(parsed, file_name, note = "",
-                                             corrected = FALSE, precheck = NULL) {
+                                             corrected = FALSE, precheck = NULL,
+                                             settings = NULL) {
   sheet_json_objs <- lapply(parsed$sheets, function(s) {
     s$json %||% .translator_table_to_json(s$preview, sheet_name = s$name)
   })
@@ -2021,7 +2054,8 @@ translator_cancel_clear <- function(tok) {
     "Not a prose table: ONE fenced block labelled `source_values` holding a JSON array with one object per sub-category and ",
     "production system. Each object has `system` (the production-system label exactly as written in the file), `label` (the ",
     "sub-category label exactly as written on its rows), `sub_category` and `aggregation_level` (template codes) and `values`: ",
-    "an array with one row per value you will emit from the file, one row per line, in this fixed order: ",
+    "an array with one row per value you will emit from the file for the inventory year (one row per parameter and group; ",
+    "the other years of a time series are not listed, the server checks them after production), one row per line, in this fixed order: ",
     "`[parameter, sheet, row, col, section, mean, lower, upper, unit, distribution]` where `parameter` is the catalogue code, ",
     "`sheet` the sheet name, `row` the JSON row key (an integer), `col` the header the mean was read from (the year header, ",
     "a header name from `headers`, or the Excel letter), `section` the row's `_section` copied verbatim, `mean`, `lower`, ",
@@ -2081,6 +2115,15 @@ translator_cancel_clear <- function(tok) {
   note_block <- if (nzchar(note)) paste0(
     "## NOTES FROM THE USER ABOUT THIS FILE\n\n", note,
     "\n\nThese notes are binding: record them in your decisions block.\n\n---\n\n") else ""
+  # 2026-11-01: the inventory year and the country given at upload
+  settings_block <- if (!is.null(settings$year) || !is.null(settings$country)) paste0(
+    "## SETTINGS GIVEN BY THE USER AT UPLOAD\n\n",
+    if (!is.null(settings$year)) sprintf(paste0(
+      "Inventory year: %s. Read every value of the source_values block from the %s column ",
+      "(a parameter given once applies to it) and do not ask which year is the inventory year. "),
+      settings$year, settings$year) else "",
+    if (!is.null(settings$country)) sprintf("Country: %s. ", settings$country) else "",
+    "\n\nThese are decisions already recorded (topics inventory_year and country): repeat them in your decisions block.\n\n---\n\n") else ""
   corrected_block <- if (isTRUE(corrected)) {
     sm <- precheck$summary
     paste0(
@@ -2097,10 +2140,10 @@ translator_cancel_clear <- function(tok) {
       "\n\n---\n\n")
   } else ""
   content <- sprintf(
-    "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s%s%s%s",
+    "I have uploaded a file (%s) with %d sheet%s.\n\n%s%s%s%s%s%s%s",
     file_name, parsed$n_total_sheets,
     if (parsed$n_total_sheets == 1L) "" else "s",
-    scale_block, corrected_block, note_block, exploration_block, detect_block, file_block)
+    scale_block, corrected_block, settings_block, note_block, exploration_block, detect_block, file_block)
   display <- if (parsed$n_total_sheets == 1L)
     sprintf("Uploaded %s (%d rows × %d columns sent). Step 1 of 3: the AI will now explore your file and report what it found.",
             file_name, nrow(parsed$sheets[[1]]$preview), ncol(parsed$sheets[[1]]$preview))
@@ -2110,6 +2153,10 @@ translator_cancel_clear <- function(tok) {
             paste(sapply(parsed$sheets, `[[`, "name"), collapse = ", "))
   if (isTRUE(corrected))
     display <- sprintf("Uploaded the corrected template %s. The AI will take its values as they are.", file_name)
+  if (!is.null(settings$year) || !is.null(settings$country))
+    display <- paste0(display, "\n\n",
+                      if (!is.null(settings$year)) paste0("Inventory year: ", settings$year, ". ") else "",
+                      if (!is.null(settings$country)) paste0("Country: ", settings$country, ".") else "")
   if (nzchar(note)) display <- paste0(display, "\n\nYour notes: ", note)
   list(content = content, display = display)
 }
@@ -2614,6 +2661,27 @@ translator_cancel_clear <- function(tok) {
   # the user can miss the "click to download" cue: this dedicated
   # message is the clear next step.
   if (template_just_ready) .translator_append_download_hint(state)
+
+  # 2026-11-01: the table was built on one year column; when the
+  # inventory year now decided is another one, the block is asked again
+  # on that column, once, when no question is open and nothing else is
+  # being continued.
+  if (!continue_now && !length(qs) && !isTRUE(resp$tool_used) && !template_just_ready &&
+      !isTRUE(state$year_fix_done)) {
+    yfix <- tryCatch(.translator_year_fix_message(state$register, state$source_values), error = function(e) NULL)
+    if (!is.null(yfix)) {
+      state$year_fix_done <- TRUE
+      state$messages[[length(state$messages) + 1L]] <-
+        list(role = "user", content = yfix$text,
+             display = sprintf(t("ai_year_fix_notice"), yfix$table_year, yfix$year),
+             source = "server_correction", ts = .translator_now())
+      message("translator: year check, table on ", yfix$table_year, ", inventory year ", yfix$year, "; re-emit requested")
+      .translator_persist(state)
+      later::later(function() shiny::withReactiveDomain(session, shiny::isolate(
+        tryCatch(.translator_send(state, session, stage = "source_fix"),
+                 error = function(e) message("translator: year fix not sent (", conditionMessage(e), ")")))), 0.2)
+    }
+  }
 
   # Persist so a refresh / reload resumes where we left off.
   .translator_persist(state)
