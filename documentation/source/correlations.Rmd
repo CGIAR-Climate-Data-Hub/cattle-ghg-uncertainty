@@ -127,48 +127,20 @@ In both cases, choose the option that describes how your numbers and factors wer
 
 ## 6. Example: what the choices change
 
-The example is a national cattle inventory with 27 groups of animals: dairy and other cattle, in five production systems, about 6.4 million animals in the inventory year. The file gives values for every year from 1990 to 2024, and the inventory year is 2024. The country gave its own uncertainty range for most inputs. Each run used 4,000 iterations and the same starting point for the random draws, so the only difference between two runs is the choice tested. The trend runs used 2,000 iterations per year, and 4,000 for the two years compared.
+The example is a national cattle inventory with 27 groups of animals: dairy and other cattle, in five production systems, about 6.4 million animals in the inventory year 2024. The country gave its own uncertainty range for most inputs, and a series of 35 years for the inputs that change over time. Each run used 4,000 iterations and the same starting point for the random draws, so the only difference between two runs is the choice tested. The total emissions are 15.4 million t CO~2~e in every run; the choices change only the uncertainty around that total.
 
-### 6.1 One year (2024)
+The table crosses the two cards of Tab 3: each row is an answer to "Do some inputs move together?", each column an answer to "Animal numbers between groups". The cell is the uncertainty of the total, as ± half of the 95% range.
 
-The first table compares the three choices of the first card, with the animal numbers set to one national count split into groups. The second table compares the three answers about animal numbers between groups, with no correlations between inputs.
+| Do some inputs move together? | Separate counts per group | Partly | One national count, split into groups |
+|---------------|-----------|-----------|-----------|
+| No correlations | ±37.8% | ±46.7% | ±52.3% |
+| Structural defaults | ±37.3% | ±45.2% | ±50.8% |
+| From template | ±35.8% | ±44.0% | ±49.7% |
 
-| Do some inputs move together? | Total emissions (million t CO~2~e) | 95% range | Uncertainty |
-|---------------|-----------|-------------|---------|
-| No correlations | 15.4 | 8.6 to 24.6 | ±52.3% |
-| Structural defaults | 15.3 | 8.8 to 24.3 | ±50.8% |
-| From template | 15.3 | 8.8 to 24.0 | ±49.7% |
+**Reading the rows: the links between inputs change the uncertainty by one to two points.** In this inventory most of the uncertainty comes from the animal numbers and from feed digestibility, and the seven links are weak to moderate. Several of them pull in opposite directions. Heavier cows give more milk, and both raise the emissions, so that link widens the range. Higher digestibility comes with a higher crude protein content; the first lowers the methane, the second raises the nitrous oxide, so that link narrows the range. Here the second effect is the larger one, and the range narrows a little. In another inventory the balance can go the other way; a change of a few points in either direction is what to expect from this card.
 
-| Animal numbers between groups | Total emissions (million t CO~2~e) | 95% range | Uncertainty |
-|---------------|-----------|-------------|---------|
-| Separate counts per group | 15.4 | 10.6 to 22.2 | ±37.8% |
-| Partly | 15.4 | 9.4 to 23.8 | ±46.7% |
-| One national count, split into groups | 15.4 | 8.6 to 24.6 | ±52.3% |
+"From template" gives the narrowest range because the check (section 4.1) kept two links from the country's own series, both stronger than the literature values: milk and body weight at +0.55 instead of +0.30, and digestibility and crude protein at +0.79 instead of +0.20. The other five links kept their literature values: two were not significant, two had no variation in the series, and one input (the methane conversion factor) is not in the series.
 
-**Why these results are expected.** The links between inputs change little: the uncertainty moves by one to three points, and the total does not move. In this inventory most of the uncertainty comes from the animal numbers and from feed digestibility, and the seven links are weak to moderate. Several of them pull in opposite directions. Heavier cows give more milk, and both raise the emissions, so that link widens the range. Higher digestibility comes with a higher crude protein content; the first lowers the methane, the second raises the nitrous oxide, so that link narrows the range. Here the second effect is the larger one, and the range narrows a little. In another inventory the balance can go the other way; a change of a few points in either direction is what to expect from this card.
+**Reading the columns: how the animal numbers were made changes the uncertainty by 15 points.** With separate counts, the 27 groups each have their own error. Some are too high and some too low, so the errors partly cancel in the total. With one national count split into groups, a count that is too low makes every group too low at the same time. Nothing cancels, so the range is much wider. Neither answer is better than the other: the right one is the one that describes how your numbers were made.
 
-"From template" gives the narrowest range of the three because the check (section 4.1) kept two links from the country's own series, both stronger than the literature values: milk and body weight at +0.55 instead of +0.30, and digestibility and crude protein at +0.79 instead of +0.20. The other five links kept their literature values: two were not significant, two had no variation in the series, and one input (the methane conversion factor) is not in the series.
-
-How the animal numbers were made changes a lot. With separate counts, the 27 groups each have their own error. Some are too high and some too low, so the errors partly cancel in the total. With one national count split into groups, a count that is too low makes every group too low at the same time. Nothing cancels, so the range is much wider: 15 points more. Neither answer is better than the other: the right one is the one that describes how your numbers were made.
-
-### 6.2 Trend (1990 to 2024)
-
-In this inventory the total emissions of the cattle sector rose from about 6.1 million t CO~2~e in 1990 to 15.4 million t in 2024: a rise of 9.3 million t, which is 153% of the 1990 total (2024 is 2.5 times 1990). Most of it comes from the herd, which grew from 2.5 to 6.4 million animals. Because the inputs are uncertain, the true rise is not known exactly. The table gives, for each pair of answers, the most likely rise as a percentage of the 1990 total, and the range in which the true rise very likely lies (95% of the iterations). Read the first row like this: with the same factors every year and a new survey every year, emissions most likely rose by 153% of the 1990 total, and the true rise is very likely somewhere between +49% and +332% of it. The uncertainty of each year on its own is about ±50% in every row; the table shows the uncertainty of the change, which is a different thing: two years can each be ±50% and their change known to a few points, when the errors are the same in both years and cancel.
-
-| Emission factors between years | Animal numbers between years | Most likely rise, 1990 to 2024 | The true rise is very likely between |
-|---------------|---------------|--------|--------------|
-| The same factors for every year | A new survey every year | +153% | +49% and +332% |
-| The same factors for every year | A census every few years | +153% | +48% and +337% |
-| The same factors for every year | One census, years filled in | +153% | +148% and +158% |
-| Factors revised every few years | A new survey every year | +154% | +19% and +445% |
-| Factors revised every few years | A census every few years | +154% | +22% and +444% |
-| Factors revised every few years | One census, years filled in | +153% | +54% and +327% |
-| New factors every year | A new survey every year | +164% | +23% and +452% |
-| New factors every year | A census every few years | +164% | +24% and +455% |
-| New factors every year | One census, years filled in | +164% | +56% and +333% |
-
-**Why these results are expected.** Errors shared by both years cancel. With one census and the same factors for every year, the error in 1990 and the error in 2024 are the same error, so it cancels in the change, and the range is narrow: between +148% and +158%, five points either side of the most likely rise. Errors that are new each year add up instead. With a new survey every year, the 1990 count and the 2024 count each have their own error. In this inventory the animal numbers are the largest source of uncertainty, so the range becomes very wide: between +49% and +332%.
-
-A census every few years behaves here almost like a new survey every year, because 1990 and 2024 are 34 years apart and their counts share almost nothing; the two rows differ only by the noise of the random draws. This middle option makes more difference for years close together. Factors revised every few years, or new every year, widen the range further, because the factor errors no longer cancel either; with the animal numbers from one census the factor errors are then the whole of the remaining uncertainty, which is why the range goes from five points either side to about a hundred. The most likely rise also moves a little, from +153% to +164%, with new factors every year, because each year gets its own draws; the data are the same.
-
-The right choice is the one that describes how your numbers and factors were really made. It is not the one that gives the narrowest range.
+These are the results expected from the method: the column effect is large because the animal numbers are the largest source of uncertainty and the column decides whether their errors add up; the row effect is small because the links are weak and partly cancel.
