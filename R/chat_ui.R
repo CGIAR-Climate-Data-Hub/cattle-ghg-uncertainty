@@ -125,6 +125,7 @@ translator_chat_ui <- function() {
     # result was posted in the chat
     source_check = NULL,
     source_posted = NULL,
+    source_status = NULL,
     # 2026-10-22 (WP6): the job this session started or reconnected to,
     # and the folder the user chose for the results (Chrome/Edge).
     job_id = NULL,
@@ -456,6 +457,7 @@ translator_chat_server <- function(input, output, session) {
       state$source_fix_done <- FALSE
       state$source_check <- NULL
       state$source_posted <- NULL
+      state$source_status <- NULL
       state$year_fix_done <- FALSE
       state$source_fp <- tryCatch(translator_source_fingerprint(parsed),
                                   error = function(e) NULL)
@@ -823,8 +825,10 @@ translator_chat_server <- function(input, output, session) {
     if (is.null(chk)) { state$source_gate <- NULL; return(TRUE) }
     bad <- chk[!chk$ok & !chk$cap, , drop = FALSE]
     key <- state$source_check$key
-    post <- function(txt) state$messages[[length(state$messages) + 1L]] <- list(
-      role = "assistant", source = "server_notice", content = "(source check)", display = txt, ts = .translator_now())
+    # 2026-11-01, evening: the result is a status line under the chat
+    # (output$translator_source_status), not a bubble: as a bubble it
+    # landed between two questions
+    post <- function(txt) state$source_status <- txt
     if (!nrow(bad)) {
       state$source_gate <- NULL
       if (!identical(state$source_posted, key)) { state$source_posted <- key; post(sprintf(t("ai_source_gate_ok"), nrow(chk))) }
@@ -880,6 +884,16 @@ translator_chat_server <- function(input, output, session) {
     }
     .translator_source_gate(auto = TRUE)
   }, ignoreInit = TRUE)
+  output$translator_source_status <- renderUI({
+    txt <- state$source_status
+    if (is.null(txt) || !nzchar(txt) || isTRUE(state$pending)) return(NULL)
+    okay <- grepl("^Source check: all|^Verification de la source : les", txt)
+    tags$div(
+      style = paste0("text-align:left; margin:0 auto 8px auto; max-width:720px; padding:8px 12px; border-radius:8px; font-size:0.85rem; ",
+                     if (okay) "background:#F1F8F4; border:1px solid #C8E6C9; color:#1B4332;"
+                     else "background:#FEF9C3; border:1px solid #FDE68A; color:#713F12;"),
+      txt)
+  })
   output$translator_source_gate <- renderUI({
     bad <- state$source_gate
     if (!is.data.frame(bad) || !nrow(bad)) return(NULL)
@@ -1463,6 +1477,7 @@ translator_chat_server <- function(input, output, session) {
       condition = "!output.translator_template_ready",
     # 2026-10-22 (WP1): the register and the current question sit above
     # the free-text row.
+    uiOutput("translator_source_status"),
     uiOutput("translator_source_gate"),
     uiOutput("translator_job_panel"),
     uiOutput("translator_past_upload"),
@@ -2820,8 +2835,10 @@ translator_cancel_clear <- function(tok) {
   stream_acc <- ""; stream_last <- NULL; stream_at <- 0
   on_chunk_cb <- function(text) {
     stream_acc <<- paste0(stream_acc, text)
+    # (2026-11-01, evening: once a second; at four times a second the page
+    # still lagged while a 361-row table streamed)
     now <- as.numeric(Sys.time())
-    if (now - stream_at < 0.25) return(invisible(NULL))
+    if (now - stream_at < 1) return(invisible(NULL))
     stream_at <<- now
     vis <- tryCatch(.translator_reply_visible(stream_acc, live = TRUE), error = function(e) stream_acc)
     if (identical(vis, stream_last)) return(invisible(NULL))
