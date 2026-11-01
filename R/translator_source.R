@@ -290,6 +290,110 @@ translator_apply_table_ranges_json <- function(json, source_values) {
   as.character(jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
 }
 
+# ---------------------------------------------------------------------------
+# The manure coefficients from the file, by the server (2026-11-01, night).
+# The checked table has one entry per coefficient row of the file (MCF,
+# EF3, Frac_GasMS, Frac_LeachMS), labelled with the file's manure-system
+# name. The label is mapped to the template's code by keyword; when the
+# table gives one value for a (system, manure system, coefficient), every
+# manure row of that system takes it (the 17:13 Zambia run: Frac_GasMS of
+# solid storage at the IPCC default 30 on four rows where the file gives
+# 45). Two values for one code (the two slurry MCF variants) are left
+# alone. A coefficient given as a fraction in the file is written in
+# percent where the column is a percent column.
+# ---------------------------------------------------------------------------
+.TRANSLATOR_MMS_KEYWORDS <- c(
+  pasture = "pasture|paddock|range|grazing", daily_spread = "daily spread", solid_storage = "solid storage",
+  dry_lot = "dry ?lot", deep_bedding = "deep bedding", liquid_slurry = "slurry|liquid|pit storage",
+  composting = "compost", anaerobic_lagoon = "lagoon", anaerobic_digester = "digester|biogas",
+  aerobic_treatment = "aerobic treatment", burned_for_fuel = "burn")
+.TRANSLATOR_MANURE_COLUMNS <- c(MCF = "MCF_pct", EF3 = "EF3", Frac_GasMS = "Frac_GasMS_pct", Frac_LeachMS = "Frac_LeachMS_pct")
+
+.translator_mms_from_label <- function(label) {
+  l <- .translator_fold(label)
+  if (!nzchar(l)) return(NA_character_)
+  ids <- if (exists("MMS_DEFAULTS")) as.character(get("MMS_DEFAULTS")$id) else names(.TRANSLATOR_MMS_KEYWORDS)
+  for (code in names(.TRANSLATOR_MMS_KEYWORDS))
+    if (code %in% ids && grepl(.TRANSLATOR_MMS_KEYWORDS[[code]], l, perl = TRUE)) return(code)
+  NA_character_
+}
+
+translator_apply_table_manure <- function(piece, source_values, tol = 0.002) {
+  mm <- piece$manure_management
+  if (!length(source_values) || !is.data.frame(mm) || !nrow(mm) || !"mms_type" %in% names(mm)) return(piece)
+  lv_mm <- .translator_norm_level(mm$aggregation_level); lv_mm[is.na(lv_mm)] <- ""
+  if (".requested_aggregation_level" %in% names(mm)) {
+    rq <- .translator_norm_level(mm$.requested_aggregation_level); rq[is.na(rq)] <- ""
+    lv_mm[!nzchar(lv_mm)] <- rq[!nzchar(lv_mm)]
+  }
+  near <- function(a, b) is.finite(a) && is.finite(b) && abs(a - b) <= tol * max(1, abs(b))
+  # the candidate values per (level or "", mms code, column)
+  cand <- list()
+  for (e in source_values) {
+    p <- as.character(e$parameter %||% ""); if (!p %in% names(.TRANSLATOR_MANURE_COLUMNS)) next
+    v <- suppressWarnings(as.numeric(e$mean %||% NA)); if (!is.finite(v)) next
+    code <- .translator_mms_from_label(e$label %||% ""); if (is.na(code)) code <- .translator_mms_from_label(e$section %||% "")
+    if (is.na(code)) next
+    L <- .translator_norm_level(e$aggregation_level %||% ""); if (is.na(L)) L <- ""
+    if (grepl("\\ball\\b", .translator_fold(e$system %||% ""), perl = TRUE)) L <- ""
+    S <- as.character(e$sub_category %||% ""); if (is.na(S)) S <- ""
+    k <- paste(L, code, p, sep = "||")
+    cand[[k]] <- c(cand[[k]], list(list(v = v, S = S, sheet = e$sheet %||% "", row = e$row %||% "")))
+  }
+  if (!length(cand)) return(piece)
+  rows <- list(); n_changed <- 0L
+  levels <- unique(lv_mm[nzchar(lv_mm)])
+  for (L in levels) for (code in unique(as.character(mm$mms_type))) for (p in names(.TRANSLATOR_MANURE_COLUMNS)) {
+    col <- .TRANSLATOR_MANURE_COLUMNS[[p]]; if (!col %in% names(mm)) next
+    ents <- c(cand[[paste(L, code, p, sep = "||")]], cand[[paste("", code, p, sep = "||")]])
+    if (!length(ents)) next
+    vals <- vapply(ents, function(x) x$v, numeric(1))
+    distinct <- vals[!duplicated(round(vals, 6))]
+    if (length(distinct) != 1L) next     # variants of one system (the slurry MCFs): not decided here
+    v <- distinct[1]
+    idx <- which(lv_mm == L & as.character(mm$mms_type) == code)
+    S_only <- unique(vapply(ents, function(x) x$S, character(1))); S_only <- S_only[nzchar(S_only)]
+    if (length(S_only) && all(S_only %in% as.character(mm$sub_category[idx]))) idx <- idx[as.character(mm$sub_category[idx]) %in% S_only]
+    if (!length(idx)) next
+    cur <- suppressWarnings(as.numeric(mm[[col]][idx]))
+    scale <- if (any(vapply(cur, function(x) near(x, v * 100), logical(1)))) 100
+             else if (any(vapply(cur, function(x) near(x, v), logical(1)))) 1
+             else if (grepl("_pct$", col) && v <= 1) 100 else 1
+    target <- v * scale
+    off <- which(!vapply(cur, function(x) near(x, target), logical(1)))
+    if (!length(off)) next
+    old <- cur[off]
+    mm[[col]][idx[off]] <- target
+    n_changed <- n_changed + length(off)
+    rows[[length(rows) + 1L]] <- data.frame(
+      where = "Manure_Management",
+      issue = sprintf("%s of %s in %s: %d row(s) (%s) carried %s; the file's row (%s!%s) gives %s, which the server wrote on them.",
+                      col, code, L, length(off), paste(as.character(mm$sub_category[idx[off]]), collapse = ", "),
+                      paste(unique(format(signif(old, 6))), collapse = ", "), ents[[1]]$sheet, as.character(ents[[1]]$row), format(signif(target, 6))),
+      severity = "warn", sheet = "Manure_Management", group = NA_character_, parameter = col,
+      check = "manure coefficient taken from the file", stringsAsFactors = FALSE)
+  }
+  if (!n_changed) return(piece)
+  piece$manure_management <- mm
+  corr <- do.call(rbind, rows); rownames(corr) <- NULL
+  piece$server_corrections <- .translator_add_corrections(piece$server_corrections, corr)
+  piece
+}
+
+translator_apply_table_manure_json <- function(json, source_values) {
+  if (is.null(json) || !nzchar(json) || !length(source_values)) return(json)
+  piece <- tryCatch(jsonlite::fromJSON(json, simplifyVector = TRUE), error = function(e) NULL)
+  if (is.null(piece)) return(json)
+  out <- tryCatch(translator_apply_table_manure(piece, source_values), error = function(e) {
+    message("translator: table manure failed (", conditionMessage(e), ")"); NULL })
+  if (is.null(out)) return(json)
+  before <- if (is.data.frame(piece$server_corrections)) nrow(piece$server_corrections) else 0L
+  after <- if (is.data.frame(out$server_corrections)) nrow(out$server_corrections) else 0L
+  if (after == before) return(json)
+  message("translator: ", after - before, " manure coefficient(s) taken from the table")
+  as.character(jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", digits = NA, dataframe = "rows", null = "null"))
+}
+
 # One entry against the file. Returns list(ok, what, cap).
 .translator_check_entry <- function(e, tables) {
   what <- character(0); cap <- FALSE

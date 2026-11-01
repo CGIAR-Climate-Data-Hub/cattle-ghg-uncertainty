@@ -81,6 +81,32 @@ ok(is.data.frame(scr) && nrow(scr) == 1L && scr$check == "range taken from the f
    "one warning records the range and the distribution that changed")
 ok(identical(translator_apply_table_ranges(list(parameters = ps), sv_r[2])$parameters, ps), "nothing to apply: the piece is untouched")
 
+# ---- 1c. the manure coefficients from the table ----------------------------------
+mm <- data.frame(cattle_type = "non_dairy", aggregation_level = "sys_a",
+                 sub_category = c("other_cows", "bulls", "calves", "other_cows", "bulls"),
+                 mms_type = c("solid_storage", "solid_storage", "solid_storage", "liquid_slurry", "liquid_slurry"),
+                 fraction_pct = c(20, 20, 20, 10, 10), MCF_pct = c(4, 4, 4, 25, 73), EF3 = 0.02,
+                 Frac_GasMS_pct = c(45, 30, 30, 48, 48), Frac_LeachMS_pct = 2, stringsAsFactors = FALSE)
+sv_m <- list(
+  list(system = "All production systems", label = "Solid storage", section = "Frac_GasMS", sheet = "Coefficients", row = 20L, col = "value",
+       mean = 0.45, parameter = "Frac_GasMS", sub_category = "", aggregation_level = "sys_a"),
+  list(system = "All production systems", label = "Liquid slurry & pit storage, 1 month", section = "MCF", sheet = "Coefficients", row = 30L, col = "value",
+       mean = 25, parameter = "MCF", aggregation_level = ""),
+  list(system = "All production systems", label = "Liquid slurry & pit storage, 12 month", section = "MCF", sheet = "Coefficients", row = 31L, col = "value",
+       mean = 73, parameter = "MCF", aggregation_level = ""))
+out_m <- translator_apply_table_manure(list(manure_management = mm), sv_m)
+m2 <- out_m$manure_management
+ok(all(m2$Frac_GasMS_pct[m2$mms_type == "solid_storage"] == 45), "the file's Frac_GasMS (0.45, written as 45 %) replaces the default on the two slipped rows")
+ok(identical(m2$MCF_pct, mm$MCF_pct), "two MCF variants for one code are left alone")
+scm <- out_m$server_corrections
+ok(is.data.frame(scm) && nrow(scm) == 1L && scm$check == "manure coefficient taken from the file" && grepl("2 row\\(s\\) \\(bulls, calves\\) carried 30", scm$issue),
+   "one warning per coefficient names the rows and the values replaced")
+ok(identical(.translator_mms_from_label("Composting - static pile (forced aeration)"), "composting") &&
+   identical(.translator_mms_from_label("Anaerobic digester / biogas"), "anaerobic_digester") &&
+   identical(.translator_mms_from_label("Pasture/range/paddock"), "pasture") && is.na(.translator_mms_from_label("Lactation length")),
+   "the file's manure-system labels map to the template's codes by keyword")
+ok(identical(translator_apply_table_manure(list(manure_management = mm), sv_m[2:3])$manure_management, mm), "nothing to apply: untouched")
+
 # ---- 2. the blocking failures through the workbook to the QA/QC tab ------------
 tmp <- tempfile(fileext = ".xlsx")
 piece2 <- list(

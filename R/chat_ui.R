@@ -1962,6 +1962,9 @@ translator_cancel_clear <- function(tok) {
   # and the ranges and distributions the table carries for each row
   ranged <- tryCatch(translator_apply_table_ranges_json(fixed %||% json, isolate(state$source_values)), error = function(e) NULL)
   if (!is.null(ranged)) fixed <- ranged
+  # and the manure coefficients the table carries per manure system
+  manured <- tryCatch(translator_apply_table_manure_json(fixed %||% json, isolate(state$source_values)), error = function(e) NULL)
+  if (!is.null(manured)) fixed <- manured
   if (!is.null(fixed) && !identical(fixed, json)) {
     json <- fixed
     state$last_template_json <- fixed

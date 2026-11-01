@@ -460,8 +460,8 @@ translator_source_fingerprint <- function(parsed) {
       # 16:18 Zambia run wrote +-35 % where the file's row has 3 to 7.5
       rows[[length(rows) + 1L]] <- row(sprintf(paste0(
         "%s: a margin of +-%s %% was written for a converted value, and the file's bounds were not stated (source_lower, ",
-        "source_upper). If the file gives bounds for this row, they belong here, converted with the same factor (%s)."),
-        p, fmt(u_i), fmt(f)), "warn", "unit conversion not verified")
+        "source_upper). If the file gives a margin for this row, this is right; if it gives bounds, they belong here, converted with the same factor (%s)."),
+        p, fmt(u_i), fmt(f)), "info", "unit conversion not verified")
     }
     if (is.finite(lo) || is.finite(up)) {
       if (is.finite(slo) || is.finite(sup)) {
