@@ -26,6 +26,36 @@ mid <- sub("\n\n### D[.].*$", "", blk(good))
 live <- .translator_reply_visible(mid, live = TRUE)
 ok(grepl("\\b2\\b", live) && !grepl("source_values", live, fixed = TRUE), "the live view counts the entries and hides the block")
 
+# ---- the compact form (2026-11-01): one object per group, positional value rows ----
+grp <- paste0('[{"system": "Sys A", "label": "Cows", "sub_category": "other_cows", "aggregation_level": "sys_a", "values": [\n',
+              '["BW", "Data", 5, "2020", "Weight (kg)", 410, null, null, "kg", null],\n',
+              '["MW", "Data", 9, "2020", "Mature weight (kg)", 450, 430, 470, "kg", "normal", "Margins", 3]\n',
+              ']},\n{"system": "Sys B", "label": "Cows", "sub_category": "other_cows", "aggregation_level": "sys_b", "values": [\n',
+              '["N", "Data", 20, "2020", "Animal numbers", 1, null, null, "head", null]\n]}]')
+ev <- .translator_extract_source_values(blk(grp))
+ok(length(ev) == 3L && ev[[1]]$system == "Sys A" && ev[[1]]$label == "Cows" && ev[[1]]$sub_category == "other_cows" &&
+   ev[[1]]$aggregation_level == "sys_a" && ev[[1]]$parameter == "BW" && ev[[1]]$sheet == "Data" && ev[[1]]$row == 5L &&
+   ev[[1]]$col == "2020" && ev[[1]]$section == "Weight (kg)" && ev[[1]]$mean == 410 && is.na(ev[[1]]$lower) && ev[[1]]$unit == "kg",
+   "compact form: a value row carries its group's labels and codes")
+ok(ev[[2]]$lower == 430 && ev[[2]]$upper == 470 && ev[[2]]$distribution == "normal" && ev[[2]]$bounds_sheet == "Margins" && ev[[2]]$bounds_row == 3L,
+   "compact form: bounds, distribution and the bounds sheet")
+ok(ev[[3]]$aggregation_level == "sys_b" && ev[[3]]$parameter == "N", "compact form: the second group")
+# cut at the output limit: no closing fence, cut inside a value row of the second group
+cut2 <- paste0("I read your file.\n\n### B. Inventory of values found\nsource_values: 3 entries\n```source_values\n",
+               sub('\\["N", "Data", 20.*$', '["N", "Data", 20, "20', grp))
+ev <- .translator_extract_source_values(cut2)
+ok(length(ev) == 2L && ev[[2]]$parameter == "MW", "compact form: a block cut inside a value row, without a closing fence, keeps the complete rows")
+cut3 <- sub("\n\\]\\},\n.*$", "\n]},\n", grp)   # cut right after the first group closed
+ok(length(.translator_extract_source_values(blk(cut3))) == 2L, "compact form: a block cut between two groups keeps the first")
+cut_flat <- paste0("I read your file.\n\n### B. Inventory of values found\n```source_values\n", cut)   # the flat form, cut, no closing fence
+ok(length(.translator_extract_source_values(cut_flat)) == 1L, "flat form: a cut block without a closing fence keeps its complete entries")
+live2 <- .translator_reply_visible(sub("\n\n### D[.].*$", "", blk(grp)), live = TRUE)
+ok(grepl("\\b3\\b", live2) && !grepl("source_values", live2, fixed = TRUE), "the live view counts the value rows of the compact form")
+# a continuation's block is appended to the cut block, a restarted row counted once
+merged <- .translator_merge_source_values(.translator_extract_source_values(cut2), .translator_extract_source_values(blk(grp))[2:3])
+ok(length(merged) == 3L && merged[[3]]$parameter == "N", "the continuation's rows are appended; a row written twice is kept once")
+ok(is.null(.translator_merge_source_values(NULL, NULL)), "merging nothing gives NULL")
+
 # ---- the check on synthetic sheets ------------------------------------------------
 # the layout of the Zambia sheets: the system label above the block heading
 df <- data.frame(a = c("Sys A", "Weight (kg)", "Cows", "Bulls", NA, "Sys A", "Mature weight (kg)", "Cows", "Bulls"),

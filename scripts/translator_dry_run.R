@@ -115,11 +115,17 @@ calls <- character()
   # scenario 3; from then on it is "pooled" and the batches violate it.
   pooled <- grepl("keep calves pooled", last, fixed = TRUE)
   calves_dec <- if (pooled) "pooled: one calves category per system" else "split into calves_male and calves_female, 50/50"
-  # Stage 3: section B as a source_values block built from the fixture
-  sv_json <- jsonlite::toJSON(lapply(seq_len(nrow(ps)), function(i) list(
-    system = ps$aggregation_level[i], label = ps$sub_category[i], section = "Parameters", sheet = "Data",
-    row = i + 1L, col = "value", mean = ps$mean[i], parameter = ps$parameter[i],
-    sub_category = ps$sub_category[i], aggregation_level = ps$aggregation_level[i])), auto_unbox = TRUE, na = "null", digits = NA)
+  # Stage 3: section B as a source_values block built from the fixture, in
+  # the compact form of 2026-11-01 (one object per group, positional rows)
+  grp_key <- paste(ps$aggregation_level, ps$sub_category, sep = "\r")
+  sv_json <- paste0("[", paste(vapply(unique(grp_key), function(k) {
+    idx <- which(grp_key == k)
+    rows <- vapply(idx, function(i) jsonlite::toJSON(list(ps$parameter[i], "Data", i + 1L, "value", "Parameters", ps$mean[i],
+                                                           NA, NA, NA, NA), auto_unbox = TRUE, na = "null", digits = NA), character(1))
+    paste0('{"system": "', ps$aggregation_level[idx[1]], '", "label": "', ps$sub_category[idx[1]], '", "sub_category": "',
+           ps$sub_category[idx[1]], '", "aggregation_level": "', ps$aggregation_level[idx[1]], '", "values": [\n',
+           paste(rows, collapse = ",\n"), "\n]}")
+  }, character(1)), collapse = ",\n"), "]")
   txt <- paste0("Thanks. Before I can produce, please answer:\n\n### B. Inventory of values found\nsource_values: ", nrow(ps),
                 " entries\n```source_values\n", sv_json, "\n```\n\n### D. Ambiguities to ask the user\n\n1. Which year?\n2. Split calves?\n\n",
                 "```decisions\n[{\"topic\": \"inventory_year\", \"decision\": \"2022\", \"basis\": \"user\", \"confidence\": \"high\", \"quote\": \"Year 2022\"},",

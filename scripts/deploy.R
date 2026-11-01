@@ -17,13 +17,23 @@ if (basename(getwd()) == "scripts") setwd("..")
 # Set DEPLOY_SKIP_GATE=1 to bypass, and say why in the commit that follows.
 # ---------------------------------------------------------------------------
 if (!identical(Sys.getenv("DEPLOY_SKIP_GATE", ""), "1")) {
-  rs <- file.path(R.home("bin"), "Rscript")
-  audit <- suppressWarnings(system2(rs, "scripts/audit.R", stdout = TRUE, stderr = TRUE))
-  fails <- grep("Fail: *[1-9]", audit, value = TRUE)
-  if (length(fails) || !any(grepl("AUDIT COMPLETE", audit, fixed = TRUE))) {
-    cat(tail(audit, 25), sep = "\n")
-    stop("deploy gate: the audit did not pass. Fix it, or set DEPLOY_SKIP_GATE=1 and record why.",
-         call. = FALSE)
+  # 2026-11-01: a passing audit stamps the tree it ran on (scripts/tree_hash.R);
+  # when the stamp matches the tree about to be bundled and is less than a
+  # day old, the audit is not run again (it took 7 to 8 of a deploy's 10
+  # minutes, on code that had just passed it).
+  source("scripts/tree_hash.R", local = TRUE)
+  stamped <- tryCatch(audit_stamp_matches(), error = function(e) NULL)
+  if (!is.null(stamped)) {
+    message("deploy gate: the audit passed on this exact tree at ", stamped, "; not run again.")
+  } else {
+    rs <- file.path(R.home("bin"), "Rscript")
+    audit <- suppressWarnings(system2(rs, "scripts/audit.R", stdout = TRUE, stderr = TRUE))
+    fails <- grep("Fail: *[1-9]", audit, value = TRUE)
+    if (length(fails) || !any(grepl("AUDIT COMPLETE", audit, fixed = TRUE))) {
+      cat(tail(audit, 25), sep = "\n")
+      stop("deploy gate: the audit did not pass. Fix it, or set DEPLOY_SKIP_GATE=1 and record why.",
+           call. = FALSE)
+    }
   }
   status <- tryCatch(system2("git", c("status", "--porcelain"), stdout = TRUE, stderr = FALSE),
                      error = function(e) character(0))

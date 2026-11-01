@@ -215,7 +215,7 @@ translator_source_values_check <- function(entries, sheets) {
     paste(lines, collapse = "\n"),
     if (nrow(bad) > 60L) sprintf("\n[... and %d more]", nrow(bad) - 60L) else "",
     "\n\nRe-read those rows in the JSON (the row key, its _section and its labels) and re-emit the WHOLE ",
-    "source_values block, corrected, with the same fields. Nothing else: no other section, no questions, ",
+    "source_values block, corrected, in the same form. Nothing else: no other section, no questions, ",
     "no decisions block.")
 }
 

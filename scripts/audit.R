@@ -4604,6 +4604,16 @@ section_F <- function() {
     body <- '[{"system": "Sys A", "label": "Cows", "section": "Weight (kg)", "sheet": "Data", "row": 4, "col": "2020", "mean": 410, "parameter": "BW", "aggregation_level": "sys_a"},\n {"system": "Sys A", "label": "Bulls", "sheet": "Data", "row": 5, "co'
     ev <- .translator_extract_source_values(paste0("### B.\n```source_values\n", body, "\n```"))
     if (length(ev) != 1L || ev[[1]]$row != 4L) f <- c(f, "cut block not recovered")
+    # 2026-11-01: the compact form (one object per group, positional value
+    # rows), cut inside a row with no closing fence, as the 1 November run was
+    grp <- paste0('[{"system": "Sys A", "label": "Cows", "sub_category": "other_cows", "aggregation_level": "sys_a", "values": [\n',
+                  '["BW", "Data", 4, "2020", "Weight (kg)", 410, null, null, "kg", null],\n',
+                  '["MW", "Data", 9, "2020", "Mature weight (kg)", 450, 430, 470, "kg", "normal"],\n["N", "Data", 2, "20')
+    ev2 <- .translator_extract_source_values(paste0("### B.\n```source_values\n", grp))
+    if (length(ev2) != 2L || ev2[[2]]$parameter != "MW" || ev2[[1]]$label != "Cows" || ev2[[1]]$aggregation_level != "sys_a" ||
+        !identical(ev2[[2]]$lower, 430))
+      f <- c(f, "compact cut block without a closing fence not recovered")
+    if (length(.translator_merge_source_values(ev2, ev2[2])) != 2L) f <- c(f, "merge does not drop a repeated row")
     df <- data.frame(a = c("Sys A", "Weight (kg)", "Cows", "Bulls", NA, "Sys A", "Mature weight (kg)", "Cows", "Bulls"),
                      `2019` = c(NA, NA, 400, 500, NA, NA, NA, 440, 540), `2020` = c(NA, NA, 410, 510, NA, NA, NA, 450, 550),
                      check.names = FALSE, stringsAsFactors = FALSE)
@@ -5017,6 +5027,14 @@ md <- c(md, "",
 writeLines(md, "reports/AUDIT_REPORT.md", useBytes = TRUE)
 cat(sprintf("\n=== AUDIT COMPLETE ===\nTotal: %d  Pass: %d  Fail: %d  Skip: %d\nReport: reports/AUDIT_REPORT.md\n",
             total, pass, fail, skip))
+
+# 2026-11-01: a passing audit stamps the tree it ran on (runtime/.audit_stamp)
+# so that scripts/deploy.R does not run it again on the same code.
+if (fail == 0L && file.exists("scripts/tree_hash.R")) {
+  source("scripts/tree_hash.R", local = TRUE)
+  if (isTRUE(tryCatch(audit_stamp_write(), error = function(e) FALSE)))
+    cat("Stamp: runtime/.audit_stamp (the deploy gate skips the audit on this tree)\n")
+}
 
 # Non-zero exit on failure so CI (.github/workflows/audit.yml) gates on this.
 # Guarded on interactive() so sourcing the script in an R session still just

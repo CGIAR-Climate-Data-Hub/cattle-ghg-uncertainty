@@ -506,7 +506,10 @@ translator_register_df <- function(register) {
   if (live) {
     # the entries of the source_values block, counted before the fences go
     # (2026-10-31: section B is a fenced block in the middle of the reply)
-    n_entries <- sum(grepl("^\\s*\\[?\\s*\\{", strsplit(txt, "\n", fixed = TRUE)[[1]], perl = TRUE))
+    # (2026-11-01: a positional value row, or a flat object naming its parameter)
+    lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
+    n_entries <- sum(grepl("^\\s*\\[\\s*\"", lines, perl = TRUE) |
+                     grepl("^\\s*\\[?\\s*\\{.*\"parameter\"", lines, perl = TRUE))
     txt <- gsub("```[A-Za-z_]*[ \\t]*\\n[\\s\\S]*?\\n```", "", txt, perl = TRUE)   # complete fenced blocks
     txt <- sub("(?s)\\n```.*$", "", txt, perl = TRUE)   # an unfinished one at the end
   }
@@ -877,45 +880,106 @@ translator_register_mark <- function(register, topic, applied, note = NULL) {
 # Source values (2026-10-31, Stage 3): section B as a verifiable block
 # ---------------------------------------------------------------------------
 
-.TRANSLATOR_SOURCE_VALUES_FENCE <- "```source_values[ \\t]*\\n([\\s\\S]*?)\\n```"
+# The closing fence is optional: a block cut at the output limit has none
+# and runs to the end of the reply (2026-11-01: the first Zambia run of
+# Stage 3 was cut inside the block, the pattern wanted the closing fence,
+# nothing was extracted, and the continuation's 77 entries were all the
+# server had).
+.TRANSLATOR_SOURCE_VALUES_FENCE <- "```source_values[ \\t]*\\n([\\s\\S]*?)(?:\\n```|\\z)"
 
 # Every entry of every source_values block in a reply (a continuation may
-# carry a second block). A block cut at the output limit is trimmed to its
-# last complete object. Entries without sheet, row and parameter are
-# dropped. NULL when nothing usable is there.
+# carry a second block). Two forms are read (2026-11-01): the compact
+# form, one object per sub-category and system with `values`, an array of
+# positional rows [parameter, sheet, row, col, section, mean, lower,
+# upper, unit, distribution, bounds_sheet, bounds_row]; and the older
+# flat form, one object per value with named fields. A block cut at the
+# output limit is trimmed to its last complete row. Entries without
+# sheet, row and parameter are dropped. NULL when nothing usable is there.
 .translator_extract_source_values <- function(reply) {
   if (is.null(reply) || !nzchar(reply)) return(NULL)
   m <- gregexpr(.TRANSLATOR_SOURCE_VALUES_FENCE, reply, perl = TRUE)[[1]]
   if (m[1] < 0) return(NULL)
   fences <- regmatches(reply, list(m))[[1]]
   out <- list()
-  num <- function(x) { v <- suppressWarnings(as.numeric(x %||% NA)); if (length(v) == 1L && is.finite(v)) v else NA_real_ }
-  chr <- function(x) { v <- trimws(as.character(x %||% "")); if (length(v) == 1L) v else "" }
   for (fence in fences) {
     inner <- sub("^```source_values[ \\t]*\\n", "", fence, perl = TRUE)
     inner <- sub("\\n```$", "", inner)
-    arr <- tryCatch(jsonlite::fromJSON(inner, simplifyVector = FALSE), error = function(e) NULL)
-    if (is.null(arr)) {
-      cut <- regexpr("\\}[^\\}]*$", inner, perl = TRUE)
-      if (cut > 0) arr <- tryCatch(jsonlite::fromJSON(paste0(substr(inner, 1L, cut), "]"), simplifyVector = FALSE),
-                                   error = function(e) NULL)
-    }
+    arr <- .translator_parse_source_block(inner)
     if (is.null(arr)) next
-    if (!is.null(arr$parameter)) arr <- list(arr)
-    for (e in arr) {
-      if (!is.list(e)) next
-      sheet <- chr(e$sheet); row <- suppressWarnings(as.integer(e$row %||% NA)); par <- chr(e$parameter)
-      if (!nzchar(sheet) || is.na(row) || !nzchar(par)) next
-      out[[length(out) + 1L]] <- list(
-        system = chr(e$system), label = chr(e$label), section = chr(e$section),
-        sheet = sheet, row = row, col = chr(e$col), mean = num(e$mean), lower = num(e$lower), upper = num(e$upper),
-        unit = chr(e$unit), distribution = chr(e$distribution), year_col = chr(e$year_col),
-        parameter = par, sub_category = chr(e$sub_category),
-        aggregation_level = chr(e$aggregation_level),
-        bounds_sheet = chr(e$bounds_sheet), bounds_row = suppressWarnings(as.integer(e$bounds_row %||% NA)))
-    }
+    out <- c(out, .translator_flatten_source_block(arr))
   }
   if (!length(out)) NULL else out
+}
+
+# The JSON of a block, repaired when it was cut at the output limit: the
+# lines up to the last complete value row, object or group closer are
+# kept and the open structures closed.
+.translator_parse_source_block <- function(inner) {
+  if (!length(inner) || !nzchar(inner)) return(NULL)
+  parse <- function(s) tryCatch(jsonlite::fromJSON(s, simplifyVector = FALSE), error = function(e) NULL)
+  arr <- parse(inner)
+  if (!is.null(arr)) return(arr)
+  lines <- strsplit(inner, "\n", fixed = TRUE)[[1]]
+  complete <- grepl("^\\s*\\[\\s*\".*\\]\\s*,?\\s*$", lines, perl = TRUE) |     # a positional value row
+              grepl("^\\s*\\[?\\s*\\{.*\\}\\s*,?\\s*$", lines, perl = TRUE) |   # a flat object on one line
+              grepl("^\\s*\\]\\s*\\}\\s*,?\\s*$", lines, perl = TRUE)          # a group closer
+  last <- if (any(complete)) max(which(complete)) else 0L
+  if (last > 0L) {
+    kept <- sub(",\\s*$", "", paste(lines[seq_len(last)], collapse = "\n"), perl = TRUE)
+    for (closer in c("", "]", "]}]", "]}", "}]")) {
+      arr <- parse(paste0(kept, closer))
+      if (!is.null(arr)) return(arr)
+    }
+  }
+  # objects written over several lines: back to the last closing brace
+  cut <- regexpr("\\}[^\\}]*$", inner, perl = TRUE)
+  if (cut > 0) arr <- parse(paste0(substr(inner, 1L, cut), "]"))
+  arr
+}
+
+# The entries of a parsed block as flat lists with the fields the verifier
+# and the batch scope read.
+.translator_flatten_source_block <- function(arr) {
+  num <- function(x) { v <- suppressWarnings(as.numeric(x %||% NA)); if (length(v) == 1L && is.finite(v)) v else NA_real_ }
+  chr <- function(x) { v <- trimws(as.character(x %||% "")); if (length(v) == 1L) v else "" }
+  int <- function(x) { v <- suppressWarnings(as.integer(x %||% NA)); if (length(v) == 1L) v else NA_integer_ }
+  mk <- function(e, g = list()) {
+    sheet <- chr(e$sheet); row <- int(e$row); par <- chr(e$parameter)
+    if (!nzchar(sheet) || is.na(row) || !nzchar(par)) return(NULL)
+    list(system = chr(e$system %||% g$system), label = chr(e$label %||% g$label), section = chr(e$section),
+         sheet = sheet, row = row, col = chr(e$col), mean = num(e$mean), lower = num(e$lower), upper = num(e$upper),
+         unit = chr(e$unit), distribution = chr(e$distribution), year_col = chr(e$year_col),
+         parameter = par, sub_category = chr(e$sub_category %||% g$sub_category),
+         aggregation_level = chr(e$aggregation_level %||% g$aggregation_level),
+         bounds_sheet = chr(e$bounds_sheet), bounds_row = int(e$bounds_row))
+  }
+  if (!is.null(arr$parameter) || !is.null(arr$values)) arr <- list(arr)
+  out <- list()
+  for (e in arr) {
+    if (!is.list(e)) next
+    if (is.null(e$values)) { r <- mk(e); if (!is.null(r)) out[[length(out) + 1L]] <- r; next }
+    g <- list(system = e$system, label = e$label, sub_category = e$sub_category, aggregation_level = e$aggregation_level)
+    for (v in e$values) {
+      if (!is.list(v) || !length(v)) next
+      if (!is.null(names(v)) && any(nzchar(names(v)))) { r <- mk(v, g); if (!is.null(r)) out[[length(out) + 1L]] <- r; next }
+      at <- function(i) if (length(v) >= i) v[[i]] else NULL
+      r <- mk(list(parameter = at(1), sheet = at(2), row = at(3), col = at(4), section = at(5), mean = at(6),
+                   lower = at(7), upper = at(8), unit = at(9), distribution = at(10),
+                   bounds_sheet = at(11), bounds_row = at(12)), g)
+      if (!is.null(r)) out[[length(out) + 1L]] <- r
+    }
+  }
+  out
+}
+
+# A continuation's block appended to the block it continues; an entry
+# written in both (the model restarted a group) is kept once, the later
+# one.
+.translator_merge_source_values <- function(old, new) {
+  all <- c(old %||% list(), new %||% list())
+  if (!length(all)) return(NULL)
+  key <- vapply(all, function(e) paste(e$sheet, e$row, e$col, e$parameter, e$system, e$label, sep = "\r"), character(1))
+  all[!duplicated(key, fromLast = TRUE)]
 }
 
 .translator_strip_source_values <- function(text) {

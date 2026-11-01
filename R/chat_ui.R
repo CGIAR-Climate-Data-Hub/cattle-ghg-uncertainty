@@ -2018,14 +2018,16 @@ translator_cancel_clear <- function(tok) {
     "- `reference-table`: vocab / dropdown lists / catalogues, NOT data to extract\n",
     "- `calc-sheet`: derived / computed (e.g. NRC calculations behind an aggregated value)\n\n",
     "### B. Inventory of values found\n\n",
-    "Not a prose table: ONE fenced block labelled `source_values` holding a JSON array, one object per line, ",
-    "one object per value you will emit from the file, with the fields: `system` (the production-system label exactly as ",
-    "written in the file), `label` (the sub-category label exactly as written on that row), `section` (the row's `_section`, ",
-    "copied verbatim), `sheet`, `row` (the JSON row key, an integer), `col` (the header name from `headers`, or the Excel letter), ",
-    "`mean`, `lower`, `upper` (numbers or null), `unit`, `distribution` (as in the file, or null), `year_col` (the year header ",
-    "the mean was read from, or null), `parameter` (catalogue code), `sub_category` and `aggregation_level` (template codes). ",
-    "A lower/upper read from another sheet (a margin-of-error sheet) comes with `bounds_sheet` and `bounds_row`. ",
-    "Write one line of text before the block: \"source_values: N entries\".\n\n",
+    "Not a prose table: ONE fenced block labelled `source_values` holding a JSON array with one object per sub-category and ",
+    "production system. Each object has `system` (the production-system label exactly as written in the file), `label` (the ",
+    "sub-category label exactly as written on its rows), `sub_category` and `aggregation_level` (template codes) and `values`: ",
+    "an array with one row per value you will emit from the file, one row per line, in this fixed order: ",
+    "`[parameter, sheet, row, col, section, mean, lower, upper, unit, distribution]` where `parameter` is the catalogue code, ",
+    "`sheet` the sheet name, `row` the JSON row key (an integer), `col` the header the mean was read from (the year header, ",
+    "a header name from `headers`, or the Excel letter), `section` the row's `_section` copied verbatim, `mean`, `lower`, ",
+    "`upper` numbers or null, `unit` a string or null, `distribution` as in the file or null. A lower/upper read from another ",
+    "sheet (a margin-of-error sheet) adds two more elements: `bounds_sheet`, `bounds_row`. ",
+    "Write one line of text before the block: \"source_values: N entries\" (N counts the value rows).\n\n",
     "The server checks every entry against the file cell by cell (sheet, row, column, value, `_section`, labels) and sends ",
     "back any that does not match. The production system and the block heading tell look-alike rows apart ",
     "(the same sub-category in several systems; the Weight, Mature weight and Weight gain blocks): take the ",
@@ -2535,11 +2537,17 @@ translator_cancel_clear <- function(tok) {
                                                         note = sc$sub_category %||% "")
     reply_vis <- .translator_strip_source_categories(reply_vis)
   }
-  # 2026-10-31 (Stage 3): the source_values block (section B). A block in a
-  # continuation or in the corrective round replaces the previous one; the
-  # Produce observer checks it against the file.
+  # 2026-10-31 (Stage 3): the source_values block (section B). A block in
+  # the corrective round replaces the previous one; the Produce observer
+  # checks it against the file. 2026-11-01: a block in a continuation is
+  # appended to the block it continues (it used to replace it: the Zambia
+  # run of 1 November kept the continuation's 77 entries and lost the rest).
+  users <- Filter(function(m) identical(m$role, "user"), state$messages)
+  already_continued <- length(users) > 0 && identical(users[[length(users)]]$source, "user_continue")
   svals <- if (!isTRUE(resp$tool_used)) .translator_extract_source_values(reply_text) else NULL
   if (!is.null(svals)) {
+    if (already_continued && length(state$source_values))
+      svals <- .translator_merge_source_values(state$source_values, svals)
     state$source_values <- svals
     reply_vis <- .translator_strip_source_values(reply_vis)
     if (!nzchar(trimws(reply_vis %||% ""))) reply_vis <- sprintf(t("ai_source_values_noted"), length(svals))
@@ -2549,8 +2557,6 @@ translator_cancel_clear <- function(tok) {
   # is and one continuation is requested; its questions, incomplete, are
   # not put to the user, the continuation brings them.
   truncated <- identical(resp$stop_reason, "max_tokens") && !isTRUE(resp$tool_used) && !template_just_ready
-  users <- Filter(function(m) identical(m$role, "user"), state$messages)
-  already_continued <- length(users) > 0 && identical(users[[length(users)]]$source, "user_continue")
   continue_now <- truncated && !already_continued
   qs <- if (!isTRUE(resp$tool_used) && !template_just_ready && !continue_now)
     .translator_question_list(reply_vis) else character(0)
@@ -2624,9 +2630,11 @@ translator_cancel_clear <- function(tok) {
 .TRANSLATOR_CONTINUE_TEXT <- paste(
   "Your previous reply was cut off by the output length limit. Do not repeat",
   "what you already wrote. If the source_values block was cut, continue it",
-  "in a new source_values block starting from the entry after the last",
-  "complete one. Then section D: every numbered question in full, numbered",
-  "from 1, then the decisions block and the source_categories block.")
+  "in a new source_values block: start with the group that was cut (its",
+  "header object again, then only the value rows not yet written), then",
+  "the remaining groups. Then section C if it was not written, then section",
+  "D: every numbered question in full, numbered from 1, then the decisions",
+  "block and the source_categories block.")
 
 .translator_send <- function(state, session, stage = "clarify") {
   state$pending <- TRUE
@@ -2691,9 +2699,17 @@ translator_cancel_clear <- function(tok) {
   # the orientation lines and section D as it arrives. Sections A to C
   # (the table of every value read) are replaced by a progress line while
   # they stream. The whole visible text is sent each time it changes.
-  stream_acc <- ""; stream_last <- NULL
+  # 2026-11-01: at most four times a second. The visible-text filter walks
+  # the whole accumulated reply; run on every chunk of a 160 KB reply it
+  # held the process long enough for the websocket to drop (the Zambia
+  # run of 1 November: "disconnected" in the middle of the exploration).
+  # The finished bubble comes from on_result, so no final flush is needed.
+  stream_acc <- ""; stream_last <- NULL; stream_at <- 0
   on_chunk_cb <- function(text) {
     stream_acc <<- paste0(stream_acc, text)
+    now <- as.numeric(Sys.time())
+    if (now - stream_at < 0.25) return(invisible(NULL))
+    stream_at <<- now
     vis <- tryCatch(.translator_reply_visible(stream_acc, live = TRUE), error = function(e) stream_acc)
     if (identical(vis, stream_last)) return(invisible(NULL))
     stream_last <<- vis

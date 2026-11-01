@@ -2,6 +2,14 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-01, the source_values block in compact form
+
+Reason: the first Zambia run of Stage 3 wrote the block as one object per value with fifteen named fields; the explore reply reached the 40,000-token output limit inside the block (run 1's prose table had taken 25,500 tokens), the server's pattern wanted a closing fence and extracted nothing, and the continuation's 77 entries replaced the lost block. The streamed reply also dropped the browser connection.
+
+- **One object per sub-category and system**, with `system`, `label`, `sub_category`, `aggregation_level` and `values`: positional rows `[parameter, sheet, row, col, section, mean, lower, upper, unit, distribution]` plus `bounds_sheet`, `bounds_row` when the bounds come from another sheet (rule 13; Step 2 and Step 9 of system_instructions.md; the upload block). About 35 tokens per value instead of 90; `year_col` is gone, `col` is the header the mean was read from. The server still reads the older flat form.
+- A block cut at the output limit is read without its closing fence, trimmed to its last complete row; the continuation's block is appended, a row written twice is kept once; the continuation request says to restart the cut group with its header.
+- The live bubble is refreshed at most four times a second while a reply streams.
+
 ## 2026-10-31, Stage 3 of the review plan: the verified exploration table
 
 Reason: the batches copied from a prose table (section B) that had no production-system column and no block-heading column and that the server could not check; the Zambia misreadings (a mature-weight range on a body-weight row, a per-system DE fix on the wrong system) came from it.
