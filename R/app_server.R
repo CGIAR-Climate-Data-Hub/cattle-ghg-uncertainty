@@ -2143,9 +2143,10 @@ app_server <- function(input, output, session) {
     xaxis <- list(title = t("res_hist_xaxis"))
     if (!is.null(xbins)) xaxis$range <- c(disp[1], disp[2])
 
-    p <- plotly::plot_ly(x = co2e, type = "histogram", nbinsx = 50, xbins = xbins,
+    hb <- if (!is.null(xbins)) .hist_bars(co2e, 50, disp[1], disp[2]) else .hist_bars(co2e, 50)
+    p <- plotly::plot_ly(x = hb$x, y = hb$y, width = hb$width, type = "bar",
                     marker = list(color = "#2D6A4F", line = list(color = "#1B4332", width = 1))) %>%
-      plotly::layout(
+      plotly::layout(bargap = 0,
         title = t("res_hist_chart_title"),
         xaxis = xaxis,
         yaxis = list(title = t("res_hist_yaxis")),
@@ -2994,6 +2995,22 @@ app_server <- function(input, output, session) {
   # histogram trace and just thin the input.)
   .HIST_MAX_PTS <- 2500L
   .downsample <- function(x) if (length(x) > .HIST_MAX_PTS) x[seq_len(.HIST_MAX_PTS)] else x
+  # 2026-11-02 (Lolita: the page froze for a few seconds right after the
+  # results appeared). The histograms used to send every draw to the
+  # browser (up to 2 MB at 10,000 iterations, and the Report tab's charts
+  # arrive half a second after the results), and plotly binned them there.
+  # They are binned here instead: a histogram is 30 to 50 bars, a few KB.
+  .hist_bars <- function(x, nbins = 40, from = NULL, to = NULL, density = FALSE) {
+    x <- x[is.finite(x)]
+    if (length(x) == 0) return(NULL)
+    lo <- if (is.null(from)) min(x) else from
+    hi <- if (is.null(to)) max(x) else to
+    if (!is.finite(lo) || !is.finite(hi) || hi <= lo) { lo <- min(x) - 0.5; hi <- max(x) + 0.5 }
+    br <- seq(lo, hi, length.out = nbins + 1L)
+    h  <- graphics::hist(pmin(pmax(x, lo), hi), breaks = br, plot = FALSE)
+    y  <- if (density) h$density else h$counts
+    list(x = h$mids, y = y, width = diff(br)[1])
+  }
 
   # T8.4 / Round 6a #8: per-source histograms embedded in IPCC Report.
   # Bug fix: previous version referenced `inv$enteric_ch4_total` etc., but the
@@ -3055,10 +3072,11 @@ app_server <- function(input, output, session) {
     sources <- sources[keep]
 
     plots <- lapply(seq_along(sources), function(i) {
-      plotly::plot_ly(x = .downsample(sources[[i]]), type = "histogram", nbinsx = 40,
+      hb <- .hist_bars(sources[[i]], 40)
+      plotly::plot_ly(x = hb$x, y = hb$y, width = hb$width, type = "bar",
                       marker = list(color = "#2D6A4F"),
                       name = names(sources)[i], showlegend = FALSE) |>
-        plotly::layout(xaxis = list(title = names(sources)[i]),
+        plotly::layout(bargap = 0, xaxis = list(title = names(sources)[i]),
                        yaxis = list(title = ""))
     })
     plotly::subplot(plots,
@@ -3119,11 +3137,12 @@ app_server <- function(input, output, session) {
     # Take up to 12 parameters to keep the panel readable
     keep <- head(colnames(samples), 12)
     plots <- lapply(keep, function(p) {
-      plotly::plot_ly(x = .downsample(samples[[p]]), type = "histogram",
-                      histnorm = "probability density",
-                      nbinsx = 30, marker = list(color = "#40916C"),
+      hb <- .hist_bars(samples[[p]], 30, density = TRUE)
+      if (is.null(hb)) return(plotly::plot_ly() |> plotly::layout(xaxis = list(title = p)))
+      plotly::plot_ly(x = hb$x, y = hb$y, width = hb$width, type = "bar",
+                      marker = list(color = "#40916C"),
                       name = p, showlegend = FALSE) |>
-        plotly::layout(xaxis = list(title = p), yaxis = list(title = ""))
+        plotly::layout(bargap = 0, xaxis = list(title = p), yaxis = list(title = ""))
     })
     # Wider inter-panel margin so each panel's x-axis title (the parameter name)
     # sits clearly in the gap below its histogram instead of overlapping the row
