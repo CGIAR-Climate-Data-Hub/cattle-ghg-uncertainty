@@ -1386,8 +1386,8 @@ lang_state_take <- function(token) {
   trend_word_base_year = list(en = "Base year", fr = "Année de base"),
   trend_word_year_t = list(en = "Year t", fr = "Année t"),
   trend_line_year = list(
-    en = "%s %d: %s t CO₂eq, plus or minus %s%% (95%% range %s to %s t).",
-    fr = "%s %d : %s t CO₂éq, plus ou moins %s %% (plage à 95 %% de %s à %s t)."),
+    en = "%s %d: %s CO₂eq, plus or minus %s%% (95%% range %s to %s).",
+    fr = "%s %d : %s CO₂éq, plus ou moins %s %% (plage à 95 %% de %s à %s)."),
   trend_line_change = list(
     en = "Change from %d to %d: %s%%. The 95%% range of this change is %s%% to %s%%, that is %s to %s percentage points around the trend.",
     fr = "Variation de %d à %d : %s %%. La plage à 95 %% de cette variation va de %s %% à %s %%, soit %s à %s points de pourcentage autour de la tendance."),
@@ -2218,6 +2218,22 @@ lang_state_take <- function(token) {
   run_released_trend = list(
     en = "The trend results were released to make room for this run (the server holds one run at a time). Run the trend again to see them.",
     fr = "Les résultats de tendance ont été libérés pour laisser la place à ce run (le serveur garde un seul run à la fois). Relancez la tendance pour les revoir."),
+  res_waiting_trend = list(en = "The trend results appear here when the run is complete. Click Run trend above to start it.",
+                           fr = "Les résultats de tendance apparaissent ici quand le calcul est terminé. Cliquez sur Lancer la tendance ci-dessus pour le démarrer."),
+  diag_trend_year_t = list(en = "Year t total (%d)", fr = "Total de l'année t (%d)"),
+  diag_trend_year_t_note = list(
+    en = "The figure you report. Checked on the paired reporting draws for the first and last year.",
+    fr = "Le chiffre que vous déclarez. Vérifié sur les tirages appariés de déclaration de la première et de la dernière année."),
+  diag_trend_change = list(en = "Change from %d to %d", fr = "Variation de %d à %d"),
+  diag_trend_change_note = list(
+    en = "The difference between the two years, draw by draw. The percentages are relative to the year t total, because the mean change can be close to zero.",
+    fr = "La différence entre les deux années, tirage par tirage. Les pourcentages sont relatifs au total de l'année t, car la variation moyenne peut être proche de zéro."),
+  diag_trend_axis_year_t = list(en = "Total CO₂eq, year %d", fr = "CO₂éq total, année %d"),
+  diag_trend_axis_change = list(en = "Change since base year", fr = "Variation depuis l'année de base"),
+  fig_cap_conv_trend = list(
+    en = "Left: running mean of the year t total (solid line) and running 2.5th and 97.5th percentiles (dashed lines) as draws are added. Right: the same for the change between the base year and year t. Lines that are flat at the right edge show that the run was long enough.",
+    fr = "À gauche : moyenne cumulée du total de l'année t (trait plein) et 2,5e et 97,5e percentiles cumulés (tirets) au fil des tirages. À droite : la même chose pour la variation entre l'année de base et l'année t. Des courbes plates à droite indiquent que le calcul a été assez long."),
+  fig_conv_title_trend = list(en = "Convergence of the reporting draws", fr = "Convergence des tirages de déclaration"),
   res_waiting = list(en = "The results appear here when the simulation is complete. Click Run simulation above to start it.",
                      fr = "Les résultats apparaissent ici quand la simulation est terminée. Cliquez sur Lancer la simulation ci-dessus pour la démarrer."),
   res_agg_level_label = list(en = "Aggregation level:", fr = "Niveau d'agrégation :"),

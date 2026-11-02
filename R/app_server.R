@@ -1698,25 +1698,9 @@ app_server <- function(input, output, session) {
           rv$mc_results        <- sim_result
           rv$show_diagnostics  <- FALSE
 
-          local({
-            co2e <- sim_result$inventory$total_co2e
-            n    <- length(co2e)
-            n2   <- floor(n / 2L)
-            h1   <- co2e[seq_len(n2)]
-            h2   <- co2e[seq(n2 + 1L, n)]
-            om   <- mean(co2e)
-            oci  <- quantile(co2e, c(0.025, 0.975), names = FALSE)
-            ci1  <- quantile(h1,   c(0.025, 0.975), names = FALSE)
-            ci2  <- quantile(h2,   c(0.025, 0.975), names = FALSE)
-            rv$diagnostics <- list(
-              n            = n,
-              mcse_pct     = (sd(co2e) / om) / sqrt(n) * 100,
-              drift_pct    = abs(mean(h1) - mean(h2)) / om * 100,
-              ci_drift_pct = mean(abs(ci1 - ci2) / pmax(abs(oci), .Machine$double.eps)) * 100,
-              skew_val     = mean(((co2e - om) / sd(co2e))^3),
-              trace        = compute_diag_trace(co2e)
-            )
-          })
+          # (2026-11-02: mc_diagnostics() in R/utils_diagnostics.R, shared
+          # with the trend results.)
+          rv$diagnostics <- mc_diagnostics(sim_result$inventory$total_co2e)
 
           # ---- Stage 3: uncertainty metrics ----
           setProgress(0.40, detail = "Computing uncertainty metrics...")
@@ -2051,12 +2035,22 @@ app_server <- function(input, output, session) {
 
   # 2026-10-28 (review): masses in gigagrams with 3 decimals by default,
   # in tonnes, or both, as the user picks above the result cards.
-  .fmt_mass <- function(x_t, suffix = "") {
+  # 2026-11-02: one formatter for both modes. The single-year block reads
+  # its own radio (res_units), the trend block its own (res_units_trend);
+  # `signed` prefixes a plus sign on a positive change (slope, delta).
+  .fmt_mass_u <- function(x_t, units = "gg", suffix = "", signed = FALSE) {
     if (length(x_t) == 0 || is.na(x_t)) return("---")
-    gg <- paste0(formatC(x_t / 1000, format = "f", digits = 3, big.mark = ","), " Gg", suffix)
-    tt <- paste0(formatC(x_t, format = "f", digits = if (abs(x_t) < 10) 3 else 1, big.mark = ","), " t", suffix)
-    switch(input$res_units %||% "gg", t = tt, both = paste0(gg, " (", tt, ")"), gg)
+    sg <- if (signed && x_t > 0) "+" else ""
+    gg <- paste0(sg, formatC(x_t / 1000, format = "f", digits = 3, big.mark = ","), " Gg", suffix)
+    tt <- paste0(sg, formatC(x_t, format = "f", digits = if (abs(x_t) < 10) 3 else 1, big.mark = ","), " t", suffix)
+    switch(units, t = tt, both = paste0(gg, " (", tt, ")"), gg)
   }
+  .fmt_mass <- function(x_t, suffix = "", signed = FALSE)
+    .fmt_mass_u(x_t, input$res_units %||% "gg", suffix, signed)
+  .fmt_mass_tr <- function(x_t, suffix = "", signed = FALSE)
+    .fmt_mass_u(x_t, input$res_units_trend %||% "gg", suffix, signed)
+  # the convergence plots: divisor and axis unit for a units choice
+  .mass_axis <- function(units) if (identical(units, "t")) list(div = 1, unit = "t") else list(div = 1000, unit = "Gg")
 
   output$vb_ch4 <- renderText({
     req(rv$uncertainty)
@@ -2240,10 +2234,11 @@ app_server <- function(input, output, session) {
   output$show_diagnostics <- reactive({ isTRUE(rv$show_diagnostics) })
   outputOptions(output, "show_diagnostics", suspendWhenHidden = FALSE)
 
-  output$diag_badges <- renderUI({
-    req(rv$diagnostics)
-    d <- rv$diagnostics
-
+  # 2026-11-02: the badges as a function of one diagnostics list, so the
+  # trend results show the same checks for the year t total and for the
+  # change since the base year (no skew badge for a change: its sign has
+  # no expected direction).
+  .diag_badges_ui <- function(d, skew = TRUE, iter_warning = TRUE) {
     mcse_s  <- if (d$mcse_pct     <  0.5) "pass" else if (d$mcse_pct     < 1)  "warn" else "fail"
     drift_s <- if (d$drift_pct    <  2.0) "pass" else if (d$drift_pct    < 5)  "warn" else "fail"
     ci_s    <- if (d$ci_drift_pct <  5.0) "pass" else if (d$ci_drift_pct < 10) "warn" else "fail"
@@ -2253,7 +2248,7 @@ app_server <- function(input, output, session) {
                   else                          "left-skewed"
     skew_note  <- if (abs(d$skew_val) > 3) ": extreme, check draws" else ""
 
-    iter_warning <- if (d$n < 10000) {
+    iter_warning <- if (iter_warning && d$n < 10000) {
       div(style = paste0("background:#FEF3C7; border-left:4px solid #F59E0B;",
                          "padding:10px 14px; border-radius:4px; margin-bottom:12px;",
                          "font-size:0.88rem; color:#92400E;"),
@@ -2264,10 +2259,7 @@ app_server <- function(input, output, session) {
       )
     } else NULL
 
-    tagList(
-      iter_warning,
-      bslib::layout_columns(
-      col_widths = NULL,
+    badges <- list(
       make_diag_badge(
         "Precision (MCSE)",
         paste0("Monte Carlo Standard Error: measures how much the reported mean would shift if ",
@@ -2293,7 +2285,7 @@ app_server <- function(input, output, session) {
         sprintf("%.1f%% drift (1st vs 2nd half)", d$ci_drift_pct),
         ci_s
       ),
-      make_diag_badge(
+      if (skew) make_diag_badge(
         "Distribution Skew",
         paste0("Measures the asymmetry of the simulated emission distribution. ",
                "Positive (right-skewed) is normal and expected when emission factors follow lognormal distributions: this is not a problem. ",
@@ -2302,12 +2294,30 @@ app_server <- function(input, output, session) {
         "info"
       )
     )
-    )  # tagList
+    badges <- Filter(Negate(is.null), badges)
+    tagList(iter_warning, do.call(bslib::layout_columns, c(list(col_widths = NULL), badges)))
+  }
+  output$diag_badges <- renderUI({ req(rv$diagnostics); .diag_badges_ui(rv$diagnostics) })
+  # the trend: the year t total (the reported figure), then the change
+  # since the base year, both from the paired reporting draws
+  output$diag_badges_trend <- renderUI({
+    req(rv_trend$diagnostics)
+    d <- rv_trend$diagnostics
+    tagList(
+      tags$h6(style = "margin:4px 0 6px;", sprintf(t("diag_trend_year_t"), d$years[2])),
+      tags$p(style = "font-size:0.85rem; color:#555; margin:0 0 8px;", t("diag_trend_year_t_note")),
+      .diag_badges_ui(d$year_t),
+      tags$h6(style = "margin:14px 0 6px;", sprintf(t("diag_trend_change"), d$years[1], d$years[2])),
+      tags$p(style = "font-size:0.85rem; color:#555; margin:0 0 8px;", t("diag_trend_change_note")),
+      .diag_badges_ui(d$delta, skew = FALSE, iter_warning = FALSE)
+    )
   })
 
-  output$convergence_plot <- plotly::renderPlotly({
-    req(rv$diagnostics)
-    tr <- rv$diagnostics$trace
+  .convergence_plotly <- function(tr, units = "gg", ytitle = "Total CO₂eq") {
+    ax <- .mass_axis(units)
+    tr[c("running_mean", "running_lo", "running_hi", "final_mean", "final_lo", "final_hi")] <-
+      lapply(tr[c("running_mean", "running_lo", "running_hi", "final_mean", "final_lo", "final_hi")],
+             function(v) v / ax$div)
     plotly::plot_ly() |>
       plotly::add_ribbons(
         x = tr$iter, ymin = tr$running_lo, ymax = tr$running_hi,
@@ -2332,7 +2342,7 @@ app_server <- function(input, output, session) {
       ) |>
       plotly::layout(
         xaxis  = list(title = "Iteration number"),
-        yaxis  = list(title = "Total CO₂eq (t)"),
+        yaxis  = list(title = paste0(ytitle, " (", ax$unit, ")")),
         shapes = list(
           list(type = "line", x0 = min(tr$iter), x1 = max(tr$iter),
                y0 = tr$final_mean, y1 = tr$final_mean,
@@ -2349,8 +2359,35 @@ app_server <- function(input, output, session) {
                       bordercolor = "#E0DDD5", borderwidth = 1),
         margin = list(t = 10, b = 10)
       )
+  }
+  output$convergence_plot <- plotly::renderPlotly({
+    req(rv$diagnostics)
+    .convergence_plotly(rv$diagnostics$trace, input$res_units %||% "gg")
   })
   outputOptions(output, "convergence_plot", suspendWhenHidden = FALSE)
+  output$convergence_plot_trend <- plotly::renderPlotly({
+    req(rv_trend$diagnostics)
+    .convergence_plotly(rv_trend$diagnostics$year_t$trace, input$res_units_trend %||% "gg",
+                        sprintf(t("diag_trend_axis_year_t"), rv_trend$diagnostics$years[2]))
+  })
+  output$convergence_plot_trend_delta <- plotly::renderPlotly({
+    req(rv_trend$diagnostics)
+    .convergence_plotly(rv_trend$diagnostics$delta$trace, input$res_units_trend %||% "gg",
+                        t("diag_trend_axis_change"))
+  })
+  observeEvent(input$toggle_diagnostics_trend, {
+    rv_trend$show_diagnostics <- !isTRUE(rv_trend$show_diagnostics)
+  })
+  output$has_diagnostics_trend <- reactive({ !is.null(rv_trend$diagnostics) })
+  output$show_diagnostics_trend <- reactive({ isTRUE(rv_trend$show_diagnostics) })
+  # 2026-11-02: the trend results block follows the single-year rule: shown
+  # once a run is complete, a waiting note before that.
+  output$trend_results_visible <- reactive({
+    !isTRUE(rv$sim_running) && !is.null(rv_trend$results)
+  })
+  for (nm in c("has_diagnostics_trend", "show_diagnostics_trend", "trend_results_visible",
+               "convergence_plot_trend", "convergence_plot_trend_delta", "diag_badges_trend"))
+    outputOptions(output, nm, suspendWhenHidden = FALSE)
 
   # Andreas 2026-05 #32, C2: aggregate by_system results by user-chosen level
   # (cattle_type / aggregation_level / sub_category). sys_name encodes
@@ -3364,6 +3401,12 @@ app_server <- function(input, output, session) {
       invisible(gc(FALSE))
       showNotification(t("run_released_single"), type = "message", duration = 8)
     }
+    # and the previous trend results: a failed run then leaves the waiting
+    # note, never a stale result, and the memory is free before the new run
+    if (!is.null(rv_trend$results)) {
+      for (nm in names(rv_trend)) rv_trend[[nm]] <- NULL
+      invisible(gc(FALSE))
+    }
     # Round 9 follow-up: withProgress bar mirrors the single-year handler so
     # the user gets feedback during the per-year MC loop.
     withProgress(
@@ -3440,6 +3483,19 @@ app_server <- function(input, output, session) {
           # progress bar, instead of on first display: on Zambia they took
           # 40 s after the results view had already opened, which read as
           # the results "taking a long time to show".
+          # 2026-11-02: the same quality checks as the single-year run, on
+          # the paired reporting draws: the year t total (the reported
+          # figure) and the change since the base year, measured against
+          # the year t total.
+          rv_trend$diagnostics <- tryCatch({
+            tot_b <- pair$inventory_by_year[[as.character(y_first)]]$total_co2e
+            tot_t <- pair$inventory_by_year[[as.character(y_last)]]$total_co2e
+            ok <- is.finite(tot_b) & is.finite(tot_t)
+            list(years  = c(y_first, y_last),
+                 year_t = mc_diagnostics(tot_t[ok]),
+                 delta  = mc_diagnostics(tot_t[ok] - tot_b[ok], scale = mean(tot_t[ok])))
+          }, error = function(e) NULL)
+          rv_trend$show_diagnostics <- FALSE
           setProgress(0.97, detail = "Drawing the sensitivity charts...")
           sens_year  <- tryCatch(trend_sensitivity_year(res, method = "both"), error = function(e) NULL)
           sens_delta <- tryCatch(trend_sensitivity_delta(res, method = "both"), error = function(e) NULL)
@@ -3557,21 +3613,21 @@ app_server <- function(input, output, session) {
     req(rv_trend$slope)
     s <- rv_trend$slope$mean
     if (is.null(s) || is.na(s)) return("-")
-    sign_str <- if (s > 0) "+" else ""
-    paste0(sign_str, format(round(s, 0), big.mark = ","), " t/yr")
+    # 2026-11-02: in the units chosen above the cards (Gg, t or both)
+    .fmt_mass_tr(s, "/yr", signed = TRUE)
   })
   output$vb_trend_slope_sub <- renderText({
     req(rv_trend$slope)
-    sprintf("95%% CI %s to %s t CO₂eq/yr",
-            format(round(rv_trend$slope$ci[1], 0), big.mark = ","),
-            format(round(rv_trend$slope$ci[2], 0), big.mark = ","))
+    sprintf("95%% CI %s to %s CO₂eq/yr",
+            .fmt_mass_tr(rv_trend$slope$ci[1], signed = TRUE),
+            .fmt_mass_tr(rv_trend$slope$ci[2], signed = TRUE))
   })
 
   output$vb_trend_latest <- renderText({
     req(rv_trend$results)
     df <- rv_trend$results
     last <- df[nrow(df), ]
-    paste0(format(round(last$Mean_t_CO2eq, 0), big.mark = ","), " t")
+    .fmt_mass_tr(last$Mean_t_CO2eq)
   })
   output$vb_trend_latest_sub <- renderText({
     req(rv_trend$results)
@@ -3758,10 +3814,11 @@ app_server <- function(input, output, session) {
 
   .trend_report_ui <- function() {
     h <- trend_head(); req(h)
+    # 2026-11-02: the masses in the units chosen above the cards
     s1 <- sprintf(t("trend_line_year"), t("trend_word_base_year"), h$base_year,
-                  .f0(h$base_mean), .f1(h$base_moe), .f0(h$base_lo), .f0(h$base_hi))
+                  .fmt_mass_tr(h$base_mean), .f1(h$base_moe), .fmt_mass_tr(h$base_lo), .fmt_mass_tr(h$base_hi))
     s2 <- sprintf(t("trend_line_year"), t("trend_word_year_t"), h$year_t,
-                  .f0(h$t_mean), .f1(h$t_moe), .f0(h$t_lo), .f0(h$t_hi))
+                  .fmt_mass_tr(h$t_mean), .f1(h$t_moe), .fmt_mass_tr(h$t_lo), .fmt_mass_tr(h$t_hi))
     s3 <- sprintf(t("trend_line_change"), h$base_year, h$year_t, .fs(h$trend_pct),
                   .fs(h$trend_lo_pct), .fs(h$trend_hi_pct),
                   .fs(h$trend_lo_pp), .fs(h$trend_hi_pp))
@@ -4156,6 +4213,11 @@ app_server <- function(input, output, session) {
   # empty for 20 to 30 s. Computed while hidden, they are ready when it shows.
   for (nm in c("vb_enteric_ch4", "vb_manure_ch4", "vb_manure_n2o", "vb_pasture_n2o", "vb_moe_total",
                "vb_co2e_inline", "vb_moe", "vb_ch4", "vb_n2o",
-               "results_histogram", "decomposition_plot", "results_by_system", "results_by_category", "comparison_card"))
+               "results_histogram", "decomposition_plot", "results_by_system", "results_by_category", "comparison_card",
+               # the trend block, under the same gate (output$trend_results_visible)
+               "vb_trend_delta", "vb_trend_delta_sub", "vb_trend_slope", "vb_trend_slope_sub",
+               "vb_trend_latest", "vb_trend_latest_sub", "vb_trend_yoy", "vb_trend_yoy_sub", "vb_trend_inline",
+               "trend_report_text", "trend_compare_table", "trend_plot", "trend_yoy_chart",
+               "trend_delta_histogram", "trend_year_groups", "trend_table"))
     tryCatch(outputOptions(output, nm, suspendWhenHidden = FALSE), error = function(e) NULL)
 }

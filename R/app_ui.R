@@ -84,6 +84,73 @@ fig_caption <- function(key) {
          t(key))
 }
 
+# 2026-11-02: the diagnostics button and its collapsible panel, shared by
+# the single-year results (suffix "") and the trend results (suffix
+# "_trend"). `conv` is the convergence figure card built with conv_card_ui().
+.conv_tooltip <- paste0(
+  "This plot shows how the running mean (dark green) and the 95% confidence interval bounds (blue dashes) ",
+  "evolve as more iterations are added. If the lines flatten out well before the last iteration, ",
+  "the simulation has converged. If the lines are still changing near the right edge of the plot, ",
+  "you need more iterations.")
+conv_card_ui <- function(title_key, body, caption_key) {
+  bslib::card(
+    style = "margin-top:18px; border:1px solid #E0DDD5;",
+    bslib::card_header(
+      div(style = "display:flex; align-items:center; gap:6px;",
+          fig_title("4.1", t(title_key)),
+          bslib::tooltip(
+            span(icon("circle-question"), style = "color:#6B6B6B; cursor:help;"),
+            .conv_tooltip, placement = "right"))),
+    bslib::card_body(body, fig_caption(caption_key)))
+}
+diag_panel_ui <- function(suffix, conv) {
+  tagList(
+    conditionalPanel(
+      condition = sprintf("output.has_diagnostics%s == true", suffix),
+      div(style = "text-align:center; margin: 12px 0 4px 0;",
+          actionButton(paste0("toggle_diagnostics", suffix),
+                       label = tagList(icon("magnifying-glass"), " Run Diagnostic"),
+                       class = "btn btn-danger",
+                       style = "font-weight:600; padding:8px 28px; font-size:0.95rem;"))),
+    conditionalPanel(
+      condition = sprintf("output.show_diagnostics%s == true", suffix),
+      bslib::card(
+        style = "border:2px solid #EF4444; margin-bottom:4px;",
+        bslib::card_header(
+          div(style = "display:flex; align-items:center; gap:8px;",
+              icon("magnifying-glass", style = "color:#EF4444;"),
+              tags$strong("Simulation Diagnostics"),
+              tags$span(
+                style = paste0("font-size:0.75rem; color:#6B6B6B; background:#F3F4F6;",
+                               "border:1px solid #E0DDD5; border-radius:4px; padding:1px 8px;"),
+                "Monte Carlo quality checks"))),
+        bslib::card_body(
+          div(class = "info-panel",
+              icon("circle-info"),
+              " These checks tell you whether your simulation ran long enough to produce trustworthy results. ",
+              "All three quality checks should be ", tags$strong("green (Pass)"),
+              " before submitting results. If any show ",
+              tags$strong("Warn"), " or ", tags$strong("Fail"),
+              ", go back to the Simulate tab, increase the number of iterations, and re-run.",
+              tags$br(),
+              tags$em(style = "color:#555; font-size:0.85rem;",
+                      icon("circle-info", style = "font-size:0.8rem;"),
+                      " Note: this tool uses ", tags$strong("independent Monte Carlo"), ", not MCMC. ",
+                      "Each iteration is drawn independently, so there are no chains, no warmup, and no burn-in. ",
+                      "The diagnostics above replace the multi-chain Gelman-Rubin checks used in Bayesian MCMC.")),
+          div(style = "margin-top:14px;", uiOutput(paste0("diag_badges", suffix))),
+          conv))))
+}
+# the units switch above the result cards (one per mode: Shiny inputs
+# cannot share an id)
+units_switch_ui <- function(id) {
+  div(style = "padding: 4px 16px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap;",
+      tags$strong(t("res_units_label")),
+      radioButtons(id, NULL, inline = TRUE, selected = "gg",
+                   choices = setNames(c("gg", "t", "both"),
+                                      c(t("res_units_gg"), t("res_units_t"), t("res_units_both")))))
+}
+
 app_ui <- function(request = NULL) {
   lang <- i18n_lang_from_request(request)
   i18n_set_lang(lang)
@@ -2204,73 +2271,11 @@ app_ui <- function(request = NULL) {
 
         conditionalPanel(
           condition = "input.analysis_mode != 'trend'",
-          # 2026-10-28 (review): diagnostics first.
-          # ---- Diagnostic trigger button (appears after simulation runs) ----
-          conditionalPanel(
-            condition = "output.has_diagnostics == true",
-            div(style = "text-align:center; margin: 12px 0 4px 0;",
-              actionButton("toggle_diagnostics",
-                           label = tagList(icon("magnifying-glass"), " Run Diagnostic"),
-                           class = "btn btn-danger",
-                           style = "font-weight:600; padding:8px 28px; font-size:0.95rem;")
-            )
-          ),
-
-          # ---- Collapsible diagnostic panel ----
-          conditionalPanel(
-            condition = "output.show_diagnostics == true",
-            bslib::card(
-              style = "border:2px solid #EF4444; margin-bottom:4px;",
-              bslib::card_header(
-                div(style = "display:flex; align-items:center; gap:8px;",
-                    icon("magnifying-glass", style = "color:#EF4444;"),
-                    tags$strong("Simulation Diagnostics"),
-                    tags$span(
-                      style = paste0("font-size:0.75rem; color:#6B6B6B; background:#F3F4F6;",
-                                     "border:1px solid #E0DDD5; border-radius:4px; padding:1px 8px;"),
-                      "Monte Carlo quality checks"
-                    )
-                )
-              ),
-              bslib::card_body(
-                div(class = "info-panel",
-                    icon("circle-info"),
-                    " These checks tell you whether your simulation ran long enough to produce trustworthy results. ",
-                    "All three quality checks should be ", tags$strong("green (Pass)"),
-                    " before submitting results. If any show ",
-                    tags$strong("Warn"), " or ", tags$strong("Fail"),
-                    ", go back to the Simulate tab, increase the number of iterations, and re-run.",
-                    tags$br(),
-                    tags$em(style = "color:#555; font-size:0.85rem;",
-                            icon("circle-info", style = "font-size:0.8rem;"),
-                            " Note: this tool uses ", tags$strong("independent Monte Carlo"), ", not MCMC. ",
-                            "Each iteration is drawn independently, so there are no chains, no warmup, and no burn-in. ",
-                            "The diagnostics above replace the multi-chain Gelman-Rubin checks used in Bayesian MCMC.")),
-                div(style = "margin-top:14px;",
-                    uiOutput("diag_badges")),
-                bslib::card(
-                  style = "margin-top:18px; border:1px solid #E0DDD5;",
-                  bslib::card_header(
-                    div(style = "display:flex; align-items:center; gap:6px;",
-                        fig_title("4.1", t("fig_conv_title")),
-                        bslib::tooltip(
-                          span(icon("circle-question"), style = "color:#6B6B6B; cursor:help;"),
-                          paste0("This plot shows how the running mean (dark green) and the 95% confidence interval bounds (blue dashes) ",
-                                 "evolve as more iterations are added. If the lines flatten out well before the last iteration, ",
-                                 "the simulation has converged. If the lines are still changing near the right edge of the plot, ",
-                                 "you need more iterations."),
-                          placement = "right"
-                        )
-                    )
-                  ),
-                  bslib::card_body(
-                    plotly::plotlyOutput("convergence_plot", height = "260px"),
-                    fig_caption("fig_cap_conv")
-                  )
-                )
-              )
-            )
-          ),
+          # 2026-10-28 (review): diagnostics first. (2026-11-02: the button
+          # and panel are diag_panel_ui(), shared with the trend block.)
+          diag_panel_ui("", conv_card_ui("fig_conv_title",
+                                         plotly::plotlyOutput("convergence_plot", height = "260px"),
+                                         "fig_cap_conv")),
 
           # 2026-11-02: the results block is shown only when a run is complete; while
           # the simulation runs, or before the first run, a note stands in its place.
@@ -2278,11 +2283,7 @@ app_ui <- function(request = NULL) {
             condition = "output.results_visible == true",
           # 2026-10-28 (review): results in gigagrams with 3 decimals by
           # default; tonnes, or both, on request.
-          div(style = "padding: 4px 16px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap;",
-              tags$strong(t("res_units_label")),
-              radioButtons("res_units", NULL, inline = TRUE, selected = "gg",
-                           choices = setNames(c("gg", "t", "both"),
-                                              c(t("res_units_gg"), t("res_units_t"), t("res_units_both"))))),
+          units_switch_ui("res_units"),
           bslib::layout_columns(
             col_widths = NULL,
             bslib::value_box(title = t("res_vb_enteric_ch4_t"),
@@ -2365,8 +2366,21 @@ app_ui <- function(request = NULL) {
 
         # Round 9 follow-up: trend results layout, mirrors single-year's
         # value-boxes-then-charts pattern but with trend-specific metrics.
+        # 2026-11-02: and the single-year rules: diagnostics first, the
+        # block shown only when a run is complete, the units switch above
+        # the cards, then cards, charts, tables.
         conditionalPanel(
           condition = "input.analysis_mode == 'trend'",
+          diag_panel_ui("_trend", conv_card_ui(
+            "fig_conv_title_trend",
+            bslib::layout_columns(
+              col_widths = c(6, 6),
+              plotly::plotlyOutput("convergence_plot_trend", height = "260px"),
+              plotly::plotlyOutput("convergence_plot_trend_delta", height = "260px")),
+            "fig_cap_conv_trend")),
+          conditionalPanel(
+            condition = "output.trend_results_visible == true",
+          units_switch_ui("res_units_trend"),
           # 2026-10-22: what a compiler reports, first. IPCC Table 3.3 wants
           # a base year and a year t; the selectors drive the sentences,
           # the comparison table and the IPCC table on the report tab.
@@ -2403,32 +2417,34 @@ app_ui <- function(request = NULL) {
           ),
           div(style = "padding: 0 12px 8px; color: #555; font-size: 0.85rem;",
               tags$em(textOutput("vb_trend_inline", inline = TRUE))),
-          bslib::card(
-            bslib::card_header(t("trend_compare_h")),
-            bslib::card_body(
-              p(tags$em(t("trend_compare_note"))),
-              DT::DTOutput("trend_compare_table")
-            )
-          ),
+          # charts (4.1 is the convergence figure in the diagnostics panel)
           bslib::layout_columns(
             col_widths = c(7, 5),
             bslib::card(
-              bslib::card_header(fig_title("4.1", t("card_trend_chart_h"))),
+              bslib::card_header(fig_title("4.2", t("card_trend_chart_h"))),
               bslib::card_body(plotly::plotlyOutput("trend_plot", height = "360px"),
                                fig_caption("fig_cap_trend"))
             ),
             bslib::card(
-              bslib::card_header(fig_title("4.2", t("res_trend_yoy_h"))),
+              bslib::card_header(fig_title("4.3", t("res_trend_yoy_h"))),
               bslib::card_body(plotly::plotlyOutput("trend_yoy_chart", height = "360px"),
                                fig_caption("fig_cap_yoy"))
             )
           ),
           bslib::card(
-            bslib::card_header(fig_title("4.3", t("res_trend_delta_hist_h"))),
+            bslib::card_header(fig_title("4.4", t("res_trend_delta_hist_h"))),
             bslib::card_body(
               p(tags$em(t("res_trend_delta_hist_note"))),
               plotly::plotlyOutput("trend_delta_histogram", height = "300px"),
               fig_caption("fig_cap_delta")
+            )
+          ),
+          # tables
+          bslib::card(
+            bslib::card_header(t("trend_compare_h")),
+            bslib::card_body(
+              p(tags$em(t("trend_compare_note"))),
+              DT::DTOutput("trend_compare_table")
             )
           ),
           bslib::card(
@@ -2449,6 +2465,10 @@ app_ui <- function(request = NULL) {
           ),
           div(style = "margin: 8px 16px; font-size:0.85rem; color:#555;",
               tags$em(t("res_trend_footer_note")))
+          ),
+          conditionalPanel(
+            condition = "output.trend_results_visible != true",
+            div(class = "info-panel", style = "margin:12px 16px;", icon("hourglass-half"), " ", t("res_waiting_trend")))
         )
       ),
       # R1.5: placeholder removed, settings panel itself shows when sim_view is settings
