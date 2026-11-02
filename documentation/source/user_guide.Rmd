@@ -574,31 +574,6 @@ Two downloads are available:
 
 \newpage
 
-# IPCC reporting conventions
-
-## Where uncertainty results go in the national inventory report
-
-The 2006 IPCC Guidelines (Volume 1, Chapter 3, section 3.3) describe what to report for Approach 2 (Monte Carlo):
-
-1. the 95% confidence interval for each major source category and for the national total;
-2. the results in the Table 3.3 format (the downloads on Tab 6 give it);
-3. a description of the Monte Carlo approach: number of iterations, distributions used, correlation assumptions;
-4. every parameter where a country-specific value replaced an IPCC default, with the justification.
-
-The Methodology document on the Resources tab gives the complete technical description of the equations, the sampling and the convergence checks. You can cite it in your inventory report.
-
-## What IPCC expert reviewers will check
-
-From experience with IPCC expert reviews, reviewers usually look at:
-
-- whether the uncertainty is reported at the right level of detail (for example separately for dairy and other cattle, per emission source, when the inventory reports them separately);
-- whether the Table 3.3 format and column conventions are followed;
-- whether the Monte Carlo approach is described well enough to be reproduced (this is where the seed and the settings sheet help);
-- whether the number of iterations is enough for stable results;
-- the basis for any country-specific uncertainty range that differs from the IPCC defaults.
-
-\newpage
-
 # Worked example: Country X (hypothetical dairy)
 
 This example walks through the whole workflow with the Country X dataset. It takes about ten minutes, and it is the best way to get to know the tool before you use your own data.
