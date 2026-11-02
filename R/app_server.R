@@ -2144,8 +2144,9 @@ app_server <- function(input, output, session) {
     if (!is.null(xbins)) xaxis$range <- c(disp[1], disp[2])
 
     hb <- if (!is.null(xbins)) .hist_bars(co2e, 50, disp[1], disp[2]) else .hist_bars(co2e, 50)
-    p <- plotly::plot_ly(x = hb$x, y = hb$y, width = hb$width, type = "bar",
-                    marker = list(color = "#2D6A4F", line = list(color = "#1B4332", width = 1))) %>%
+    p <- plotly::plot_ly() %>%
+      plotly::add_trace(type = "bar", x = hb$x, y = hb$y, width = rep(hb$width, length(hb$x)),
+                        marker = list(color = "#2D6A4F", line = list(color = "#1B4332", width = 1))) %>%
       plotly::layout(bargap = 0,
         title = t("res_hist_chart_title"),
         xaxis = xaxis,
@@ -3073,9 +3074,10 @@ app_server <- function(input, output, session) {
 
     plots <- lapply(seq_along(sources), function(i) {
       hb <- .hist_bars(sources[[i]], 40)
-      plotly::plot_ly(x = hb$x, y = hb$y, width = hb$width, type = "bar",
-                      marker = list(color = "#2D6A4F"),
-                      name = names(sources)[i], showlegend = FALSE) |>
+      plotly::plot_ly() |>
+        plotly::add_trace(type = "bar", x = hb$x, y = hb$y, width = rep(hb$width, length(hb$x)),
+                          marker = list(color = "#2D6A4F"),
+                          name = names(sources)[i], showlegend = FALSE) |>
         plotly::layout(bargap = 0, xaxis = list(title = names(sources)[i]),
                        yaxis = list(title = ""))
     })
@@ -3139,9 +3141,10 @@ app_server <- function(input, output, session) {
     plots <- lapply(keep, function(p) {
       hb <- .hist_bars(samples[[p]], 30, density = TRUE)
       if (is.null(hb)) return(plotly::plot_ly() |> plotly::layout(xaxis = list(title = p)))
-      plotly::plot_ly(x = hb$x, y = hb$y, width = hb$width, type = "bar",
-                      marker = list(color = "#40916C"),
-                      name = p, showlegend = FALSE) |>
+      plotly::plot_ly() |>
+        plotly::add_trace(type = "bar", x = hb$x, y = hb$y, width = rep(hb$width, length(hb$x)),
+                          marker = list(color = "#40916C"),
+                          name = p, showlegend = FALSE) |>
         plotly::layout(bargap = 0, xaxis = list(title = p), yaxis = list(title = ""))
     })
     # Wider inter-panel margin so each panel's x-axis title (the parameter name)
