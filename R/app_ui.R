@@ -2527,7 +2527,7 @@ app_ui <- function(request = NULL) {
                   p(t("sens_read_intro")),
                   tags$ul(style = "padding-left:18px; margin:0;",
                           tags$li(t("sens_read_src")), tags$li(t("sens_read_abs")),
-                          tags$li(t("sens_read_p")), tags$li(t("sens_read_groups")),
+                          tags$li(t("sens_read_p")),
                           tags$li(t("sens_read_use")))),
               DT::DTOutput("sensitivity_table")
             )
