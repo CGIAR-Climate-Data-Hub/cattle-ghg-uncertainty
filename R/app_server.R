@@ -181,7 +181,7 @@ app_server <- function(input, output, session) {
         # results of the cleared example would export its inputs
         rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
         rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
-        rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+        rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_levels <- NULL
         rv$diagnostics <- NULL
         rv$sim_view <- "settings"
       }
@@ -1009,7 +1009,9 @@ app_server <- function(input, output, session) {
   # disabled when no correlations are selected on Tab 4: the comparison
   # run would otherwise be identical to the main run and waste compute time.
   output$run_comparison_ui <- renderUI({
-    no_ad_corr <- is.null(input$corr_mode) || input$corr_mode == "none"
+    # 2026-11-02: enabled when either card of Tab 3 has a choice (the chart
+    # shows the levels); greyed out only when both are at "none"
+    no_ad_corr <- (is.null(input$corr_mode) || input$corr_mode == "none") && .n_group_rho() == 0
     # 2026-10-30 (Lolita): sharing of a value used by several groups is
     # what the tool does, not an option, so the comparison is about the
     # Tab 3 matrix only and is greyed out when no matrix is selected.
@@ -1026,7 +1028,9 @@ app_server <- function(input, output, session) {
         )
       )
     } else {
-      checkboxInput("run_comparison", t("cmp_run_label"), value = FALSE)
+      tagList(
+        checkboxInput("run_comparison", t("cmp_run_label"), value = FALSE),
+        tags$div(style = "font-size:0.78rem; color:#555; margin-top:-6px; margin-bottom:8px;", t("cmp_run_what")))
     }
   })
 
@@ -1460,7 +1464,7 @@ app_server <- function(input, output, session) {
     # for a first run, and crashed the 1 GB server (oom, 2026-10-30 19:27 UTC).
     rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
     rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
-    rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+    rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_levels <- NULL
     rv$diagnostics <- NULL
     # 2026-11-02: and the trend results, for the same reason (see the trend
     # handler); the series and its retained draws are the bulk of them
@@ -1839,8 +1843,16 @@ app_server <- function(input, output, session) {
           # ---- Stage 6: comparison run (no correlations) ----
           rv$comparison_result      <- NULL
           rv$comparison_sensitivity <- NULL
-          if (isTRUE(input$run_comparison)) {
-            setProgress(0.94, detail = "Running comparison (no correlations)...")
+          rv$comparison_levels      <- NULL
+          # 2026-11-02: the comparison has two parts. The "without the links"
+          # run (the Tab 3 matrix off, everything else as chosen) feeds the
+          # Tab 5 toggle and runs only when a matrix was chosen. The level
+          # runs below feed the chart: no correlations at all, then the
+          # links, then the animal numbers, each as chosen.
+          cm_main_cmp  <- if (isTRUE(input$corr_mode != "none")) effective_corr_matrix() else NULL
+          rho_main_cmp <- .n_group_rho()
+          if (isTRUE(input$run_comparison) && !is.null(cm_main_cmp)) {
+            setProgress(0.94, detail = "Running comparison (without the links between inputs)...")
             # 2026-06: must also null unified_corr_matrix here. Since the
             # Round 7 unified-matrix refactor, the preset / time-series /
             # manual matrices all flow through unified_corr_matrix (not the
@@ -1874,6 +1886,9 @@ app_server <- function(input, output, session) {
               keep_sample_rows = 4000L
             )
             rv$comparison_result <- nocorr_result
+            # 2026-11-02: what the two runs differ in, named on the card
+            rv$comparison_settings <- list(corr_mode = input$corr_mode %||% "none",
+                                           n_group = input$n_group_corr %||% "full")
             rm(systems_nocorr, systems_data, built); invisible(gc(FALSE))
             if (length(nocorr_result$by_system) > 0) {
               rv$comparison_sensitivity <- tryCatch(
@@ -1886,8 +1901,37 @@ app_server <- function(input, output, session) {
                   NULL
                 })
             }
-            rv$sim_log <- paste0(rv$sim_log, "Comparison (no correlations) complete.\n")
+            rv$sim_log <- paste0(rv$sim_log, "Comparison (without the links) complete.\n")
             invisible(gc(FALSE))
+            setProgress(0.955, detail = "Comparison: without the links done.")
+          }
+          if (isTRUE(input$run_comparison) && (!is.null(cm_main_cmp) || rho_main_cmp > 0)) {
+            # 2026-11-02: the levels for the chart. Only the uncertainty
+            # summaries are kept (one retained row per run), and the main
+            # run's systems are released first.
+            suppressWarnings(rm(list = intersect(c("systems_data", "built", "systems_nocorr"), ls())))
+            invisible(gc(FALSE))
+            level_unc <- function(cm_use, rho, label, lo, hi) {
+              b <- build_systems_data(specs, manure = manure, n_iter = n_iter_val, seed = input$seed,
+                                      crossgroup = "shared", corr_matrix = cm_use, sg_to_mm = sg_to_mm, n_group_rho = rho)
+              r <- run_inventory_simulation(b$systems, n_iter = n_iter_val, gwp = input$gwp_version, seed = input$seed,
+                                            pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
+                                            sampler = "iman_conover", progress_cb = keepalive_cb(lo, hi, label),
+                                            keep_sample_rows = 1L)
+              u <- calc_all_uncertainty(r$inventory); rm(b, r); invisible(gc(FALSE)); u
+            }
+            # the animal-number step exists only with two groups or more
+            n_groups_cmp <- tryCatch(length(unique(make_group_key(specs))), error = function(e) 2L)
+            lv <- list(corr_mode = input$corr_mode %||% "none", n_group = input$n_group_corr %||% "full",
+                       n_groups = n_groups_cmp)
+            setProgress(0.955, detail = "Comparison: no correlations at all...")
+            lv$base <- tryCatch(level_unc(NULL, 0, "Comparison: no correlations", 0.955, 0.975),
+                                error = function(e) { rv$sim_log <- paste0(rv$sim_log, "WARNING: base comparison run failed: ", conditionMessage(e), "\n"); NULL })
+            if (!is.null(cm_main_cmp) && rho_main_cmp > 0 && n_groups_cmp > 1L)
+              lv$links <- tryCatch(level_unc(cm_main_cmp, 0, "Comparison: links between inputs", 0.975, 0.99),
+                                   error = function(e) { rv$sim_log <- paste0(rv$sim_log, "WARNING: links comparison run failed: ", conditionMessage(e), "\n"); NULL })
+            rv$comparison_levels <- lv
+            rv$sim_log <- paste0(rv$sim_log, "Comparison levels complete.\n")
             setProgress(0.99, detail = "Comparison complete.")
           }
 
@@ -2537,44 +2581,63 @@ app_server <- function(input, output, session) {
 
   # Comparison card in Results tab: only rendered when comparison data exists
   output$comparison_card <- renderUI({
-    if (is.null(rv$comparison_result)) return(NULL)
+    if (is.null(rv$comparison_result) && is.null(rv$comparison_levels)) return(NULL)
+    # 2026-11-02: the card names the two settings the runs were made with
+    cs <- rv$comparison_levels %||% rv$comparison_settings %||%
+      list(corr_mode = input$corr_mode %||% "none", n_group = input$n_group_corr %||% "full")
+    mode_lab <- switch(as.character(cs$corr_mode), preset = t("corr_mode_preset"), timeseries = t("corr_mode_ts"),
+                       manual = t("corr_mode_manual"), t("corr_mode_none"))
+    n_lab <- switch(as.character(cs$n_group), full = t("n_group_full"), partial = t("n_group_partial"), t("n_group_none"))
     bslib::card(
       bslib::card_header(t("res_comparison_h")),
-      bslib::card_body(plotly::plotlyOutput("comparison_plot", height = "320px"))
+      bslib::card_body(
+        p(tags$em(style = "color:#555; font-size:0.85rem;", sprintf(t("res_comparison_setting"), mode_lab, n_lab))),
+        plotly::plotlyOutput("comparison_plot", height = "320px"))
     )
   })
 
+  # 2026-11-02 (Lolita): the levels of the correlation choices, one bar per
+  # level and variable: no correlations at all, then the links between
+  # inputs as chosen, then the animal numbers between groups as chosen (the
+  # main run). The change from the previous level is written on each bar,
+  # with its sign: the links can narrow the range as well as widen it.
   output$comparison_plot <- plotly::renderPlotly({
-    req(rv$mc_results, rv$comparison_result)
-
+    req(rv$mc_results)
+    lv <- rv$comparison_levels
+    req(!is.null(lv) || !is.null(rv$comparison_result))
     vars   <- c("total_co2e", "total_ch4", "total_n2o")
     labels <- c(t("res_cmp_total_co2e"), t("res_cmp_total_ch4"), t("res_cmp_total_n2o"))
-
-    unc_with    <- calc_all_uncertainty(rv$mc_results$inventory)
-    unc_without <- calc_all_uncertainty(rv$comparison_result$inventory)
-
-    get_moe <- function(unc, v) {
-      row <- unc[unc$variable == v, ]
-      if (nrow(row) > 0) round(row$moe_pct, 1) else NA_real_
+    get_moe <- function(unc, v) { row <- unc[unc$variable == v, ]; if (nrow(row) > 0) round(row$moe_pct, 1) else NA_real_ }
+    unc_main <- calc_all_uncertainty(rv$mc_results$inventory)
+    levels <- list()
+    if (!is.null(lv)) {
+      mode_lab <- switch(as.character(lv$corr_mode), preset = t("corr_mode_preset"), timeseries = t("corr_mode_ts"),
+                         manual = t("corr_mode_manual"), t("corr_mode_none"))
+      n_lab <- switch(as.character(lv$n_group), full = t("n_group_full"), partial = t("n_group_partial"), t("n_group_none"))
+      has_links <- !identical(as.character(lv$corr_mode), "none")
+      has_n <- !identical(as.character(lv$n_group), "none") && (lv$n_groups %||% 2L) > 1L
+      if (!is.null(lv$base)) levels[[t("res_cmp_level_base")]] <- lv$base
+      if (!is.null(lv$links)) levels[[sprintf(t("res_cmp_level_links"), mode_lab)]] <- lv$links
+      main_lab <- if (has_n) sprintf(t("res_cmp_level_n"), n_lab) else sprintf(t("res_cmp_level_links"), mode_lab)
+      levels[[main_lab]] <- unc_main
+    } else {
+      levels[[t("res_comparison_without_label")]] <- calc_all_uncertainty(rv$comparison_result$inventory)
+      levels[[t("res_comparison_with_label")]] <- unc_main
     }
-
-    moe_with    <- sapply(vars, get_moe, unc = unc_with)
-    moe_without <- sapply(vars, get_moe, unc = unc_without)
-
-    plotly::plot_ly() %>%
-      plotly::add_bars(x = labels, y = moe_with,
-                       name = t("res_comparison_with_label"),
-                       marker = list(color = "#2D6A4F")) %>%
-      plotly::add_bars(x = labels, y = moe_without,
-                       name = t("res_comparison_without_label"),
-                       marker = list(color = "#90A4AE")) %>%
-      plotly::layout(
-        barmode = "group",
-        title   = t("res_cmp_chart_title"),
-        yaxis   = list(title = t("res_decomp_yaxis")),
-        xaxis   = list(title = ""),
-        legend  = list(orientation = "h", y = -0.25)
-      )
+    cols <- c("#90A4AE", "#2D6A4F", "#1D4ED8")[seq_along(levels)]
+    p <- plotly::plot_ly()
+    prev <- NULL
+    for (k in seq_along(levels)) {
+      moe <- sapply(vars, get_moe, unc = levels[[k]])
+      txt <- if (is.null(prev)) sprintf("±%.1f%%", moe)
+             else sprintf("±%.1f%% (%+.1f pts)", moe, moe - prev)
+      p <- plotly::add_bars(p, x = labels, y = moe, name = names(levels)[k], text = txt, textposition = "outside",
+                            marker = list(color = cols[k]))
+      prev <- moe
+    }
+    plotly::layout(p, barmode = "group", title = t("res_cmp_chart_title"),
+                   yaxis = list(title = t("res_decomp_yaxis")), xaxis = list(title = ""),
+                   legend = list(orientation = "h", y = -0.25))
   })
 
   # --- SENSITIVITY ---
@@ -3296,7 +3359,7 @@ app_server <- function(input, output, session) {
     if (!is.null(rv$mc_results)) {
       rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
       rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
-      rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+      rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_levels <- NULL
       rv$diagnostics <- NULL
       invisible(gc(FALSE))
       showNotification(t("run_released_single"), type = "message", duration = 8)
