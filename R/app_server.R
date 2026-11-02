@@ -2785,6 +2785,11 @@ app_server <- function(input, output, session) {
   # data, blue for IPCC coefficients, no red; the direction of the bar
   # carries the sign; a legend below the chart in a larger font.
   .tornado_bars <- function(params, vals, reducible, title_text, x_title) {
+    # 2026-11-02 (Lolita): a long label breaks onto two lines before its
+    # bracket ("DE = 52.8" over "(extensive beef, 6 groups)"), so the
+    # label margin stays the same width whatever the names.
+    long <- nchar(params) > 22 & grepl(" (", params, fixed = TRUE)
+    params[long] <- sub(" (", "<br>(", params[long], fixed = TRUE)
     lev <- params
     p <- plotly::plot_ly()
     for (grp in c(TRUE, FALSE)) {
@@ -2860,6 +2865,10 @@ app_server <- function(input, output, session) {
     sens_data <- active_sensitivity()
     req(sens_data)
     sens <- if (!is.null(sens_data$src)) sens_data$src else req(FALSE)
+    # 2026-11-02 (Lolita): the groups column is not shown (it made the table
+    # unreadable); the parameter name already says "shared by N groups".
+    # The column stays in the data for the group filter above the tornado.
+    sens <- sens[, setdiff(names(sens), "groups"), drop = FALSE]
     # 2026-10-28 (review): two decimals.
     dec <- names(sens)[vapply(sens, function(v) is.numeric(v) && any(abs(v - round(v)) > 1e-9, na.rm = TRUE), logical(1))]
     dt <- DT::datatable(sens, rownames = FALSE, options = list(pageLength = 20))
