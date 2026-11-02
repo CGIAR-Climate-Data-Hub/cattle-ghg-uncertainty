@@ -1108,15 +1108,8 @@ app_server <- function(input, output, session) {
       # 2026-10-29: Shiny caps an input container at 300 px; the help text
       # under each option needs the whole column.
       width = "100%",
-      label = tagList(
-        paste0(t("corr_mode_label"), " "),
-        bslib::tooltip(
-          tags$span(icon("circle-question"),
-                    style = "color:#2D6A4F; cursor:help; vertical-align:middle;"),
-          t("tip_corr_mode"),
-          placement = "right"
-        )
-      ),
+      # (2026-11-02: the "?" tooltip on this label removed at Lolita's request)
+      label = t("corr_mode_label"),
       choiceValues = c("none", "timeseries", "preset", "manual"),
       choiceNames = list(
         label_for("none", t("corr_mode_none"),

@@ -763,10 +763,6 @@ lang_state_take <- function(token) {
                                 fr = "Répondez aux questions de l'IA, ou posez les vôtres…"),
   btn_ai_send = list(en = "Send", fr = "Envoyer"),
   btn_ai_produce = list(en = " Produce template now", fr = " Générer le modèle"),
-  tip_ai_produce = list(
-    en = "Emit the JSON template from your section B + C exploration. Use this when you've finished answering the AI's section D clarifications.",
-    fr = "Générer le modèle JSON à partir de votre exploration section B + C. Utilisez-le après avoir répondu aux clarifications section D de l'IA."
-  ),
   btn_ai_reset = list(en = " Reset conversation", fr = " Réinitialiser"),
   tip_ai_reset = list(en = "Clear the chat and start over from scratch.",
                         fr = "Effacer la conversation et recommencer."),
@@ -811,8 +807,8 @@ lang_state_take <- function(token) {
     en = "Give the inventory year and the country before sending; both are required.",
     fr = "Indiquez l'année d'inventaire et le pays avant d'envoyer ; les deux sont obligatoires."),
   ai_upload_year_tip = list(
-    en = "The results are for one inventory year, usually the most recent year with complete data. The AI reads your file for that year: its column gives the point estimates. The other years of your file are not lost: they go to the time series sheet, and the trend tab uses them.",
-    fr = "Les résultats portent sur une seule année d'inventaire, en général l'année la plus récente aux données complètes. L'IA lit votre fichier pour cette année : sa colonne donne les estimations ponctuelles. Les autres années de votre fichier ne sont pas perdues : elles vont dans la feuille des séries temporelles, et l'onglet tendance les utilise."),
+    en = "The results are for one inventory year, usually the most recent year with complete data. The other years of your file are not lost: they go to the time series sheet, and the trend tab uses them.",
+    fr = "Les résultats portent sur une seule année d'inventaire, en général l'année la plus récente aux données complètes. Les autres années de votre fichier ne sont pas perdues : elles vont dans la feuille des séries temporelles, et l'onglet tendance les utilise."),
   ai_upload_year_label = list(en = "Inventory year (required, one year)", fr = "Année d'inventaire (obligatoire, une seule)"),
   ai_upload_year_placeholder = list(en = "for example 2024", fr = "par exemple 2024"),
   ai_upload_country_label = list(en = "Country (required)", fr = "Pays (obligatoire)"),
@@ -885,16 +881,16 @@ lang_state_take <- function(token) {
     fr = "Année unique : quantifier l'incertitude d'une année d'inventaire"
   ),
   tip_analysis_mode_single = list(
-    en = "One inventory year. Gives the uncertainty of that year's emissions, as IPCC Table 3.3 asks.",
-    fr = "Une année d'inventaire. Donne l'incertitude des émissions de cette année, comme le demande le Tableau 3.3 du GIEC."
+    en = "One inventory year. Gives the uncertainty of that year's emissions.",
+    fr = "Une année d'inventaire. Donne l'incertitude des émissions de cette année."
   ),
   analysis_mode_trend = list(
     en = "Trend: compare uncertainty across multiple years",
     fr = "Tendance : comparer l'incertitude entre plusieurs années"
   ),
   tip_analysis_mode_trend = list(
-    en = "Several years. Gives the uncertainty of each year and of the change between the base year and the year you report (IPCC Vol. 1, Ch. 3, §3.7). Needs a Parameter_TimeSeries sheet, or an example dataset.",
-    fr = "Plusieurs années. Donne l'incertitude de chaque année et du changement entre l'année de base et l'année déclarée (GIEC Vol. 1, Ch. 3, §3.7). Nécessite une feuille Parameter_TimeSeries, ou un jeu d'exemple."
+    en = "Several years. Gives the uncertainty of each year and of the change between the base year and the year you report.",
+    fr = "Plusieurs années. Donne l'incertitude de chaque année et du changement entre l'année de base et l'année déclarée."
   ),
   trend_base_year = list(en = "base year", fr = "année de base"),
 
@@ -1143,8 +1139,8 @@ lang_state_take <- function(token) {
   sim_seed_label = list(en = "Random Seed (for reproducibility)",
                           fr = "Graine aléatoire (pour la reproductibilité)"),
   tip_sim_seed = list(
-    en = "Fixing the seed makes results exactly reproducible: anyone using the same data, settings, and seed will get the same numbers. To check convergence, re-run with a different seed (e.g. 123 or 456): if the 95% MoE changes by more than ~2 percentage points, increase the number of iterations.",
-    fr = "Fixer la graine rend les résultats exactement reproductibles : toute personne utilisant les mêmes données, paramètres et graine obtiendra les mêmes chiffres. Pour vérifier la convergence, relancez avec une autre graine (par exemple 123 ou 456) : si la marge d'erreur 95 % change de plus de ~2 points, augmentez le nombre d'itérations."
+    en = "Fixing the seed makes results exactly reproducible: anyone using the same data, settings, and seed will get the same numbers.",
+    fr = "Fixer la graine rend les résultats exactement reproductibles : toute personne utilisant les mêmes données, paramètres et graine obtiendra les mêmes chiffres."
   ),
   sim_gwp_label = list(en = "GWP Assessment Report",
                          fr = "Rapport d'évaluation GWP"),
@@ -1820,10 +1816,6 @@ lang_state_take <- function(token) {
 
   # Correlations tab: radio mode label + tooltip + per-mode help text
   corr_mode_label = list(en = "Mode", fr = "Mode"),
-  tip_corr_mode = list(
-    en = "How should the tool decide which input parameters move together? Modes whose prerequisites are missing (no time-series, no manual matrix uploaded) are greyed out below.",
-    fr = "Comment l'outil doit-il décider quels paramètres bougent ensemble ? Les modes dont les prérequis manquent (pas de séries temporelles, pas de matrice manuelle téléversée) sont grisés ci-dessous."
-  ),
   corr_disabled_prefix = list(en = "Disabled: ", fr = "Désactivé, "),
   corr_help_none = list(
     en = "Pick this if you have no information about how your parameters move together. Matches the standard IPCC Approach 2 starting point.",
