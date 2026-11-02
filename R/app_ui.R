@@ -2272,6 +2272,10 @@ app_ui <- function(request = NULL) {
             )
           ),
 
+          # 2026-11-02: the results block is shown only when a run is complete; while
+          # the simulation runs, or before the first run, a note stands in its place.
+          conditionalPanel(
+            condition = "output.results_visible == true",
           # 2026-10-28 (review): results in gigagrams with 3 decimals by
           # default; tonnes, or both, on request.
           div(style = "padding: 4px 16px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap;",
@@ -2309,21 +2313,10 @@ app_ui <- function(request = NULL) {
               textOutput("vb_ch4", inline = TRUE),
               tags$em(paste0(" · ", t("res_inline_total_n2o"), " ")),
               textOutput("vb_n2o", inline = TRUE)),
-          # Andreas 28/5/26 #7.1: headline split by cattle_type so dairy and
-          # non-dairy contributions are visible without having to drill into
-          # the aggregation-level selector below. Only rendered when the
-          # inventory has more than one cattle_type.
-          conditionalPanel(
-            condition = "output.has_multi_cattle_type == true",
-            bslib::card(
-              bslib::card_header(t("res_headline_by_cattle_h")),
-              bslib::card_body(
-                p(tags$em(style = "color:#555; font-size:0.85rem;",
-                          t("res_headline_by_cattle_note"))),
-                DT::DTOutput("results_headline_by_cattle_type")
-              )
-            )
-          ),
+          # (2026-11-02: the "Headline by cattle type" card that stood here
+          # repeated the per-category table below at its "Cattle type"
+          # level; removed at the user's request. Cards, then charts, then
+          # the tables.)
           bslib::layout_columns(
             col_widths = c(6, 6),
             bslib::card(
@@ -2364,6 +2357,10 @@ app_ui <- function(request = NULL) {
             )
           ),
           uiOutput("comparison_card")
+          ),
+          conditionalPanel(
+            condition = "output.results_visible != true",
+            div(class = "info-panel", style = "margin:12px 16px;", icon("hourglass-half"), " ", t("res_waiting")))
         ),
 
         # Round 9 follow-up: trend results layout, mirrors single-year's

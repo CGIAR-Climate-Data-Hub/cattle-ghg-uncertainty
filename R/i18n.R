@@ -2185,6 +2185,8 @@ lang_state_take <- function(token) {
   res_emission_dist_h = list(en = "Emission Distribution (Total CO₂eq)",
                                 fr = "Distribution des émissions (CO₂éq total)"),
 
+  res_waiting = list(en = "The results appear here when the simulation is complete. Click Run simulation above to start it.",
+                     fr = "Les résultats apparaissent ici quand la simulation est terminée. Cliquez sur Lancer la simulation ci-dessus pour la démarrer."),
   res_agg_level_label = list(en = "Aggregation level:", fr = "Niveau d'agrégation :"),
   res_agg_cattle_type = list(en = "Cattle type (dairy / other)",
                                 fr = "Type de bétail (laitier / autre)"),

@@ -2385,6 +2385,13 @@ app_server <- function(input, output, session) {
 
   # Andreas 28/5/26 #7.1: tell the UI whether the inventory has more than
   # one cattle_type so the headline-split card can show/hide automatically.
+  # 2026-11-02: the single-year results block is shown only once a run has
+  # finished; while it runs the cards would stand empty under the progress
+  # bar, and before the first run they mean nothing.
+  output$results_visible <- reactive({
+    !isTRUE(rv$sim_running) && !is.null(rv$mc_results)
+  })
+  outputOptions(output, "results_visible", suspendWhenHidden = FALSE)
   output$has_multi_cattle_type <- reactive({
     by_sys <- rv$mc_results$by_system
     if (is.null(by_sys) || length(by_sys) == 0) return(FALSE)
@@ -2398,42 +2405,8 @@ app_server <- function(input, output, session) {
   # value boxes. One row per cattle_type, columns = the four headline
   # emission sources + total CO₂eq. Mean and 95 % MoE % per cell. Uses the
   # existing .agg_results_by_level("cattle_type") helper.
-  output$results_headline_by_cattle_type <- DT::renderDT({
-    req(rv$mc_results)
-    agg <- .agg_results_by_level("cattle_type")
-    if (length(agg) == 0) return(DT::datatable(data.frame()))
-    fmt <- function(x) {
-      m  <- mean(x); if (!is.finite(m) || m == 0) return("0")
-      lo <- quantile(x, 0.025, names = FALSE)
-      hi <- quantile(x, 0.975, names = FALSE)
-      moe <- ((hi - lo) / 2) / m * 100
-      sprintf("%.3g ± %.1f%%", m, moe)
-    }
-    rows <- lapply(names(agg), function(gn) {
-      r <- agg[[gn]]
-      manure_n2o  <- r$direct_n2o_mm_total  + r$indirect_n2o_mm_total
-      pasture_n2o <- r$direct_n2o_prp_total + r$indirect_n2o_prp_total
-      data.frame(
-        cattle = gn,
-        enteric = fmt(r$enteric_ch4_total),
-        m_ch4 = fmt(r$manure_ch4_total),
-        m_n2o = fmt(manure_n2o),
-        p_n2o = fmt(pasture_n2o),
-        co2e  = fmt(r$total_co2e),
-        check.names = FALSE)
-    })
-    df <- do.call(rbind, rows)
-    names(df) <- c(t("res_col_cattle_type"),
-                    t("res_col_enteric_ch4_t"),
-                    t("res_col_manure_ch4_t"),
-                    t("res_col_manure_n2o_t"),
-                    t("res_col_pasture_n2o_t"),
-                    t("res_col_total_co2e_t"))
-    DT::datatable(df, rownames = FALSE,
-                  options = list(dom = "t", paging = FALSE, ordering = FALSE,
-                                 scrollX = TRUE))
-  })
-
+  # (2026-11-02: output$results_headline_by_cattle_type removed with its card;
+  # the per-category table at the "Cattle type" level shows the same.)
   output$results_by_system <- DT::renderDT({
     req(rv$mc_results)
     level <- input$results_aggregation_level %||% "cattle_type"
