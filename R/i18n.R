@@ -1405,26 +1405,32 @@ lang_state_take <- function(token) {
   trend_compare_h = list(en = "The two years side by side, by emission source",
                          fr = "Les deux années côte à côte, par source d'émission"),
   trend_compare_note = list(
-    en = "Mean and 95% uncertainty of each source in both years, the change between the years and its 95% range. The last column shows which sources drive the uncertainty of year t; the six sources add up to 1.",
-    fr = "Moyenne et incertitude à 95 % de chaque source pour les deux années, la variation entre les années et sa plage à 95 %. La dernière colonne montre quelles sources pilotent l'incertitude de l'année t ; les six sources totalisent 1."),
+    en = "For each emission source: the mean emissions and their 95% margin of error (MoE, half the width of the 95% confidence interval as a percentage of the mean) in the base year and in year t; the change in the mean between the two years; the 95% confidence interval of that change. The last column shows which sources drive the uncertainty of year t; the six sources add up to 1.",
+    fr = "Pour chaque source d'émission : les émissions moyennes et leur marge d'erreur à 95 % (MoE, demi-largeur de l'intervalle de confiance à 95 % en pourcentage de la moyenne) pour l'année de base et l'année t ; la variation de la moyenne entre les deux années ; l'intervalle de confiance à 95 % de cette variation. La dernière colonne montre quelles sources pilotent l'incertitude de l'année t ; les six sources totalisent 1."),
   trend_col_source = list(en = "Emission source", fr = "Source d'émission"),
-  trend_col_base_mean = list(en = "Base year (t CO₂eq)", fr = "Année de base (t CO₂éq)"),
-  trend_col_base_moe = list(en = "Base year ± %", fr = "Année de base ± %"),
-  trend_col_t_mean = list(en = "Year t (t CO₂eq)", fr = "Année t (t CO₂éq)"),
-  trend_col_t_moe = list(en = "Year t ± %", fr = "Année t ± %"),
-  trend_col_change = list(en = "Change (%)", fr = "Variation (%)"),
-  trend_col_change_range = list(en = "Change, 95% range (%)", fr = "Variation, plage à 95 % (%)"),
-  trend_col_contrib = list(en = "Share of year t variance", fr = "Part de la variance de l'année t"),
+  # 2026-11-02 (Lolita): the same words as the single-year tables: mean,
+  # MoE 95%, CI; every header says what it holds and its unit.
+  trend_col_base_mean = list(en = "Base year emissions: mean (t CO₂eq)", fr = "Émissions de l'année de base : moyenne (t CO₂éq)"),
+  trend_col_base_moe = list(en = "Base year emissions: MoE 95% (%)", fr = "Émissions de l'année de base : MoE 95 % (%)"),
+  trend_col_t_mean = list(en = "Year t emissions: mean (t CO₂eq)", fr = "Émissions de l'année t : moyenne (t CO₂éq)"),
+  trend_col_t_moe = list(en = "Year t emissions: MoE 95% (%)", fr = "Émissions de l'année t : MoE 95 % (%)"),
+  trend_col_change = list(en = "Change in mean emissions, base year to year t (%)", fr = "Variation des émissions moyennes, année de base à année t (%)"),
+  trend_col_change_range = list(en = "Change in emissions: 95% CI (%)", fr = "Variation des émissions : IC 95 % (%)"),
+  trend_col_contrib = list(en = "Share of the variance of year t emissions (sources sum to 1)", fr = "Part de la variance des émissions de l'année t (les sources totalisent 1)"),
   trend_year_detail_h = list(en = "One year in detail, by group", fr = "Une année en détail, par groupe"),
   trend_year_detail_label = list(en = "Year", fr = "Année"),
   trend_year_detail_note = list(
-    en = "Mean total and 95% range for each group in the selected year, as a single-year run shows them.",
-    fr = "Total moyen et plage à 95 % pour chaque groupe de l'année choisie, comme dans une exécution sur une seule année."),
+    en = "Mean total emissions, their 95% margin of error (MoE) and 95% confidence interval (CI) for each group in the selected year, as a single-year run shows them.",
+    fr = "Émissions totales moyennes, leur marge d'erreur à 95 % (MoE) et intervalle de confiance à 95 % (IC) pour chaque groupe de l'année choisie, comme dans une exécution sur une seule année."),
   trend_col_group = list(en = "Group", fr = "Groupe"),
-  trend_col_year_mean = list(en = "Mean (t CO₂eq)", fr = "Moyenne (t CO₂éq)"),
-  trend_col_year_moe = list(en = "± %", fr = "± %"),
-  trend_col_year_lo = list(en = "95% lower (t)", fr = "Borne basse 95 % (t)"),
-  trend_col_year_hi = list(en = "95% upper (t)", fr = "Borne haute 95 % (t)"),
+  trend_col_year_mean = list(en = "Mean total emissions (t CO₂eq)", fr = "Émissions totales moyennes (t CO₂éq)"),
+  trend_col_year_moe = list(en = "MoE 95% of total emissions (%)", fr = "MoE 95 % des émissions totales (%)"),
+  trend_col_year_lo = list(en = "95% CI lower (t CO₂eq)", fr = "Borne inf. IC 95 % (t CO₂éq)"),
+  trend_col_year_hi = list(en = "95% CI upper (t CO₂eq)", fr = "Borne sup. IC 95 % (t CO₂éq)"),
+  # the every-year table (Results tab and IPCC Report tab)
+  trend_col_year = list(en = "Year", fr = "Année"),
+  trend_col_delta_base = list(en = "Change in mean total emissions since the base year (%)", fr = "Variation des émissions totales moyennes depuis l'année de base (%)"),
+  trend_col_yoy = list(en = "Change in mean total emissions from the previous year (%)", fr = "Variation des émissions totales moyennes par rapport à l'année précédente (%)"),
   trend_ipcc_h = list(en = "IPCC reporting table (Table 3.3) for the two years",
                       fr = "Tableau de déclaration GIEC (tableau 3.3) pour les deux années"),
   trend_ipcc_note = list(
@@ -1448,8 +1454,8 @@ lang_state_take <- function(token) {
                               fr = "CO₂éq total par année avec sa plage à 95 %"),
   card_trend_table_h = list(en = "Every year: total and 95% range", fr = "Chaque année : total et plage à 95 %"),
   trend_table_note = list(
-    en = "One row per year: mean total, lower and upper bound of the 95% range, uncertainty as ± % of the mean, change since the base year, change from the previous year.",
-    fr = "Une ligne par année : total moyen, bornes basse et haute de la plage à 95 %, incertitude en ± % de la moyenne, variation depuis l'année de base, variation par rapport à l'année précédente."
+    en = "One row per year: mean total emissions, lower and upper bound of the 95% confidence interval (CI), 95% margin of error (MoE, half the width of the CI as a percentage of the mean), change in the mean since the base year, change in the mean from the previous year.",
+    fr = "Une ligne par année : émissions totales moyennes, bornes inférieure et supérieure de l'intervalle de confiance à 95 % (IC), marge d'erreur à 95 % (MoE, demi-largeur de l'IC en pourcentage de la moyenne), variation de la moyenne depuis l'année de base, variation de la moyenne par rapport à l'année précédente."
   ),
   card_trend_sens_h = list(en = "What drives the uncertainty",
                               fr = "Ce qui pilote l'incertitude"),
@@ -2015,8 +2021,12 @@ lang_state_take <- function(token) {
   res_comparison_h = list(en = "Uncertainty with and without correlations",
                              fr = "Incertitude avec et sans corrélations"),
   res_comparison_setting = list(
-    en = "Without correlations: a run with nothing ticked on Tab 3. With correlations: the main run, with your Tab 3 choices (links between inputs: \"%s\"; animal numbers between groups: \"%s\"). The change in percentage points is written on the second bar.",
-    fr = "Sans corrélations : un run sans rien de coché à l'onglet 3. Avec corrélations : le run principal, avec vos choix de l'onglet 3 (liens entre entrées : « %s » ; effectifs entre groupes : « %s »). Le changement en points de pourcentage est écrit sur la seconde barre."),
+    en = "One bar per correlation level, from left to right: no correlations (nothing ticked on Tab 3); + the links between inputs as chosen on Tab 3 (\"%s\"); + the N correlation, the animal numbers between groups as chosen (\"%s\"), which is the main run. The change from the previous level is written on each bar, in percentage points.",
+    fr = "Une barre par niveau de corrélation, de gauche à droite : aucune corrélation (rien de coché à l'onglet 3) ; + les liens entre entrées tels que choisis à l'onglet 3 (« %s ») ; + la corrélation des effectifs (N) entre groupes telle que choisie (« %s »), qui est le run principal. Le changement par rapport au niveau précédent est écrit sur chaque barre, en points de pourcentage."),
+  res_cmp_level_base = list(en = "No correlations", fr = "Aucune corrélation"),
+  res_cmp_level_links = list(en = "+ %s", fr = "+ %s"),
+  res_cmp_level_n = list(en = "+ N correlation", fr = "+ corrélation des effectifs (N)"),
+  res_cmp_level_both = list(en = "+ %s + N correlation", fr = "+ %s + corrélation des effectifs (N)"),
   res_comparison_intro = list(
     en = "Side-by-side comparison of the same Monte Carlo run with the correlations you picked vs. with all correlations turned off. The difference shows how much the correlation structure widens or narrows the uncertainty range.",
     fr = "Comparaison côte à côte de la même simulation Monte Carlo avec les corrélations choisies vs. toutes corrélations désactivées. La différence montre comment la structure des corrélations élargit ou réduit la plage d'incertitude."
@@ -2146,8 +2156,8 @@ lang_state_take <- function(token) {
   res_cmp_total_ch4  = list(en = "Total CH4", fr = "CH₄ total"),
   res_cmp_total_n2o  = list(en = "Total N2O", fr = "N₂O total"),
   res_cmp_chart_title = list(
-    en = "95% MoE: without and with correlations",
-    fr = "MoE 95 % : sans et avec corrélations"
+    en = "95% MoE of emissions by correlation level: each bar adds one Tab 3 choice",
+    fr = "MoE 95 % des émissions par niveau de corrélation : chaque barre ajoute un choix de l'onglet 3"
   ),
 
   sens_view_label = list(en = "View:", fr = "Vue :"),

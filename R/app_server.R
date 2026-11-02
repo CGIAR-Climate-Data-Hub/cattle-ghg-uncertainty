@@ -181,7 +181,7 @@ app_server <- function(input, output, session) {
         # results of the cleared example would export its inputs
         rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
         rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
-        rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+        rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_links <- NULL
         rv$diagnostics <- NULL
         rv$sim_view <- "settings"
       }
@@ -1457,7 +1457,7 @@ app_server <- function(input, output, session) {
     # for a first run, and crashed the 1 GB server (oom, 2026-10-30 19:27 UTC).
     rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
     rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
-    rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+    rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_links <- NULL
     rv$diagnostics <- NULL
     # 2026-11-02: and the trend results, for the same reason (see the trend
     # handler); the series and its retained draws are the bulk of them
@@ -1852,8 +1852,10 @@ app_server <- function(input, output, session) {
             rm(b0); invisible(gc(FALSE))
             rv$comparison_result <- nocorr_result
             # what the two runs differ in, named on the card
+            n_groups_cmp <- tryCatch(length(unique(make_group_key(specs))), error = function(e) 2L)
             rv$comparison_settings <- list(corr_mode = input$corr_mode %||% "none",
-                                           n_group = input$n_group_corr %||% "full")
+                                           n_group = input$n_group_corr %||% "full",
+                                           n_groups = n_groups_cmp)
             if (length(nocorr_result$by_system) > 0) {
               rv$comparison_sensitivity <- tryCatch(
                 aggregate_sensitivity(
@@ -1867,6 +1869,24 @@ app_server <- function(input, output, session) {
             }
             rv$sim_log <- paste0(rv$sim_log, "Comparison (without correlations) complete.\n")
             invisible(gc(FALSE))
+            # 2026-11-02 (Lolita, later): three bars when both Tab 3 cards
+            # are ticked: no correlations (the run above), + the links
+            # between inputs alone, + the N correlation (the main run). The
+            # middle level is one more run, of which only the uncertainty
+            # summary is kept.
+            rv$comparison_links <- NULL
+            if (!is.null(cm_main_cmp) && rho_main_cmp > 0 && n_groups_cmp > 1L) {
+              setProgress(0.975, detail = "Comparison: with the links between inputs only...")
+              rv$comparison_links <- tryCatch({
+                b1 <- build_systems_data(specs, manure = manure, n_iter = n_iter_val, seed = input$seed,
+                                         crossgroup = "shared", corr_matrix = cm_main_cmp, sg_to_mm = sg_to_mm, n_group_rho = 0)
+                r1 <- run_inventory_simulation(b1$systems, n_iter = n_iter_val, gwp = input$gwp_version, seed = input$seed,
+                                               pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
+                                               sampler = "iman_conover", progress_cb = keepalive_cb(0.975, 0.99, "Comparison (links only)"),
+                                               keep_sample_rows = 1L)
+                u <- calc_all_uncertainty(r1$inventory); rm(b1, r1); invisible(gc(FALSE)); u
+              }, error = function(e) { rv$sim_log <- paste0(rv$sim_log, "WARNING: links-only comparison run failed: ", conditionMessage(e), "\n"); NULL })
+            }
             setProgress(0.99, detail = "Comparison complete.")
           }
 
@@ -2588,26 +2608,52 @@ app_server <- function(input, output, session) {
   # (nothing ticked on Tab 3) and with correlations (the main run, with
   # everything ticked). The change is written on the second bar with its
   # sign: correlations can narrow the range as well as widen it.
+  # 2026-11-02 (Lolita): one bar per correlation level and variable: no
+  # correlations (nothing ticked on Tab 3), + the links between inputs as
+  # chosen on Tab 3 (named by its option, "Structural defaults" for
+  # example), + the N correlation (animal numbers between groups), which
+  # is the main run. A level that was not ticked has no bar. The change
+  # from the previous level is written on each bar, with its sign:
+  # correlations can narrow the range as well as widen it.
+  .cmp_mode_short <- function(mode) {
+    lab <- switch(as.character(mode), preset = t("corr_mode_preset"), timeseries = t("corr_mode_ts"),
+                  manual = t("corr_mode_manual"), t("corr_mode_none"))
+    # the option name without its bracket: "Structural defaults"
+    short <- trimws(sub("^Advanced: ", "", sub(" \\(.*\\)$", "", lab)))
+    paste0(toupper(substr(short, 1, 1)), substr(short, 2, nchar(short)))
+  }
   output$comparison_plot <- plotly::renderPlotly({
     req(rv$mc_results, rv$comparison_result)
+    cs <- rv$comparison_settings %||% list(corr_mode = "none", n_group = "full")
     vars   <- c("total_co2e", "total_ch4", "total_n2o")
     labels <- c(t("res_cmp_total_co2e"), t("res_cmp_total_ch4"), t("res_cmp_total_n2o"))
     get_moe <- function(unc, v) { row <- unc[unc$variable == v, ]; if (nrow(row) > 0) round(row$moe_pct, 1) else NA_real_ }
-    moe_without <- sapply(vars, get_moe, unc = calc_all_uncertainty(rv$comparison_result$inventory))
-    moe_with    <- sapply(vars, get_moe, unc = calc_all_uncertainty(rv$mc_results$inventory))
-    top <- max(c(moe_without, moe_with), na.rm = TRUE)
-    plotly::plot_ly() |>
-      plotly::add_bars(x = labels, y = moe_without, name = t("res_comparison_without_label"),
-                       text = sprintf("±%.1f%%", moe_without), textposition = "outside",
-                       marker = list(color = "#90A4AE")) |>
-      plotly::add_bars(x = labels, y = moe_with, name = t("res_comparison_with_label"),
-                       text = sprintf("±%.1f%% (%+.1f pts)", moe_with, moe_with - moe_without), textposition = "outside",
-                       marker = list(color = "#2D6A4F")) |>
-      plotly::layout(barmode = "group", title = t("res_cmp_chart_title"),
-                     # room above the tallest bar for its label
-                     yaxis = list(title = t("res_decomp_yaxis"), range = c(0, top * 1.2)),
-                     xaxis = list(title = ""), margin = list(t = 50),
-                     legend = list(orientation = "h", y = -0.25))
+    has_links <- !identical(as.character(cs$corr_mode), "none")
+    # the N correlation exists only with two groups or more
+    has_n     <- !identical(as.character(cs$n_group), "none") && (cs$n_groups %||% 2L) > 1L
+    levels <- list()
+    levels[[t("res_cmp_level_base")]] <- calc_all_uncertainty(rv$comparison_result$inventory)
+    if (!is.null(rv$comparison_links))
+      levels[[sprintf(t("res_cmp_level_links"), .cmp_mode_short(cs$corr_mode))]] <- rv$comparison_links
+    main_lab <- if (has_n && (!is.null(rv$comparison_links) || !has_links)) t("res_cmp_level_n")
+                else if (has_links && !has_n) sprintf(t("res_cmp_level_links"), .cmp_mode_short(cs$corr_mode))
+                else sprintf(t("res_cmp_level_both"), .cmp_mode_short(cs$corr_mode))
+    levels[[main_lab]] <- calc_all_uncertainty(rv$mc_results$inventory)
+    cols <- c("#90A4AE", "#2D6A4F", "#1D4ED8")
+    if (length(levels) == 2L) cols <- cols[c(1, 3)]
+    p <- plotly::plot_ly(); prev <- NULL; top <- 0
+    for (k in seq_along(levels)) {
+      moe <- sapply(vars, get_moe, unc = levels[[k]]); top <- max(top, moe, na.rm = TRUE)
+      txt <- if (is.null(prev)) sprintf("±%.1f%%", moe) else sprintf("±%.1f%% (%+.1f pts)", moe, moe - prev)
+      p <- plotly::add_bars(p, x = labels, y = moe, name = names(levels)[k], text = txt, textposition = "outside",
+                            marker = list(color = cols[k]))
+      prev <- moe
+    }
+    plotly::layout(p, barmode = "group", title = t("res_cmp_chart_title"),
+                   # room above the tallest bar for its label
+                   yaxis = list(title = t("res_decomp_yaxis"), range = c(0, top * 1.2)),
+                   xaxis = list(title = ""), margin = list(t = 50),
+                   legend = list(orientation = "h", y = -0.25))
   })
 
   # --- SENSITIVITY ---
@@ -3329,7 +3375,7 @@ app_server <- function(input, output, session) {
     if (!is.null(rv$mc_results)) {
       rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
       rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
-      rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+      rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_links <- NULL
       rv$diagnostics <- NULL
       invisible(gc(FALSE))
       showNotification(t("run_released_single"), type = "message", duration = 8)
@@ -3478,7 +3524,7 @@ app_server <- function(input, output, session) {
           # show in place (mirrors the single-year Run handler's sim_view flip).
           rv$sim_view <- "results"
           setProgress(1.00, detail = "Done.")
-          showNotification(rv_trend$message$text, type = "message", duration = 7)
+          showNotification("Trend complete: the results appear in a few seconds.", type = "message", duration = 4)  # 2026-11-02 (Lolita): the same toast as single-year; the full sentence stays in the status box
         }, error = function(e) {
           rv_trend$message <- list(type = "error",
             text = paste("Trend run failed:", e$message))
@@ -3655,11 +3701,22 @@ app_server <- function(input, output, session) {
     # single-year results tables (every user-facing uncertainty display in
     # the app reports as 95% MoE only). CV_pct is still in rv_trend$results
     # for internal/audit access.
-    df <- rv_trend$results[, setdiff(names(rv_trend$results), "CV_pct"),
-                            drop = FALSE]
-    DT::datatable(df, rownames = FALSE,
+    DT::datatable(.trend_table_labelled(rv_trend$results), rownames = FALSE,
                   options = list(pageLength = 25, dom = "t"))
   })
+  # 2026-11-02 (Lolita): the every-year table with the same headers as the
+  # single-year tables (mean, CI, MoE 95%) instead of the frame's code names.
+  .trend_table_labelled <- function(res) {
+    df <- res[, setdiff(names(res), "CV_pct"), drop = FALSE]
+    lab <- c(Year = t("trend_col_year"), Mean_t_CO2eq = t("trend_col_year_mean"),
+             CI_Lower_t = t("trend_col_year_lo"), CI_Upper_t = t("trend_col_year_hi"),
+             MoE_95_pct = t("trend_col_year_moe"), Delta_vs_base_pct = t("trend_col_delta_base"),
+             YoY_pct = t("trend_col_yoy"))
+    keep <- intersect(names(lab), names(df))
+    df <- df[, keep, drop = FALSE]
+    names(df) <- unname(lab[keep])
+    df
+  }
 
   output$trend_plot <- plotly::renderPlotly({
     req(rv_trend$results)
@@ -3958,7 +4015,7 @@ app_server <- function(input, output, session) {
   output$trend_table_report <- DT::renderDT({
     req(isTRUE(rv$prerender_ok))
     req(rv_trend$results)
-    DT::datatable(rv_trend$results, rownames = FALSE,
+    DT::datatable(.trend_table_labelled(rv_trend$results), rownames = FALSE,
                   options = list(pageLength = 25, dom = "t"))
   })
   output$trend_plot_report <- plotly::renderPlotly({
