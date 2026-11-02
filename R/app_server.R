@@ -3676,7 +3676,14 @@ app_server <- function(input, output, session) {
         error = function(e) { showNotification(conditionMessage(e), type = "error"); NULL })
     })
     if (!is.null(d)) {
-      pr <- rv_trend$pairs; pr[[.trend_pair_key(ys$base, ys$t)]] <- d; rv_trend$pairs <- pr
+      # 2026-11-02 (Lolita: a new run releases the previous one, whatever
+      # the run). Only the first/last pair of the trend run and this
+      # latest pair are kept; a pair asked for earlier is released.
+      yrs_all <- rv_trend$res$years
+      keep_key <- .trend_pair_key(yrs_all[1], yrs_all[length(yrs_all)])
+      pr <- rv_trend$pairs; pr <- pr[names(pr) %in% keep_key]
+      pr[[.trend_pair_key(ys$base, ys$t)]] <- d; rv_trend$pairs <- pr
+      invisible(gc(FALSE))
     }
   })
 
