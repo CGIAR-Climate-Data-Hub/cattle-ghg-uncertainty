@@ -84,6 +84,10 @@ app_server <- function(input, output, session) {
   # newly-activated tab a tick to render before we try to scroll to it.
   # "Resources" is the panel's explicit value (R/app_ui.R), not its title,
   # so this works in French as well.
+  # 2026-11-02: the home page's start button
+  observeEvent(input$goto_data_input, {
+    bslib::nav_select(id = "nav", selected = "DataInput", session = session)
+  })
   observeEvent(input$goto_resources, {
     bslib::nav_select(id = "nav", selected = "Resources", session = session)
     session$sendCustomMessage("scrollTo", "downloads-card")
@@ -1262,7 +1266,7 @@ app_server <- function(input, output, session) {
         type = "error", duration = 10)
       rv$sim_log <- paste0(rv$sim_log,
         "Run blocked: no analysis mode selected.\n")
-      bslib::nav_select(id = "nav", selected = "1. Data Input", session = session)
+      bslib::nav_select(id = "nav", selected = "DataInput", session = session)  # the panel value (works in French too)
       return()
     }
 

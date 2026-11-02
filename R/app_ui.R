@@ -1329,8 +1329,6 @@ app_ui <- function(request = NULL) {
                    position: relative; overflow: hidden;",
           h1(t("hero_title"),
              style = "font-size: 2rem; font-weight: 700; margin-bottom: 12px;"),
-          p(t("hero_subtitle"),
-            style = "font-size: 1.1rem; opacity: 0.9; margin-bottom: 8px;"),
           p(t("hero_credit"),
             style = "font-size: 0.9rem; opacity: 0.7;")
         ),
@@ -1404,70 +1402,35 @@ app_ui <- function(request = NULL) {
                          class = "btn btn-success btn-sm",
                          icon("circle-play"), " ", t("btn_watch_overview")))))) else NULL,
 
-        # ---- What the tool is for ------------------------------------------
+        # 2026-11-02 (Lolita): after the video, what the tool does, tab by
+        # tab, one sentence each; then what the user needs before starting,
+        # with the way in. The four "benefit" boxes, the credibility card
+        # (the logos and the credit line already say who built and funded
+        # it) and the "How a run works" card (the same steps as the tabs)
+        # were removed.
         bslib::card(
           style = "margin-top: 20px;",
           bslib::card_header(h4(t("card_what_does_title"), style = "margin: 0;")),
           bslib::card_body(
             tags$p(t("what_problem"), style = "margin-bottom: 18px;"),
-            # Four statements of what the tool does. Each names one thing and
-            # describes it; none of them tells the reader what to conclude.
+            tags$p(tags$strong(t("home_tabs_intro")), style = "margin-bottom: 10px;"),
             div(
-              style = "display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(248px,1fr));",
-              lapply(1:4, function(i) {
-                div(style = "border:1px solid #E0DDD5; border-radius:10px; padding:14px 16px;
-                             background:#FCFCFA;",
-                    tags$div(t(paste0("benefit", i, "_title")),
-                             style = "font-weight:700; color:#2D6A4F; margin-bottom:5px;"),
-                    tags$div(t(paste0("benefit", i, "_body")),
-                             style = "font-size:0.92rem; color:#475569; line-height:1.5;"))
+              style = "display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));",
+              lapply(list(c("tab_data_input", "home_tab1"), c("tab_qaqc", "home_tab2"),
+                          c("tab_correlations", "home_tab3"), c("tab_simulate", "home_tab4"),
+                          c("tab_sensitivity", "home_tab5"), c("tab_ipcc_report", "home_tab6"),
+                          c("tab_resources", "home_tab_resources")), function(k) {
+                div(style = "border:1px solid #E0DDD5; border-radius:10px; padding:12px 14px; background:#FCFCFA;",
+                    tags$div(t(k[1]), style = "font-weight:700; color:#2D6A4F; margin-bottom:4px;"),
+                    tags$div(t(k[2]), style = "font-size:0.92rem; color:#475569; line-height:1.5;"))
               })),
             tags$p(style = "margin: 18px 0 0 0; font-size: 0.92rem;",
                    tags$strong(t("what_does_sources_label")), " ",
                    t("what_does_sources_body")))),
 
-        # ---- Credibility ----------------------------------------------------
-        # Free, open, independently reviewed, and who paid for it. These are
-        # the four things a government compiler checks before investing time,
-        # and the page did not state any of them.
+        # T0.4: prerequisites, then the way in
         bslib::card(
           style = "margin-top: 20px;",
-          bslib::card_body(
-            div(style = "display:grid; gap:12px;
-                         grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-                         font-size:0.92rem; color:#475569;",
-              div(icon("unlock", style="color:#2D6A4F;"), " ", t("trust_open")),
-              div(icon("user-check", style="color:#2D6A4F;"), " ", t("trust_reviewed")),
-              div(icon("building-columns", style="color:#2D6A4F;"), " ", t("trust_built"))))),
-
-        # ---- Three steps -----------------------------------------------------
-        # The seven-tab table with per-tab timings moved to the user guide,
-        # where a reader who has decided to start will look for it.
-        bslib::card(
-          style = "margin-top: 20px;",
-          bslib::card_header(h4(t("steps_title"), style = "margin: 0;")),
-          bslib::card_body(
-            div(
-              style = "display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));",
-              lapply(1:3, function(i) {
-                div(
-                  tags$div(paste0("0", i),
-                           style = "font-size:1.5rem; font-weight:700; color:#95D5B2;
-                                    line-height:1;"),
-                  tags$div(t(paste0("step", i, "_title")),
-                           style = "font-weight:700; margin:4px 0 4px 0;"),
-                  tags$div(t(paste0("step", i, "_body")),
-                           style = "font-size:0.92rem; color:#475569; line-height:1.5;"))
-              })),
-            div(class = "info-panel", style = "margin-top:18px;",
-                HTML(t("quick_start_html"))),
-            div(style = "text-align: center; margin-top: 14px;",
-                actionButton("goto_resources", t("btn_goto_resources"),
-                             class = "btn btn-outline-success")))),
-
-
-        # T0.4: prerequisites & limitations
-        bslib::card(
           bslib::card_header(h4(t("card_before_you_start_title"), style = "margin: 0;")),
           bslib::card_body(
             tags$p(tags$strong(t("before_you_will_need"))),
@@ -1476,7 +1439,24 @@ app_ui <- function(request = NULL) {
               tags$li(HTML(t("before_li2_html"))),
               tags$li(t("before_li3")),
               tags$li(t("before_li4"))
-            )
+            ),
+            # 2026-11-02 (Lolita): the guides, opened straight from here
+            tags$p(tags$strong(t("home_guides_label")), style = "margin: 14px 0 8px 0;"),
+            div(style = "display:flex; gap:10px; flex-wrap:wrap;",
+                tags$a(href = "user_guide.pdf", target = "_blank", rel = "noopener noreferrer",
+                       class = "btn btn-outline-success btn-sm", icon("book"), " ", t("btn_open_userguide")),
+                tags$a(href = "methodology.pdf", target = "_blank", rel = "noopener noreferrer",
+                       class = "btn btn-outline-success btn-sm", icon("file-pdf"), " ", t("btn_open_methodology")),
+                tags$a(href = "ai_translator_guide.pdf", target = "_blank", rel = "noopener noreferrer",
+                       class = "btn btn-outline-success btn-sm", icon("book"), " ", t("btn_open_ai_guide")),
+                tags$a(href = "#", class = "btn btn-outline-success btn-sm",
+                       onclick = "window.openDefinitions(); return false;",
+                       icon("book-open"), " ", t("btn_open_definitions"))),
+            div(style = "display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top: 18px;",
+                actionButton("goto_data_input", t("btn_goto_data_input"), class = "btn btn-success",
+                             icon = icon("arrow-right")),
+                actionButton("goto_resources", t("btn_all_resources"),
+                             class = "btn btn-outline-success"))
           )
         ),
         # Andreas 2026-05 #3: analysis-mode toggle moved to top of Data Input
@@ -1720,6 +1700,7 @@ app_ui <- function(request = NULL) {
     # ==================== TAB 1: DATA INPUT ====================
     bslib::nav_panel(
       title = t("tab_data_input"),
+      value = "DataInput",
       icon = icon("upload"),
       tutorial_video_link("data_input"),
       # 2026-10-29 (Lolita): the What-to-do box sits above the mode card and
