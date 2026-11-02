@@ -2870,16 +2870,20 @@ app_server <- function(input, output, session) {
     sens_data <- active_sensitivity()
     req(sens_data)
     sens <- if (!is.null(sens_data$src)) sens_data$src else req(FALSE)
-    # 2026-11-02 (Lolita): the groups column is not shown (it made the table
-    # unreadable); the parameter name already says "shared by N groups".
-    # The column stays in the data for the group filter above the tornado.
+    .sens_rank_dt(sens)
+  })
+  # 2026-11-02 (Lolita): one sensitivity table for the single-year and the
+  # trend views: parameter, src, abs_src, p_value, rank, two decimals. The
+  # groups column is not shown (it made the table unreadable; the parameter
+  # name already says "shared by N groups") but stays in the data for the
+  # group filter above the tornado.
+  .sens_rank_dt <- function(sens) {
     sens <- sens[, setdiff(names(sens), "groups"), drop = FALSE]
-    # 2026-10-28 (review): two decimals.
     dec <- names(sens)[vapply(sens, function(v) is.numeric(v) && any(abs(v - round(v)) > 1e-9, na.rm = TRUE), logical(1))]
     dt <- DT::datatable(sens, rownames = FALSE, options = list(pageLength = 20))
     if (length(dec)) dt <- DT::formatRound(dt, dec, digits = 2)
     dt
-  })
+  }
 
   # --- IPCC REPORT ---
 
@@ -3638,6 +3642,14 @@ app_server <- function(input, output, session) {
                   options = list(pageLength = 12, dom = "t", ordering = FALSE, scrollX = TRUE)) |>
       DT::formatCurrency(c(3, 4), currency = "", digits = 0)
   })
+  output$trend_adef_ui <- renderUI({
+    req(rv_trend$res)
+    status <- tags$em(style = "color:#555; font-size:0.85rem;", textOutput("trend_adef_status", inline = TRUE))
+    if (!is.null(trend_pair())) return(div(style = "margin-bottom:8px;", status))
+    div(style = "display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px;",
+        actionButton("trend_adef_btn", t("trend_adef_btn"), class = "btn-outline-success", icon = icon("calculator")),
+        status)
+  })
   output$trend_adef_status <- renderText({
     p <- trend_pair()
     if (is.null(p))
@@ -3721,50 +3733,15 @@ app_server <- function(input, output, session) {
   # coloured Class column. Used by Tab 6 (Sensitivity) under the trend mode
   # conditional.
   .trend_sens_table <- function(sens) {
-    if (is.null(sens) || length(sens) == 0) {
-      return(DT::datatable(data.frame(Note = "Run a trend simulation first."),
-                            rownames = FALSE, options = list(dom = "t")))
-    }
-    src  <- sens$src
-    base <- if (!is.null(src) && nrow(src) > 0) src else NULL
-    if (is.null(base) || nrow(base) == 0) {
-      return(DT::datatable(
-        data.frame(Note = "No input parameters had variance."),
-        rownames = FALSE, options = list(dom = "t")))
-    }
-    val_col <- if ("src" %in% names(base)) "src" else names(base)[2]
-    base <- base[order(-abs(base[[val_col]])), , drop = FALSE]
-    base <- utils::head(base, 15)
-
-    bare_name <- sub(" \\([^()]+\\)\\s*$", "", base$parameter)
-    bare_name <- gsub("_(y1|yN)$", "", bare_name)
-    reducible_lut <- setNames(PARAM_CATALOGUE$user_reducible,
-                                PARAM_CATALOGUE$parameter)
-    reducible <- reducible_lut[bare_name]
-    reducible[is.na(reducible)] <- TRUE
-
-    src_disp  <- if ("src" %in% names(base))
-                   formatC(base$src,  digits = 2, format = "f") else NA_character_
-
-    df <- data.frame(
-      Parameter = base$parameter,
-      Class     = ifelse(reducible, "User-reducible", "IPCC coefficient"),
-      SRC       = src_disp,
-      stringsAsFactors = FALSE,
-      check.names = FALSE
-    )
-    if (all(is.na(df$SRC)))  df$SRC  <- NULL
-
-    dt <- DT::datatable(df, rownames = FALSE,
-                         options = list(pageLength = 15, dom = "t"))
-    DT::formatStyle(dt, "Class",
-      backgroundColor = DT::styleEqual(
-        c("User-reducible", "IPCC coefficient"),
-        c("#D8F3DC", "#DBEAFE")),
-      color = DT::styleEqual(
-        c("User-reducible", "IPCC coefficient"),
-        c("#1B4332", "#1E3A8A")),
-      fontWeight = "600")
+    base <- if (!is.null(sens) && length(sens) && is.data.frame(sens$src)) sens$src else NULL
+    if (is.null(base) || nrow(base) == 0)
+      return(DT::datatable(data.frame(Note = if (is.null(sens)) "Run a trend simulation first."
+                                             else "No input parameters had variance."),
+                           rownames = FALSE, options = list(dom = "t")))
+    # 2026-11-02 (Lolita): the same table as the single-year view, sorted
+    # by rank, every input (it was the top 15 with a Class column)
+    if ("rank" %in% names(base)) base <- base[order(base$rank), , drop = FALSE]
+    .sens_rank_dt(base)
   }
 
   output$trend_tornado_per_year <- plotly::renderPlotly({
@@ -3877,7 +3854,16 @@ app_server <- function(input, output, session) {
         ipcc_table           = trend_ipcc(),
         compare              = trend_cmp(),
         sources_long         = trend_sources_long(rv_trend$res, trend_gwp()),
-        by_group             = rv_trend$res$system_summary
+        by_group             = rv_trend$res$system_summary,
+        settings             = list(gwp_version = rv_trend$run_args$gwp %||% input$gwp_version,
+                                    seed = rv_trend$run_args$seed %||% input$seed,
+                                    emission_sources = input$emission_sources,
+                                    corr_mode = input$corr_mode %||% "none",
+                                    n_group_corr = input$n_group_corr %||% "full",
+                                    n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none"),
+        qa_caveats           = .qa_caveats_export(),
+        param_specs          = rv$param_specs,
+        manure               = rv$manure_data
       )
     }
   )
@@ -3906,7 +3892,11 @@ app_server <- function(input, output, session) {
         manure               = rv$manure_data,
         corr_settings        = list(corr_mode = input$corr_mode %||% "none",
                                     n_group_corr = input$n_group_corr %||% "full",
-                                    n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none")
+                                    n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none",
+                                    gwp_version = rv_trend$run_args$gwp %||% input$gwp_version,
+                                    seed = rv_trend$run_args$seed %||% input$seed,
+                                    emission_sources = input$emission_sources),
+        diagnostics          = rv_trend$diagnostics
       )
     }
   )

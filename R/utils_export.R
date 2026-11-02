@@ -255,110 +255,151 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
                                # year t), IPCC Table 3.3, the two years by
                                # source, every year by source and by group
                                headline = NULL, ipcc_table = NULL, compare = NULL,
-                               sources_long = NULL, by_group = NULL) {
-  slope_delta_summary <- data.frame(
-    Metric = c("Trend slope (t CO2eq / yr)",
-               "Trend slope 95% CI lower",
-               "Trend slope 95% CI upper",
-               "Delta total (Y_N - Y_1, t CO2eq)",
-               "Delta total 95% CI lower",
-               "Delta total 95% CI upper",
-               "Delta percent (vs Y_1)",
-               "Delta percent 95% CI lower",
-               "Delta percent 95% CI upper"),
-    Value  = c(slope$mean, slope$ci[1], slope$ci[2],
-               delta_total$mean, delta_total$ci[1], delta_total$ci[2],
-               delta_total$pct_mean, delta_total$pct_ci[1], delta_total$pct_ci[2]),
-    stringsAsFactors = FALSE
-  )
-  methodology <- data.frame(
-    Field = c("Generated", "Tool", "Iterations per year",
-              "Year-to-year correlation mode",
-              "IPCC reference"),
-    Value = c(as.character(Sys.time()),
-              "IPCC Tier 2 Uncertainty Calculator: Trend",
-              n_iter, year_corr,
-              "IPCC 2019 Refinement Vol 1 Ch 3 §3.2.2.4 (year correlation) + §3.7 (trend reporting)"),
-    stringsAsFactors = FALSE
-  )
+                               sources_long = NULL, by_group = NULL,
+                               # 2026-11-02: the run settings, the QA/QC
+                               # caveats and the inputs, as in the
+                               # single-year workbook
+                               settings = NULL, qa_caveats = NULL,
+                               param_specs = NULL, manure = NULL) {
+  # 2026-11-02 (Lolita: "the excel for trend is really messy ... like the
+  # single year one"). README first, then the run, the headline figures,
+  # IPCC Table 3.3, every year (total, by source, by group), the two
+  # sensitivity rankings and the inputs. Dropped as duplicates: the two
+  # years by source (in IPCC Table 3.3 and All_years_by_source), the slope
+  # and delta sheet (in Headline), the Methodology sheet (in README and
+  # Run_Settings).
+  placeholder <- function(msg) data.frame(Note = msg, stringsAsFactors = FALSE)
+  r1 <- function(x, d = 1) if (is.null(x) || !length(x) || is.na(x[1])) NA_real_ else round(x, d)
+  yrs <- if (is.data.frame(results_table) && nrow(results_table)) range(results_table$Year) else c(NA, NA)
+  h <- headline
+  n_pair <- if (!is.null(h) && !is.null(h$n_iter_pair)) h$n_iter_pair else n_iter
 
-  pull_df <- function(sens, key) {
-    if (is.null(sens) || is.null(sens[[key]])) return(data.frame())
-    sens[[key]]
-  }
+  run_settings_df <- data.frame(
+    Setting = c("Analysis mode", "Years", "Draws per year (series)", "Draws for base year and year t (paired run)",
+                "Year-to-year correlation of coefficients", "Links between inputs (Tab 3)",
+                "Animal numbers (N) between groups (Tab 3)", "Animal numbers (N) between years (Tab 3)",
+                "GWP basis", "Seed", "Emission sources", "QA/QC checks ignored or repaired"),
+    Value = c("Trend",
+              sprintf("%s to %s (%d years)", yrs[1], yrs[2], if (is.data.frame(results_table)) nrow(results_table) else NA_integer_),
+              format(n_iter, big.mark = ","), format(n_pair, big.mark = ","),
+              .year_corr_label(year_corr),
+              .corr_mode_label(settings$corr_mode),
+              .n_corr_label(settings$n_group_corr %||% "full", "group"),
+              .n_corr_label(settings$n_year_corr %||% "none", "year"),
+              as.character(settings$gwp_version %||% NA), as.character(settings$seed %||% NA),
+              .emission_sources_label(settings$emission_sources %||% character(0)),
+              if (is.null(qa_caveats) || !nrow(qa_caveats)) "none" else paste0(nrow(qa_caveats), " (see sheet QA_Caveats)")),
+    stringsAsFactors = FALSE)
 
-  report_sheets <- list()
-  if (!is.null(headline)) {
-    h <- headline
-    report_sheets$What_to_report <- data.frame(
-      Item = c("Base year", "Base year total (t CO2eq)", "Base year uncertainty (+/- % of mean)",
-               "Base year 95% range lower (t)", "Base year 95% range upper (t)",
-               "Year t", "Year t total (t CO2eq)", "Year t uncertainty (+/- % of mean)",
-               "Year t 95% range lower (t)", "Year t 95% range upper (t)",
-               "Change from base year to year t (%)",
-               "Change, 95% range lower (%)", "Change, 95% range upper (%)",
-               "Uncertainty in the trend (-) percentage points",
-               "Uncertainty in the trend (+) percentage points",
-               "95% range of the change includes zero",
-               "Year-to-year correlation of coefficients",
-               "Draws for base year and year t", "Draws per year in the series"),
-      Value = c(h$base_year, round(h$base_mean, 1), round(h$base_moe, 1),
-                round(h$base_lo, 1), round(h$base_hi, 1),
-                h$year_t, round(h$t_mean, 1), round(h$t_moe, 1),
-                round(h$t_lo, 1), round(h$t_hi, 1),
-                round(h$trend_pct, 1), round(h$trend_lo_pct, 1), round(h$trend_hi_pct, 1),
-                round(h$trend_lo_pp, 1), round(h$trend_hi_pp, 1),
-                if (isTRUE(h$zero_inside)) "yes" else "no", h$year_corr,
-                if (is.null(h$n_iter_pair)) n_iter else h$n_iter_pair, n_iter),
-      stringsAsFactors = FALSE)
-  }
-  if (!is.null(ipcc_table)) report_sheets$IPCC_Table_3_3 <- ipcc_table
-  if (!is.null(compare)) {
-    cmp <- compare
-    report_sheets$Two_years_by_source <- data.frame(
-      `Emission source` = cmp$category, Gas = cmp$gas,
-      `Base year mean (t CO2eq)` = round(cmp$base_mean, 1),
-      `Base year +/- %` = round(cmp$base_moe_pct, 1),
-      `Base year (-) %` = round(cmp$base_lower_pct, 1),
-      `Base year (+) %` = round(cmp$base_upper_pct, 1),
-      `Year t mean (t CO2eq)` = round(cmp$t_mean, 1),
-      `Year t +/- %` = round(cmp$t_moe_pct, 1),
-      `Year t (-) %` = round(cmp$t_lower_pct, 1),
-      `Year t (+) %` = round(cmp$t_upper_pct, 1),
-      `Change (%)` = round(cmp$trend_pct, 1),
-      `Change 95% lower (%)` = round(cmp$trend_pct + cmp$trend_lo_pp, 1),
-      `Change 95% upper (%)` = round(cmp$trend_pct + cmp$trend_hi_pp, 1),
-      `Share of year t variance` = round(cmp$contribution, 4),
-      check.names = FALSE, stringsAsFactors = FALSE)
-  }
-  if (!is.null(sources_long)) {
+  caveats_df <- if (is.data.frame(qa_caveats) && nrow(qa_caveats) > 0) qa_caveats
+                else placeholder("No QA/QC checks were ignored or repaired for this run.")
+
+  headline_df <- if (!is.null(h)) data.frame(
+    Item = c("Base year", "Base year: mean total emissions (t CO2eq)",
+             "Base year: 95% CI lower (t CO2eq)", "Base year: 95% CI upper (t CO2eq)", "Base year: MoE 95% (%)",
+             "Year t", "Year t: mean total emissions (t CO2eq)",
+             "Year t: 95% CI lower (t CO2eq)", "Year t: 95% CI upper (t CO2eq)", "Year t: MoE 95% (%)",
+             "Change in mean emissions, base year to year t (%)",
+             "Change: 95% CI lower (%)", "Change: 95% CI upper (%)",
+             "Trend uncertainty, lower (percentage points)", "Trend uncertainty, upper (percentage points)",
+             "The 95% CI of the change includes zero",
+             "Average change per year over all years (t CO2eq per year)",
+             "Average change per year: 95% CI lower", "Average change per year: 95% CI upper"),
+    Value = c(h$base_year, r1(h$base_mean, 0), r1(h$base_lo, 0), r1(h$base_hi, 0), r1(h$base_moe),
+              h$year_t, r1(h$t_mean, 0), r1(h$t_lo, 0), r1(h$t_hi, 0), r1(h$t_moe),
+              r1(h$trend_pct), r1(h$trend_lo_pct), r1(h$trend_hi_pct),
+              r1(h$trend_lo_pp), r1(h$trend_hi_pp),
+              if (isTRUE(h$zero_inside)) "yes" else "no",
+              r1(slope$mean, 0), r1(slope$ci[1], 0), r1(slope$ci[2], 0)),
+    stringsAsFactors = FALSE) else placeholder("Headline figures unavailable.")
+
+  all_years_df <- if (is.data.frame(results_table) && nrow(results_table)) data.frame(
+    Year = results_table$Year,
+    `Mean total emissions (t CO2eq)` = round(results_table$Mean_t_CO2eq, 0),
+    `95% CI lower (t CO2eq)` = round(results_table$CI_Lower_t, 0),
+    `95% CI upper (t CO2eq)` = round(results_table$CI_Upper_t, 0),
+    `MoE 95% (%)` = round(results_table$MoE_95_pct, 1),
+    `Change in mean since the base year (%)` = round(results_table$Delta_vs_base_pct, 1),
+    `Change in mean from the previous year (%)` = round(results_table$YoY_pct, 1),
+    check.names = FALSE, stringsAsFactors = FALSE) else placeholder("No trend results.")
+
+  by_source_df <- if (!is.null(sources_long) && nrow(sources_long)) {
     sl <- sources_long
-    report_sheets$All_years_by_source <- data.frame(
-      Year = sl$year, `Emission source` = sl$category, Gas = sl$gas,
-      `Mean (t CO2eq)` = round(sl$mean_t_co2e, 1),
-      `95% lower (t)` = round(sl$lo, 1), `95% upper (t)` = round(sl$hi, 1),
-      `+/- %` = round(sl$moe_pct, 1), `(-) %` = round(sl$lower_pct, 1),
-      `(+) %` = round(sl$upper_pct, 1),
-      check.names = FALSE, stringsAsFactors = FALSE)
-  }
-  if (!is.null(by_group)) {
+    data.frame(Year = sl$year, `Emission source` = sl$category, Gas = sl$gas,
+               `Mean emissions (t CO2eq)` = round(sl$mean_t_co2e, 1),
+               `95% CI lower (t CO2eq)` = round(sl$lo, 1), `95% CI upper (t CO2eq)` = round(sl$hi, 1),
+               `MoE 95% (%)` = round(sl$moe_pct, 1),
+               `Lower half of the CI (-%)` = round(sl$lower_pct, 1), `Upper half of the CI (+%)` = round(sl$upper_pct, 1),
+               check.names = FALSE, stringsAsFactors = FALSE)
+  } else placeholder("No per-source results.")
+
+  by_group_df <- if (!is.null(by_group) && nrow(by_group)) {
     bg <- by_group
-    report_sheets$All_years_by_group <- data.frame(
-      Year = bg$year, `Cattle type` = bg$cattle_type,
-      `Production system` = bg$aggregation_level, `Sub-category` = bg$sub_category,
-      Source = bg$source, Mean = round(bg$mean, 2),
-      `95% lower` = round(bg$lo, 2), `95% upper` = round(bg$hi, 2),
-      check.names = FALSE, stringsAsFactors = FALSE)
+    src_lab <- c(enteric_ch4_total = "Enteric CH4", manure_ch4_total = "Manure CH4",
+                 direct_n2o_mm_total = "Manure N2O direct", indirect_n2o_mm_total = "Manure N2O indirect",
+                 direct_n2o_prp_total = "Pasture N2O direct", indirect_n2o_prp_total = "Pasture N2O indirect",
+                 total_ch4 = "Total CH4", total_n2o = "Total N2O", total_co2e = "Total CO2eq")
+    s <- as.character(bg$source); s <- ifelse(s %in% names(src_lab), src_lab[s], s)
+    data.frame(Year = bg$year, `Cattle type` = bg$cattle_type,
+               `Production system` = bg$aggregation_level, `Sub-category` = bg$sub_category,
+               Source = unname(s),
+               `Mean (t of the gas; t CO2eq for Total CO2eq)` = round(bg$mean, 2),
+               `95% CI lower` = round(bg$lo, 2), `95% CI upper` = round(bg$hi, 2),
+               check.names = FALSE, stringsAsFactors = FALSE)
+  } else placeholder("No per-group results.")
+
+  pull_sens <- function(sens) {
+    if (is.null(sens) || !is.data.frame(sens$src) || !nrow(sens$src)) return(placeholder("Sensitivity unavailable for this run."))
+    x <- sens$src
+    if ("rank" %in% names(x)) x <- x[order(x$rank), , drop = FALSE]
+    num <- vapply(x, is.numeric, logical(1)); x[num] <- lapply(x[num], round, 3)
+    x
   }
 
-  sheets <- c(report_sheets, list(
-    Trend_summary    = results_table,
-    Slope_and_delta  = slope_delta_summary,
-    Sensitivity_per_year_SRC  = pull_df(sensitivity_per_year, "src"),
-    Sensitivity_delta_SRC     = pull_df(sensitivity_delta, "src"),
-    Methodology      = methodology
-  ))
+  inputs_df <- if (is.data.frame(param_specs) && nrow(param_specs)) {
+    x <- param_specs
+    x$range_source <- tryCatch(range_source_label(param_specs), error = function(e) NA_character_)
+    x
+  } else placeholder("Input parameters unavailable.")
+
+  readme_df <- data.frame(
+    Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Headline", "IPCC_Table_3_3", "All_years",
+              "All_years_by_source", "All_years_by_group", "Sensitivity_latest_year", "Sensitivity_change", "Input_Parameters"),
+    Contents = c(
+      sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Trend %s to %s.",
+              .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), yrs[1], yrs[2]),
+      "This sheet: what each sheet of the workbook contains.",
+      "The settings of the run: years, draws, the year-to-year correlation of the coefficients, the correlation choices of Tab 3, GWP basis, seed, emission sources, and how many QA/QC checks were ignored or repaired.",
+      "The QA/QC checks that were ignored or repaired so the run could go ahead.",
+      "The figures to report: total emissions of the base year and year t with their 95% confidence interval (CI) and 95% margin of error (MoE, half the width of the CI as a percentage of the mean); the change between the two years with its 95% CI and the trend uncertainty in percentage points; the average change per year over all years.",
+      "IPCC 2006 Vol. 1 Ch. 3 Table 3.3, the general reporting table for uncertainty, for the base year and year t.",
+      "One row per year: mean total emissions, 95% CI, MoE, change since the base year and from the previous year.",
+      "One row per year and emission source: mean emissions in t CO2eq, 95% CI, MoE and its lower and upper halves.",
+      "One row per year, animal group and emission source: mean and 95% CI.",
+      "The sensitivity analysis of total CO2eq in the latest year: one row per input, its standardised regression coefficient (src, from -1 to +1; the further from zero, the more the input matters), its absolute value, p_value and rank.",
+      "The same for the change in total CO2eq between the first and the last year; an input drawn in both years appears once per year.",
+      "Every input of the run, with range_source, which says where each uncertainty range comes from and marks the placeholder ranges."),
+    stringsAsFactors = FALSE)
+
+  sheets <- list(
+    README = readme_df, Run_Settings = run_settings_df, QA_Caveats = caveats_df,
+    Headline = headline_df,
+    IPCC_Table_3_3 = if (is.data.frame(ipcc_table) && nrow(ipcc_table)) ipcc_table else placeholder("IPCC table unavailable."),
+    All_years = all_years_df, All_years_by_source = by_source_df, All_years_by_group = by_group_df,
+    Sensitivity_latest_year = pull_sens(sensitivity_per_year),
+    Sensitivity_change = pull_sens(sensitivity_delta),
+    Input_Parameters = inputs_df)
   writexl::write_xlsx(sheets, path = filepath)
+}
+
+# 2026-11-02: the year-to-year correlation of the coefficients as the
+# reports word it.
+.year_corr_label <- function(code) {
+  switch(as.character(code %||% "full"),
+         full    = "The same factors for every year (fully correlated between years)",
+         partial = "Factors revised every few years (partly correlated between years)",
+         none    = "Independent (no year-to-year correlation)",
+         as.character(code))
 }
 
 # 2026-11-02: the Tab 3 "links between inputs" option as the reports word it.

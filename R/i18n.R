@@ -1295,20 +1295,19 @@ lang_state_take <- function(token) {
   card_sens_rankings = list(en = "Sensitivity Rankings",
                               fr = "Classements de sensibilité"),
   info_trend_sens_what = list(
-    en = "Two charts. 'Latest year' ranks the inputs behind that year's uncertainty. 'Change between first and last year' ranks the inputs behind the trend. Green bars are inputs you can improve with national data; grey bars are IPCC coefficients. Focus on the green ones in the top five.",
-    fr = "Deux graphiques. « Dernière année » classe les entrées derrière l'incertitude de cette année. « Variation entre la première et la dernière année » classe les entrées derrière la tendance. Les barres vertes sont des entrées améliorables avec des données nationales ; les barres grises sont des coefficients GIEC. Concentrez-vous sur les vertes du top 5."
+    en = "Two charts. 'Latest year' ranks the inputs behind that year's uncertainty. 'Change between first and last year' ranks the inputs behind the trend. Green bars are inputs you can improve with national data; blue bars are IPCC coefficients. Focus on the green ones in the top five.",
+    fr = "Deux graphiques. « Dernière année » classe les entrées derrière l'incertitude de cette année. « Variation entre la première et la dernière année » classe les entrées derrière la tendance. Les barres vertes sont des entrées améliorables avec des données nationales ; les barres bleues sont des coefficients GIEC. Concentrez-vous sur les vertes du top 5."
   ),
   trend_sens_per_year_h = list(en = "What drives the uncertainty in the latest year",
                                   fr = "Ce qui pilote l'incertitude de la dernière année"),
   trend_sens_delta_h = list(en = "What drives the change between the first and last year",
                               fr = "Ce qui pilote la variation entre la première et la dernière année"),
   tornado_top10 = list(en = "Tornado: top 10", fr = "Tornado, top 10"),
+  sens_read_delta = list(
+    en = "The same columns as the table above, for the change in total CO2eq between the first and the last year. An input drawn in both years appears once per year, for example N (cows) 2018 and N (cows) 2022.",
+    fr = "Les mêmes colonnes que le tableau ci-dessus, pour la variation du CO2éq total entre la première et la dernière année. Une entrée tirée les deux années apparaît une fois par année, par exemple N (cows) 2018 et N (cows) 2022."),
   trend_rankings_top15 = list(en = "Rankings: top 15 (SRC)",
                                 fr = "Classements : top 15 (SRC)"),
-  trend_combined_note = list(
-    en = "Combined Y_1 + Y_N inputs are sensitivity-tested against the per-iteration ΔCO₂eq. Suffixes _y1 / _yN distinguish the same parameter at different years.",
-    fr = "Les entrées combinées Y_1 + Y_N sont testées en sensibilité contre le ΔCO₂éq par itération. Les suffixes _y1 / _yN distinguent le même paramètre à différentes années."
-  ),
 
   # =====================================================================
   # IPCC REPORT TAB
@@ -1433,8 +1432,8 @@ lang_state_take <- function(token) {
   trend_ipcc_h = list(en = "IPCC reporting table (Table 3.3) for the two years",
                       fr = "Tableau de déclaration GIEC (tableau 3.3) pour les deux années"),
   trend_ipcc_note = list(
-    en = "The general reporting table for uncertainty from IPCC 2006 Vol. 1 Ch. 3, filled with Approach 2 (Monte Carlo). Values are in t CO₂eq; divide by 1,000 for Gg. The base year and year t come from their own paired run at the reporting draw count, which also fills the activity data and emission factor columns. After choosing other years, use the button to run them the same way.",
-    fr = "Le tableau général de déclaration de l'incertitude du GIEC 2006 Vol. 1 Ch. 3, rempli avec l'approche 2 (Monte Carlo). Valeurs en t CO₂éq ; diviser par 1 000 pour des Gg. L'année de base et l'année t proviennent de leur propre exécution en paire avec le nombre de tirages de déclaration, qui remplit aussi les colonnes données d'activité et facteurs d'émission. Après avoir choisi d'autres années, utilisez le bouton pour les exécuter de la même façon."),
+    en = "The general reporting table for uncertainty from IPCC 2006 Vol. 1 Ch. 3, filled with Approach 2 (Monte Carlo). Values are in t CO₂eq; divide by 1,000 for Gg. The base year and year t come from their own paired run at the reporting draw count, which also fills the activity data and emission factor columns. If you choose two other years, a button appears to run them the same way.",
+    fr = "Le tableau général de déclaration de l'incertitude du GIEC 2006 Vol. 1 Ch. 3, rempli avec l'approche 2 (Monte Carlo). Valeurs en t CO₂éq ; diviser par 1 000 pour des Gg. L'année de base et l'année t proviennent de leur propre exécution en paire avec le nombre de tirages de déclaration, qui remplit aussi les colonnes données d'activité et facteurs d'émission. Si vous choisissez deux autres années, un bouton apparaît pour les exécuter de la même façon."),
   trend_adef_btn = list(en = "Run these two years at the reporting draw count",
                         fr = "Lancer ces deux années avec le nombre de tirages de déclaration"),
   trend_adef_running = list(en = "Running base year %d and year t %d at %s draws...",

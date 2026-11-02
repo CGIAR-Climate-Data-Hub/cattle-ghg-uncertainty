@@ -354,7 +354,9 @@ sens_groups_of_row <- function(df) {
 # Frac_LeachMS) are IPCC coefficients; the manure shares (fraction_...)
 # and anything not in the catalogue count as national data.
 param_reducible <- function(params) {
-  bare <- sub("[[:space:]]*[(][^()]*[)][[:space:]]*$", "", as.character(params))
+  # the trend's change ranking names an input per year: "N (cows) 2022"
+  bare <- sub("[[:space:]]+[0-9]{4}$", "", as.character(params))
+  bare <- sub("[[:space:]]*[(][^()]*[)][[:space:]]*$", "", bare)
   bare <- sub("[[:space:]]*=.*$", "", bare)
   bare <- sub("_(y1|yN)$", "", bare)
   lut <- stats::setNames(PARAM_CATALOGUE$user_reducible, PARAM_CATALOGUE$parameter)

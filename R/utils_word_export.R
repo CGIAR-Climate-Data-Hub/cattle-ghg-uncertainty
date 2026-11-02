@@ -522,7 +522,8 @@ build_trend_summary_docx <- function(path,
                                       ipcc_table  = NULL,
                                       compare     = NULL,
                                       manure      = NULL,
-                                     corr_settings = NULL) {
+                                     corr_settings = NULL,
+                                     diagnostics = NULL) {
 
   doc <- officer::read_docx()
   yrs <- if (!is.null(years)) range(years) else range(trend_results$Year)
@@ -532,7 +533,6 @@ build_trend_summary_docx <- function(path,
                                 yrs[1], yrs[2]))
   meta_line <- paste(
     sprintf("Generated %s.", format(Sys.time(), "%Y-%m-%d %H:%M %Z")),
-    sprintf("Year-to-year correlation mode: %s.", year_corr),
     if (!is.null(ipcc_meta) && !is.null(ipcc_meta$ipcc_version))
       sprintf("IPCC guidelines: %s.", ipcc_meta$ipcc_version) else NULL,
     if (!is.null(ipcc_meta) && !is.null(ipcc_meta$region) && nzchar(ipcc_meta$region))
@@ -541,125 +541,141 @@ build_trend_summary_docx <- function(path,
   )
   doc <- .add_p(doc, paste(stats::na.omit(meta_line), collapse = " "))
 
-  # ---- Executive summary --------------------------------------------------
-  doc <- .add_h2(doc, "Executive summary")
+  # 2026-11-02 (Lolita: "same comment for the word"). The trend report now
+  # reads in the order of the single-year report: summary; 1. simulation
+  # (settings, Monte Carlo diagnostics); 2. inputs; 3. results (base year
+  # and year t with IPCC Table 3.3, every year, the change between the
+  # first and last year); 4. sensitivity analysis; 5. IPCC reporting notes.
+  num <- local({ part <- 0L; sub <- 0L
+    list(part = function(doc, title) { part <<- part + 1L; sub <<- 0L
+                                        .add_h2(doc, sprintf("%d. %s", part, title)) },
+         sub  = function(doc, title) { sub <<- sub + 1L
+                                        .add_h3(doc, sprintf("%d.%d %s", part, sub, title)) })
+  })
+  fig <- .make_fig_adder()
+
+  # ---- Summary ------------------------------------------------------------
+  doc <- .add_h2(doc, "Summary")
   doc <- .add_p(doc, .build_trend_exec_summary(trend_results, slope, delta_total,
                                                  sensitivity_delta, year_corr, n_iter))
+  if (!is.null(headline)) for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
+  doc <- .add_p(doc, paste(
+    "The report has five parts: the simulation, the inputs, the results,",
+    "the sensitivity analysis, and notes for IPCC reporting."))
 
-  # ---- What to report (base year and year t) ------------------------------
-  if (!is.null(headline)) {
-    doc <- .add_h2(doc, "What to report")
-    for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
-    if (!is.null(headline$n_iter_pair))
-      doc <- .add_p(doc, sprintf(paste(
-        "Base year and year t were simulated at %s draws each, as a pair (the two years",
-        "linked as the series links them under the %s setting); the series was run at %s",
-        "draws per year."), .fmt_int(headline$n_iter_pair), year_corr, .fmt_int(n_iter)))
-    if (!is.null(compare)) {
-      doc <- .add_h3(doc, sprintf("The two years side by side, by emission source (%d and %d)",
-                                  headline$base_year, headline$year_t))
-      doc <- .add_flextable_safe(doc, .styled_flextable(.trend_compare_flextable(compare)))
-    }
-    if (!is.null(ipcc_table)) {
-      doc <- .add_h3(doc, sprintf("IPCC Table 3.3, general reporting table for uncertainty (base year %d, year t %d)",
-                                  headline$base_year, headline$year_t))
-      doc <- .add_p(doc, paste(
-        "Approach 2 (Monte Carlo). Values in t CO2eq; divide by 1,000 for Gg.",
-        if (isTRUE(attr(ipcc_table, "has_ad_ef")))
-          "Activity data and emission factor columns come from two extra simulations for year t with the other side held at its mean."
-        else "Activity data and emission factor columns were not computed for this report; IPCC allows them to be left blank.",
-        "Contribution to variance is each source's covariance with the total divided by the variance of the total; the six sources sum to 1.",
-        "Trend uncertainty is in percentage points around the trend, the IPCC convention."))
-      doc <- .add_flextable_safe(doc, .styled_flextable(.trend_ipcc_flextable(ipcc_table)))
-    }
-  }
-
-  # ---- Run settings -------------------------------------------------------
-  doc <- .add_h2(doc, "1. What was run")
+  # ---- 1. Simulation --------------------------------------------------------
+  doc <- num$part(doc, "Simulation")
+  doc <- num$sub(doc, "Run settings")
   doc <- .add_flextable_safe(doc,
     .styled_flextable(.trend_settings_flextable(year_corr, n_iter, yrs, ipcc_meta, headline$n_iter_pair,
                                                  corr_settings = corr_settings)))
-  doc <- .add_placeholder_section(doc, param_specs, manure, "1a. Placeholder uncertainty ranges")
+  if (!is.null(diagnostics) && !is.null(diagnostics$year_t)) {
+    doc <- num$sub(doc, "Monte Carlo diagnostics")
+    doc <- .add_p(doc, sprintf(paste(
+      "Quality checks on the paired run of the base year and year t (%s draws each). PASS means the reported",
+      "figures do not depend on the random seed; WARN or FAIL means the run should be repeated with more draws."),
+      .fmt_int(diagnostics$year_t$n)))
+    yt <- .diagnostics_flextable(diagnostics$year_t)
+    if (!is.null(yt)) {
+      doc <- .add_p(doc, sprintf("Year t total (%s):", diagnostics$years[2]))
+      doc <- .add_flextable_safe(doc, .styled_flextable(yt))
+    }
+    ch <- .diagnostics_flextable(diagnostics$delta)
+    if (!is.null(ch)) {
+      doc <- .add_p(doc, sprintf("Change from %s to %s (percentages relative to the year t total):",
+                                 diagnostics$years[1], diagnostics$years[2]))
+      doc <- .add_flextable_safe(doc, .styled_flextable(ch))
+    }
+    doc <- fig(doc, .gg_convergence(diagnostics$year_t), "Convergence of the simulation (year t)",
+      "Running mean of the year t total (solid line) and running 2.5th and 97.5th percentiles (dashed lines) as draws are added. Lines that are flat at the right edge show that the run was long enough.",
+      height = 3.0)
+  }
 
-  # ---- Trend table (LANDSCAPE) -------------------------------------------
-  doc <- .add_h2(doc, "2. Year-by-year trend")
+  # ---- 2. Inputs ------------------------------------------------------------
+  doc <- num$part(doc, "Inputs")
+  doc <- .add_placeholder_section(doc, param_specs, manure, "Placeholder uncertainty ranges",
+                                  heading_fn = num$sub)
+  inputs_ft <- .inputs_doc_flextable(param_specs)
+  if (!is.null(inputs_ft)) {
+    doc <- .add_portrait_break(doc)
+    doc <- num$sub(doc, "Input parameters")
+    total_params <- if (is.data.frame(param_specs)) nrow(param_specs) else 0L
+    doc <- .add_p(doc, paste(
+      if (total_params > WORD_INPUTS_MAX)
+        sprintf("The first %d of %s parameter rows; every row is in the Input_Parameters sheet of the Excel download.",
+                WORD_INPUTS_MAX, format(total_params, big.mark = ","))
+      else "Every parameter used in the trend run: distribution, mean, bounds and IPCC reference.",
+      "Animal numbers are drawn for each year; the coefficients follow the year-to-year correlation in section 1."))
+    doc <- .add_flextable_safe(doc, .styled_flextable(inputs_ft))
+    doc <- .add_landscape_break(doc)
+  }
+
+  # ---- 3. Results -----------------------------------------------------------
+  doc <- num$part(doc, "Results")
+  if (!is.null(headline)) {
+    doc <- num$sub(doc, sprintf("Base year %d and year t %d", headline$base_year, headline$year_t))
+    if (!is.null(compare)) {
+      doc <- .add_p(doc, "The two years side by side, by emission source:")
+      doc <- .add_flextable_safe(doc, .styled_flextable(.trend_compare_flextable(compare)))
+    }
+    if (!is.null(ipcc_table)) {
+      doc <- .add_portrait_break(doc)
+      doc <- .add_p(doc, paste(
+        "IPCC Table 3.3, the general reporting table for uncertainty. Approach 2 (Monte Carlo); values in t CO2eq, divide by 1,000 for Gg.",
+        if (isTRUE(attr(ipcc_table, "has_ad_ef")))
+          "The activity data and emission factor columns come from two extra simulations for year t with the other side held at its mean."
+        else "The activity data and emission factor columns were not computed for this report; IPCC allows them to be left blank.",
+        "Contribution to variance is each source's covariance with the total divided by the variance of the total; the six sources sum to 1.",
+        "Trend uncertainty is in percentage points around the trend, the IPCC convention."))
+      doc <- .add_flextable_safe(doc, .styled_flextable(.trend_ipcc_flextable(ipcc_table)))
+      doc <- .add_landscape_break(doc)
+    }
+  }
+
+  doc <- num$sub(doc, "Every year")
   doc <- .add_p(doc,
-    "Per-year mean total emissions, 95% confidence interval, 95% margin of error (the IPCC reporting convention per Vol.1 Ch.3 Table 3.3), and the percent change relative to the base year and to the previous year.")
+    "Mean total emissions of each year with the 95% confidence interval, the 95% margin of error, and the change since the base year and from the previous year.")
   doc <- .add_flextable_safe(doc, .styled_flextable(.trend_table_flextable(trend_results)))
-  doc <- .add_landscape_break(doc)
-
-  # ---- Trend chart --------------------------------------------------------
-  doc <- .add_h2(doc, "3. Trend charts")
-  fig <- .make_fig_adder()
   doc <- fig(doc, .gg_trend_chart(trend_results), "Trend in total CO2eq emissions",
     "Mean total CO2eq for each year (line) with its 95% confidence interval (shaded band).")
   doc <- fig(doc, .gg_yoy_chart(trend_results), "Year-over-year change",
     "Change in mean total CO2eq from one year to the next, in percent. Bars above zero are increases.",
     height = 2.8)
+
+  doc <- num$sub(doc, "Change between the first and last year")
+  doc <- .add_p(doc,
+    "The change between the last and the first year, and the average change per year (a straight line fitted to every year), each computed draw by draw so that their 95% confidence intervals keep the correlation between years.")
+  doc <- .add_flextable_safe(doc, .styled_flextable(.slope_delta_flextable(slope, delta_total)))
   doc <- fig(doc, .gg_delta_distribution(delta_total), "Distribution of the change between the first and last year",
-    "Distribution, across iterations, of the difference between the last and the first year. The dashed lines bound the 95% confidence interval; when it does not include zero, the trend is distinguishable from no change.",
+    "Distribution, across draws, of the difference between the last and the first year. The dashed lines bound the 95% confidence interval; when it does not include zero, the trend is distinguishable from no change.",
     height = 3.0)
 
-  # ---- Slope + delta mini-table ------------------------------------------
-  doc <- .add_h2(doc, "4. Trend slope and Δ Y_N − Y_1")
-  doc <- .add_p(doc,
-    "The slope is fitted via least-squares per Monte Carlo iteration; the 95% CI is the [2.5%, 97.5%] of that distribution. ΔY_N−Y_1 is the per-iteration difference between the last and first year, with its own 95% CI and percent of the base year.")
-  doc <- .add_flextable_safe(doc,
-    .styled_flextable(.slope_delta_flextable(slope, delta_total)))
-
-  # ---- Sensitivity drivers -----------------------------------------------
-  doc <- .add_h2(doc, "5. Sensitivity drivers")
-  doc <- .add_p(doc,
-    "Two views: per-year drivers identify what dominates the uncertainty in the most recent year, while trend drivers (Δ across years) identify what drives the change between Y_1 and Y_N. The latter is the methodologically correct answer to 'what makes the trend uncertain' per IPCC Vol 1 Ch 3 §3.7.")
-
-  py_ft <- .sensitivity_flextable(sensitivity_per_year, top_n = 10L)
-  if (!is.null(py_ft)) {
-    doc <- .add_h3(doc, "Per-year (latest year): top 10")
-    doc <- .add_flextable_safe(doc, .styled_flextable(py_ft))
-    doc <- fig(doc, .gg_tornado(sensitivity_per_year), "Top 10 drivers of the latest year (SRC)",
-      "The ten inputs with the largest influence on total CO2eq in the latest year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
-      height = 4.0)
-  }
-
-  dl_ft <- .sensitivity_flextable(sensitivity_delta, top_n = 10L)
-  if (!is.null(dl_ft)) {
-    doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1): top 10")
-    doc <- .add_flextable_safe(doc, .styled_flextable(dl_ft))
-    doc <- fig(doc, .gg_tornado(sensitivity_delta), "Top 10 drivers of the change between the first and last year (SRC)",
-      "The ten inputs with the largest influence on the change in total CO2eq between the first and the last year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
-      height = 4.0)
-  }
-
-  # Round 9b §5a: Full sensitivity rankings (all parameters).
-  full_py <- .sensitivity_flextable(sensitivity_per_year, top_n = Inf)
-  full_dl <- .sensitivity_flextable(sensitivity_delta,    top_n = Inf)
-  if (!is.null(full_py) || !is.null(full_dl)) {
-    doc <- .add_h2(doc, "5a. Full sensitivity rankings (all parameters)")
+  # ---- 4. Sensitivity analysis -----------------------------------------------
+  has_py <- !is.null(.sensitivity_flextable(sensitivity_per_year, top_n = 1L))
+  has_dl <- !is.null(.sensitivity_flextable(sensitivity_delta, top_n = 1L))
+  if (has_py || has_dl) {
+    doc <- num$part(doc, "Sensitivity analysis")
     doc <- .add_p(doc,
-      "Complete SRC values for every input parameter. Per-year is the latest-year analysis; trend driver is the Δ Y_N − Y_1 analysis.")
-    if (!is.null(full_py)) {
-      doc <- .add_h3(doc, "Per-year (latest year): full ranking")
-      doc <- .add_flextable_safe(doc, .styled_flextable(full_py))
+      "The standardised regression coefficient (SRC) of each input, from -1 to +1: the further from zero, the more the input drives the uncertainty. The latest year shows what makes that year uncertain; the change shows what makes the trend uncertain (IPCC Vol. 1 Ch. 3, section 3.7).")
+    add_rank <- function(doc, sens, title_sub, fig_title, fig_cap) {
+      doc <- num$sub(doc, title_sub)
+      doc <- fig(doc, .gg_tornado(sens), fig_title, fig_cap, height = 4.0)
+      n_s <- if (!is.null(sens$src)) nrow(sens$src) else 0L
+      doc <- .add_p(doc, if (n_s > WORD_SENS_MAX)
+                           sprintf("SRC ranking: the %d largest drivers, of %d inputs. The complete ranking is in the Excel download.", WORD_SENS_MAX, n_s)
+                         else "SRC ranking of every input:")
+      .add_flextable_safe(doc, .styled_flextable(.sensitivity_flextable(sens, top_n = WORD_SENS_MAX)))
     }
-    if (!is.null(full_dl)) {
-      doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1): full ranking")
-      doc <- .add_flextable_safe(doc, .styled_flextable(full_dl))
-    }
-    doc <- .add_landscape_break(doc)
+    if (has_py) doc <- add_rank(doc, sensitivity_per_year, "Latest year",
+      "Top 10 drivers of the latest year (SRC)",
+      "The ten inputs with the largest influence on total CO2eq in the latest year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.")
+    if (has_dl) doc <- add_rank(doc, sensitivity_delta, "Change between the first and last year",
+      "Top 10 drivers of the change between the first and last year (SRC)",
+      "The ten inputs with the largest influence on the change in total CO2eq between the first and the last year; an input drawn in both years appears once per year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.")
   }
 
-  # Round 9b §6: Input parameter documentation.
-  inputs_ft <- .inputs_doc_flextable(param_specs)
-  if (!is.null(inputs_ft)) {
-    doc <- .add_h2(doc, "6. Input parameter documentation")
-    doc <- .add_p(doc,
-      "Every parameter used in the trend run: distribution, central value, bounds and IPCC reference. AD parameters (animal population) are re-drawn per year; coefficient (EF) parameters are drawn according to the year-correlation mode in section 1.")
-    doc <- .add_flextable_safe(doc, .styled_flextable(inputs_ft))
-    doc <- .add_landscape_break(doc)
-  }
-
-  # ---- Methodological notes ----------------------------------------------
-  doc <- .add_h2(doc, "7. Methodological notes")
+  # ---- 5. IPCC reporting notes -----------------------------------------------
+  doc <- num$part(doc, "IPCC reporting notes")
   yc_text <- switch(
     year_corr,
     full    = "Coefficient draws (the 23 IPCC equation parameters) are sampled once and reused across every year, while activity data (animal population N) is re-drawn fresh for each year. This is the IPCC 2019 Refinement Vol 1 Ch 3 §3.2.2.4 default for emission-factor uncertainty: same EF every year, AD re-estimated annually. The trend uncertainty in this configuration reflects only the AD changes between years.",
@@ -668,14 +684,9 @@ build_trend_summary_docx <- function(path,
   )
   doc <- .add_p(doc, yc_text)
   doc <- .add_p(doc,
-    "All uncertainty quantification follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo). The trend slope is computed via per-iteration least-squares fit; the slope's 95% CI is therefore the empirical 2.5%/97.5% quantiles of the slope distribution, not a parametric CI. ΔY_N−Y_1 reports the difference between the per-iteration totals at the last and first years, preserving the year-to-year correlation structure imposed above.")
-
-  # ---- IPCC reporting context --------------------------------------------
-  doc <- .add_h2(doc, "8. IPCC reporting context")
+    "All uncertainty quantification follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo). The average change per year is a least-squares line fitted draw by draw; its 95% CI is the 2.5th to 97.5th percentile of those slopes. The change between the first and last year is the per-draw difference, which keeps the year-to-year correlation set above.")
   doc <- .add_p(doc,
-    "Per IPCC Vol 1 Ch 3 §3.7, trend uncertainty should be reported alongside the level of emissions in any national inventory submission that covers more than a single year. The Δ vs base year column in section 2 maps to the trend uncertainty cells of the IPCC Table 3.3 trend annex; the slope in section 4 supports the §3.7.2 'trend assessment' text typical of biennial transparency reports under the Paris Agreement Enhanced Transparency Framework. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance.")
-  doc <- .add_p(doc,
-    "If the trend is reported with a year-correlation assumption other than 'fully correlated coefficients', that choice should be documented in the methods section of the national inventory report, the year-correlation setting recorded in section 1 of this document is the one to cite.")
+    "Per IPCC Vol 1 Ch 3 §3.7, trend uncertainty is reported alongside the level of emissions in any national inventory submission that covers more than one year. The trend columns of IPCC Table 3.3 in section 3 are the figures to report. If the trend is reported with a year-to-year correlation other than 'the same factors for every year', document that choice in the methods section of the national inventory report; the setting is recorded in section 1.")
 
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")
@@ -772,13 +783,9 @@ build_trend_summary_docx <- function(path,
 
 .trend_settings_flextable <- function(year_corr, n_iter, yrs, ipcc_meta, n_iter_pair = NULL,
                                       corr_settings = NULL) {
-  yc_label <- switch(
-    year_corr,
-    full    = "The same factors for every year (fully correlated between years)",
-    partial = "Factors revised every few years (partly correlated between years)",
-    none    = "Independent (no year-to-year correlation)"
-  )
+  yc_label <- .year_corr_label(year_corr)
   rows <- list(
+    c("Analysis mode",           "Trend"),
     c("Year range",              sprintf("%d – %d", yrs[1], yrs[2])),
     c("Iterations per year",     .fmt_int(n_iter)),
     c("Draws for base year and year t",
@@ -789,6 +796,9 @@ build_trend_summary_docx <- function(path,
     c("Links between inputs (Tab 3)", .corr_mode_label(corr_settings$corr_mode %||% "none")),
     c("Animal numbers (N) between groups (Tab 3)", .n_corr_label(corr_settings$n_group_corr %||% "full", "group")),
     c("Animal numbers (N) between years (Tab 3)", .n_corr_label(corr_settings$n_year_corr %||% "none", "year")),
+    c("GWP basis", .as_str(corr_settings$gwp_version, "AR5")),
+    c("Seed", .as_str(corr_settings$seed, "(random)")),
+    c("Emission sources", .emission_sources_label(corr_settings$emission_sources)),
     c("IPCC guidelines version",
       if (!is.null(ipcc_meta) && !is.null(ipcc_meta$ipcc_version))
         ipcc_meta$ipcc_version else "(not set)"),

@@ -2543,8 +2543,11 @@ app_ui <- function(request = NULL) {
             t("info_trend_sens_what")),
         h4(t("trend_sens_per_year_h"),
             style = "color:#1B4332; margin: 8px 16px 4px;"),
+        # 2026-11-02 (Lolita): the same layout and table as the single-year
+        # view: tornado and ranking side by side, the reading note above the
+        # first ranking.
         bslib::layout_columns(
-          col_widths = c(7, 5),
+          col_widths = c(6, 6),
           bslib::card(
             bslib::card_header(fig_title("5.1", t("fig_tornado_year_title"))),
             bslib::card_body(plotly::plotlyOutput("trend_tornado_per_year_sens",
@@ -2552,16 +2555,21 @@ app_ui <- function(request = NULL) {
                              fig_caption("fig_cap_tornado_year"))
           ),
           bslib::card(
-            bslib::card_header(t("trend_rankings_top15")),
-            bslib::card_body(DT::DTOutput("trend_sens_per_year_table"))
+            bslib::card_header(t("card_sens_rankings")),
+            bslib::card_body(
+              div(style = "color:#555; font-size:0.85rem; margin-bottom:10px;",
+                  p(t("sens_read_intro")),
+                  tags$ul(style = "padding-left:18px; margin:0;",
+                          tags$li(t("sens_read_src")), tags$li(t("sens_read_abs")),
+                          tags$li(t("sens_read_p")),
+                          tags$li(t("sens_read_use")))),
+              DT::DTOutput("trend_sens_per_year_table"))
           )
         ),
         h4(t("trend_sens_delta_h"),
             style = "color:#1B4332; margin: 16px 16px 4px;"),
-        div(style = "margin: 0 16px 8px; font-size:0.82rem; color:#666;",
-            tags$em(t("trend_combined_note"))),
         bslib::layout_columns(
-          col_widths = c(7, 5),
+          col_widths = c(6, 6),
           bslib::card(
             bslib::card_header(fig_title("5.2", t("fig_tornado_delta_title"))),
             bslib::card_body(plotly::plotlyOutput("trend_tornado_delta_sens",
@@ -2569,8 +2577,11 @@ app_ui <- function(request = NULL) {
                              fig_caption("fig_cap_tornado_delta"))
           ),
           bslib::card(
-            bslib::card_header(t("trend_rankings_top15")),
-            bslib::card_body(DT::DTOutput("trend_sens_delta_table"))
+            bslib::card_header(t("card_sens_rankings")),
+            bslib::card_body(
+              div(style = "color:#555; font-size:0.85rem; margin-bottom:10px;",
+                  p(t("sens_read_delta"))),
+              DT::DTOutput("trend_sens_delta_table"))
           )
         )
       )
@@ -2648,11 +2659,10 @@ app_ui <- function(request = NULL) {
           bslib::card_header(t("trend_ipcc_h")),
           bslib::card_body(
             p(tags$em(t("trend_ipcc_note"))),
-            div(style = "display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px;",
-                actionButton("trend_adef_btn", t("trend_adef_btn"),
-                             class = "btn-outline-success", icon = icon("calculator")),
-                tags$em(style = "color:#555; font-size:0.85rem;",
-                        textOutput("trend_adef_status", inline = TRUE))),
+            # 2026-11-02 (Lolita): the button shows only when the chosen
+            # years have not been run as a pair (the run already does the
+            # first and last year); otherwise only the status line.
+            uiOutput("trend_adef_ui"),
             DT::DTOutput("trend_ipcc_table")
           )
         ),
