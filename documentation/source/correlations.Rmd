@@ -99,7 +99,7 @@ In the example inventory of section 5, the series has 35 years. Two links pass a
 
 **Advanced: manual entry.** This option lets you give your own table of correlations, for example from a study of your own herds. When you select it, two templates appear below the option. The first is a blank table with the names of all your inputs already in its rows and columns. The second is the same table filled with the seven structural-default links, as a starting point. Download one, fill it in Excel with values between −1 and +1 (the diagonal stays at 1), save it as CSV, and upload it. An input missing from your table is drawn on its own. Choose this option only if you have measured correlations.
 
-**To see the effect on your own inventory**, tick "Compare with/without correlations" on Tab 4 before you run. The tool then runs twice, once with your choice and once without any correlation, and shows both results side by side.
+**To see the effect on your own inventory**, tick "Compare with and without correlations" on Tab 4 before you run. The tool then runs twice, once with your choice and once without any correlation, and shows both results side by side.
 
 ### 4.2 Animal numbers between groups
 

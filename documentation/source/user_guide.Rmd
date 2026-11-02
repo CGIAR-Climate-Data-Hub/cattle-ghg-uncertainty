@@ -218,7 +218,7 @@ The central estimate (the mean emissions) stays the same whichever mode you pick
 
 If you select correlations and the result barely changes, that is usually expected, not a bug. The IPCC calculation multiplies about 13 parameters together, which dilutes the effect of any single pair. Also, a value shared by several groups can only be linked to another value shared by the same groups, not to a value that differs from group to group. The Methodology document explains the mathematics.
 
-Before you run the simulation, Tab 4 (Simulate & Results) lets you tick "Compare with/without correlations". The run is then done twice, with and without your correlations, so you can see their effect directly.
+Before you run the simulation, Tab 4 (Simulate & Results) lets you tick "Compare with and without correlations". The run is then done twice, with and without your correlations, so you can see their effect directly.
 
 ## Automatic correlations from time-series data
 

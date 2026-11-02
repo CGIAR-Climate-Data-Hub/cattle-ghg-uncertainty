@@ -1800,11 +1800,8 @@ lang_state_take <- function(token) {
   ),
 
 
-  cmp_run_label = list(en = "Compare with/without the links between inputs",
-                         fr = "Comparer avec/sans les liens entre entrées"),
-  cmp_run_what = list(
-    en = "The second run drops the first card of Tab 3 only (the links between inputs: structural defaults, from template or manual). Your choice on animal numbers between groups stays the same in both runs.",
-    fr = "Le second run retire seulement la première carte de l'onglet 3 (les liens entre entrées : valeurs structurelles, depuis le modèle ou manuel). Votre choix sur les effectifs entre groupes reste le même dans les deux runs."),
+  cmp_run_label = list(en = "Compare with and without correlations",
+                         fr = "Comparer avec et sans corrélations"),
   cmp_run_tooltip = list(
     en = "When ticked, the simulation runs twice: once with the correlations you picked, once with all correlations off, and the Results tab shows both side-by-side so you can see the impact.",
     fr = "Quand coché, la simulation s'exécute deux fois : une avec les corrélations choisies, une avec les corrélations désactivées, et l'onglet Résultats les affiche côte à côte pour voir l'effet."
@@ -2015,20 +2012,17 @@ lang_state_take <- function(token) {
     fr = "Agrégés par type de bétail (laitier, non laitier, buffle)."
   ),
 
-  res_comparison_h = list(en = "With vs without the links between inputs (Tab 3, first card)",
-                             fr = "Avec vs sans les liens entre entrées (onglet 3, première carte)"),
+  res_comparison_h = list(en = "Uncertainty with and without correlations",
+                             fr = "Incertitude avec et sans corrélations"),
   res_comparison_setting = list(
-    en = "One bar per level, from left to right: no correlations at all; then the links between inputs as chosen on Tab 3 (\"%s\"); then the animal numbers between groups as chosen (\"%s\"), which is the main run. The change from the previous level is written on each bar.",
-    fr = "Une barre par niveau, de gauche à droite : aucune corrélation ; puis les liens entre entrées tels que choisis à l'onglet 3 (« %s ») ; puis les effectifs entre groupes tels que choisis (« %s »), qui est le run principal. Le changement par rapport au niveau précédent est écrit sur chaque barre."),
-  res_cmp_level_base = list(en = "No correlations", fr = "Aucune corrélation"),
-  res_cmp_level_links = list(en = "+ links between inputs (%s)", fr = "+ liens entre entrées (%s)"),
-  res_cmp_level_n = list(en = "+ animal numbers between groups (%s)", fr = "+ effectifs entre groupes (%s)"),
+    en = "Without correlations: a run with nothing ticked on Tab 3. With correlations: the main run, with your Tab 3 choices (links between inputs: \"%s\"; animal numbers between groups: \"%s\"). The change in percentage points is written on the second bar.",
+    fr = "Sans corrélations : un run sans rien de coché à l'onglet 3. Avec corrélations : le run principal, avec vos choix de l'onglet 3 (liens entre entrées : « %s » ; effectifs entre groupes : « %s »). Le changement en points de pourcentage est écrit sur la seconde barre."),
   res_comparison_intro = list(
     en = "Side-by-side comparison of the same Monte Carlo run with the correlations you picked vs. with all correlations turned off. The difference shows how much the correlation structure widens or narrows the uncertainty range.",
     fr = "Comparaison côte à côte de la même simulation Monte Carlo avec les corrélations choisies vs. toutes corrélations désactivées. La différence montre comment la structure des corrélations élargit ou réduit la plage d'incertitude."
   ),
-  res_comparison_with_label = list(en = "With the links between inputs", fr = "Avec les liens entre entrées"),
-  res_comparison_without_label = list(en = "Without the links between inputs", fr = "Sans les liens entre entrées"),
+  res_comparison_with_label = list(en = "With correlations", fr = "Avec corrélations"),
+  res_comparison_without_label = list(en = "Without correlations", fr = "Sans corrélations"),
   res_comparison_delta_label = list(en = "Δ (% points)", fr = "Δ (points de %)"),
 
   # Trend Results value boxes
@@ -2152,8 +2146,8 @@ lang_state_take <- function(token) {
   res_cmp_total_ch4  = list(en = "Total CH4", fr = "CH₄ total"),
   res_cmp_total_n2o  = list(en = "Total N2O", fr = "N₂O total"),
   res_cmp_chart_title = list(
-    en = "95% MoE: with vs. without the links between inputs",
-    fr = "MoE 95 % : avec vs sans les liens entre entrées"
+    en = "95% MoE: without and with correlations",
+    fr = "MoE 95 % : sans et avec corrélations"
   ),
 
   sens_view_label = list(en = "View:", fr = "Vue :"),
