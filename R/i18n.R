@@ -221,7 +221,7 @@ lang_state_take <- function(token) {
                    fr = "Téléchargez les résultats au format du tableau 3.3 du GIEC, en classeur Excel et en rapport Word."),
   home_tab_resources = list(en = "The user guide, the methodology, the parameter definitions, and the AI translator that turns your own spreadsheet into the template.",
                             fr = "Le guide de l'utilisateur, la méthodologie, les définitions des paramètres, et le traducteur IA qui transforme votre propre tableur en modèle."),
-  home_guides_label = list(en = "Guides:", fr = "Guides :"),
+  home_guides_title = list(en = "Guides", fr = "Guides"),
   btn_all_resources = list(en = "All resources and videos →", fr = "Toutes les ressources et vidéos →"),
   btn_goto_data_input = list(en = "Start with 1. Data Input", fr = "Commencer par 1. Saisie des données"),
   card_before_you_start_title = list(en = "Before you start",

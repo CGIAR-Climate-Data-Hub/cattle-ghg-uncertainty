@@ -1414,19 +1414,39 @@ app_ui <- function(request = NULL) {
           bslib::card_body(
             tags$p(t("what_problem"), style = "margin-bottom: 18px;"),
             tags$p(tags$strong(t("home_tabs_intro")), style = "margin-bottom: 10px;"),
-            div(
-              style = "display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));",
-              lapply(list(c("tab_data_input", "home_tab1"), c("tab_qaqc", "home_tab2"),
-                          c("tab_correlations", "home_tab3"), c("tab_simulate", "home_tab4"),
-                          c("tab_sensitivity", "home_tab5"), c("tab_ipcc_report", "home_tab6"),
-                          c("tab_resources", "home_tab_resources")), function(k) {
-                div(style = "border:1px solid #E0DDD5; border-radius:10px; padding:12px 14px; background:#FCFCFA;",
-                    tags$div(t(k[1]), style = "font-weight:700; color:#2D6A4F; margin-bottom:4px;"),
-                    tags$div(t(k[2]), style = "font-size:0.92rem; color:#475569; line-height:1.5;"))
-              })),
+            # 2026-11-02 (Lolita): one row per tab, two columns (tab, what it does)
+            tags$table(
+              style = "width:100%; border-collapse:collapse; font-size:0.93rem;",
+              tags$tbody(
+                lapply(list(c("tab_data_input", "home_tab1"), c("tab_qaqc", "home_tab2"),
+                            c("tab_correlations", "home_tab3"), c("tab_simulate", "home_tab4"),
+                            c("tab_sensitivity", "home_tab5"), c("tab_ipcc_report", "home_tab6"),
+                            c("tab_resources", "home_tab_resources")), function(k) {
+                  tags$tr(style = "border-top:1px solid #E0DDD5;",
+                    tags$td(t(k[1]), style = "padding:10px 14px 10px 0; font-weight:700; color:#2D6A4F;
+                                              white-space:nowrap; vertical-align:top; width:1%;"),
+                    tags$td(t(k[2]), style = "padding:10px 0; color:#475569; line-height:1.5; vertical-align:top;"))
+                }))),
             tags$p(style = "margin: 18px 0 0 0; font-size: 0.92rem;",
                    tags$strong(t("what_does_sources_label")), " ",
                    t("what_does_sources_body")))),
+
+        # 2026-11-02 (Lolita): the guides in their own card, between what the
+        # tool does and what the user needs before starting
+        bslib::card(
+          style = "margin-top: 20px;",
+          bslib::card_header(h4(t("home_guides_title"), style = "margin: 0;")),
+          bslib::card_body(
+            div(style = "display:flex; gap:10px; flex-wrap:wrap;",
+                tags$a(href = "user_guide.pdf", target = "_blank", rel = "noopener noreferrer",
+                       class = "btn btn-outline-success", icon("book"), " ", t("btn_open_userguide")),
+                tags$a(href = "methodology.pdf", target = "_blank", rel = "noopener noreferrer",
+                       class = "btn btn-outline-success", icon("file-pdf"), " ", t("btn_open_methodology")),
+                tags$a(href = "ai_translator_guide.pdf", target = "_blank", rel = "noopener noreferrer",
+                       class = "btn btn-outline-success", icon("book"), " ", t("btn_open_ai_guide")),
+                tags$a(href = "#", class = "btn btn-outline-success",
+                       onclick = "window.openDefinitions(); return false;",
+                       icon("book-open"), " ", t("btn_open_definitions"))))),
 
         # T0.4: prerequisites, then the way in
         bslib::card(
@@ -1440,18 +1460,6 @@ app_ui <- function(request = NULL) {
               tags$li(t("before_li3")),
               tags$li(t("before_li4"))
             ),
-            # 2026-11-02 (Lolita): the guides, opened straight from here
-            tags$p(tags$strong(t("home_guides_label")), style = "margin: 14px 0 8px 0;"),
-            div(style = "display:flex; gap:10px; flex-wrap:wrap;",
-                tags$a(href = "user_guide.pdf", target = "_blank", rel = "noopener noreferrer",
-                       class = "btn btn-outline-success btn-sm", icon("book"), " ", t("btn_open_userguide")),
-                tags$a(href = "methodology.pdf", target = "_blank", rel = "noopener noreferrer",
-                       class = "btn btn-outline-success btn-sm", icon("file-pdf"), " ", t("btn_open_methodology")),
-                tags$a(href = "ai_translator_guide.pdf", target = "_blank", rel = "noopener noreferrer",
-                       class = "btn btn-outline-success btn-sm", icon("book"), " ", t("btn_open_ai_guide")),
-                tags$a(href = "#", class = "btn btn-outline-success btn-sm",
-                       onclick = "window.openDefinitions(); return false;",
-                       icon("book-open"), " ", t("btn_open_definitions"))),
             div(style = "display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top: 18px;",
                 actionButton("goto_data_input", t("btn_goto_data_input"), class = "btn btn-success",
                              icon = icon("arrow-right")),
