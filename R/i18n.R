@@ -516,8 +516,8 @@ lang_state_take <- function(token) {
     fr = "Chaque entrée porte une distribution et une plage issues du modèle. Indiquez les corrélations éventuelles entre entrées, puis lancez la simulation de Monte-Carlo."),
   step3_title = list(en = "Read and report the results", fr = "Lire et rapporter les résultats"),
   step3_body = list(
-    en = "Read the confidence interval for each emission source and the ranking of influential inputs, then download the results in IPCC Table 3.3 format as Excel, CSV or Word.",
-    fr = "Consultez l'intervalle de confiance de chaque source d'émission et le classement des paramètres influents, puis téléchargez les résultats au format du tableau 3.3 de l'IPCC, en Excel, CSV ou Word."),
+    en = "Read the confidence interval for each emission source and the ranking of influential inputs, then download the results in IPCC Table 3.3 format as Excel or Word.",
+    fr = "Consultez l'intervalle de confiance de chaque source d'émission et le classement des paramètres influents, puis téléchargez les résultats au format du tableau 3.3 de l'IPCC, en Excel ou Word."),
 
   # Workshop hold notice. Shown until 16 October 2026, then it retires
   # itself (see .TRANSLATOR_HOLD_UNTIL in R/chat_ui.R).
@@ -1015,8 +1015,8 @@ lang_state_take <- function(token) {
   qa_repaired_tag = list(en = "Repaired", fr = "Réparé"),
   qa_ignore_modal_title = list(en = "Ignore this QA/QC check?", fr = "Ignorer ce contrôle QA/QC ?"),
   qa_ignore_modal_body = list(
-    en = "Running with ignored checks may produce unreliable results. Where a failure would crash the simulation (bounds that do not bracket the mean, or a beta or lognormal distribution outside its valid range) the tool applies the smallest repair instead and records it. Every ignored or repaired check is shown on the results page and listed in the Excel, CSV and Word exports.",
-    fr = "Lancer la simulation avec des contrôles ignorés peut donner des résultats peu fiables. Lorsqu'un échec ferait planter la simulation (bornes qui n'encadrent pas la moyenne, ou distribution bêta ou log-normale hors de son domaine), l'outil applique la plus petite réparation possible et l'enregistre. Chaque contrôle ignoré ou réparé est affiché sur la page des résultats et listé dans les exports Excel, CSV et Word."),
+    en = "Running with ignored checks may produce unreliable results. Where a failure would crash the simulation (bounds that do not bracket the mean, or a beta or lognormal distribution outside its valid range) the tool applies the smallest repair instead and records it. Every ignored or repaired check is shown on the results page and listed in the Excel and Word exports.",
+    fr = "Lancer la simulation avec des contrôles ignorés peut donner des résultats peu fiables. Lorsqu'un échec ferait planter la simulation (bornes qui n'encadrent pas la moyenne, ou distribution bêta ou log-normale hors de son domaine), l'outil applique la plus petite réparation possible et l'enregistre. Chaque contrôle ignoré ou réparé est affiché sur la page des résultats et listé dans les exports Excel et Word."),
   qa_ignore_confirm = list(en = "Ignore and continue", fr = "Ignorer et continuer"),
   qa_ignore_cancel = list(en = "Cancel", fr = "Annuler"),
   qa_gate_blocked = list(
@@ -1326,8 +1326,8 @@ lang_state_take <- function(token) {
                               fr = "Tableau IPCC 3.3 : Rapport d'incertitude"),
   card_downloads_h = list(en = "Download reports", fr = "Télécharger les rapports"),
   downloads_intro = list(
-    en = "Excel: all results and settings. CSV: the table only. Word: the full report with charts, ready to adapt for your inventory document.",
-    fr = "Excel : tous les résultats et réglages. CSV : le tableau seul. Word : le rapport complet avec graphiques, prêt à adapter pour votre document d'inventaire."
+    en = "Excel: all results and settings, with a README sheet that describes each sheet. Word: the full report with charts, ready to adapt for your inventory document.",
+    fr = "Excel : tous les résultats et réglages, avec une feuille README qui décrit chaque feuille. Word : le rapport complet avec graphiques, prêt à adapter pour votre document d'inventaire."
   ),
   card_dist_per_source = list(en = "Uncertainty distributions per emission source",
                                 fr = "Distributions d'incertitude par source d'émission"),
@@ -1365,12 +1365,11 @@ lang_state_take <- function(token) {
   ),
   btn_download_xlsx = list(en = "Download Excel Report",
                               fr = "Télécharger le rapport Excel"),
-  btn_download_csv = list(en = "Download CSV", fr = "Télécharger en CSV"),
   btn_download_docx = list(en = "Download Word summary",
                               fr = "Télécharger le résumé Word"),
   info_trend_report_what = list(
-    en = "What you report for several years: the base year and year t in plain sentences, the IPCC table for those two years, every year's total with its uncertainty, and what drives it. Pick the two years below. Downloads: Excel, CSV or Word.",
-    fr = "Ce que vous déclarez pour plusieurs années : l'année de base et l'année t en phrases simples, le tableau GIEC pour ces deux années, le total de chaque année avec son incertitude, et ce qui la pilote. Choisissez les deux années ci-dessous. Téléchargements : Excel, CSV ou Word."
+    en = "What you report for several years: the base year and year t in plain sentences, the IPCC table for those two years, every year's total with its uncertainty, and what drives it. Pick the two years below. Downloads: Excel or Word.",
+    fr = "Ce que vous déclarez pour plusieurs années : l'année de base et l'année t en phrases simples, le tableau GIEC pour ces deux années, le total de chaque année avec son incertitude, et ce qui la pilote. Choisissez les deux années ci-dessous. Téléchargements : Excel ou Word."
   ),
   # ---- Trend: what to report (2026-10-22) ----------------------------------
   trend_report_h = list(en = "What to report", fr = "Ce qu'il faut déclarer"),

@@ -95,29 +95,13 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   placeholder <- function(msg)
     data.frame(Note = msg, stringsAsFactors = FALSE)
 
-  summary_df <- if (is.null(ipcc_table) || !is.data.frame(ipcc_table) || nrow(ipcc_table) == 0)
-    placeholder("IPCC summary unavailable. Enable 'Run uncertainty decomposition (AD/EF/Combined)' on Tab 5 and re-run to populate this sheet.")
-  else ipcc_table
-  # 2026-10-30: which inputs of each reporting line carry a placeholder
-  # range (no published source; see the Word report, section 2a).
-  if (is.data.frame(ipcc_table) && nrow(ipcc_table) == 9L && !is.null(param_specs)) {
-    ph <- tryCatch(placeholder_inputs_by_line(param_specs, manure), error = function(e) NULL)
-    if (!is.null(ph))
-      summary_df[["Inputs with a placeholder range (no published source)"]] <-
-        unname(ph[c("enteric_ch4_total", "manure_ch4_total", "direct_n2o_mm_total", "indirect_n2o_mm_total",
-                    "direct_n2o_prp_total", "indirect_n2o_prp_total", "total_ch4", "total_n2o", "total_co2e")])
-  }
-
-  # 2026-06: drop the cv_pct column from the Uncertainty_Metrics sheet so the
-  # Excel export aligns with every other user-facing surface (in-app tables,
-  # Word report, IPCC Annex 7), which all report 95% MoE as the single
-  # uncertainty metric. moe_pct stays; raw mean / sd / quantiles stay so
-  # advanced users can still re-derive CV manually if needed.
-  uncertainty_df <- if (is.null(uncertainty) || !is.data.frame(uncertainty) || nrow(uncertainty) == 0) {
-    placeholder("No uncertainty metrics available. Run a Monte Carlo simulation on Tab 5 first.")
-  } else {
-    uncertainty[, setdiff(names(uncertainty), "cv_pct"), drop = FALSE]
-  }
+  # 2026-11-02 (Lolita): one Results sheet in place of Summary (the IPCC
+  # table) and Uncertainty_Metrics, which carried the same numbers (the
+  # IPCC table's "Combined" column is the main run's uncertainty). One row
+  # per IPCC reporting line: mean, 95% CI, MoE and its asymmetric halves,
+  # then the AD and EF split when the decomposition ran. The placeholder
+  # column is gone: Input_Parameters marks each placeholder range.
+  results_df <- .results_sheet(uncertainty, ipcc_table)
 
   src_df <- if (!is.null(sensitivity) && is.data.frame(sensitivity$src) && nrow(sensitivity$src) > 0)
     sensitivity$src
@@ -132,10 +116,8 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
                   "Animal numbers between groups", "Animal numbers between years (trend)",
                   "Comparison run (no corr.)", "GWP basis", "Seed",
                   "Analysis mode", "Emission sources",
-                  # Measured-intake route (2026-09). Says which groups used
-                  # the IPCC energy balance and which supplied a measured
-                  # intake, so the workbook is self-describing.
-                  "Intake route",
+                  # (2026-11-02: the "Intake route" row removed at Lolita's
+                  # request; the results table in the app still shows it.)
                   "QA/QC checks ignored or repaired"),
       Value   = c(
         as.character(settings$n_iter %||% NA),
@@ -147,7 +129,6 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
         as.character(settings$seed %||% NA),
         as.character(settings$analysis_mode %||% NA),
         paste(settings$emission_sources %||% character(0), collapse = ", "),
-        as.character(settings$intake_routes %||% "Energy balance"),
         if (is.null(qa_caveats) || nrow(qa_caveats) == 0) "none"
         else paste0(nrow(qa_caveats), " (see sheet QA_Caveats)")
       ),
@@ -182,22 +163,85 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   # full record stays in defaults/DEFAULTS_MASTER.md. Restoring the
   # display means putting these call sites back.
 
+  # 2026-11-02 (Lolita): the Metadata sheet is gone (the iterations are in
+  # Run_Settings); a README sheet first says what every sheet holds.
+  has_decomp <- "AD uncertainty, MoE 95% (%)" %in% names(results_df)
+  readme_df <- data.frame(
+    Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Results", "Sensitivity_SRC", "Input_Parameters"),
+    Contents = c(
+      sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Single-year Monte Carlo results, %s iterations.",
+              .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), format(n_iter, big.mark = ",")),
+      "This sheet: what each sheet of the workbook contains.",
+      "The settings of the run: iterations, correlation choices (Tab 3), GWP basis, seed, emission sources, and how many QA/QC checks were ignored or repaired.",
+      "The QA/QC checks that were ignored or repaired so the run could go ahead. Empty when there were none.",
+      paste0("One row per IPCC reporting line (Table 3.3): mean emissions in tonnes of the gas, the 95% confidence interval (CI), ",
+             "the 95% margin of error (MoE, half the width of the CI as a percentage of the mean) and its lower and upper halves",
+             if (has_decomp) ", then the uncertainty from the activity data (AD) alone and from the emission factors and coefficients (EF) alone."
+             else ". The AD and EF split appears when 'Run uncertainty decomposition' is ticked on Tab 4."),
+      "The sensitivity analysis of total CO2eq: one row per input, its standardised regression coefficient (src, from -1 to +1; the further from zero, the more the input matters), its absolute value, p_value, rank, and the animal groups that use it.",
+      "Every input of the run: group, parameter, mean, distribution, bounds, and range_source, which says where each uncertainty range comes from and marks the placeholder ranges (no published source)."),
+    stringsAsFactors = FALSE)
+
   sheets <- list(
-    Run_Settings        = run_settings_df,
-    QA_Caveats          = caveats_df,
-    Summary             = summary_df,
-    Uncertainty_Metrics = uncertainty_df,
-    Sensitivity_SRC     = src_df,
-    Input_Parameters    = inputs_df,
-    Metadata = data.frame(
-      Field = c("Generated", "Tool", "Iterations"),
-      Value = c(as.character(Sys.time()),
-                "IPCC Tier 2 Uncertainty Calculator v1.1",
-                as.character(n_iter)),
-      stringsAsFactors = FALSE
-    )
+    README           = readme_df,
+    Run_Settings     = run_settings_df,
+    QA_Caveats       = caveats_df,
+    Results          = results_df,
+    Sensitivity_SRC  = src_df,
+    Input_Parameters = inputs_df
   )
   writexl::write_xlsx(sheets, path = filepath)
+}
+
+# 2026-11-02: the app version for the README sheet (VERSION file at the app root).
+.app_version <- function() {
+  v <- tryCatch(trimws(readLines("VERSION", n = 1L, warn = FALSE)), error = function(e) "")
+  if (length(v) == 1L && nzchar(v)) v else "unknown"
+}
+
+# 2026-11-02: the Results sheet: one row per IPCC reporting line from the
+# main run's uncertainty (mean, CI, MoE, halves), and the AD / EF columns
+# of the IPCC table when the decomposition ran.
+.results_sheet <- function(uncertainty, ipcc_table = NULL) {
+  if (is.null(uncertainty) || !is.data.frame(uncertainty) || nrow(uncertainty) == 0)
+    return(data.frame(Note = "No results available. Run a Monte Carlo simulation on Tab 4 first.",
+                      stringsAsFactors = FALSE))
+  lines <- data.frame(
+    var = c("total_enteric_ch4", "total_manure_ch4", "total_direct_n2o_mm", "total_indirect_n2o_mm",
+            "total_direct_n2o_prp", "total_indirect_n2o_prp", "total_ch4", "total_n2o", "total_co2e"),
+    alt = c("enteric_ch4_total", "manure_ch4_total", "direct_n2o_mm_total", "indirect_n2o_mm_total",
+            "direct_n2o_prp_total", "indirect_n2o_prp_total", "total_ch4", "total_n2o", "total_co2e"),
+    category = c("3.A.1 Enteric Fermentation: Cattle",
+                 "3.B.1 Manure Management: Cattle (CH\u2084)",
+                 "3.B.1 Manure Management: Cattle (N\u2082O direct)",
+                 "3.B.5 Manure Management: Cattle (N\u2082O indirect)",
+                 "3.D.1.c Direct N\u2082O: Pasture/Range/Paddock",
+                 "3.D.2 Indirect N\u2082O: Pasture/Range/Paddock",
+                 "Total CH\u2084", "Total N\u2082O", "Total CO\u2082eq"),
+    gas = c("CH\u2084", "CH\u2084", "N\u2082O", "N\u2082O", "N\u2082O", "N\u2082O", "CH\u2084", "N\u2082O", "CO\u2082eq"),
+    stringsAsFactors = FALSE)
+  pick <- function(v, a, col) {
+    row <- uncertainty[uncertainty$variable %in% c(v, a), , drop = FALSE]
+    if (nrow(row) == 0L || !col %in% names(row)) NA_real_ else row[[col]][1]
+  }
+  get <- function(col, digits) vapply(seq_len(nrow(lines)), function(i)
+    round(pick(lines$var[i], lines$alt[i], col), digits), numeric(1))
+  out <- data.frame(
+    `Emission category` = lines$category,
+    Gas = lines$gas,
+    `Mean emissions (t of the gas)` = get("mean", 2),
+    `95% CI lower (t)` = get("ci_lower", 2),
+    `95% CI upper (t)` = get("ci_upper", 2),
+    `MoE 95% (%)` = get("moe_pct", 1),
+    `Lower half of the CI (-%)` = get("lower_pct", 1),
+    `Upper half of the CI (+%)` = get("upper_pct", 1),
+    check.names = FALSE, stringsAsFactors = FALSE)
+  if (is.data.frame(ipcc_table) && nrow(ipcc_table) == nrow(out) &&
+      all(c("AD uncertainty (95% MoE %)", "EF uncertainty (95% MoE %)") %in% names(ipcc_table))) {
+    out[["AD uncertainty, MoE 95% (%)"]] <- ipcc_table[["AD uncertainty (95% MoE %)"]]
+    out[["EF uncertainty, MoE 95% (%)"]] <- ipcc_table[["EF uncertainty (95% MoE %)"]]
+  }
+  out
 }
 
 # Round 8: trend export, multi-sheet Excel for the Trend tab.

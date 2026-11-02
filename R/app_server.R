@@ -3207,121 +3207,8 @@ app_server <- function(input, output, session) {
     }
   )
 
-  # Andreas 2026-05 #36, C10: CSV layout, emission category in column A,
-  # pasture direct + indirect kept as separate rows (not collapsed into
-  # total N₂O), and the variable->category mapping made explicit.
-  output$download_csv <- downloadHandler(
-    filename = function() paste0("uncertainty_results_", Sys.Date(), ".csv"),
-    content = function(file) {
-      req(rv$uncertainty)
-      cat_map <- c(
-        enteric_ch4_total       = "3.A.1 Enteric fermentation - CH4",
-        manure_ch4_total        = "3.B.1 Manure management - CH4",
-        direct_n2o_mm_total     = "3.B.1 Manure management - N2O direct",
-        indirect_n2o_mm_total   = "3.B.5 Manure management - N2O indirect",
-        direct_n2o_prp_total    = "3.D.1.c Pasture deposition - N2O direct",
-        indirect_n2o_prp_total  = "3.D.2 Pasture deposition - N2O indirect",
-        total_enteric_ch4       = "3.A.1 Enteric fermentation - CH4 (inventory total)",
-        total_manure_ch4        = "3.B.1 Manure management - CH4 (inventory total)",
-        total_direct_n2o_mm     = "3.B.1 Manure management - N2O direct (inventory total)",
-        total_indirect_n2o_mm   = "3.B.5 Manure management - N2O indirect (inventory total)",
-        total_direct_n2o_prp    = "3.D.1.c Pasture deposition - N2O direct (inventory total)",
-        total_indirect_n2o_prp  = "3.D.2 Pasture deposition - N2O indirect (inventory total)",
-        total_ch4               = "Aggregate - Total CH4",
-        total_n2o               = "Aggregate - Total N2O",
-        total_direct_n2o        = "Aggregate - Total N2O direct (MM + PRP)",
-        total_indirect_n2o      = "Aggregate - Total N2O indirect (MM + PRP)",
-        total_co2e              = "Aggregate - Total CO2eq"
-      )
-      unit_map <- c(
-        enteric_ch4_total = "t CH4", manure_ch4_total = "t CH4",
-        direct_n2o_mm_total = "t N2O", indirect_n2o_mm_total = "t N2O",
-        direct_n2o_prp_total = "t N2O", indirect_n2o_prp_total = "t N2O",
-        total_enteric_ch4 = "t CH4", total_manure_ch4 = "t CH4",
-        total_direct_n2o_mm = "t N2O", total_indirect_n2o_mm = "t N2O",
-        total_direct_n2o_prp = "t N2O", total_indirect_n2o_prp = "t N2O",
-        total_ch4 = "t CH4", total_n2o = "t N2O",
-        total_direct_n2o = "t N2O", total_indirect_n2o = "t N2O",
-        total_co2e = "t CO2eq"
-      )
-      df <- rv$uncertainty
-      out <- data.frame(
-        cattle_type       = "TOTAL",
-        emission_category = ifelse(df$variable %in% names(cat_map),
-                                    cat_map[df$variable], df$variable),
-        unit              = ifelse(df$variable %in% names(unit_map),
-                                    unit_map[df$variable], ""),
-        variable          = df$variable,
-        mean              = df$mean,
-        ci_lower          = df$ci_lower,
-        ci_upper          = df$ci_upper,
-        moe_pct           = df$moe_pct,
-        cv_pct            = df$cv_pct,
-        stringsAsFactors  = FALSE
-      )
-
-      # Andreas 28/5/26 #7.1 + #7.2: append per-cattle_type rows so inventory
-      # compilers can see dairy / non-dairy / other contributions to each
-      # IPCC reporting category, not only the inventory total.
-      agg_ct <- .agg_results_by_level("cattle_type")
-      per_source_vars <- c("enteric_ch4_total", "manure_ch4_total",
-                            "direct_n2o_mm_total", "indirect_n2o_mm_total",
-                            "direct_n2o_prp_total", "indirect_n2o_prp_total")
-      ct_rows <- list()
-      for (ct in names(agg_ct)) {
-        res <- agg_ct[[ct]]
-        for (v in per_source_vars) {
-          if (!v %in% names(res)) next
-          x <- res[[v]]
-          if (all(x == 0)) next
-          m  <- mean(x)
-          lo <- stats::quantile(x, 0.025, names = FALSE)
-          hi <- stats::quantile(x, 0.975, names = FALSE)
-          ct_rows[[length(ct_rows) + 1L]] <- data.frame(
-            cattle_type       = ct,
-            emission_category = cat_map[[v]],
-            unit              = unit_map[[v]],
-            variable          = v,
-            mean              = m,
-            ci_lower          = lo,
-            ci_upper          = hi,
-            moe_pct           = if (m > 0) ((hi - lo) / 2) / m * 100 else NA_real_,
-            cv_pct            = if (m > 0) stats::sd(x) / m * 100 else NA_real_,
-            stringsAsFactors  = FALSE
-          )
-        }
-      }
-      if (length(ct_rows) > 0) out <- rbind(out, do.call(rbind, ct_rows))
-
-      # 2026-09-18: ignored / repaired QA checks travel with the numbers.
-      cv <- .qa_caveats_export()
-      if (!is.null(cv)) {
-        cav <- out[rep(NA_integer_, nrow(cv)), , drop = FALSE]
-        cav$cattle_type       <- "QA_CAVEAT"
-        cav$emission_category <- sprintf("%s: %s%s / %s / %s. %s", cv$Action, cv$Group,
-                                         ifelse(nzchar(cv$Level), paste0(" @", cv$Level), ""),
-                                         cv$Parameter, cv$Check, cv$Detail)
-        cav$unit <- ""
-        cav$variable <- cv$Check
-        out <- rbind(out, cav)
-      }
-
-      # 2026-10-30: the inputs of each line that carry a placeholder range
-      # (no published source; listed in the Word report, section 2a)
-      ph <- tryCatch(placeholder_inputs_by_line(rv$param_specs, rv$manure_data), error = function(e) NULL)
-      if (!is.null(ph)) {
-        key <- sub("^total_(enteric_ch4|manure_ch4|direct_n2o_mm|indirect_n2o_mm|direct_n2o_prp|indirect_n2o_prp)$",
-                   "\\1_total", out$variable)
-        both <- function(a, b) { v <- setdiff(unique(c(strsplit(ph[[a]], ", ")[[1]], strsplit(ph[[b]], ", ")[[1]])), "none")
-                                 if (length(v)) paste(sort(v), collapse = ", ") else "none" }
-        extra <- c(total_direct_n2o = both("direct_n2o_mm_total", "direct_n2o_prp_total"),
-                   total_indirect_n2o = both("indirect_n2o_mm_total", "indirect_n2o_prp_total"))
-        lut <- c(ph, extra)
-        out$placeholder_ranges <- ifelse(!is.na(key) & key %in% names(lut), unname(lut[key]), "")
-      }
-      write.csv(out, file, row.names = FALSE)
-    }
-  )
+  # (2026-11-02: the CSV download removed at Lolita's request; the Excel
+  # Results sheet holds the same table.)
 
   # Round 6b #9: Word run-summary download
   output$download_docx <- downloadHandler(
@@ -4142,15 +4029,6 @@ app_server <- function(input, output, session) {
         sources_long         = trend_sources_long(rv_trend$res, trend_gwp()),
         by_group             = rv_trend$res$system_summary
       )
-    }
-  )
-
-  output$download_trend_csv <- downloadHandler(
-    filename = function() .trend_filename("csv"),
-    content = function(file) {
-      shiny::validate(shiny::need(!is.null(rv_trend$results),
-                    "Run a trend simulation on Tab 7 before downloading."))
-      write.csv(rv_trend$results, file, row.names = FALSE)
     }
   )
 

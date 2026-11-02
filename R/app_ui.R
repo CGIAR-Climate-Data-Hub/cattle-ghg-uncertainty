@@ -2612,15 +2612,11 @@ app_ui <- function(request = NULL) {
             p(style = "margin: 0 0 12px 0; color: #475569; font-size: 0.92rem;",
               t("downloads_intro")),
             fluidRow(
-              column(4, downloadButton("download_xlsx",
+              column(6, downloadButton("download_xlsx",
                                         t("btn_download_xlsx"),
                                         class = "btn-success",
                                         style = "width:100%;")),
-              column(4, downloadButton("download_csv",
-                                        t("btn_download_csv"),
-                                        class = "btn-outline-success",
-                                        style = "width:100%;")),
-              column(4, downloadButton("download_docx",
+              column(6, downloadButton("download_docx",
                                         t("btn_download_docx"),
                                         class = "btn-primary",
                                         style = "width:100%;"))
@@ -2700,8 +2696,6 @@ app_ui <- function(request = NULL) {
             fluidRow(
               column(3, downloadButton("download_trend_xlsx", t("btn_download_xlsx"),
                                         class = "btn-success")),
-              column(3, downloadButton("download_trend_csv", t("btn_download_csv"),
-                                        class = "btn-outline-success")),
               column(3, downloadButton("download_trend_docx", t("btn_download_docx"),
                                         class = "btn-primary"))
             )

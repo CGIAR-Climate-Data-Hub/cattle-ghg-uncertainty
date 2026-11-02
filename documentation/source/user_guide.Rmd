@@ -393,10 +393,9 @@ The bars have two colours:
 
 Focus your data work on the green bars at the top of the chart.
 
-Three downloads are available on Tab 6:
+Two downloads are available on Tab 6:
 
-- **Excel report (.xlsx)**: the full workbook with the run settings, the IPCC summary table, the uncertainty metrics and the sensitivity results.
-- **CSV**: the IPCC Table 3.3 table only, easy to import into inventory software.
+- **Excel report (.xlsx)**: a README sheet that describes each sheet, the run settings, the QA/QC checks ignored or repaired, the results (one row per IPCC reporting line: mean, 95% confidence interval, margin of error, and the activity data and emission factor split when the decomposition ran), the sensitivity results and every input of the run.
 - **Word report**: a narrative summary with the charts, ready to adapt for the uncertainty section of your inventory report.
 
 \newpage
