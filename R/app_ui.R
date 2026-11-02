@@ -2503,6 +2503,12 @@ app_ui <- function(request = NULL) {
           bslib::card(
             bslib::card_header(t("card_sens_rankings")),
             bslib::card_body(
+              div(style = "color:#555; font-size:0.85rem; margin-bottom:10px;",
+                  p(t("sens_read_intro")),
+                  tags$ul(style = "padding-left:18px; margin:0;",
+                          tags$li(t("sens_read_src")), tags$li(t("sens_read_abs")),
+                          tags$li(t("sens_read_p")), tags$li(t("sens_read_groups")),
+                          tags$li(t("sens_read_use")))),
               DT::DTOutput("sensitivity_table")
             )
           )

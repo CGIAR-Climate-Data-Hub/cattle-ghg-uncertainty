@@ -2607,7 +2607,10 @@ app_server <- function(input, output, session) {
     groups <- unique(unlist(sens_groups_of_row(df)))
     if (length(groups) <= 1) return(NULL)   # single group: no filter needed
 
-    div(style = "min-width: 280px;",
+    # 2026-11-02: the chips flow across the width and the box scrolls after
+    # two lines (27 groups stood in a column 800 px tall)
+    div(style = "flex: 1 1 640px; min-width: 420px;",
+      tags$style(HTML("#sens_groups + .selectize-control .selectize-input { max-height: 74px; overflow-y: auto; }")),
       tags$label("Animal groups shown", class = "control-label"),
       div(style = "display: flex; gap: 6px; align-items: center;",
         selectizeInput("sens_groups",
@@ -2615,6 +2618,7 @@ app_server <- function(input, output, session) {
           choices = groups,
           selected = groups,
           multiple = TRUE,
+          width   = "100%",
           options  = list(placeholder = "Select groups…",
                           plugins     = list("remove_button"))
         ),
