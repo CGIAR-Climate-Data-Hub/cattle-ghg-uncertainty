@@ -2605,7 +2605,14 @@ app_server <- function(input, output, session) {
     bslib::card(
       bslib::card_header(t("res_comparison_h")),
       bslib::card_body(
-        p(tags$em(style = "color:#555; font-size:0.85rem;", sprintf(t("res_comparison_setting"), mode_lab, n_lab))),
+        p(tags$em(style = "color:#555; font-size:0.85rem;", sprintf(t("res_comparison_setting"), {
+          has_links <- !identical(as.character(cs$corr_mode), "none")
+          has_n <- !identical(as.character(cs$n_group), "none") && (cs$n_groups %||% 2L) > 1L
+          parts <- c(t("res_cmp_note_base"),
+                     if (has_links) sprintf(t("res_cmp_note_links"), mode_lab),
+                     if (has_n) sprintf(t("res_cmp_note_n"), n_lab))
+          paste(parts, collapse = "; ")
+        }))),
         plotly::plotlyOutput("comparison_plot", height = "320px"))
     )
   })

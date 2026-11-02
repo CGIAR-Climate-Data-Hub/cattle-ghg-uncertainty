@@ -2037,9 +2037,14 @@ lang_state_take <- function(token) {
 
   res_comparison_h = list(en = "Uncertainty with and without correlations",
                              fr = "Incertitude avec et sans corrélations"),
+  # 2026-11-02: the note lists the bars actually shown (no N bar for a
+  # one-group inventory or when N is "separate counts")
   res_comparison_setting = list(
-    en = "One bar per correlation level, from left to right: no correlations (nothing ticked on Tab 3); + the links between inputs as chosen on Tab 3 (\"%s\"); + the N correlation, the animal numbers between groups as chosen (\"%s\"), which is the main run. The change from the previous level is written on each bar, in percentage points.",
-    fr = "Une barre par niveau de corrélation, de gauche à droite : aucune corrélation (rien de coché à l'onglet 3) ; + les liens entre entrées tels que choisis à l'onglet 3 (« %s ») ; + la corrélation des effectifs (N) entre groupes telle que choisie (« %s »), qui est le run principal. Le changement par rapport au niveau précédent est écrit sur chaque barre, en points de pourcentage."),
+    en = "One bar per correlation level, from left to right: %s. The last bar is the reported run. The change from the previous level is written on each bar, in percentage points.",
+    fr = "Une barre par niveau de corrélation, de gauche à droite : %s. La dernière barre est le run déclaré. Le changement par rapport au niveau précédent est écrit sur chaque barre, en points de pourcentage."),
+  res_cmp_note_base = list(en = "no correlations (nothing ticked on Tab 3)", fr = "aucune corrélation (rien de coché à l'onglet 3)"),
+  res_cmp_note_links = list(en = "+ the links between inputs chosen on Tab 3 (\"%s\")", fr = "+ les liens entre entrées choisis à l'onglet 3 (« %s »)"),
+  res_cmp_note_n = list(en = "+ the N correlation, the animal numbers between groups (\"%s\")", fr = "+ la corrélation des effectifs (N) entre groupes (« %s »)"),
   res_cmp_level_base = list(en = "No correlations", fr = "Aucune corrélation"),
   res_cmp_level_links = list(en = "+ %s", fr = "+ %s"),
   res_cmp_level_n = list(en = "+ N correlation", fr = "+ corrélation des effectifs (N)"),
@@ -2180,10 +2185,10 @@ lang_state_take <- function(token) {
   sens_view_label = list(en = "View:", fr = "Vue :"),
 
   res_sim_results_h = list(en = "Simulation results", fr = "Résultats de la simulation"),
-  res_vb_enteric_ch4_t = list(en = "Enteric CH₄ (t)", fr = "CH₄ entérique (t)"),
-  res_vb_manure_ch4_t  = list(en = "Manure CH₄ (t)", fr = "CH₄ du fumier (t)"),
-  res_vb_manure_n2o_t  = list(en = "Manure N₂O (t)", fr = "N₂O du fumier (t)"),
-  res_vb_pasture_n2o_t = list(en = "Pasture N₂O (t)", fr = "N₂O au pâturage (t)"),
+  res_vb_enteric_ch4_t = list(en = "Enteric CH₄", fr = "CH₄ entérique"),
+  res_vb_manure_ch4_t  = list(en = "Manure CH₄", fr = "CH₄ du fumier"),
+  res_vb_manure_n2o_t  = list(en = "Manure N₂O", fr = "N₂O du fumier"),
+  res_vb_pasture_n2o_t = list(en = "Pasture N₂O", fr = "N₂O au pâturage"),
   res_vb_total_moe_pct = list(en = "Total 95% MoE (%)", fr = "MoE 95 % total (%)"),
   res_vb_total_moe_sub = list(
     en = "± half-width of 95% CI / mean: IPCC convention",
