@@ -2,6 +2,10 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-02
+
+- Tw at 20 C or above is written as a constant (bounds equal to the value). The writer left it without a range on purpose (the cold adjustment applies below 20 only) and the app's QA/QC then reported "range missing" on all 27 rows of the 17:13 template, which blocked the run.
+
 ## 2026-11-01, after the 17:13 run
 
 The 17:13 run (2026.11.02.4): 496/496 values, 200/200 ranges and distributions, every series cell equal to its file row, milk verified; one error left, Frac_GasMS of solid storage at the IPCC default 30 on four commercial dairy rows where the file gives 45 (reported as a warning).

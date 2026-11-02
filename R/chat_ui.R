@@ -4056,6 +4056,11 @@ translator_cancel_clear <- function(tok) {
             if (!is.null(ph)) {
               if (!is.na(ph$pct)) v_unc <- ph$pct else { v_lo <- ph$lower; v_hi <- ph$upper }
               ph_tag <- TRUE
+            } else if (identical(p_name, "Tw") && num0(v_mean) >= 20) {
+              # 2026-11-02: Tw at 20 C or above is a fixed value by design
+              # (placeholder_range_for), but a row without a range is
+              # "range missing" on the QA/QC tab: written as a constant
+              v_dist <- "constant"; v_lo <- num0(v_mean); v_hi <- num0(v_mean)
             }
           }
           .put_param(7,  v_mean)
