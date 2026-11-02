@@ -219,7 +219,13 @@
       officer::ftext(sprintf("Figure %d. %s", k, title), prop = officer::fp_text(
         bold = TRUE, font.size = 10, color = .GREEN_DARK, font.family = "Calibri")),
       fp_p = officer::fp_par(padding.top = 8, padding.bottom = 2, keep_with_next = TRUE)))
-    doc <- officer::body_add_gg(doc, value = gg + ggplot2::labs(title = NULL), width = width, height = height)
+    # 2026-11-02: 150 dpi (officer's default is 300). At 5.5 inches that is
+    # 825 pixels, sharp on screen and in print, and it roughly quarters the
+    # memory of each chart while the report is built (a Zambia trend report
+    # peaked at 884 MB locally at 300 dpi; the server has 1 GB).
+    doc <- officer::body_add_gg(doc, value = gg + ggplot2::labs(title = NULL), width = width, height = height,
+                                res = 150)
+    invisible(gc(FALSE))
     officer::body_add_fpar(doc, officer::fpar(
       officer::ftext(caption, prop = officer::fp_text(
         italic = TRUE, font.size = 9, color = "#4B5563", font.family = "Calibri")),
