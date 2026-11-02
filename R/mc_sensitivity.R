@@ -255,13 +255,18 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   # column, their sum, shown as one bar: "N (one count, 32 groups)".
   n_cols <- colnames(combined)[sub("\\s*\\(.*\\)$", "", colnames(combined)) == "N"]
   if (length(n_cols) > 1L) {
-    rk  <- lapply(n_cols, function(cn) rank(combined[, cn], ties.method = "first"))
-    key <- vapply(rk, function(r) paste(r[seq_len(min(300L, length(r)))], collapse = ","), character(1))
-    for (k in unique(key[duplicated(key)])) {
-      members <- n_cols[key == k]
-      ref <- rk[[match(members[1], n_cols)]]
-      same <- vapply(members, function(cn) identical(rk[[match(cn, n_cols)]], ref), logical(1))
-      members <- members[same]
+    # 2026-11-02: columns are merged on a rank correlation above 0.999, not
+    # on identical ranks. Counts rounded to whole animals tie in some groups
+    # and not in others, so identical ranks failed for 8 of the 27 Zambia
+    # groups at 10,000 rows and the regression got eight collinear columns.
+    rk  <- lapply(n_cols, function(cn) rank(combined[, cn], ties.method = "average"))
+    left <- seq_along(n_cols)
+    while (length(left) > 1L) {
+      ref <- rk[[left[1]]]
+      rho <- vapply(left, function(i) suppressWarnings(stats::cor(rk[[i]], ref)), numeric(1))
+      pick <- left[is.finite(rho) & rho > 0.999]
+      left <- setdiff(left, if (length(pick)) pick else left[1])
+      members <- n_cols[pick]
       if (length(members) < 2L) next
       tot <- rowSums(combined[, members, drop = FALSE])
       lab <- sprintf("N (one count, %d groups)", length(members))

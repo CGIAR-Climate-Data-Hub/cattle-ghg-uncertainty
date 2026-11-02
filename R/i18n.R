@@ -2203,6 +2203,12 @@ lang_state_take <- function(token) {
   sens_read_use = list(
     en = "What to do with it: the inputs at the top are where better national data reduce the uncertainty most. In the tornado, green bars are inputs you can improve with your own data, blue bars are IPCC coefficients.",
     fr = "Que faire avec : les entrées en tête sont celles où de meilleures données nationales réduisent le plus l'incertitude. Dans le tornado, les barres vertes sont les entrées que vous pouvez améliorer avec vos propres données, les bleues des coefficients du GIEC."),
+  run_released_single = list(
+    en = "The single-year results were released to make room for the trend run (the server holds one run at a time). Run the single year again to see them.",
+    fr = "Les résultats de l'année unique ont été libérés pour laisser la place à la tendance (le serveur garde un seul run à la fois). Relancez l'année unique pour les revoir."),
+  run_released_trend = list(
+    en = "The trend results were released to make room for this run (the server holds one run at a time). Run the trend again to see them.",
+    fr = "Les résultats de tendance ont été libérés pour laisser la place à ce run (le serveur garde un seul run à la fois). Relancez la tendance pour les revoir."),
   res_waiting = list(en = "The results appear here when the simulation is complete. Click Run simulation above to start it.",
                      fr = "Les résultats apparaissent ici quand la simulation est terminée. Cliquez sur Lancer la simulation ci-dessus pour la démarrer."),
   res_agg_level_label = list(en = "Aggregation level:", fr = "Niveau d'agrégation :"),

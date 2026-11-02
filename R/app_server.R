@@ -1462,6 +1462,12 @@ app_server <- function(input, output, session) {
     rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
     rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
     rv$diagnostics <- NULL
+    # 2026-11-02: and the trend results, for the same reason (see the trend
+    # handler); the series and its retained draws are the bulk of them
+    if (!is.null(rv_trend$results)) {
+      for (nm in names(rv_trend)) rv_trend[[nm]] <- NULL
+      showNotification(t("run_released_trend"), type = "message", duration = 8)
+    }
     invisible(gc(FALSE))
 
     withProgress(
@@ -3282,6 +3288,19 @@ app_server <- function(input, output, session) {
     # 2,000; the user can raise it.
     n_iter <- as.integer(input$n_iter_trend %||% 2000)
     n_iter_fmt <- format(n_iter, big.mark = ",")
+    # 2026-11-02: the single-year results are released before a trend run
+    # (and a trend's before a single-year run). A single-year run with its
+    # decomposition and comparison holds several hundred MB; a trend with
+    # decomposition on top of it ran the 1 GB server out of memory
+    # (2026-11-02 09:36 UTC). The note tells the user what went.
+    if (!is.null(rv$mc_results)) {
+      rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
+      rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
+      rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL
+      rv$diagnostics <- NULL
+      invisible(gc(FALSE))
+      showNotification(t("run_released_single"), type = "message", duration = 8)
+    }
     # Round 9 follow-up: withProgress bar mirrors the single-year handler so
     # the user gets feedback during the per-year MC loop.
     withProgress(
