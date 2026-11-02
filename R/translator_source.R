@@ -3,7 +3,7 @@
 #
 # The model's exploration reply used to carry section B as a prose table
 # with no production-system column and no block-heading column, and the
-# batches copied from it. On the Zambia file that produced a mature-weight
+# batches copied from it. On the test-inventory file that produced a mature-weight
 # range on a body-weight row, a per-system DE fix on the wrong system and
 # an emergent-beef question labelled extensive. Section B is now a fenced
 # `source_values` JSON block, one entry per value the model will emit from
@@ -71,7 +71,7 @@
 # every year column are the series: they replace what the AI wrote for
 # that group and parameter, converted with the Parameters row's factor
 # where the value is converted (milk per lactating day). The AI extended
-# and smoothed the feedlot BW series of the 13:31 Zambia run and left the
+# and smoothed the feedlot BW series of the 13:31 test-inventory run and left the
 # MW series out; copying the row is deterministic. Each rebuilt series is
 # recorded: info when the AI's cells agreed, warn when some differed or
 # were missing, with the years.
@@ -147,7 +147,7 @@ translator_rebuild_series <- function(piece, source_values, sheets, tol = 0.002)
                                       f = f, changed = changed, added = added)
   }
   if (!n_rebuilt) return(piece)
-  # one record per system and parameter (2026-11-01: 199 rows on the Zambia
+  # one record per system and parameter (2026-11-01: 199 rows on the test-inventory
   # file said the same thing); a warning only when the AI's cells differed
   # from the file, a note when it had written none or all agreed
   yr_txt <- function(x) .translator_year_runs(sort(unique(as.integer(x))))
@@ -213,7 +213,7 @@ translator_rebuild_series_json <- function(json, source_values, sheets) {
 # The ranges and distributions from the file, by the server (2026-11-01,
 # evening). The source check has confirmed each entry's lower, upper and
 # distribution against the file; a Parameters row that carries something
-# else (the 16:18 Zambia run: a normal +-35 % where the file's row says
+# else (the 16:18 test-inventory run: a normal +-35 % where the file's row says
 # triangular 3 to 7.5) takes the entry's, converted with the row's factor.
 # Recorded as "range taken from the file" / "distribution taken from the
 # file" warnings. Rows whose entry gives no bounds are left alone.
@@ -296,7 +296,7 @@ translator_apply_table_ranges_json <- function(json, source_values) {
 # EF3, Frac_GasMS, Frac_LeachMS), labelled with the file's manure-system
 # name. The label is mapped to the template's code by keyword; when the
 # table gives one value for a (system, manure system, coefficient), every
-# manure row of that system takes it (the 17:13 Zambia run: Frac_GasMS of
+# manure row of that system takes it (the 17:13 test-inventory run: Frac_GasMS of
 # solid storage at the IPCC default 30 on four rows where the file gives
 # 45). Two values for one code (the two slurry MCF variants) are left
 # alone. A coefficient given as a fraction in the file is written in
@@ -462,7 +462,7 @@ translator_apply_table_manure_json <- function(json, source_values) {
     }
   }
   # section: a row under no heading (no `_section`) accepts whatever the
-  # entry says (2026-11-01: the population rows of the Zambia file have
+  # entry says (2026-11-01: the population rows of the test-inventory file have
   # none and were all flagged); a row under a heading must name it.
   sec <- as.character(e$section %||% "")
   rsec <- as.character(row[["_section"]] %||% "")

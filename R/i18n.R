@@ -831,7 +831,7 @@ lang_state_take <- function(token) {
   ai_upload_year_label = list(en = "Inventory year (required, one year)", fr = "Année d'inventaire (obligatoire, une seule)"),
   ai_upload_year_placeholder = list(en = "for example 2024", fr = "par exemple 2024"),
   ai_upload_country_label = list(en = "Country (required)", fr = "Pays (obligatoire)"),
-  ai_upload_country_placeholder = list(en = "for example Zambia", fr = "par exemple Zambie"),
+  ai_upload_country_placeholder = list(en = "country name", fr = "nom du pays"),
   ai_upload_fields_required = list(en = "Give the inventory year (one year, four digits) and the country before sending.",
                                    fr = "Indiquez l'année d'inventaire (une seule, quatre chiffres) et le pays avant d'envoyer."),
   ai_year_fix_notice = list(

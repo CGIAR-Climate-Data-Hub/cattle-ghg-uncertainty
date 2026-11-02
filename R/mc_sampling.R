@@ -100,7 +100,7 @@ make_uniform_corr <- function(n, rho) {
 #
 # Sign and power guards (2026-10-16): a normal distribution has no lower
 # limit, so a wide range on a positive quantity reaches below zero in the
-# far tail. On the Zambia file BW is normal(305, 168 to 442): one draw in
+# far tail. On the test-inventory file BW is normal(305, 168 to 442): one draw in
 # 11 million is negative, which at 35 years x 32 groups x 10,000 iterations
 # happens about once per trend run. BW^0.75 and WG^1.097 are then NaN, the
 # iteration poisons every source of that group, and quantile() stops with
@@ -136,7 +136,7 @@ make_uniform_corr <- function(n, rho) {
 # GE and DMI are optional measured intakes: a 0 (or blank) means "not
 # measured" and resolve_ge() then uses the energy balance. 2026-10-30: the
 # floor used to lift a constant 0 to 5 MJ/day (GE) and 0.2 kg/day (DMI),
-# which resolve_ge() took as a measured intake. On the Zambia 2024 translation
+# which resolve_ge() took as a measured intake. On the test-inventory 2024 translation
 # (GE = DMI = 0 written for 21 groups) those groups got about 2.5% of their
 # feed energy: total 11.3 instead of 15.4 Mt CO2e, uncertainty 48.7% instead
 # of 37.1%. A column with no positive draw is therefore left as it is.

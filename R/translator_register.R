@@ -881,7 +881,7 @@ translator_register_mark <- function(register, topic, applied, note = NULL) {
 # ---------------------------------------------------------------------------
 
 # The closing fence is optional: a block cut at the output limit has none
-# and runs to the end of the reply (2026-11-01: the first Zambia run of
+# and runs to the end of the reply (2026-11-01: the first test-inventory run of
 # Stage 3 was cut inside the block, the pattern wanted the closing fence,
 # nothing was extracted, and the continuation's 77 entries were all the
 # server had).
@@ -974,7 +974,7 @@ translator_register_mark <- function(register, topic, applied, note = NULL) {
 
 # The table is built on one year column. When the inventory year decided
 # afterwards is another one, the block has to be read again from that
-# column (2026-11-01: the Zambia run had 2022 in every entry and 2024 in
+# column (2026-11-01: the test-inventory run had 2022 in every entry and 2024 in
 # the register; the batches copy from the block). NULL when nothing is
 # to be done; else list(year, table_year, text) for the corrective message.
 .translator_year_fix_message <- function(register, entries) {

@@ -164,7 +164,7 @@ ghg_emissions_vec <- function(
 ) {
   # Round 11 (2026-06): fully vectorised over all n iterations. Previously this
   # looped i = 1..n calling the scalar ghg_emissions() once per iteration, which
-  # dominated runtime on large inventories (the 32-sub-category Zambia run at
+  # dominated runtime on large inventories (the 32-sub-category test-inventory run at
   # 30k iterations × 4 simulations took minutes). Every IPCC equation here is
   # element-wise, so the loop is replaced by whole-vector arithmetic; the only
   # remaining loop is over the handful of MMS *types* (not iterations).

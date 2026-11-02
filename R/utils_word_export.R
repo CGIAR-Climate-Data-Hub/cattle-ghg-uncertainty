@@ -221,7 +221,7 @@
       fp_p = officer::fp_par(padding.top = 8, padding.bottom = 2, keep_with_next = TRUE)))
     # 2026-11-02: 150 dpi (officer's default is 300). At 5.5 inches that is
     # 825 pixels, sharp on screen and in print, and it roughly quarters the
-    # memory of each chart while the report is built (a Zambia trend report
+    # memory of each chart while the report is built (a test-inventory trend report
     # peaked at 884 MB locally at 300 dpi; the server has 1 GB).
     doc <- officer::body_add_gg(doc, value = gg + ggplot2::labs(title = NULL), width = width, height = height,
                                 res = 150)
@@ -825,7 +825,7 @@ build_trend_summary_docx <- function(path,
   doc <- heading_fn(doc, heading)
   doc <- .add_p(doc, "Your file gave no uncertainty range for the inputs below, and no published default exists for them. So that the run could go ahead, the tool used placeholder ranges. They are not IPCC defaults. The results that depend on them are indicative only. Replace each one with a range from your own data and run again.")
   # 2026-11-02 (Lolita): one row per input instead of one per group and
-  # input (59 rows on Zambia for three inputs). The group-by-group list is
+  # input (59 rows on the test inventory for three inputs). The group-by-group list is
   # in the range_source column of the Excel Input_Parameters sheet.
   sm <- .placeholder_summary(tb)
   doc <- .add_p(doc, sprintf(
@@ -1164,7 +1164,7 @@ build_trend_summary_docx <- function(path,
 
 # Round 9b §13: Input parameter documentation. Mirrors inputs_doc_table.
 # Perf (2026-06): the input-documentation table is the single biggest driver of
-# Word build time on large inventories: for the 32-sub-category Zambia run it is
+# Word build time on large inventories: for the 32-sub-category test-inventory run it is
 # 576 rows, and officer's print.rdocx runs several whole-document regex passes
 # whose cost scales with the table's WML size (~25 s of the ~33 s build). Cap the
 # rows shown in the Word doc; the COMPLETE per-parameter listing ships in the

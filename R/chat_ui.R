@@ -408,7 +408,7 @@ translator_chat_server <- function(input, output, session) {
   # re-upload after Reset costs nothing and yields byte-identical JSON,
   # which is what lets the prompt cache hit), shows one checkbox per sheet
   # with its size in tokens, and sends only the ticked sheets when the user
-  # clicks "Send to the AI". For the Zambia file, leaving the Coefficients
+  # clicks "Send to the AI". For the test-inventory file, leaving the Coefficients
   # sheet unticked when the user has no country coefficients removes ~17K
   # tokens from every call of the run.
   observeEvent(input$translator_file, {
@@ -578,7 +578,7 @@ translator_chat_server <- function(input, output, session) {
       # 2026-11-01: the inventory year and the country, asked before the
       # exploration. The year decides which column every value of the
       # AI's table is read from; asked afterwards it cost a second table
-      # (the Zambia run of 1 November had 2022 in every entry).
+      # (the test-inventory run of 1 November had 2022 in every entry).
       if (!isTRUE(pu$is_template)) tags$div(style = "font-size:0.85rem; margin:2px 0 6px 0;", t("ai_upload_fields_hint")),
       if (!isTRUE(pu$is_template)) tags$div(
         style = "display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px;",
@@ -2295,8 +2295,8 @@ translator_cancel_clear <- function(tok) {
 # the actual cattle data on the floor. The AI then had nothing to map.
 # Now every non-trivial sheet is summarised and forwarded to the AI.
 .translator_read_upload <- function(path, name) {
-  # 2026-06-10 (Andy's 26-sub-cat Zambia case): bumped 200 → 1000.
-  # A full Zambian inventory has 282+ rows in one sheet (26 sub-categories
+  # 2026-06-10 (Andy's 26-sub-cat test-inventory case): bumped 200 → 1000.
+  # A full national inventory has 282+ rows in one sheet (26 sub-categories
   # × several production-system blocks). The 200-row cap silently cut off
   # the last 6+ sub-categories, and the AI confessed it could not see
   # row 282 when asked about an extensive-system heifer value. 1000 rows
@@ -2362,7 +2362,7 @@ translator_cancel_clear <- function(tok) {
 # the headers plus the first three columns, and matches the prose labels
 # real files use ("Coefficients for Net Energy for Maintenance (Cfi)", "Bo,
 # Maximum methane producing capacity", "Digestibility of feed (%)"). On the
-# Zambia stress file the old patterns found 5 parameter families; the new
+# the test inventory stress file the old patterns found 5 parameter families; the new
 # ones find the manure coefficients as well. Each hit reports the sheet and
 # Excel row of its first occurrence so the model and the user can go there.
 .translator_scan_param_labels <- function(sheets) {
@@ -2412,7 +2412,7 @@ translator_cancel_clear <- function(tok) {
     # the Excel row (data starts at row 2).
     cand <- data.frame(text = tolower(trimws(names(df))), row = 1L, stringsAsFactors = FALSE)
     # 2026-10-23: a sheet without numbers is a notes sheet, and a label on
-    # it is not a value. The Zambia notes sheet lists ASH, UE and Tw as
+    # it is not a value. The test-inventory notes sheet lists ASH, UE and Tw as
     # MISSING, and the scan reported them present, which then flagged every
     # default as replacing a file value. (A label on a block-header row of
     # a data sheet still counts: the numbers sit on the rows below it.)
@@ -2467,7 +2467,7 @@ translator_cancel_clear <- function(tok) {
 }
 
 # Render a sheet as a structured JSON object the LLM can navigate by
-# (sheet, row, column). Replaces the markdown table because Andy's Zambia
+# (sheet, row, column). Replaces the markdown table because Andy's test-inventory
 # inventory (26 sub-categories) was losing rows in the flat markdown
 # representation: the model couldn't reliably look up a specific row by
 # number once the sheet exceeded ~30 rows.
@@ -2493,7 +2493,7 @@ translator_cancel_clear <- function(tok) {
 #
 # 2026-10-31: many inventory sheets name the parameter only in a heading
 # row above a block ("Weight (kg)", then one row per sub-category), so the
-# data rows of two blocks look identical. On the Zambia file the AI took the
+# data rows of two blocks look identical. On the test-inventory file the AI took the
 # feedlot mature-weight range (MoE row 162) for the body-weight row (154),
 # eight rows above. Each data row now carries the nearest heading above it
 # as `_section`.
@@ -2506,15 +2506,15 @@ translator_cancel_clear <- function(tok) {
 #   a blank row, another heading or the column header;
 # - kept inside a block: a row of column names straight under a heading,
 #   and a row without values whose first cell matches the same column of
-#   the row above (a group with no entry, Zambia MoE rows 35 to 38 and 94);
+#   the row above (a group with no entry, the test inventory MoE rows 35 to 38 and 94);
 # - after a blank row the label carries on only for rows with the same
-#   columns as the block above (Zambia Coefficients: one block per
+#   columns as the block above (the test inventory Coefficients: one block per
 #   parameter, a blank between production systems), so a different table
 #   without a heading never inherits it;
 # - anything else clears the label (a value-less label such as an unused
 #   manure system, a heading with its unit in a second cell, a heading
 #   straight under data).
-# Checked on eight inventory files (Zambia, Zimbabwe, Burkina, Ethiopia,
+# Checked on eight inventory files (eight real national inventories:
 # Kenya twice, Uganda, Colombia): no row was given a wrong label.
 .translator_add_sections <- function(row_vals) {
   numberish <- function(x) is.numeric(x) || is.logical(x) ||
@@ -2706,7 +2706,7 @@ translator_cancel_clear <- function(tok) {
   # 2026-10-31 (Stage 3): the source_values block (section B). A block in
   # the corrective round replaces the previous one; the Produce observer
   # checks it against the file. 2026-11-01: a block in a continuation is
-  # appended to the block it continues (it used to replace it: the Zambia
+  # appended to the block it continues (it used to replace it: the test-inventory
   # run of 1 November kept the continuation's 77 entries and lost the rest).
   users <- Filter(function(m) identical(m$role, "user"), state$messages)
   already_continued <- length(users) > 0 && identical(users[[length(users)]]$source, "user_continue")
@@ -2792,7 +2792,7 @@ translator_cancel_clear <- function(tok) {
 
 # 2026-10-23: the explore reply carries the full table of values read
 # (sections A to C) before its questions; at 16,000 output tokens the
-# Zambia file's reply was cut off inside section D twice. 32,000 covers
+# the test inventory file's reply was cut off inside section D twice. 32,000 covers
 # it, and a reply that still hits the limit gets one continuation request.
 # 2026-10-31: 40,000 (was 32,000): section B is now a JSON block of about
 # 500 entries, roughly twice the prose table it replaces.
@@ -2875,7 +2875,7 @@ translator_cancel_clear <- function(tok) {
   # they stream. The whole visible text is sent each time it changes.
   # 2026-11-01: at most four times a second. The visible-text filter walks
   # the whole accumulated reply; run on every chunk of a 160 KB reply it
-  # held the process long enough for the websocket to drop (the Zambia
+  # held the process long enough for the websocket to drop (the test-inventory
   # run of 1 November: "disconnected" in the middle of the exploration).
   # The finished bubble comes from on_result, so no final flush is needed.
   stream_acc <- ""; stream_last <- NULL; stream_at <- 0
@@ -2978,7 +2978,7 @@ translator_cancel_clear <- function(tok) {
 # Force the AI to emit the final filled-template JSON now, regardless of
 # whether it thinks it has enough info.
 #
-# 2026-06-11 (Lolita's full Zambia run): this is now a DISPATCHER. It
+# 2026-06-11 (Lolita's full test-inventory run): this is now a DISPATCHER. It
 # does a small Stage 1 discovery call to enumerate the aggregation_level
 # labels in the conversation; for ≤2 aggregation_levels it hands off to
 # .translator_force_template_single() (the previous monolithic path,
@@ -3802,7 +3802,7 @@ translator_cancel_clear <- function(tok) {
   # Run the official writer under a calling handler so a thrown error
   # captures the FULL call stack (R function names + line numbers) into
   # shinyapps.io logs. The previous tryCatch only logged
-  # conditionMessage(), which on the Zambia run produced just "no such
+  # conditionMessage(), which on the test-inventory run produced just "no such
   # index at level 1" with no clue where it came from: local repros
   # of the same input data succeeded. The withCallingHandlers below
   # snapshots sys.calls() at the throw site BEFORE control unwinds to
@@ -3942,7 +3942,7 @@ translator_cancel_clear <- function(tok) {
         # The first-match-wins behaviour wrote commercial_dairy values
         # into emergent_dairy's rows and commercial_beef values into
         # both emergent_beef and extensive_trad. Identified 2026-06-15
-        # in QA against the Zambia source file: 9/56 spot-checked
+        # in QA against the test-inventory source file: 9/56 spot-checked
         # values were contaminated.
         mask <- params$sub_category == sub_cat &
                 params$parameter    == p_name &
@@ -4333,7 +4333,7 @@ translator_cancel_clear <- function(tok) {
   ts <- parsed$parameter_timeseries
   # 2026-10-30: a row the AI left without cattle_type takes it from the
   # Parameters group with the same aggregation_level and sub_category. The
-  # Zambia 2024 run left it blank for all commercial dairy rows: the trend
+  # the test inventory 2024 run left it blank for all commercial dairy rows: the trend
   # matched none of them, and one cell kept the blank template's note.
   if (is.data.frame(ts) && nrow(ts) > 0 && is.data.frame(parsed$parameters) &&
       all(c("aggregation_level", "sub_category") %in% names(ts)) &&

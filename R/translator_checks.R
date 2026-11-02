@@ -1,7 +1,7 @@
 # Consistency checks on a translator-produced template (2026-09-18).
 #
 # run_qaqc() judges each row on its own. The errors the AI actually made on
-# the Zambia file were relational: a calf row split into male and female
+# the test-inventory file were relational: a calf row split into male and female
 # halves with different invented weights, a manure allocation that summed to
 # 111 %, one production system given a pasture MCF four times the value the
 # file gives every other system, and an uncertainty of 0.5 where the file
@@ -57,7 +57,7 @@
 }
 
 # Parameters whose value is one per production system in a file like
-# Zambia's (the diet and the milk composition): near-identical values
+# the test inventory's (the diet and the milk composition): near-identical values
 # across the groups of one system are usually a different year or a
 # rounding, and shared draws need identical values (Stage 5.5).
 .TRANSLATOR_PER_SYSTEM <- c("DE", "CP", "Fat", "MilkPR", "pct_pregnant", "Ym")
@@ -155,7 +155,7 @@ translator_source_fingerprint <- function(parsed) {
   # 2026-10-22 (WP3, C7): columns headed by a year carry the source's own
   # per-year totals; every sheet's column sum is kept as a candidate.
   # 2026-10-23: a population sheet carries subtotal and total rows, so the
-  # whole column is a multiple of the herd (Zambia: four times). Three
+  # whole column is a multiple of the herd (Test inventory: four times). Three
   # candidates per column: the whole column, the rows not labelled total,
   # and the largest cell (a grand-total row is the herd itself).
   year_sums <- list()
@@ -212,7 +212,7 @@ translator_source_fingerprint <- function(parsed) {
 
 # 2026-10-23: a relative uncertainty written as a fraction of 1 (0.5 for
 # 50 %) where the catalogue and the rest of the file say percent. The
-# Zambia MoE sheet gives "95% margin of error (%)" as 0.5; the user
+# the test inventory MoE sheet gives "95% margin of error (%)" as 0.5; the user
 # confirmed it means 50 %, and one production system still came out with
 # 0.5. The reference is the catalogue's suggested uncertainty for the
 # parameter, else the median of the other rows of the same parameter: when
@@ -278,7 +278,7 @@ translator_source_fingerprint <- function(parsed) {
 }
 
 # 2026-10-23: the Parameters sheet is the single-year snapshot of the time
-# series, so for the inventory year the two must agree. On the Zambia run
+# series, so for the inventory year the two must agree. On the test-inventory run
 # of 15:50 the model emitted four systems' populations from its
 # exploration table, built for 2022 before the user chose 2024, while the
 # time series (read straight from the year columns) was right. Where they
@@ -365,7 +365,7 @@ translator_source_fingerprint <- function(parsed) {
 
 # 2026-10-30 (Lolita, hard rule): an optional input (GE, DMI: measured
 # intake) appears in the template only when the uploaded file has it. The
-# AI wrote GE = DMI = 0 for every Zambia group from about 22 October, and a
+# AI wrote GE = DMI = 0 for every test-inventory group from about 22 October, and a
 # value it invents would replace the energy balance. `families` is the
 # source scan (NULL when the source is unknown: nothing is removed then).
 .translator_drop_unsourced_intake <- function(piece, families = NULL) {
@@ -457,7 +457,7 @@ translator_source_fingerprint <- function(parsed) {
     u_i <- num("uncertainty_pct", i)
     if (!is.finite(lo) && !is.finite(up) && is.finite(u_i) && u_i > 0 && !is.finite(slo) && !is.finite(sup)) {
       # a margin on a converted value, with no file bounds stated: the
-      # 16:18 Zambia run wrote +-35 % where the file's row has 3 to 7.5
+      # 16:18 test-inventory run wrote +-35 % where the file's row has 3 to 7.5
       rows[[length(rows) + 1L]] <- row(sprintf(paste0(
         "%s: a margin of +-%s %% was written for a converted value, and the file's bounds were not stated (source_lower, ",
         "source_upper). If the file gives a margin for this row, this is right; if it gives bounds, they belong here, converted with the same factor (%s)."),
@@ -1169,7 +1169,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     # 5. One manure system, one set of coefficients. MCF depends on climate
     #    and system, not on which herd uses it, so different values for the
     #    same system across the file point at a copy error.
-    #    2026-10-23: within a cattle type. The IPCC tables and the Zambia
+    #    2026-10-23: within a cattle type. The IPCC tables and the test-inventory
     #    file give dairy and other cattle different Frac_GasMS for the same
     #    system, which is not a copy error.
     coef_cols <- intersect(c("MCF_pct", "EF3", "Frac_GasMS_pct", "Frac_LeachMS_pct"), names(mm))
@@ -1188,7 +1188,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           sprintf("%s in %s", fmt(x), paste(utils::head(grp, 3), collapse = ", "))
         }, character(1))
         # 2026-10-31: when every value is in the file, these are variants of
-        # one system (Zambia: slurry stored 1 month at MCF 25 and 12 months
+        # one system (Test inventory: slurry stored 1 month at MCF 25 and 12 months
         # at 73, both mapped to liquid_slurry). An info with its own name,
         # which the AI review is not asked to "correct": asked to, it set
         # the 12-month row to 25.
@@ -1197,7 +1197,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         pool <- pool[is.finite(pool)]
         # (2026-11-01: MCF only; a Frac_GasMS that differs between the
         # groups of one system is a slip even when both numbers are in the
-        # file, as in the 16:18 Zambia run: 45 for the cows, 30 elsewhere)
+        # file, as in the 16:18 test-inventory run: 45 for the cows, 30 elsewhere)
         in_file <- identical(col, "MCF_pct") && length(pool) > 0 && all(vapply(vals, function(x)
           any(.translator_near(pool, x) | .translator_near(pool * 100, x) | .translator_near(pool / 100, x)),
           logical(1)))
@@ -1214,7 +1214,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     }
 
     # 6. One bound pair reused across every manure row (Andreas, 2026-09-30).
-    #    On the Zambia file the source gave a RELATIVE MoE of +/-50 % per
+    #    On the test-inventory file the source gave a RELATIVE MoE of +/-50 % per
     #    share; the translator wrote lower = 0, upper = 50 on every row
     #    instead, so a 40 % dry-lot share and a 1.25 % digester share were
     #    given the same bounds. Every existing check passed it: the bounds
@@ -1229,7 +1229,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         # EVERY repeated pair is examined, not just the commonest one. A
         # partly-corrected file can carry the error on a minority of rows
         # while some larger, entirely legitimate group sits above it: on the
-        # Zambia file, once the 102 worst rows were fixed, the largest group
+        # the test inventory file, once the 102 worst rows were fixed, the largest group
         # became 32 rows that correctly share both a bound pair AND a share,
         # which hid 21 rows that were still wrong.
         for (pv in names(table(pair))) {
@@ -1259,7 +1259,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     #    (Andreas, 2026-09-30). The engine treats a blank bound pair as
     #    EXACTLY KNOWN: sample_per_mms_param() returns a zero-variance column,
     #    so the source's stated uncertainty is dropped rather than replaced by
-    #    a default. On the Zambia file MCF came through correctly but its
+    #    a default. On the test-inventory file MCF came through correctly but its
     #    +/-25 % did not, and nothing said so.
     for (col in coef_cols) {
       lo_col <- switch(col, MCF_pct = "lower_mcf", EF3 = "lower_ef3",
@@ -1463,7 +1463,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
       filled <- grepl("ipcc|default|auto", dsrc) & ps$parameter %in% source$families
       if (any(filled)) {
         by_p <- split(which(filled), ps$parameter[filled])
-        # one row per parameter (2026-11-01: 54 identical rows on the Zambia file)
+        # one row per parameter (2026-11-01: 54 identical rows on the test-inventory file)
         for (pn in names(by_p)) {
           i <- by_p[[pn]]
           add("source reconciliation", sprintf(paste0(
@@ -1479,7 +1479,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
 
   # C3m (2026-10-23). A manure coefficient must be a number of the file
   # when the file carries that coefficient at all (the scan found the
-  # family). The Zambia run of 15:50 came out with MCF 4.59 and 50 and
+  # family). The test-inventory run of 15:50 came out with MCF 4.59 and 50 and
   # Frac_GasMS 48, none of which exist in the file, and nothing said so:
   # C5 compares against the file's own column, which the row-block layout
   # of the Coefficients sheet does not yield.
@@ -1627,7 +1627,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   }
 
   # C10 (2026-10-30): one parameter, one distribution across the systems.
-  # On the Zambia file of 30 October the file named "normal" for Ym in all
+  # On the test-inventory file of 30 October the file named "normal" for Ym in all
   # five systems and one batch came back with PERT. A minority shape among
   # three or more systems, against a clear majority, is listed for review.
   if (!is.null(ps) && is.data.frame(ps) && nrow(ps) > 0 &&
@@ -1674,7 +1674,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
         tb <- table(vals); modal <- as.numeric(names(tb)[which.max(tb)])
         if (spread < 0.02) {
           # a note, not a warning: a group can have its own row in the file
-          # (the Zambia feedlot's CP, 10.2156 against 10.0625 elsewhere);
+          # (the test-inventory feedlot's CP, 10.2156 against 10.0625 elsewhere);
           # a value copied from another year is the year check's
           for (i in idx[vals != modal])
             add(sprintf("%s / %s / %s", L, ps$sub_category[i], p),
@@ -1694,7 +1694,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
 
   # C11 and C12 (2026-10-30): the time series against the source.
   # C11, coverage: a value the file gives year by year must have a series
-  # for that group. On the Zambia file of 30 October the series covered the
+  # for that group. On the test-inventory file of 30 October the series covered the
   # cows only in three systems (DE and CP of 12 other groups, and the
   # feedlot weights, were blank), so a trend run held those values at the
   # 2024 level for 35 years. A value is "given year by year" when it is the
@@ -1703,7 +1703,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
   # that year; a value found only in another year's column was copied from
   # the wrong column (emergent beef calves 2023 carried the 2024 count).
   # 2026-11-01: two rows for one group and year on the series sheet (the
-  # 15:09 Zambia run had 70 rows per commercial dairy group: the AI's rows
+  # 15:09 test-inventory run had 70 rows per commercial dairy group: the AI's rows
   # without a system label and the server's). The trend run reads the
   # first; the sheet is wrong.
   if (is.data.frame(population) && nrow(population) && all(c("sub_category", "year") %in% names(population))) {
@@ -1833,7 +1833,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
             # 2026-11-01: a value in no year column at all. A converted
             # parameter is checked by .translator_ts_conversion_issues;
             # anything else is a number the file does not have (the
-            # feedlot BW series of the 13:31 Zambia run climbed by one
+            # feedlot BW series of the 13:31 test-inventory run climbed by one
             # kilogram a year where the file is uneven and then flat).
             conv <- if (!is.null(piece) && is.data.frame(piece$parameters) && "conversion_factor" %in% names(piece$parameters)) {
               pp <- piece$parameters

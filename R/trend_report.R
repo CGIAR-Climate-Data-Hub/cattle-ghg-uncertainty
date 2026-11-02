@@ -287,7 +287,7 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
 # simulations for year t (Table 3.3 columns E and F) run on the same
 # systems at the same count, as trend_decompose_year() did on its own.
 #
-# Monte Carlo error at 2,000 draws against 10,000 on the Zambia total: the
+# Monte Carlo error at 2,000 draws against 10,000 on the test-inventory total: the
 # standard error of the mean 0.30% against 0.13%; the 95% half-width known
 # to plus or minus 1.2 points against 0.6 (knowledge/22, section 6).
 #
@@ -304,7 +304,7 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
                                  # nothing reads the pair's input draws (the
                                  # trend tornadoes read the series), so one
                                  # row is kept: about 60 MB less at the peak
-                                 # on Zambia at 10,000
+                                 # on the test inventory at 10,000
                                  keep_sample_rows = 1L, progress_fn = NULL,
                                  n_group_rho = 0, n_year_corr = "none") {
   n_iter <- as.integer(n_iter)

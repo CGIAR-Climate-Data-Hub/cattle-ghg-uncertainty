@@ -48,7 +48,7 @@ sample_distribution <- function(n, type, mean_val, lower, upper) {
   # beef DE case). mc2d::rpert / rtriang then emit "mode < min or mode > max"
   # warnings and NaN samples; the NaN column later makes sd() return NA and
   # crashes the sensitivity analysis with "undefined columns selected"
-  # (Andy's Zambia run, Tab 6 blank / Tab 7 distributions wrong). We repair
+  # (Andy's test-inventory run, Tab 6 blank / Tab 7 distributions wrong). We repair
   # the bounds here rather than propagate NaN:
   #   - swap inverted bounds (lower > upper);
   #   - for bounded distributions, clamp the mode/mean into [lower, upper];

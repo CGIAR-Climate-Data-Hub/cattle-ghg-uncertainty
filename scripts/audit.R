@@ -1953,7 +1953,7 @@ section_F <- function() {
                              paste(reducible, collapse = ", "),
                              paste(expected, collapse = ", ")))
 
-  # F24: regression guard for Andy's Zambia crash (2026-06-15):
+  # F24: regression guard for Andy's test-inventory crash (2026-06-15):
   # an inconsistent CI where the central value sits OUTSIDE [lower, upper]
   # must not make the sampler return NaN. Before the fix, mc2d::rpert emitted
   # "mode < min or mode > max" + NaN, which later made sd() return NA and
@@ -2022,7 +2022,7 @@ section_F <- function() {
   # and REG crosses zero near DE = 37.6%. An UNtruncated normal draw on DE
   # (lower/upper only set the SD) wanders into the low tail and sends gross
   # energy to +/-infinity, producing impossible negative / exploded total_co2e
-  # (Andy's Zambia histogram: x-axis to ~50B t, mean above the 97.5th pctl).
+  # (Andy's test-inventory histogram: x-axis to ~50B t, mean above the 97.5th pctl).
   # generate_mc_samples() must clamp DE into [45, 85] so REM/REG stay positive.
   set.seed(7)
   de_specs <- data.frame(
@@ -3408,7 +3408,7 @@ section_F <- function() {
   # (2026-09-18). A fail row blocks the run until fixed or ignored; ignoring
   # bounds_order / dist_suitability applies the smallest repair; benchmark
   # deviation is advisory; sub_category_ambiguous cannot be ignored; the
-  # consistency checks catch the four error classes seen on the Zambia run.
+  # consistency checks catch the four error classes seen on the test-inventory run.
   {
     f49_fail <- tryCatch({
       f <- character()
@@ -3940,7 +3940,7 @@ section_F <- function() {
   # ---------------------------------------------------------------------
   # F62-F63 -- the absolute-versus-relative spread defect (Andreas, 2026-09-30).
   #
-  # On the Zambia file the source gave a RELATIVE 50 % margin on each manure
+  # On the test-inventory file the source gave a RELATIVE 50 % margin on each manure
   # share; the translation wrote a flat 0 to 50 on every row, and a relative
   # 25 % on MCF was dropped entirely by leaving its bounds blank. Neither was
   # visible row by row: the flat bounds bracket every mean and the shares
@@ -4287,7 +4287,7 @@ section_F <- function() {
                      else paste(f67_fail, collapse = "; "))
 
   # F68 -- measured intake (GE, DMI) only from the source (2026-10-30). The
-  # AI wrote GE = DMI = 0 for every Zambia group; the sampler lifted the 0 to
+  # AI wrote GE = DMI = 0 for every test-inventory group; the sampler lifted the 0 to
   # its floor and used it as a measured intake (total 11.3 instead of 15.4
   # Mt CO2e). Four guards: the scan recognises GE and DMI by name and unit
   # (not net or metabolisable energy), the server removes them when the file
@@ -4322,7 +4322,7 @@ section_F <- function() {
              notes = if (f68_ok) "scan, removal, C14 and sampler floor all as intended"
                      else paste(f68_fail, collapse = "; "))
 
-  # F69 -- a broken tool stream is issued again (2026-10-31). On a Zambia run
+  # F69 -- a broken tool stream is issued again (2026-10-31). On a test-inventory run
   # the fifth system's stream broke after data had arrived; the transport
   # retried only untouched calls, so the run failed silently while the page
   # clock went on counting. Tool calls (restart_ok) now start over; a text
@@ -4374,7 +4374,7 @@ section_F <- function() {
                      else paste(f69_fail, collapse = "; "))
 
   # F70 -- every data row carries the heading above it (2026-10-31). The
-  # Zambia sheets name the parameter only in a heading row, so the Weight
+  # the test inventory sheets name the parameter only in a heading row, so the Weight
   # and Mature weight blocks of the MoE sheet look identical and the AI took
   # row 162 (MW) for row 154 (BW). A text row that is not clearly a heading
   # (here a value-less label straight under data) clears the label.
@@ -4523,7 +4523,7 @@ section_F <- function() {
              notes = if (f74_ok) "1 fail on GE after write and read-back" else paste(f74_fail, collapse = "; "))
 
   # F75 -- two legitimate values of one manure coefficient (2026-10-31): the
-  # Zambia slurry rows (1 month at MCF 25, 12 months at 73) are an info with
+  # the test inventory slurry rows (1 month at MCF 25, 12 months at 73) are an info with
   # their own name, and the AI review is not asked to "correct" them. Two
   # values of which one is not in the file stay a warning.
   f75_fail <- tryCatch({
@@ -4599,7 +4599,7 @@ section_F <- function() {
   # F77 -- the source_values block (2026-10-31, Stage 3): the extractor keeps
   # the complete entries of a block cut at the output limit, and the server
   # check flags a wrong row (the MW row offered as BW), a wrong heading and
-  # a wrong system label on synthetic sheets laid out like the Zambia file.
+  # a wrong system label on synthetic sheets laid out like the test-inventory file.
   f77_fail <- tryCatch({
     f <- character(0)
     body <- '[{"system": "Sys A", "label": "Cows", "section": "Weight (kg)", "sheet": "Data", "row": 4, "col": "2020", "mean": 410, "parameter": "BW", "aggregation_level": "sys_a"},\n {"system": "Sys A", "label": "Bulls", "sheet": "Data", "row": 5, "co'

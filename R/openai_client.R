@@ -430,7 +430,7 @@ assemble_translator_system_prompt <- function(asset_dir = "translator_prompts") 
   out
 }
 
-# The emission checklist (2026-10-31): the rules behind the Zambia errors,
+# The emission checklist (2026-10-31): the rules behind the test-inventory errors,
 # restated in about 250 tokens at the end of every emission request (the
 # uncached tail, where the model weighs text most). The system prompt
 # carries each of them in full; here they are the last thing read before

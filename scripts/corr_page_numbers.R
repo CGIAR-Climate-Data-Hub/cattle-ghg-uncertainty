@@ -1,16 +1,16 @@
-# Numbers for section 6 of the correlations help page, from the Zambia
+# Numbers for section 6 of the correlations help page, from the test-inventory
 # template of 1 November 17:13 (every series, range and coefficient equal
 # to the file). Single year 2024 at 4,000 draws; trend 1990 to 2024 at
 # 2,000 draws per year plus a 4,000-draw pair for the two reported years.
 suppressMessages({for (f in list.files("R", "\\.R$", full.names = TRUE)) try(source(f), silent = TRUE)})
 Sys.setenv(APP_RUNTIME_DIR = "C:/tmp/rt")
 N_ITER <- 4000L; SEED <- 42L; GWP <- "AR5"
-parsed <- parse_uploaded_template("test_data/ZAM/zam_1713.xlsx")
+parsed <- parse_uploaded_template("test_data/inv_a/inv_a_1713.xlsx")
 specs <- parsed$param_specs; manure <- parsed$manure
 comp <- ensure_completeness(specs, region = parsed$metadata$region)
 if (isTRUE(comp$valid)) specs <- comp$param_specs
 sgm <- resolve_sub_category_matches(specs, manure)$matched
-cat("Zambia 2024: rows", nrow(specs), " groups", length(unique(make_group_key(specs))), " year", parsed$metadata$inventory_year %||% parsed$metadata$year, "\n")
+cat("the test inventory 2024: rows", nrow(specs), " groups", length(unique(make_group_key(specs))), " year", parsed$metadata$inventory_year %||% parsed$metadata$year, "\n")
 summ <- function(x) { m <- mean(x); q <- quantile(x, c(0.025, 0.975), names = FALSE)
   c(mean_Mt = m / 1e6, lo_Mt = q[1] / 1e6, hi_Mt = q[2] / 1e6, moe_pct = (q[2] - q[1]) / (2 * m) * 100) }
 

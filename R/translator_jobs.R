@@ -169,7 +169,7 @@ translator_job_estimate <- function(levels, subcats_by_level = NULL, usage_df = 
   }
   n_params <- nrow(PARAM_CATALOGUE)
   # per sub-category: a parameter row is about 60 tokens of JSON, a manure
-  # row 70 (eight systems), a time-series row 65 (the Zambia run of
+  # row 70 (eight systems), a time-series row 65 (the test-inventory run of
   # 2026-10-23: 17,500 to 35,400 tokens per system of 5 or 6 sub-categories)
   n_years <- suppressWarnings(as.numeric(n_years %||% 0)); if (!is.finite(n_years)) n_years <- 0
   ts_tokens <- if (n_years > 1) n_years * 65 else 0

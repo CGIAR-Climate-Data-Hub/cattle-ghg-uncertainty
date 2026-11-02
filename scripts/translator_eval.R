@@ -29,7 +29,7 @@
 # Why this exists (plan E): nothing in the translator should change what the
 # model emits without a number saying whether the output got better or
 # worse. The June writer contamination (9 of 56 values wrong) was found by
-# exactly this kind of comparison, by hand. A Zambia replay costs about $5
+# exactly this kind of comparison, by hand. A test-inventory replay costs about $5
 # and 45 minutes; the offline score costs nothing and takes a second.
 # =============================================================================
 

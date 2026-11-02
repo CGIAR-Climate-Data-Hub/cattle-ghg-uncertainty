@@ -9,7 +9,7 @@
 # 2026-10-16 rewrite. Until this date trend mode (a) dropped the group key,
 # so the last group's value for a parameter overwrote every group's, and (b)
 # passed the whole parameter sheet as one system, so the inventory was
-# computed from one group. On the Zambia file: every group given N = 252,503
+# computed from one group. On the test-inventory file: every group given N = 252,503
 # and a total of 196,566 t against 9,240,534 t. It also retained the full
 # sample matrix of every year, 2.09 GB over 35 years. See
 # knowledge/22-trend-capacity.md.
@@ -85,7 +85,7 @@ trend_df_from_population <- function(population, base_specs,
   # blank one takes the cattle_type of the Parameters group with the same
   # aggregation_level and sub_category (or the only one of that system);
   # the key used to read "NA||...", matched nothing, and the trend kept the
-  # inventory-year values for the whole group without saying so (Zambia
+  # inventory-year values for the whole group without saying so (the test inventory
   # 2024 translation: all of commercial dairy).
   if (all(c("cattle_type", "aggregation_level") %in% names(population)) &&
       !is.null(base_specs) &&
@@ -197,7 +197,7 @@ trend_df_from_population <- function(population, base_specs,
 # year_seed, and the per-MMS draws use year_seed + 1000003. Until 2026-10-28
 # the year seed was seed + yi, so year y group g + 1 and year y + 1 group g
 # both drew from seed + y + g + 1: their animal numbers had a rank
-# correlation of 1.000 (31 of 32 groups on Zambia, every pair of
+# correlation of 1.000 (31 of 32 groups on the test inventory, every pair of
 # consecutive years), a year-to-year correlation nobody chose. A stride of
 # 10007 per year keeps every stream of every year apart for up to 9,300
 # groups; the partial-correlation generator (seed + 1 .. seed + n_years) and
@@ -486,7 +486,7 @@ trend_sensitivity_delta <- function(res, method = "both", max_rows = 4000L) {
   # identical columns (a coefficient shared across groups, or held across
   # both years) are regressed once. 2026-10-29: found from a numeric
   # fingerprint confirmed with identical(), as aggregate_sensitivity() does;
-  # pasting every column into a string took 37 s on Zambia (2 x 1,250
+  # pasting every column into a string took 37 s on the test inventory (2 x 1,250
   # columns), which was most of the wait before the trend results showed.
   cm <- as.matrix(combined)
   fp <- paste(colSums(cm), colSums(cm * cm), cm[1L, ], cm[nrow(cm), ], sep = "|")

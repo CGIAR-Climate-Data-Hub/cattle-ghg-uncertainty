@@ -3,7 +3,7 @@
 # Stage 3 of the 31 October plan: the source_values block (section B as a
 # verifiable JSON block), its extractor, the server check of every entry
 # against the uploaded sheets, the per-system rows for the batch nudge and
-# the sub-category check. The real Zambia file (gitignored) is used when it
+# the sub-category check. The real test-inventory file (gitignored) is used when it
 # is present; the synthetic part runs everywhere.
 suppressMessages({for (f in list.files("R", pattern = "[.]R$", full.names = TRUE)) source(f)})
 n_ok <- 0L; n_bad <- 0L
@@ -62,7 +62,7 @@ df2 <- data.frame(a = c("Dairy cattle", "Cows", "Heifer (1 - 3 years)", "Oxen (>
                         "Coefficients for growth (_C)", "All production systems", "Growing males", NA,
                         "Sys A", "Methane conversion (Ym)", "all categories except calves", "Adult bulls, heifers and growing males", "Cows"),
                   v = c(NA, 100, 200, 300, NA, NA, NA, 1.2, NA, NA, NA, 6.5, 7, 55), check.names = FALSE, stringsAsFactors = FALSE)
-# a sheet whose first data row sits under no heading (the Zambia population rows)
+# a sheet whose first data row sits under no heading (the test-inventory population rows)
 df3 <- data.frame(Description = c("Dairy cattle", "Dairy cattle"), b = c("Cows", "Bulls"), v = c(100, 110), check.names = FALSE, stringsAsFactors = FALSE)
 sh2 <- list(list(name = "Data", json = .translator_table_to_json(df2, "Data"), n_rows = nrow(df2)),
             list(name = "Pop", json = .translator_table_to_json(df3, "Pop"), n_rows = nrow(df3)))
@@ -98,7 +98,7 @@ ok(is.null(.translator_year_fix_message(reg24, tab22[3])), "no year column in th
 ok(is.null(.translator_year_fix_message(translator_register_add_pending(list(), "inventory_year"), tab22)), "year still pending: nothing to do")
 
 # ---- the check on synthetic sheets ------------------------------------------------
-# the layout of the Zambia sheets: the system label above the block heading
+# the layout of the test-inventory sheets: the system label above the block heading
 df <- data.frame(a = c("Sys A", "Weight (kg)", "Cows", "Bulls", NA, "Sys A", "Mature weight (kg)", "Cows", "Bulls"),
                  `2019` = c(NA, NA, 400, 500, NA, NA, NA, 440, 540),
                  `2020` = c(NA, NA, 410, 510, NA, NA, NA, 450, 550), check.names = FALSE, stringsAsFactors = FALSE)
@@ -150,8 +150,8 @@ ok(!c2$ok && c2$missing == "bulls" && c2$extra == "calves", "a missing and an ex
 rej <- .translator_subcat_rejection("sys_a", c2)
 ok(grepl("^REJECTED for 'sys_a'", rej) && grepl("Missing: bulls", rej, fixed = TRUE) && grepl("the batch carries", rej, fixed = TRUE), "the rejection text")
 
-# ---- the real Zambia file, when present -------------------------------------------------
-zf <- "test_data/ZAM/Zambia Tier 2 inventory inputs.xlsx"
+# ---- the real test-inventory file, when present -------------------------------------------------
+zf <- "test_data/inv_a/inv_a_source.xlsx"
 if (file.exists(zf)) {
   parsed <- .translator_read_upload_memo(zf, basename(zf))
   zs <- lapply(parsed$sheets, function(s) list(name = s$name, json = s$json, n_rows = s$n_rows))
@@ -166,19 +166,19 @@ if (file.exists(zf)) {
   z_mw <- list(system = "Commercial beef farms", label = "Feedlot cattle (1 - 3 years)", section = "Mature weight (kg) (Country specific value)",
                sheet = csd, row = 139L, col = "2022", mean = 470, lower = 450, upper = 550, bounds_sheet = moe, bounds_row = 162L, parameter = "MW")
   zc <- translator_source_values_check(list(z_ok, z_bounds, z_row, z_sec, z_sys, z_mw), zs)
-  ok(zc$ok[1], "Zambia: feedlot BW on row 131 passes")
-  ok(zc$ok[6], "Zambia: feedlot MW with the MoE 450 to 550 bounds passes")
-  ok(zc$ok[2], "Zambia: bounds that exist on a MoE row are accepted on the BW entry (the section check is the one that tells BW from MW)")
-  ok(!zc$ok[3] && grepl("section", zc$what[3]), "Zambia: the MW row offered as BW fails on the section")
-  ok(!zc$ok[4] && grepl("section", zc$what[4]), "Zambia: a wrong heading on the right row fails")
-  ok(!zc$ok[5] && grepl("system", zc$what[5]), "Zambia: an emergent-beef row labelled extensive fails on the system")
+  ok(zc$ok[1], "Test inventory: feedlot BW on row 131 passes")
+  ok(zc$ok[6], "Test inventory: feedlot MW with the MoE 450 to 550 bounds passes")
+  ok(zc$ok[2], "Test inventory: bounds that exist on a MoE row are accepted on the BW entry (the section check is the one that tells BW from MW)")
+  ok(!zc$ok[3] && grepl("section", zc$what[3]), "Test inventory: the MW row offered as BW fails on the section")
+  ok(!zc$ok[4] && grepl("section", zc$what[4]), "Test inventory: a wrong heading on the right row fails")
+  ok(!zc$ok[5] && grepl("system", zc$what[5]), "Test inventory: an emergent-beef row labelled extensive fails on the system")
   sv_z <- list(z_ok, z_mw, modifyList(z_ok, list(row = 126L, label = "Adult cows (>3 years)", mean = 460, sub_category = "other_cows")))
   for (i in seq_along(sv_z)) sv_z[[i]]$aggregation_level <- "commercial_beef"
   scz <- translator_level_rows("commercial_beef", sv_z, NULL, zs, expected_subcats = c("other_cows", "bulls", "heifers", "growing_males", "calves", "feedlot_cattle"))
-  ok(identical(scz$systems, "Commercial beef farms") && any(scz$ranges$sheet == moe) && scz$n_expected == 6L, "Zambia: the scope names the system, the MoE rows and six sub-categories")
+  ok(identical(scz$systems, "Commercial beef farms") && any(scz$ranges$sheet == moe) && scz$n_expected == 6L, "Test inventory: the scope names the system, the MoE rows and six sub-categories")
   tz <- .translator_scope_text(scz)
-  ok(nchar(tz) / 3.6 < 300 && grepl("Expected sub-categories (6)", tz, fixed = TRUE), "Zambia: the paragraph stays under 300 tokens")
-} else cat("(Zambia file absent: the real-file part was skipped)\n")
+  ok(nchar(tz) / 3.6 < 300 && grepl("Expected sub-categories (6)", tz, fixed = TRUE), "Test inventory: the paragraph stays under 300 tokens")
+} else cat("(the test inventory file absent: the real-file part was skipped)\n")
 
 cat(sprintf("\n%d passed, %d failed\n", n_ok, n_bad))
 if (n_bad == 0L) cat("SOURCE VALUES TESTS PASSED\n")

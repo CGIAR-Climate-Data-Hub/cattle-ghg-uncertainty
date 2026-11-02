@@ -202,14 +202,14 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
                                       # blocking loop goes silent and shinyapps.io
                                       # drops the connection (~180 s idle), which
                                       # is the "timed out after a few minutes"
-                                      # failure on the 32-sub-category Zambia run.
+                                      # failure on the 32-sub-category test-inventory run.
                                       progress_cb = NULL,
                                       # Memory cap: thin each system's RETAINED
                                       # `samples` frame to at most this many rows
                                       # before it is stored in `by_system`. NULL =
                                       # keep all rows (audit / headless / trend
                                       # callers). The Shiny app passes 4000L so the
-                                      # heaviest Zambia run (32 sub-categories ×
+                                      # heaviest test-inventory run (32 sub-categories ×
                                       # main + AD-only + EF-only + no-correlation
                                       # comparison) stays under the ~1 GB free tier.
                                       # `results` and `inventory` are ALWAYS kept at
@@ -255,7 +255,7 @@ run_inventory_simulation <- function(systems_data, n_iter = 10000, gwp = "AR5",
     )
     # Memory cap: thin the retained input draws to keep_sample_rows so the
     # accumulator never holds full-n_iter samples for all systems at once
-    # (the OOM driver on the heavy Zambia run). results/inventory untouched -
+    # (the OOM driver on the heavy test-inventory run). results/inventory untouched -
     # they keep the full iteration count behind every reported figure.
     if (!is.null(keep_sample_rows) && !is.null(sim$samples) &&
         nrow(sim$samples) > keep_sample_rows) {

@@ -15,7 +15,7 @@
 }
 
 # <Country>_<year>_<what>_<stamp>.<ext>, for example
-# Zambia_2022_cattle_uncertainty_template_2026-10-22_1530.xlsx
+# Country_2022_cattle_uncertainty_template_2026-10-22_1530.xlsx
 translator_output_filename <- function(piece, kind = c("template", "checks", "conversation"),
                                        stamp = Sys.time()) {
   kind <- match.arg(kind)

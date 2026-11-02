@@ -12,7 +12,7 @@
 ## so the `ratio < 1.5 → warn` rule was firing against IPCC's own values.
 ## 2026-10-28: Frac_GASM_PRP dropped too. Its IPCC range (2019 Refinement
 ## Table 11.3: 0.21, 0.00 to 0.31) is LEFT-skewed, so the "right-skewed"
-## rule fired 27 times on the Zambia file against the tool's own default
+## rule fired 27 times on the test-inventory file against the tool's own default
 ## bounds (upper span / lower span = 0.5). Only EF3_PRP (Table 11.1,
 ## 0.0005 to 0.027 around 0.004 or 0.006) and Frac_LEACH_PRP (Table 11.3,
 ## 0.01 to 0.73 around 0.24) are right-skewed. The finding is an info,
@@ -28,7 +28,7 @@ PERCENT_PARAMS <- c("Ym", "Ym_pct", "Fat", "CP", "CP_pct", "MilkPR")
 ## Parameters whose zero means "not used for this group" (milk fat and
 ## protein on bulls and calves, measured intake not supplied, no work, no
 ## growth, no pregnancy): a zero there is not checked against the usual
-## range. The Zambia file carried 98 such zeros.
+## range. The test-inventory file carried 98 such zeros.
 .QA_ZERO_OK <- c("Fat", "MilkPR", "GE", "DMI", "Milk", "WG", "hours", "Cp", "Ca", "pct_pregnant")
 
 ## Plausible ranges (2026-10-28). A value outside is a warning that names
@@ -517,7 +517,7 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
         !is.na(ipcc_def) && ipcc_def != 0 && !is.na(mu)) {
       pct_dev <- abs(mu - ipcc_def) / abs(ipcc_def) * 100
       # 2026-09-18: a large deviation from the IPCC default is a reason to
-      # document the national source, not a reason to stop the run. Zambia's
+      # document the national source, not a reason to stop the run. the test inventory's
       # commercial beef calves (BW 197.5 vs an Annex 10A.2 calf weight) is a
       # legitimate country value that used to block the simulation.
       if (pct_dev > 200) {

@@ -735,7 +735,7 @@ app_ui <- function(request = NULL) {
            bubble._translatorLast = { label: (d && d.label) || '', eta: (d && d.eta) || '', real: true };
          });
          // 2026-10-31: when the page loses the server, the clock used to go
-         // on counting (111 minutes on a Zambia run whose request had already
+         // on counting (111 minutes on a test-inventory run whose request had already
          // failed). It now stops and says what to do. A reloaded page joins
          // the running job again; the server keeps it only while some page
          // is connected (about 15 minutes after the last one closes).

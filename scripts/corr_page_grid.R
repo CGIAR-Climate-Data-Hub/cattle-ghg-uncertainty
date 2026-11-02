@@ -1,11 +1,11 @@
 # The single-year 3 x 3 grid for section 6 of the correlations help page:
 # activity correlations (none, structural, from template) x animal numbers
-# between groups (separate, partly, one count), Zambia template of
+# between groups (separate, partly, one count), the test inventory template of
 # 1 November 17:13, inventory year 2024, 4,000 draws, seed 42.
 suppressMessages({for (f in list.files("R", "\\.R$", full.names = TRUE)) try(source(f), silent = TRUE)})
 Sys.setenv(APP_RUNTIME_DIR = "C:/tmp/rt")
 N_ITER <- 4000L; SEED <- 42L; GWP <- "AR5"
-parsed <- parse_uploaded_template("test_data/ZAM/zam_1713.xlsx")
+parsed <- parse_uploaded_template("test_data/inv_a/inv_a_1713.xlsx")
 specs <- parsed$param_specs; manure <- parsed$manure
 comp <- ensure_completeness(specs, region = parsed$metadata$region)
 if (isTRUE(comp$valid)) specs <- comp$param_specs

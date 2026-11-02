@@ -1,5 +1,5 @@
 # Build beta_sample_inventory.xlsx: a short, anonymized practice dataset for
-# beta testers. Structurally like the ZIM/Zambia files (multiple production
+# beta testers. Structurally like the real national files (multiple production
 # systems x sub-categories) but tiny, so a reviewer can grasp it in minutes.
 #
 # It is written through the app's OWN official-template writer

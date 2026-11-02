@@ -1,8 +1,8 @@
-# Usage: Rscript scripts/translator_dry_run.R   (needs the gitignored test_data/ZAM/zam2_fixed.xlsx; no API call, about 15 minutes since the review step of 2026-10-30 rebuilds the workbook; do not run it under a 10-minute timeout)
+# Usage: Rscript scripts/translator_dry_run.R   (needs the gitignored test_data/inv_a/inv_a_fixed.xlsx; no API call, about 15 minutes since the review step of 2026-10-30 rebuilds the workbook; do not run it under a 10-minute timeout)
 #
 # End-to-end dry run of the translator pipeline with a stubbed model:
 # explore -> clarify -> Produce (enumerate + 5 batches) -> merge -> writer ->
-# finalise -> precheck -> download copy, using the corrected Zambia workbook as
+# finalise -> precheck -> download copy, using the corrected test-inventory workbook as
 # the "model's" answers. No API call is made.
 #
 # 2026-10-22: rebuilt around the asynchronous client. The translator has run
@@ -23,12 +23,12 @@
 suppressMessages({library(shiny); library(readxl); library(later)})
 for (f in sort(list.files("R", pattern = "[.]R$", full.names = TRUE))) suppressMessages(source(f, local = FALSE))
 Sys.setenv(APP_RUNTIME_DIR = tempfile("rt"), ANTHROPIC_API_KEY = "stub-key")
-pu <- suppressMessages(parse_uploaded_template("test_data/ZAM/zam2_fixed.xlsx"))
+pu <- suppressMessages(parse_uploaded_template("test_data/inv_a/inv_a_fixed.xlsx"))
 ps <- pu$param_specs; mn <- pu$manure; ts <- pu$population
 levels <- unique(ps$aggregation_level)
 num <- function(x) suppressWarnings(as.numeric(x))
 rows_json <- function(df) jsonlite::toJSON(df, dataframe = "rows", na = "null", auto_unbox = TRUE, digits = NA)
-meta <- list(country = "Zambia", region = "africa", year = 2022L, species = "cattle_mixed",
+meta <- list(country = "Testland", region = "africa", year = 2022L, species = "cattle_mixed",
              ipcc_version = "2019_refinement", prepared_by = "dry run", notes = "stub")
 param_cols <- c("cattle_type","aggregation_level","sub_category","parameter","mean","uncertainty_pct","lower","upper","distribution","param_type","data_source")
 if (!"param_type" %in% names(ps)) ps$param_type <- "N"
@@ -110,7 +110,7 @@ calls <- character()
   calls <<- c(calls, "chat")
   # a clarify reply the way rule 11 asks for it: prose, questions, then the
   # decisions block
-  # The Zambia ground truth splits calves (the transcript asked for 50/50),
+  # The test-inventory ground truth splits calves (the transcript asked for 50/50),
   # so the stub's decision is "split" until the user says otherwise in
   # scenario 3; from then on it is "pooled" and the batches violate it.
   pooled <- grepl("keep calves pooled", last, fixed = TRUE)
@@ -164,7 +164,7 @@ settle <- function(max_sec = 600) {
 }
 
 # an upload message the way the sheet picker would post it
-state$messages[[1]] <- list(role = "user", content = "UPLOADED FILE zambia.xlsx: sheets Country-specific data, Estimated populations, MMS activity data, Coefficients, MoE (rows omitted in this dry run). Production systems: commercial dairy, emergent dairy, commercial beef, emergent beef, extensive beef.", display = "Uploaded zambia.xlsx", source = "server_upload")
+state$messages[[1]] <- list(role = "user", content = "UPLOADED FILE inventory.xlsx: sheets Country-specific data, Estimated populations, MMS activity data, Coefficients, MoE (rows omitted in this dry run). Production systems: commercial dairy, emergent dairy, commercial beef, emergent beef, extensive beef.", display = "Uploaded inventory.xlsx", source = "server_upload")
 t0 <- Sys.time()
 .translator_send(state, session, stage = "explore"); settle(); stopifnot(is.null(state$last_error))
 state$messages[[length(state$messages) + 1]] <- list(role = "user", content = "Year 2022. Split calves 50/50. Milk as kg per day.", display = "answers")
@@ -253,7 +253,7 @@ stopifnot(!is.null(jb), identical(jb$status, "done"), isTRUE(as.numeric(jb$progr
           identical(jb$delivery$mode, "browser"))
 cat("job", jb$id, ": done, 3 outputs,", basename(jb$outputs$template), "; estimate source:", jb$estimate$source,
     "; delivery:", jb$delivery$mode, "\n")
-stopifnot(grepl("^Zambia_2022_cattle_uncertainty_template_", basename(jb$outputs$template)),
+stopifnot(grepl("^Testland_2022_cattle_uncertainty_template_", basename(jb$outputs$template)),
           grepl("_translation_checks_", basename(jb$outputs$checks)),
           grepl("_translation_conversation_.*docx$", basename(jb$outputs$conversation)))
 # a second session of the same user finds the job and its files

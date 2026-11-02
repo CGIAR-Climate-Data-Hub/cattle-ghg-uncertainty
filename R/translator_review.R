@@ -1,7 +1,7 @@
 # AI review of the checks (2026-10-30)
 #
 # The server-side checks (R/translator_checks.R) find what a translation got
-# wrong, but until now they only reported it: on the Zambia file of 30
+# wrong, but until now they only reported it: on the test-inventory file of 30
 # October the checks named a coefficient filled from the IPCC default where
 # the file gives one, an MCF column with every range dropped and a set of
 # manure ranges copied across rows, and all three reached the workbook.

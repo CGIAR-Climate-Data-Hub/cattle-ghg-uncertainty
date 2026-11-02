@@ -8,11 +8,11 @@
 
 # 2026-10-29: SRC is fitted directly on a numeric matrix. It used scale() on
 # the data frame and lm() on a formula, which between them held about six
-# copies of the design matrix: on Zambia (4,000 rows x 1,250 columns, 38 MB)
+# copies of the design matrix: on the test inventory (4,000 rows x 1,250 columns, 38 MB)
 # that added about 300 MB at the memory peak of a run, and with the
 # no-correlation comparison the session was dropped. The arithmetic is the
 # same as before, step for step, and the result is identical to the bit
-# (checked on every emission source of the Zambia run, with and without
+# (checked on every emission source of the test-inventory run, with and without
 # correlations, and on the audit's examples):
 #   - each column is standardised as scale() does it: colMeans(), then the
 #     root mean square of the centred column with n - 1, then centred / that;
@@ -94,7 +94,7 @@ sensitivity_analysis <- function(inputs, output, method = "src") {
   # `is.finite` is essential: a column carrying NaN/NA (e.g. a per-MMS sample
   # from a degenerate PERT parameterisation) makes sd() return NA, and a
   # logical index containing NA crashes `inputs[, var_cols]` with
-  # "undefined columns selected" (the Zambia/Andy run). vapply guarantees a
+  # "undefined columns selected" (the test-inventory/Andy run). vapply guarantees a
   # clean logical vector with no NA entries.
   var_cols <- vapply(inputs, function(x) {
     s <- stats::sd(x, na.rm = TRUE)
@@ -133,7 +133,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   }
 
   # 2026-09-21: with several production systems the same sub-category
-  # recurs (other_cows in five beef systems on Zambia), cbind() then
+  # recurs (other_cows in five beef systems on the test inventory), cbind() then
   # de-duplicated the columns to "DE (other_cows).2" and the report named a
   # driver nobody could locate. When more than one aggregation level is
   # present the label carries it: "DE (other_cows, emergent_beef)".
@@ -146,7 +146,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
 
   # 2026-10-28: rows are cut to the regression size BEFORE the groups are
   # joined. The join used to build the full n_iter x (all groups' columns)
-  # matrix first and subsample it only at the end; on Zambia (32 groups,
+  # matrix first and subsample it only at the end; on the test inventory (32 groups,
   # 10,000 draws) that and the duplicate test below peaked at 1.4 GB per call,
   # twice per run with the no-correlation comparison, and the server dropped
   # the session. Every Monte Carlo row is an independent draw, so the first
@@ -257,7 +257,7 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
   if (length(n_cols) > 1L) {
     # 2026-11-02: columns are merged on a rank correlation above 0.999, not
     # on identical ranks. Counts rounded to whole animals tie in some groups
-    # and not in others, so identical ranks failed for 8 of the 27 Zambia
+    # and not in others, so identical ranks failed for 8 of the 27 test-inventory
     # groups at 10,000 rows and the regression got eight collinear columns.
     rk  <- lapply(n_cols, function(cn) rank(combined[, cn], ties.method = "average"))
     left <- seq_along(n_cols)

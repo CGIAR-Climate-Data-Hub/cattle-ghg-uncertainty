@@ -52,7 +52,7 @@
 .ANTHROPIC_1H_PREFIX_TOKENS <- 40000L
 .anthropic_est_tokens <- function(x) as.integer(ceiling(nchar(x, type = "bytes") / 3.6))
 # 2026-06-11: switched from Opus 4.8 to Sonnet 4.6 after Andy's 26-sub-cat
-# Zambia file timed out at 900s on Opus and a 10-sub-cat fallback returned
+# the test inventory file timed out at 900s on Opus and a 10-sub-cat fallback returned
 # only 2 of 10 sub-categories. Same task ran fine on claude.ai web (Sonnet).
 # Sonnet 4.6 is ~2x faster, 5x cheaper, and at least as disciplined as Opus
 # on schema-bound emission. Chat reasoning quality is slightly less than
@@ -98,7 +98,7 @@
 # Why the 1-hour option exists: in the batched-emission flow a single batch can
 # take 5-17 min to stream, so the 5-minute cache expires BETWEEN batches and
 # each batch re-pays the full cache-WRITE surcharge on the ~170K conversation
-# prefix: the dominant cost per the 2026-06-12 Zambia logs ($4.78 of $7.73).
+# prefix: the dominant cost per the 2026-06-12 test-inventory logs ($4.78 of $7.73).
 # A 1-hour TTL writes that prefix once (at 2x input price instead of 1.25x) and
 # re-reads it at 10% for every later batch in the run, roughly halving per-run
 # cost with NO change to the output.
@@ -172,7 +172,7 @@
 # (batch_nudge) differs on every batch: so a cache_control marker
 # placed only on the last message creates a fresh cache key each
 # batch and re-writes the entire ~170K conversation history every
-# time. Production logs from the 2026-06-12 Zambia run showed all
+# time. Production logs from the 2026-06-12 test-inventory run showed all
 # 5 batches paying $1.0-1.2 each, with $4.78 of the $7.73 total
 # being cache-write surcharges (171K × $3.75/M × 5 batches).
 #
@@ -653,7 +653,7 @@ anthropic_chat_stream_async <- function(messages,
   split <- .anthropic_split_system(messages)
   # Resolve "auto": measure the WHOLE request (system + every message, the
   # last one included) and take the 1-hour cache above the threshold.
-  # 2026-09-18: it used to measure only the stable prefix. On the Zambia
+  # 2026-09-18: it used to measure only the stable prefix. On the test-inventory
   # run the Explore call (prefix = system alone, below the threshold) took
   # 5 minutes, the next call (prefix now including the upload) took 1 hour,
   # and changing the TTL on the system block invalidated the cache: $1.04
@@ -984,7 +984,7 @@ anthropic_chat_stream <- function(messages,
                                    max_tokens = 16000,
                                    temperature = 0,
                                    # 2026-06-11: raised from 180s to 900s
-                                   # after Andy's 26-sub-cat Zambia file
+                                   # after Andy's 26-sub-cat test-inventory file
                                    # produced an exploration response that
                                    # legitimately needed 5-8 minutes of
                                    # streaming output (5 production systems
@@ -1266,7 +1266,7 @@ anthropic_chat_stream <- function(messages,
 # call and the monolithic call each defined a different tool. Anthropic builds
 # the prompt-cache prefix as tools -> system -> messages, so every stage
 # started a fresh cache and the same ~120K-token conversation prefix was
-# written three to seven times per run: about 60 % of a Zambia run's cost.
+# written three to seven times per run: about 60 % of a test-inventory run's cost.
 #
 # There is now a single tool, `emit_inventory_piece`, whose input carries a
 # `mode` field. The tool block is byte-identical from the first chat turn
@@ -1465,7 +1465,7 @@ anthropic_chat_stream <- function(messages,
 # The tool list sent on EVERY translator call, chat turns included, so the
 # cache prefix never changes shape. Every call also uses the same
 # tool_choice (auto): Anthropic invalidates the cached MESSAGE prefix when
-# tool_choice changes, which on the Zambia run cost $0.85 at the switch
+# tool_choice changes, which on the test-inventory run cost $0.85 at the switch
 # from chat (none) to enumerate (forced). The server now asks for the tool
 # in the message text and checks `tool_used` on the reply; a call that
 # should have produced a piece but came back as text is repeated once with
@@ -1579,7 +1579,7 @@ anthropic_translator_tools <- function() {
     tool_choice = tc,
     on_result   = cb,
     on_retry    = on_retry,
-    # Zambia, 2026-10-31: the fifth system's stream broke after data had
+    # the test inventory, 2026-10-31: the fifth system's stream broke after data had
     # arrived; without a restart the whole run failed after 15 minutes.
     restart_ok  = TRUE)
 

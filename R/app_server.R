@@ -1456,7 +1456,7 @@ app_server <- function(input, output, session) {
 
     # 2026-10-30: release the previous run's results before this run builds
     # its own. They were held until replaced, so a second run with the
-    # comparison carried two full result sets: Zambia (27 groups, 10,000
+    # comparison carried two full result sets: the test inventory (27 groups, 10,000
     # draws) peaked at about 835 MB of process memory locally against 570 MB
     # for a first run, and crashed the 1 GB server (oom, 2026-10-30 19:27 UTC).
     rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
@@ -1782,7 +1782,7 @@ app_server <- function(input, output, session) {
 
           setProgress(0.92, detail = "Running sensitivity analysis...")
           # 2026-10-28: the group inputs (per-MMS draw matrices, about 75 MB on
-          # Zambia at 10,000 draws) are needed only by the simulation runs.
+          # the test inventory at 10,000 draws) are needed only by the simulation runs.
           # Released here when no comparison run follows, and right after the
           # comparison run otherwise, so they are not held while the
           # sensitivity regressions run (the memory peak of a run).
@@ -3242,7 +3242,7 @@ app_server <- function(input, output, session) {
 
           # 2026-10-29: the two sensitivity regressions (latest year, and the
           # change between first and last year) are run here, under the
-          # progress bar, instead of on first display: on Zambia they took
+          # progress bar, instead of on first display: on the test inventory they took
           # 40 s after the results view had already opened, which read as
           # the results "taking a long time to show".
           # 2026-11-02: the same quality checks as the single-year run, on

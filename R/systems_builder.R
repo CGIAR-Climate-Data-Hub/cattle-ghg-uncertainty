@@ -5,7 +5,7 @@
 # app_server.R. It was lifted out so that trend mode runs each year through
 # exactly the same build as single-year mode. Until then trend mode passed the
 # whole parameter sheet as ONE system, and run_mc_simulation() read one row per
-# parameter name, so a 32-group inventory came out as one group: on the Zambia
+# parameter name, so a 32-group inventory came out as one group: on the test-inventory
 # file 196,566 t against 9,240,534 t from the single-year path. See
 # knowledge/22-trend-capacity.md.
 #
@@ -202,7 +202,7 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
 
   # 2026-10-28: the per-MMS draws below (MCF, EF3, Frac_GasMS,
   # Frac_LeachMS, MMS allocation) used whatever random state was left, so a
-  # fixed seed did not reproduce the manure figures (two Zambia runs at seed
+  # fixed seed did not reproduce the manure figures (two test-inventory runs at seed
   # 42 differed by about 5% on manure CH4). They now come from one stream
   # started here. The offset keeps it apart from the other seeded streams:
   # the shared coefficient draws use `seed` and each group's parameter draws
@@ -280,7 +280,7 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
         # stored is the state of the stream just before it, the manure rows
         # and the column order. run_inventory_simulation() re-draws the
         # matrices for one group at a time from that state, which gives the
-        # same numbers. Kept for all 32 Zambia groups at 10,000 draws they
+        # same numbers. Kept for all 32 test-inventory groups at 10,000 draws they
         # were 74 MB, held through the main, AD-only, EF-only and comparison
         # simulations.
         ord_names <- names(mms_fracs)
