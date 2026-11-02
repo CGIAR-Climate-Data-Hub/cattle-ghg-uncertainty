@@ -4064,4 +4064,12 @@ app_server <- function(input, output, session) {
   outputOptions(output, "trend_table_report", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_tornado_per_year_report", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_tornado_delta_report", suspendWhenHidden = FALSE)
+  # 2026-11-02: the single-year results block is hidden until a run is
+  # complete (output$results_visible). Hidden outputs are suspended, so
+  # they used to compute only after the block appeared and the cards stood
+  # empty for 20 to 30 s. Computed while hidden, they are ready when it shows.
+  for (nm in c("vb_enteric_ch4", "vb_manure_ch4", "vb_manure_n2o", "vb_pasture_n2o", "vb_moe_total",
+               "vb_co2e_inline", "vb_moe", "vb_ch4", "vb_n2o",
+               "results_histogram", "decomposition_plot", "results_by_system", "results_by_category", "comparison_card"))
+    tryCatch(outputOptions(output, nm, suspendWhenHidden = FALSE), error = function(e) NULL)
 }
