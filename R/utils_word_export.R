@@ -237,46 +237,60 @@ build_run_summary_docx <- function(path,
   )
   doc <- .add_p(doc, paste(stats::na.omit(meta_line), collapse = " "))
 
-  # ---- Executive summary --------------------------------------------------
-  doc <- .add_h2(doc, "Executive summary")
+  # 2026-11-02 (Lolita: "really messy, doesn't make sense why things are in
+  # this order"). The report now reads in the order of the work: a short
+  # summary; 1. what was run (settings, then whether the run was long
+  # enough); 2. the inputs (gaps filled, placeholder ranges, checks waved
+  # through, the sampled distributions, the full input table); 3. the
+  # results (by source with their charts, IPCC Table 3.3 and its AD / EF
+  # split, by group, the effect of correlations); 4. what drives the
+  # uncertainty (tornado and ranking); 5. IPCC reporting notes.
+  # Wide tables sit on landscape pages: a portrait break closes the
+  # portrait text before them, a landscape break closes the table.
+  num <- local({ part <- 0L; sub <- 0L
+    list(part = function(doc, title) { part <<- part + 1L; sub <<- 0L
+                                        .add_h2(doc, sprintf("%d. %s", part, title)) },
+         sub  = function(doc, title) { sub <<- sub + 1L
+                                        .add_h3(doc, sprintf("%d.%d %s", part, sub, title)) })
+  })
+
+  # ---- Summary ------------------------------------------------------------
+  doc <- .add_h2(doc, "Summary")
   doc <- .add_p(doc, .build_single_exec_summary(uncertainty, sensitivity, settings))
+  doc <- .add_p(doc, paste(
+    "The report has five parts: what was run, the inputs, the results,",
+    "what drives the uncertainty, and notes for IPCC reporting."))
 
-  # Andreas 2026-05 C11: AD-uncertainty and EF-uncertainty per-source tables
-  # follow the exec summary, matching the mock-up. Only render when the
-  # decomposition was actually run (ipcc_table is the canonical signal).
-  if (!is.null(ipcc_table) && is.data.frame(ipcc_table) && nrow(ipcc_table) > 0) {
-    ad_ft <- .ad_ef_flextable(ipcc_table, kind = "AD")
-    if (!is.null(ad_ft)) {
-      doc <- .add_p(doc, "For IPCC reporting, the key results are:")
-      doc <- .add_p(doc, "Activity-data uncertainty:")
-      doc <- .add_flextable_safe(doc, .styled_flextable(ad_ft))
-    }
-    ef_ft <- .ad_ef_flextable(ipcc_table, kind = "EF")
-    if (!is.null(ef_ft)) {
-      doc <- .add_p(doc, "Emission-factor uncertainty:")
-      doc <- .add_flextable_safe(doc, .styled_flextable(ef_ft))
-    }
-  }
-
-  # ---- Run settings -------------------------------------------------------
-  doc <- .add_h2(doc, "1. What was run")
+  # ---- 1. What was run ----------------------------------------------------
+  doc <- num$part(doc, "What was run")
+  doc <- num$sub(doc, "Run settings")
   doc <- .add_flextable_safe(doc, .styled_flextable(.settings_flextable(settings)))
 
-  # ---- Auto-filled parameters --------------------------------------------
+  conv_plot <- .gg_convergence(diagnostics)
+  diag_ft   <- .diagnostics_flextable(diagnostics)
+  if (!is.null(conv_plot) || !is.null(diag_ft)) {
+    doc <- num$sub(doc, "Was the run long enough?")
+    doc <- .add_p(doc,
+      "Quality checks on the Monte Carlo run. PASS means the reported mean and 95% confidence interval do not depend on the random seed; WARN or FAIL means the run should be repeated with more iterations.")
+    if (!is.null(diag_ft)) doc <- .add_flextable_safe(doc, .styled_flextable(diag_ft))
+    if (!is.null(conv_plot)) doc <- officer::body_add_gg(doc, value = conv_plot, width = 5.5, height = 3.0)
+  }
+
+  # ---- 2. Inputs ----------------------------------------------------------
+  doc <- num$part(doc, "Inputs")
   imputed_ft <- .imputed_flextable(param_specs)
   if (!is.null(imputed_ft)) {
-    doc <- .add_h2(doc, "2. Auto-filled parameters")
+    doc <- num$sub(doc, "Parameters filled with IPCC defaults")
     doc <- .add_p(doc,
-      "These parameters were not in the upload and were filled with IPCC defaults so the simulation could run. Override with country-specific data when available.")
+      "These parameters were not in the upload and were filled with IPCC defaults so the simulation could run. Replace them with country-specific data when available.")
     doc <- .add_flextable_safe(doc, .styled_flextable(imputed_ft))
   }
 
-  # ---- Placeholder uncertainty ranges (2026-10-30) ------------------------
-  doc <- .add_placeholder_section(doc, param_specs, manure, "2a. Placeholder uncertainty ranges")
+  doc <- .add_placeholder_section(doc, param_specs, manure, "Placeholder uncertainty ranges",
+                                  heading_fn = num$sub)
 
-  # ---- QA/QC checks ignored or repaired (2026-09-18) ----------------------
   if (!is.null(qa_caveats) && is.data.frame(qa_caveats) && nrow(qa_caveats) > 0) {
-    doc <- .add_h2(doc, "2b. QA/QC checks ignored or repaired")
+    doc <- num$sub(doc, "QA/QC checks ignored or repaired")
     doc <- .add_p(doc, paste0(
       "The compiler chose to run with ", nrow(qa_caveats),
       " QA/QC failure(s) unresolved. \"ignored\" means the input was used as ",
@@ -287,195 +301,123 @@ build_run_summary_docx <- function(path,
     doc <- .add_flextable_safe(doc, .styled_flextable(flextable::flextable(qa_caveats)))
   }
 
-  # 2026-10-15: the declared-basis table is withheld from the app and
-  # its outputs for now, on request. Nothing that builds it was removed:
-  # basis_tool_wide(), basis_dimension_label() and basis_plain_table()
-  # are intact, the translator prompt still carries the table, and the
-  # full record stays in defaults/DEFAULTS_MASTER.md. Restoring the
-  # display means putting these call sites back.
-
-  # ---- IPCC Table 3.3 results (LANDSCAPE) --------------------------------
-  if (!is.null(ipcc_table) && is.data.frame(ipcc_table) && nrow(ipcc_table) > 0) {
-    doc <- .add_h2(doc, "3. IPCC Table 3.3: uncertainty decomposition")
-    doc <- .add_p(doc,
-      "Combined % uncertainty (95% MoE, IPCC Vol.1 Ch.3 Table 3.3 convention) per emission source decomposed into the activity-data and emission-factor contributions, formatted for Annex 7 of a national inventory submission.")
-    doc <- .add_flextable_safe(doc, .styled_flextable(.ipcc_flextable(ipcc_table)))
-    doc <- .add_landscape_break(doc)
-  }
-
-  # ---- Headline by-source results ----------------------------------------
-  doc <- .add_h2(doc, "4. Headline results by source")
-  doc <- .add_p(doc,
-    "Mean total emissions per source with the 95% confidence interval and 95% margin of error (MoE %, the IPCC Vol.1 Ch.3 Table 3.3 convention) from the Monte Carlo run.")
-  doc <- .add_flextable_safe(doc, .styled_flextable(.results_flextable(uncertainty)))
-  doc <- .add_portrait_break(doc)
-
-  # ---- Results aggregated by cattle type / production system / sub-category
-  # Round 9b §5 / Andreas 2026-05 #39: per-cattle-type aggregation tables.
-  agg_fts <- .aggregated_results_flextable(mc_results)
-  if (!is.null(agg_fts)) {
-    any_rendered <- FALSE
-    for (lvl in c("cattle_type", "aggregation_level", "sub_category")) {
-      ft <- agg_fts[[lvl]]
-      if (is.null(ft)) next
-      if (!any_rendered) {
-        doc <- .add_h2(doc, "5. Results by cattle type / production system / sub-category")
-        doc <- .add_p(doc,
-          "Each table aggregates the Monte Carlo results to one row per group at the chosen level. Use these breakdowns to identify which group drives the headline totals in section 4.")
-        any_rendered <- TRUE
-      }
-      level_label <- switch(lvl,
-        cattle_type       = "By cattle type",
-        aggregation_level = "By production system (aggregation level)",
-        sub_category      = "By sub-category")
-      doc <- .add_h3(doc, level_label)
-      doc <- .add_flextable_safe(doc, .styled_flextable(ft))
-    }
-    if (any_rendered) doc <- .add_portrait_break(doc)
-  }
-
-  # ---- Per-(cattle_type × source) breakdown with raw CH4 / N2O (Andreas 28/5/26 #7.2 + #7.3)
-  ps_ft <- .per_source_breakdown_flextable(mc_results, settings$gwp_version)
-  if (!is.null(ps_ft)) {
-    doc <- .add_h2(doc, "5b. Per-(cattle type × emission source) breakdown")
-    doc <- .add_p(doc,
-      "One row per cattle_type × IPCC emission source. The 'Mean (t CH4)' and 'Mean (t N2O)' columns give the raw gas-specific quantities inventory teams report; the 'Mean (t CO2eq)' column applies the GWP for cross-source comparison.")
-    doc <- .add_flextable_safe(doc, .styled_flextable(ps_ft))
-    doc <- .add_portrait_break(doc)
-  }
-
-  # ---- AD vs EF vs Combined decomposition chart --------------------------
-  # Round 9b §6: visual companion to the IPCC Table 3.3 decomposition above.
-  decomp_plot <- .gg_decomposition(decomposition)
-  if (!is.null(decomp_plot)) {
-    doc <- .add_h2(doc, "6. AD vs EF vs Combined uncertainty")
-    doc <- .add_p(doc,
-      "95% margin of error (MoE) for total CO2eq, CH4 and N2O under three configurations: AD-only (activity data drives the uncertainty, all coefficients fixed), EF-only (coefficients drive the uncertainty, AD fixed) and Combined (both vary). The Combined value is what is reported in the IPCC Table 3.3 row. MoE is the IPCC reporting convention (Vol.1 Ch.3 Table 3.3); CV is still available in the per-source results table in section 4 for users who want it.")
-    doc <- officer::body_add_gg(doc, value = decomp_plot, width = 5.5, height = 3.2)
-  }
-
-  # ---- Comparison: with vs without correlations --------------------------
-  # Round 9b §7: only rendered when a comparison run was executed.
-  comp_plot <- .gg_comparison(uncertainty, comparison_uncertainty)
-  if (!is.null(comp_plot)) {
-    doc <- .add_h2(doc, "7. Effect of correlations on uncertainty")
-    doc <- .add_p(doc,
-      "Comparison of the main run (with the parameter correlations set on the Correlations tab) against an otherwise-identical run that ignores correlations. A larger 'with-correlations' 95% MoE indicates that the correlation structure compounds parameter uncertainty; similar MoE in both cases indicates the correlations have little effect for this inventory.")
-    doc <- officer::body_add_gg(doc, value = comp_plot, width = 5.5, height = 3.0)
-  }
-
-  # ---- Sensitivity ranking: top 10 drivers ------------------------------
-  sens_ft <- .sensitivity_flextable(sensitivity, top_n = 10L)
-  if (!is.null(sens_ft)) {
-    doc <- .add_h2(doc, "8. Sensitivity ranking: top 10 drivers")
-    doc <- .add_p(doc,
-      "Standardised regression coefficient (SRC) of each input parameter against total CO2eq. Larger absolute values dominate the output uncertainty. Parameter labels include the cattle-type and sub-category they belong to when the inventory has more than one group.")
-    doc <- .add_flextable_safe(doc, .styled_flextable(sens_ft))
-  }
-
-  # ---- Full sensitivity rankings -----------------------------------------
-  # Round 9b §9. Perf (2026-06): capped to the top WORD_SENS_MAX drivers so
-  # the Word doc stays small (officer print.rdocx cost scales with table
-  # size). The complete ranking for every parameter is in the
-  # Sensitivity_SRC sheet of the Excel download.
-  n_sens <- if (!is.null(sensitivity$src)) nrow(sensitivity$src) else 0L
-  full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = WORD_SENS_MAX)
-  if (!is.null(full_sens_ft)) {
-    if (is.finite(n_sens) && n_sens > WORD_SENS_MAX) {
-      doc <- .add_h2(doc, sprintf("9. Sensitivity rankings: top %d drivers", WORD_SENS_MAX))
-      doc <- .add_p(doc, sprintf(
-        paste0("SRC for the %d most influential parameters (of %d), sorted ",
-               "by decreasing absolute SRC. The complete ranking for every parameter ",
-               "is in the Sensitivity_SRC sheet of the Excel download."),
-        WORD_SENS_MAX, n_sens))
-    } else {
-      doc <- .add_h2(doc, "9. Full sensitivity rankings (all parameters)")
-      doc <- .add_p(doc,
-        "Complete SRC values for every input parameter, sorted by decreasing absolute SRC. Useful for QA and for documenting which parameters were considered in the run.")
-    }
-    doc <- .add_flextable_safe(doc, .styled_flextable(full_sens_ft))
-    doc <- .add_landscape_break(doc)
-  }
-
-  # ---- Charts -------------------------------------------------------------
-  doc <- .add_h2(doc, "10. Charts")
-
-  hist_plot <- .gg_total_co2e_hist(mc_results)
-  if (!is.null(hist_plot)) {
-    doc <- .add_h3(doc, "Total CO2eq: Monte Carlo distribution")
-    doc <- officer::body_add_gg(doc, value = hist_plot, width = 5.5, height = 3.0)
-  }
-
-  tornado_plot <- .gg_tornado(sensitivity)
-  if (!is.null(tornado_plot)) {
-    doc <- .add_h3(doc, "Sensitivity tornado")
-    doc <- officer::body_add_gg(doc, value = tornado_plot, width = 5.5, height = 3.5)
-  }
-
-  src_plot <- .gg_source_grid(mc_results)
-  if (!is.null(src_plot)) {
-    doc <- .add_h3(doc, "Per-source emission distributions")
-    doc <- officer::body_add_gg(doc, value = src_plot, width = 5.5, height = 4.0)
-  }
-
-  # ---- Per-parameter density plots ---------------------------------------
-  # Round 9b §11: mirrors the IPCC Report tab's input-density subplots.
   density_plot <- .gg_input_densities(samples_for_density)
   if (!is.null(density_plot)) {
-    doc <- .add_h2(doc, "11. Sampled parameter distributions")
+    doc <- num$sub(doc, "Sampled input distributions")
     doc <- .add_p(doc,
-      "Histograms of the actual parameter draws used in the Monte Carlo run (up to 12 parameters). Use this to confirm the distributions are shaped as you expected, particularly for any parameter with a non-normal distribution or asymmetric uncertainty bounds.")
+      "Histograms of the values drawn for up to 12 inputs of the first group. Use them to confirm the distributions have the shape you expected, especially for inputs with a non-normal distribution or asymmetric bounds.")
     doc <- officer::body_add_gg(doc, value = density_plot, width = 6.5, height = 4.5)
   }
 
-  # ---- MC convergence diagnostics ---------------------------------------
-  # Round 9b §12: convergence plot + 4-row diagnostics summary table.
-  conv_plot <- .gg_convergence(diagnostics)
-  diag_ft   <- .diagnostics_flextable(diagnostics)
-  if (!is.null(conv_plot) || !is.null(diag_ft)) {
-    doc <- .add_h2(doc, "12. Monte Carlo convergence diagnostics")
-    doc <- .add_p(doc,
-      "Quality checks confirming the Monte Carlo run is large enough to give a stable headline result. PASS values indicate the reported mean and 95% CI are not sensitive to the random seed; WARN/FAIL means consider re-running with more iterations.")
-    if (!is.null(diag_ft)) {
-      doc <- .add_flextable_safe(doc, .styled_flextable(diag_ft))
-    }
-    if (!is.null(conv_plot)) {
-      doc <- officer::body_add_gg(doc, value = conv_plot, width = 5.5, height = 3.0)
-    }
-  }
-
-  # ---- Input parameter documentation -------------------------------------
-  # Round 9b §13: full parameter catalogue used in the run.
   inputs_ft <- .inputs_doc_flextable(param_specs)
   if (!is.null(inputs_ft)) {
-    doc <- .add_h2(doc, "13. Input parameter documentation")
+    doc <- .add_portrait_break(doc)
+    doc <- num$sub(doc, "Input parameters")
     total_params <- nrow(param_specs)
     if (is.data.frame(param_specs) && total_params > WORD_INPUTS_MAX) {
       doc <- .add_p(doc, sprintf(
-        paste0("Showing the first %d of %s parameter rows (distribution, central ",
-               "value, bounds and IPCC reference). The COMPLETE per-parameter ",
-               "audit trail for every sub-category is in the 'Input_Parameters' ",
-               "sheet of the Excel download; the Word table is capped so the ",
-               "report renders quickly."),
+        paste0("The first %d of %s parameter rows: distribution, mean, bounds and IPCC reference. ",
+               "Every row is in the Input_Parameters sheet of the Excel download."),
         WORD_INPUTS_MAX, format(total_params, big.mark = ",")))
     } else {
       doc <- .add_p(doc,
-        "Every parameter used in this run: distribution, central value, bounds and IPCC reference. This table is the input audit trail for the IPCC inventory submission.")
+        "Every parameter used in this run: distribution, mean, bounds and IPCC reference.")
     }
     doc <- .add_flextable_safe(doc, .styled_flextable(inputs_ft))
     doc <- .add_landscape_break(doc)
   }
 
-  # ---- IPCC reporting context --------------------------------------------
-  doc <- .add_h2(doc, "14. IPCC reporting context")
-  # Andreas 2026-05 C12: previous wording named a specific column ("column J")
-  # in the national inventory uncertainty table that we had not verified
-  # against the live IPCC 2006 Vol 1 Ch 3 / Annex 7 template. Reworded to
-  # describe the metric instead of pinning a column letter.
+  # ---- 3. Results ---------------------------------------------------------
+  doc <- num$part(doc, "Results")
+  doc <- num$sub(doc, "Emissions and uncertainty by source")
   doc <- .add_p(doc,
-    "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo) for combined uncertainty estimation. The headline 95% MoE values in section 4 are the per-source combined-uncertainty figures used to populate the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (the % uncertainty column, which is the half-width of the 95% confidence interval divided by the mean, per IPCC's own definition). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; coefficient (EF) = the IPCC equation parameters that combine into the per-head emission factor. See the methodology document (Resources tab) for the full IPCC / UNFCCC reporting-alignment guidance, including the CRT category map and the three-level disaggregation scheme this tool produces.")
+    "Mean emissions of each IPCC reporting line with the 95% confidence interval and the 95% margin of error (MoE, half the width of the interval as a percentage of the mean), and its lower and upper halves.")
+  doc <- .add_flextable_safe(doc, .styled_flextable(.results_flextable(uncertainty)))
+  hist_plot <- .gg_total_co2e_hist(mc_results)
+  if (!is.null(hist_plot)) {
+    doc <- .add_p(doc, "Distribution of total CO2eq over the iterations:")
+    doc <- officer::body_add_gg(doc, value = hist_plot, width = 5.5, height = 3.0)
+  }
+  src_plot <- .gg_source_grid(mc_results)
+  if (!is.null(src_plot)) {
+    doc <- .add_p(doc, "Distribution of each emission source over the iterations:")
+    doc <- officer::body_add_gg(doc, value = src_plot, width = 5.5, height = 4.0)
+  }
+
+  has_ipcc <- !is.null(ipcc_table) && is.data.frame(ipcc_table) && nrow(ipcc_table) > 0
+  if (has_ipcc) {
+    doc <- .add_portrait_break(doc)
+    doc <- num$sub(doc, "IPCC Table 3.3: activity data and emission factor uncertainty")
+    doc <- .add_p(doc,
+      "For each reporting line: the uncertainty when only the activity data vary (AD), when only the emission factors and coefficients vary (EF), and when both vary (combined, the figure reported in Table 3.3), as 95% MoE.")
+    doc <- .add_flextable_safe(doc, .styled_flextable(.ipcc_flextable(ipcc_table)))
+    doc <- .add_landscape_break(doc)
+    decomp_plot <- .gg_decomposition(decomposition)
+    if (!is.null(decomp_plot)) {
+      doc <- .add_p(doc, "The same split for total CO2eq, CH4 and N2O:")
+      doc <- officer::body_add_gg(doc, value = decomp_plot, width = 5.5, height = 3.2)
+    }
+  }
+
+  agg_fts <- .aggregated_results_flextable(mc_results)
+  ps_ft   <- .per_source_breakdown_flextable(mc_results, settings$gwp_version)
+  if (!is.null(agg_fts) || !is.null(ps_ft)) {
+    doc <- num$sub(doc, "Results by group")
+    doc <- .add_p(doc,
+      "The results aggregated by cattle type, production system and sub-category, to show which groups drive the totals above.")
+    if (!is.null(agg_fts)) for (lvl in c("cattle_type", "aggregation_level", "sub_category")) {
+      ft <- agg_fts[[lvl]]
+      if (is.null(ft)) next
+      doc <- .add_p(doc, switch(lvl, cattle_type = "By cattle type:",
+                                aggregation_level = "By production system:",
+                                sub_category = "By sub-category:"))
+      doc <- .add_flextable_safe(doc, .styled_flextable(ft))
+    }
+    if (!is.null(ps_ft)) {
+      doc <- .add_p(doc,
+        "By cattle type and emission source, in tonnes of CH4 or N2O and in tonnes CO2eq:")
+      doc <- .add_flextable_safe(doc, .styled_flextable(ps_ft))
+    }
+  }
+
+  comp_plot <- .gg_comparison(uncertainty, comparison_uncertainty)
+  if (!is.null(comp_plot)) {
+    doc <- num$sub(doc, "Effect of correlations")
+    doc <- .add_p(doc,
+      "The 95% MoE of the main run, with the correlations chosen on the Correlations tab, next to the same run with no correlations. A higher value with correlations means the correlations widen the uncertainty; a lower value means they narrow it.")
+    doc <- officer::body_add_gg(doc, value = comp_plot, width = 5.5, height = 3.0)
+  }
+
+  # ---- 4. What drives the uncertainty --------------------------------------
+  tornado_plot <- .gg_tornado(sensitivity)
+  n_sens <- if (!is.null(sensitivity$src)) nrow(sensitivity$src) else 0L
+  full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = WORD_SENS_MAX)
+  if (!is.null(tornado_plot) || !is.null(full_sens_ft)) {
+    doc <- num$part(doc, "What drives the uncertainty")
+    doc <- .add_p(doc,
+      "The standardised regression coefficient (SRC) of each input against total CO2eq, from -1 to +1: the further from zero, the more the input drives the uncertainty. The inputs at the top are where better national data reduce the uncertainty most.")
+    if (!is.null(tornado_plot)) {
+      doc <- num$sub(doc, "The ten largest drivers")
+      doc <- officer::body_add_gg(doc, value = tornado_plot, width = 5.5, height = 3.5)
+    }
+    if (!is.null(full_sens_ft)) {
+      doc <- num$sub(doc, if (is.finite(n_sens) && n_sens > WORD_SENS_MAX)
+                            sprintf("Ranking of the %d largest drivers (of %d)", WORD_SENS_MAX, n_sens)
+                          else "Ranking of every input")
+      if (is.finite(n_sens) && n_sens > WORD_SENS_MAX)
+        doc <- .add_p(doc, "The complete ranking is in the Sensitivity_SRC sheet of the Excel download.")
+      doc <- .add_flextable_safe(doc, .styled_flextable(full_sens_ft))
+    }
+  }
+
+  # ---- 5. Notes for IPCC reporting -----------------------------------------
+  doc <- num$part(doc, "Notes for IPCC reporting")
+  # Andreas 2026-05 C12: the metric is described, not a column letter of the
+  # national template, which was not verified.
   doc <- .add_p(doc,
-    "Default uncertainty ranges are used only where the literature gives one that applies to any country: Ym (IPCC 2019, Table 10.12), Bo (IPCC 2019, Table 10.16A), the pasture N2O factors and fractions (IPCC 2019, Tables 11.1 and 11.3), EF3 and the volatilisation and leaching fractions of each manure system when the IPCC default value is used (IPCC 2019, Tables 10.21 and 10.22), and Cfi, Ca, C and Cp (Monni et al. 2007, Table I, also used by the UK inventory). Every other range comes from the uploaded template; where the template gave none, a placeholder range without a published source was used, and each one is listed in section 2a.")
+    "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo). The 95% MoE values in section 3 are the combined-uncertainty figures for the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (the % uncertainty column: half the width of the 95% confidence interval divided by the mean). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; EF = the IPCC equation parameters that combine into the per-head emission factor. The methodology document (Resources tab) has the full IPCC / UNFCCC reporting guidance, including the CRT category map.")
+  doc <- .add_p(doc,
+    "Default uncertainty ranges are used only where the literature gives one that applies to any country: Ym (IPCC 2019, Table 10.12), Bo (IPCC 2019, Table 10.16A), the pasture N2O factors and fractions (IPCC 2019, Tables 11.1 and 11.3), EF3 and the volatilisation and leaching fractions of each manure system when the IPCC default value is used (IPCC 2019, Tables 10.21 and 10.22), and Cfi, Ca, C and Cp (Monni et al. 2007, Table I, also used by the UK inventory). Every other range comes from the uploaded template; where the template gave none, a placeholder range without a published source was used, and each one is listed in section 2.")
 
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")
@@ -838,15 +780,46 @@ build_trend_summary_docx <- function(path,
   flextable::flextable(df)
 }
 
-# 2026-10-30: every placeholder range, by group and input (see
-# PLACEHOLDER_UNC_PCT in R/utils_validation.R). NULL when there is none.
-.add_placeholder_section <- function(doc, param_specs, manure, heading) {
+# 2026-10-30: the placeholder ranges (see PLACEHOLDER_UNC_PCT in
+# R/utils_validation.R), summarised by input since 2026-11-02.
+.add_placeholder_section <- function(doc, param_specs, manure, heading, heading_fn = .add_h2) {
   tb <- tryCatch(placeholder_table(param_specs, manure), error = function(e) NULL)
   if (is.null(tb) || !nrow(tb)) return(doc)
-  doc <- .add_h2(doc, heading)
+  doc <- heading_fn(doc, heading)
   doc <- .add_p(doc, "Your file gave no uncertainty range for the inputs below, and no published default exists for them. So that the run could go ahead, the tool used placeholder ranges: for parameters, the values the tool used before October 2026; for manure, MCF +/-25 %, EF3 a factor of 2, and the volatilisation and leaching fractions +/-50 %. These ranges have no published source. They are not IPCC defaults. The results that depend on them are indicative only. Replace each one with a range from your own data and run again.")
-  doc <- .add_p(doc, sprintf("%d placeholder range(s) were used.", nrow(tb)))
-  .add_flextable_safe(doc, .styled_flextable(flextable::flextable(tb)))
+  # 2026-11-02 (Lolita): one row per input instead of one per group and
+  # input (59 rows on Zambia for three inputs). The group-by-group list is
+  # in the range_source column of the Excel Input_Parameters sheet.
+  sm <- .placeholder_summary(tb)
+  doc <- .add_p(doc, sprintf(
+    "%d placeholder range(s) were used, on %d input(s). One row per input; the group-by-group list is in the range_source column of the Input_Parameters sheet of the Excel download.",
+    nrow(tb), nrow(sm)))
+  .add_flextable_safe(doc, .styled_flextable(flextable::flextable(sm)))
+}
+
+# The placeholder table summarised by input: the value or values used, the
+# placeholder range (the rule's name when it gives different bounds per
+# group, as for the manure factors) and the number of groups.
+.placeholder_summary <- function(tb) {
+  ins <- unique(tb$Input)
+  rows <- lapply(ins, function(inp) {
+    d <- tb[tb$Input == inp, , drop = FALSE]
+    v <- unique(trimws(d$Value))
+    num <- suppressWarnings(as.numeric(v))
+    val <- if (length(v) == 1L) v
+           else if (length(v) <= 3L) paste(v, collapse = ", ")
+           else if (all(is.finite(num))) sprintf("%s to %s", format(signif(min(num), 4)), format(signif(max(num), 4)))
+           else paste(head(v, 3), collapse = ", ")
+    r <- unique(d[["Placeholder range"]])
+    rng <- if (length(r) == 1L) r else {
+      lab <- unique(sub("^.*[(]([^()]*)[)][[:space:]]*$", "\\1", r[grepl("[)][[:space:]]*$", r)]))
+      if (length(lab) == 1L) lab else "varies by group"
+    }
+    data.frame(Input = inp, `Value(s) in the file` = val, `Placeholder range` = rng,
+               Groups = nrow(d), check.names = FALSE, stringsAsFactors = FALSE)
+  })
+  out <- do.call(rbind, rows)
+  out[order(-out$Groups, out$Input), , drop = FALSE]
 }
 
 .imputed_flextable <- function(param_specs) {
