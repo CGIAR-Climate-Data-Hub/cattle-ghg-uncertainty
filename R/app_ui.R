@@ -2623,41 +2623,8 @@ app_ui <- function(request = NULL) {
             )
           )
         ),
-        bslib::card(
-          bslib::card_header(fig_title("6.1", t("card_dist_per_source"))),
-          bslib::card_body(
-            p(t("body_dist_per_source"),
-              tags$strong(t("xrange_label")),
-              t("body_dist_per_source_mid"),
-              tags$strong(t("count_label")),
-              t("body_dist_per_source_tail")),
-            plotly::plotlyOutput("report_source_histograms", height = "420px"),
-            fig_caption("fig_cap_src_hist")
-          )
-        ),
-        bslib::card(
-          bslib::card_header(fig_title("6.2", t("card_top_drivers"))),
-          bslib::card_body(
-            p(t("body_top_drivers")),
-            plotly::plotlyOutput("report_tornado", height = "380px"),
-            fig_caption("fig_cap_report_tornado")
-          )
-        ),
-        bslib::card(
-          bslib::card_header(fig_title("6.3", t("card_input_dists"))),
-          bslib::card_body(
-            p(t("body_input_dists")),
-            plotly::plotlyOutput("report_input_densities", height = "780px"),
-            fig_caption("fig_cap_input_dens")
-          )
-        ),
-        bslib::card(
-          bslib::card_header(t("card_inputs_doc")),
-          bslib::card_body(
-            p(t("body_inputs_doc")),
-            DT::DTOutput("inputs_doc_table")
-          )
-        )
+        # (2026-11-02, Lolita: the charts and the input table were removed
+        # from this tab; they are in the Word report and the Excel workbook.)
       ),
 
       # ---------- Trend report layout ----------

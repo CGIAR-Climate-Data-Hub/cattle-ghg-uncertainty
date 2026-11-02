@@ -112,23 +112,24 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
 
   run_settings_df <- if (!is.null(settings)) {
     data.frame(
-      Setting = c("Iterations", "AD correlations",
-                  "Animal numbers between groups", "Animal numbers between years (trend)",
-                  "Comparison run (no corr.)", "GWP basis", "Seed",
-                  "Analysis mode", "Emission sources",
+      # 2026-11-02 (Lolita): single-year rows only (no "between years"),
+      # the two Tab 3 choices named as on the tab.
+      Setting = c("Analysis mode", "Iterations", "Links between inputs (Tab 3)",
+                  "Animal numbers (N) between groups (Tab 3)",
+                  "Comparison of correlation levels", "GWP basis", "Seed",
+                  "Emission sources",
                   # (2026-11-02: the "Intake route" row removed at Lolita's
                   # request; the results table in the app still shows it.)
                   "QA/QC checks ignored or repaired"),
       Value   = c(
+        "Single year",
         as.character(settings$n_iter %||% NA),
-        as.character(settings$corr_mode %||% "none"),
+        .corr_mode_label(settings$corr_mode),
         .n_corr_label(settings$n_group_corr %||% "full", "group"),
-        .n_corr_label(settings$n_year_corr %||% "none", "year"),
         if (isTRUE(settings$run_comparison)) "yes" else "no",
         as.character(settings$gwp_version %||% NA),
         as.character(settings$seed %||% NA),
-        as.character(settings$analysis_mode %||% NA),
-        paste(settings$emission_sources %||% character(0), collapse = ", "),
+        .emission_sources_label(settings$emission_sources %||% character(0)),
         if (is.null(qa_caveats) || nrow(qa_caveats) == 0) "none"
         else paste0(nrow(qa_caveats), " (see sheet QA_Caveats)")
       ),
@@ -358,6 +359,26 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     Methodology      = methodology
   ))
   writexl::write_xlsx(sheets, path = filepath)
+}
+
+# 2026-11-02: the Tab 3 "links between inputs" option as the reports word it.
+.corr_mode_label <- function(code) {
+  switch(as.character(code %||% "none"),
+         none = "none", preset = "Structural defaults (literature-based)",
+         timeseries = "From template (time series)", manual = "Manual matrix",
+         as.character(code))
+}
+# 2026-11-02: the emission sources with their names, not their codes.
+.emission_sources_label <- function(codes) {
+  if (!length(codes)) return("(none)")
+  lab <- c(enteric_ch4 = "Enteric CH4", manure_ch4 = "Manure CH4",
+           manure_n2o_direct = "Manure N2O direct", manure_n2o_indirect = "Manure N2O indirect",
+           pasture_n2o_direct = "Pasture N2O direct", pasture_n2o_indirect = "Pasture N2O indirect")
+  b <- sub("_total$", "", as.character(codes))
+  b <- sub("^direct_n2o_mm$", "manure_n2o_direct", b); b <- sub("^indirect_n2o_mm$", "manure_n2o_indirect", b)
+  b <- sub("^direct_n2o_prp$", "pasture_n2o_direct", b); b <- sub("^indirect_n2o_prp$", "pasture_n2o_indirect", b)
+  out <- ifelse(b %in% names(lab), lab[b], as.character(codes))
+  paste(unname(out), collapse = ", ")
 }
 
 # 2026-10-30: the animal-number choices as the report words them.

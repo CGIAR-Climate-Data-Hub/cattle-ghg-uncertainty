@@ -207,6 +207,26 @@
 # SINGLE-YEAR REPORT: build_run_summary_docx() (redesigned)
 # ============================================================================
 
+# 2026-11-02 (Lolita): every figure of the Word reports has a number and a
+# title above it and a caption below it; the chart's own title is dropped
+# so it is not said twice. One adder per report keeps its own count.
+.make_fig_adder <- function() {
+  k <- 0L
+  function(doc, gg, title, caption, width = 5.5, height = 3.2) {
+    if (is.null(gg)) return(doc)
+    k <<- k + 1L
+    doc <- officer::body_add_fpar(doc, officer::fpar(
+      officer::ftext(sprintf("Figure %d. %s", k, title), prop = officer::fp_text(
+        bold = TRUE, font.size = 10, color = .GREEN_DARK, font.family = "Calibri")),
+      fp_p = officer::fp_par(padding.top = 8, padding.bottom = 2, keep_with_next = TRUE)))
+    doc <- officer::body_add_gg(doc, value = gg + ggplot2::labs(title = NULL), width = width, height = height)
+    officer::body_add_fpar(doc, officer::fpar(
+      officer::ftext(caption, prop = officer::fp_text(
+        italic = TRUE, font.size = 9, color = "#4B5563", font.family = "Calibri")),
+      fp_p = officer::fp_par(padding.bottom = 10)))
+  }
+}
+
 build_run_summary_docx <- function(path,
                                    settings,
                                    param_specs,
@@ -217,6 +237,7 @@ build_run_summary_docx <- function(path,
                                    ipcc_meta   = NULL,
                                    decomposition          = NULL,
                                    comparison_uncertainty = NULL,
+                                   comparison_levels      = NULL,
                                    diagnostics            = NULL,
                                    samples_for_density    = NULL,
                                    app_version = NULL,
@@ -253,34 +274,37 @@ build_run_summary_docx <- function(path,
          sub  = function(doc, title) { sub <<- sub + 1L
                                         .add_h3(doc, sprintf("%d.%d %s", part, sub, title)) })
   })
+  fig <- .make_fig_adder()
 
   # ---- Summary ------------------------------------------------------------
   doc <- .add_h2(doc, "Summary")
   doc <- .add_p(doc, .build_single_exec_summary(uncertainty, sensitivity, settings))
   doc <- .add_p(doc, paste(
-    "The report has five parts: what was run, the inputs, the results,",
-    "what drives the uncertainty, and notes for IPCC reporting."))
+    "The report has five parts: the simulation, the inputs, the results,",
+    "the sensitivity analysis, and notes for IPCC reporting."))
 
   # ---- 1. What was run ----------------------------------------------------
-  doc <- num$part(doc, "What was run")
+  doc <- num$part(doc, "Simulation")
   doc <- num$sub(doc, "Run settings")
   doc <- .add_flextable_safe(doc, .styled_flextable(.settings_flextable(settings)))
 
   conv_plot <- .gg_convergence(diagnostics)
   diag_ft   <- .diagnostics_flextable(diagnostics)
   if (!is.null(conv_plot) || !is.null(diag_ft)) {
-    doc <- num$sub(doc, "Was the run long enough?")
+    doc <- num$sub(doc, "Monte Carlo diagnostics")
     doc <- .add_p(doc,
       "Quality checks on the Monte Carlo run. PASS means the reported mean and 95% confidence interval do not depend on the random seed; WARN or FAIL means the run should be repeated with more iterations.")
     if (!is.null(diag_ft)) doc <- .add_flextable_safe(doc, .styled_flextable(diag_ft))
-    if (!is.null(conv_plot)) doc <- officer::body_add_gg(doc, value = conv_plot, width = 5.5, height = 3.0)
+    doc <- fig(doc, conv_plot, "Convergence of the simulation",
+      "Running mean of total CO2eq (solid line) and running 2.5th and 97.5th percentiles (dashed lines) as iterations are added. Lines that are flat at the right edge show that the simulation ran long enough.",
+      height = 3.0)
   }
 
   # ---- 2. Inputs ----------------------------------------------------------
   doc <- num$part(doc, "Inputs")
   imputed_ft <- .imputed_flextable(param_specs)
   if (!is.null(imputed_ft)) {
-    doc <- num$sub(doc, "Parameters filled with IPCC defaults")
+    doc <- num$sub(doc, "IPCC default parameters")
     doc <- .add_p(doc,
       "These parameters were not in the upload and were filled with IPCC defaults so the simulation could run. Replace them with country-specific data when available.")
     doc <- .add_flextable_safe(doc, .styled_flextable(imputed_ft))
@@ -290,7 +314,7 @@ build_run_summary_docx <- function(path,
                                   heading_fn = num$sub)
 
   if (!is.null(qa_caveats) && is.data.frame(qa_caveats) && nrow(qa_caveats) > 0) {
-    doc <- num$sub(doc, "QA/QC checks ignored or repaired")
+    doc <- num$sub(doc, "QA/QC caveats")
     doc <- .add_p(doc, paste0(
       "The compiler chose to run with ", nrow(qa_caveats),
       " QA/QC failure(s) unresolved. \"ignored\" means the input was used as ",
@@ -303,10 +327,10 @@ build_run_summary_docx <- function(path,
 
   density_plot <- .gg_input_densities(samples_for_density)
   if (!is.null(density_plot)) {
-    doc <- num$sub(doc, "Sampled input distributions")
-    doc <- .add_p(doc,
-      "Histograms of the values drawn for up to 12 inputs of the first group. Use them to confirm the distributions have the shape you expected, especially for inputs with a non-normal distribution or asymmetric bounds.")
-    doc <- officer::body_add_gg(doc, value = density_plot, width = 6.5, height = 4.5)
+    doc <- num$sub(doc, "Input distributions")
+    doc <- fig(doc, density_plot, "Sampled input distributions",
+      "Histograms of the values drawn for up to 12 inputs of the first group. Use them to confirm that the distributions have the expected shape, especially for inputs with a non-normal distribution or asymmetric bounds.",
+      width = 6.5, height = 4.5)
   }
 
   inputs_ft <- .inputs_doc_flextable(param_specs)
@@ -329,34 +353,30 @@ build_run_summary_docx <- function(path,
 
   # ---- 3. Results ---------------------------------------------------------
   doc <- num$part(doc, "Results")
-  doc <- num$sub(doc, "Emissions and uncertainty by source")
+  doc <- num$sub(doc, "Emissions by source")
   doc <- .add_p(doc,
     "Mean emissions of each IPCC reporting line with the 95% confidence interval and the 95% margin of error (MoE, half the width of the interval as a percentage of the mean), and its lower and upper halves.")
   doc <- .add_flextable_safe(doc, .styled_flextable(.results_flextable(uncertainty)))
   hist_plot <- .gg_total_co2e_hist(mc_results)
-  if (!is.null(hist_plot)) {
-    doc <- .add_p(doc, "Distribution of total CO2eq over the iterations:")
-    doc <- officer::body_add_gg(doc, value = hist_plot, width = 5.5, height = 3.0)
-  }
+  doc <- fig(doc, hist_plot, "Emission distribution (total CO2eq)",
+    "Each bar counts the iterations whose total CO2eq fell in that range. The dashed red lines are the 2.5th and 97.5th percentiles, the bounds of the 95% confidence interval; the black line is the mean.",
+    height = 3.0)
   src_plot <- .gg_source_grid(mc_results)
-  if (!is.null(src_plot)) {
-    doc <- .add_p(doc, "Distribution of each emission source over the iterations:")
-    doc <- officer::body_add_gg(doc, value = src_plot, width = 5.5, height = 4.0)
-  }
+  doc <- fig(doc, src_plot, "Emission distribution by source",
+    "The distribution of each emission source over the iterations, in tonnes of CH4 or N2O.",
+    height = 4.0)
 
   has_ipcc <- !is.null(ipcc_table) && is.data.frame(ipcc_table) && nrow(ipcc_table) > 0
   if (has_ipcc) {
     doc <- .add_portrait_break(doc)
-    doc <- num$sub(doc, "IPCC Table 3.3: activity data and emission factor uncertainty")
+    doc <- num$sub(doc, "IPCC Table 3.3")
     doc <- .add_p(doc,
       "For each reporting line: the uncertainty when only the activity data vary (AD), when only the emission factors and coefficients vary (EF), and when both vary (combined, the figure reported in Table 3.3), as 95% MoE.")
     doc <- .add_flextable_safe(doc, .styled_flextable(.ipcc_flextable(ipcc_table)))
     doc <- .add_landscape_break(doc)
     decomp_plot <- .gg_decomposition(decomposition)
-    if (!is.null(decomp_plot)) {
-      doc <- .add_p(doc, "The same split for total CO2eq, CH4 and N2O:")
-      doc <- officer::body_add_gg(doc, value = decomp_plot, width = 5.5, height = 3.2)
-    }
+    doc <- fig(doc, decomp_plot, "Uncertainty from activity data and emission factors",
+      "Margin of error (MoE: half the width of the 95% confidence interval, as a percentage of the mean) of total CO2eq, CH4 and N2O when only the activity data vary, when only the emission factors and coefficients vary, and when both vary. The combined bar is the reported uncertainty.")
   }
 
   agg_fts <- .aggregated_results_flextable(mc_results)
@@ -380,12 +400,13 @@ build_run_summary_docx <- function(path,
     }
   }
 
-  comp_plot <- .gg_comparison(uncertainty, comparison_uncertainty)
+  comp_plot <- .gg_comparison_levels(comparison_levels)
+  if (is.null(comp_plot)) comp_plot <- .gg_comparison(uncertainty, comparison_uncertainty)
   if (!is.null(comp_plot)) {
     doc <- num$sub(doc, "Effect of correlations")
-    doc <- .add_p(doc,
-      "The 95% MoE of the main run, with the correlations chosen on the Correlations tab, next to the same run with no correlations. A higher value with correlations means the correlations widen the uncertainty; a lower value means they narrow it.")
-    doc <- officer::body_add_gg(doc, value = comp_plot, width = 5.5, height = 3.0)
+    doc <- fig(doc, comp_plot, "Uncertainty by correlation level",
+      "95% margin of error of total CO2eq, CH4 and N2O with no correlations, then with each choice of the Correlations tab added in turn; the last bar is the reported run. The change from the previous level is written on each bar, in percentage points. A rise means the correlations widen the uncertainty, a fall that they narrow it.",
+      height = 3.2)
   }
 
   # ---- 4. What drives the uncertainty --------------------------------------
@@ -393,17 +414,20 @@ build_run_summary_docx <- function(path,
   n_sens <- if (!is.null(sensitivity$src)) nrow(sensitivity$src) else 0L
   full_sens_ft <- .sensitivity_flextable(sensitivity, top_n = WORD_SENS_MAX)
   if (!is.null(tornado_plot) || !is.null(full_sens_ft)) {
-    doc <- num$part(doc, "What drives the uncertainty")
+    doc <- num$part(doc, "Sensitivity analysis")
     doc <- .add_p(doc,
       "The standardised regression coefficient (SRC) of each input against total CO2eq, from -1 to +1: the further from zero, the more the input drives the uncertainty. The inputs at the top are where better national data reduce the uncertainty most.")
     if (!is.null(tornado_plot)) {
-      doc <- num$sub(doc, "The ten largest drivers")
-      doc <- officer::body_add_gg(doc, value = tornado_plot, width = 5.5, height = 3.5)
+      doc <- num$sub(doc, "Top 10 drivers")
+      doc <- fig(doc, tornado_plot, "Top 10 drivers of the uncertainty of total CO2eq (SRC)",
+        "The ten inputs with the largest influence on total CO2eq. Bar length is the sensitivity coefficient (SRC); bars to the right raise the output, bars to the left lower it. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+        height = 4.0)
     }
     if (!is.null(full_sens_ft)) {
-      doc <- num$sub(doc, if (is.finite(n_sens) && n_sens > WORD_SENS_MAX)
-                            sprintf("Ranking of the %d largest drivers (of %d)", WORD_SENS_MAX, n_sens)
-                          else "Ranking of every input")
+      doc <- num$sub(doc, "SRC ranking")
+      doc <- .add_p(doc, if (is.finite(n_sens) && n_sens > WORD_SENS_MAX)
+                           sprintf("The %d largest drivers, of %d inputs.", WORD_SENS_MAX, n_sens)
+                         else "Every input, by decreasing absolute SRC.")
       if (is.finite(n_sens) && n_sens > WORD_SENS_MAX)
         doc <- .add_p(doc, "The complete ranking is in the Sensitivity_SRC sheet of the Excel download.")
       doc <- .add_flextable_safe(doc, .styled_flextable(full_sens_ft))
@@ -411,7 +435,7 @@ build_run_summary_docx <- function(path,
   }
 
   # ---- 5. Notes for IPCC reporting -----------------------------------------
-  doc <- num$part(doc, "Notes for IPCC reporting")
+  doc <- num$part(doc, "IPCC reporting notes")
   # Andreas 2026-05 C12: the metric is described, not a column letter of the
   # national template, which was not verified.
   doc <- .add_p(doc,
@@ -497,7 +521,8 @@ build_trend_summary_docx <- function(path,
                                       headline    = NULL,
                                       ipcc_table  = NULL,
                                       compare     = NULL,
-                                      manure      = NULL) {
+                                      manure      = NULL,
+                                     corr_settings = NULL) {
 
   doc <- officer::read_docx()
   yrs <- if (!is.null(years)) range(years) else range(trend_results$Year)
@@ -552,7 +577,8 @@ build_trend_summary_docx <- function(path,
   # ---- Run settings -------------------------------------------------------
   doc <- .add_h2(doc, "1. What was run")
   doc <- .add_flextable_safe(doc,
-    .styled_flextable(.trend_settings_flextable(year_corr, n_iter, yrs, ipcc_meta, headline$n_iter_pair)))
+    .styled_flextable(.trend_settings_flextable(year_corr, n_iter, yrs, ipcc_meta, headline$n_iter_pair,
+                                                 corr_settings = corr_settings)))
   doc <- .add_placeholder_section(doc, param_specs, manure, "1a. Placeholder uncertainty ranges")
 
   # ---- Trend table (LANDSCAPE) -------------------------------------------
@@ -563,25 +589,16 @@ build_trend_summary_docx <- function(path,
   doc <- .add_landscape_break(doc)
 
   # ---- Trend chart --------------------------------------------------------
-  doc <- .add_h2(doc, "3. Trend chart")
-  trend_plot <- .gg_trend_chart(trend_results)
-  if (!is.null(trend_plot)) {
-    doc <- officer::body_add_gg(doc, value = trend_plot, width = 5.5, height = 3.2)
-  }
-
-  # Round 9b §3a: Year-over-year % change bar chart.
-  yoy_plot <- .gg_yoy_chart(trend_results)
-  if (!is.null(yoy_plot)) {
-    doc <- .add_h3(doc, "Year-over-year % change")
-    doc <- officer::body_add_gg(doc, value = yoy_plot, width = 5.5, height = 2.8)
-  }
-
-  # Round 9b §3b: Distribution of ΔY_N − Y_1, the uncertainty on the trend.
-  delta_plot <- .gg_delta_distribution(delta_total)
-  if (!is.null(delta_plot)) {
-    doc <- .add_h3(doc, "Distribution of ΔY_N − Y_1")
-    doc <- officer::body_add_gg(doc, value = delta_plot, width = 5.5, height = 3.0)
-  }
+  doc <- .add_h2(doc, "3. Trend charts")
+  fig <- .make_fig_adder()
+  doc <- fig(doc, .gg_trend_chart(trend_results), "Trend in total CO2eq emissions",
+    "Mean total CO2eq for each year (line) with its 95% confidence interval (shaded band).")
+  doc <- fig(doc, .gg_yoy_chart(trend_results), "Year-over-year change",
+    "Change in mean total CO2eq from one year to the next, in percent. Bars above zero are increases.",
+    height = 2.8)
+  doc <- fig(doc, .gg_delta_distribution(delta_total), "Distribution of the change between the first and last year",
+    "Distribution, across iterations, of the difference between the last and the first year. The dashed lines bound the 95% confidence interval; when it does not include zero, the trend is distinguishable from no change.",
+    height = 3.0)
 
   # ---- Slope + delta mini-table ------------------------------------------
   doc <- .add_h2(doc, "4. Trend slope and Δ Y_N − Y_1")
@@ -599,18 +616,18 @@ build_trend_summary_docx <- function(path,
   if (!is.null(py_ft)) {
     doc <- .add_h3(doc, "Per-year (latest year): top 10")
     doc <- .add_flextable_safe(doc, .styled_flextable(py_ft))
-    py_plot <- .gg_tornado(sensitivity_per_year)
-    if (!is.null(py_plot))
-      doc <- officer::body_add_gg(doc, value = py_plot, width = 5.5, height = 3.0)
+    doc <- fig(doc, .gg_tornado(sensitivity_per_year), "Top 10 drivers of the latest year (SRC)",
+      "The ten inputs with the largest influence on total CO2eq in the latest year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+      height = 4.0)
   }
 
   dl_ft <- .sensitivity_flextable(sensitivity_delta, top_n = 10L)
   if (!is.null(dl_ft)) {
     doc <- .add_h3(doc, "Trend driver (Δ Y_N − Y_1): top 10")
     doc <- .add_flextable_safe(doc, .styled_flextable(dl_ft))
-    dl_plot <- .gg_tornado(sensitivity_delta)
-    if (!is.null(dl_plot))
-      doc <- officer::body_add_gg(doc, value = dl_plot, width = 5.5, height = 3.0)
+    doc <- fig(doc, .gg_tornado(sensitivity_delta), "Top 10 drivers of the change between the first and last year (SRC)",
+      "The ten inputs with the largest influence on the change in total CO2eq between the first and the last year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.",
+      height = 4.0)
   }
 
   # Round 9b §5a: Full sensitivity rankings (all parameters).
@@ -736,26 +753,25 @@ build_trend_summary_docx <- function(path,
 }
 
 .settings_flextable <- function(s) {
+  # 2026-11-02 (Lolita): the single-year report shows single-year rows only,
+  # and the two Tab 3 choices by name.
   rows <- list(
+    c("Analysis mode",         "Single year"),
     c("Iterations",            .fmt_int(s$n_iter)),
-    c("AD correlations",       .as_str(s$corr_mode,    "none")),
-    c("Animal numbers between groups", .n_corr_label(s$n_group_corr %||% "full", "group")),
-    c("Animal numbers between years (trend)", .n_corr_label(s$n_year_corr %||% "none", "year")),
-    c("Comparison run (no corr.)", if (isTRUE(s$run_comparison)) "yes" else "no"),
+    c("Links between inputs (Tab 3)", .corr_mode_label(s$corr_mode)),
+    c("Animal numbers (N) between groups (Tab 3)", .n_corr_label(s$n_group_corr %||% "full", "group")),
+    c("Comparison of correlation levels", if (isTRUE(s$run_comparison)) "yes" else "no"),
     c("GWP basis",             .as_str(s$gwp_version,  "AR5")),
     c("Seed",                  .as_str(s$seed,         "(random)")),
-    c("Analysis mode",         .as_str(s$analysis_mode, "single-year")),
-    c("Emission sources",
-      if (length(s$emission_sources)) paste(s$emission_sources, collapse = ", ") else "(none)")
-    # (2026-11-02: the "Intake route" row removed from the downloads at
-    # Lolita's request; the results table in the app still shows it.)
+    c("Emission sources",      .emission_sources_label(s$emission_sources))
   )
   df <- do.call(rbind.data.frame, c(rows, list(stringsAsFactors = FALSE)))
   names(df) <- c("Setting", "Value")
   flextable::flextable(df)
 }
 
-.trend_settings_flextable <- function(year_corr, n_iter, yrs, ipcc_meta, n_iter_pair = NULL) {
+.trend_settings_flextable <- function(year_corr, n_iter, yrs, ipcc_meta, n_iter_pair = NULL,
+                                      corr_settings = NULL) {
   yc_label <- switch(
     year_corr,
     full    = "The same factors for every year (fully correlated between years)",
@@ -768,6 +784,11 @@ build_trend_summary_docx <- function(path,
     c("Draws for base year and year t",
       if (is.null(n_iter_pair)) "same as the series" else paste(.fmt_int(n_iter_pair), "(paired run)")),
     c("Year-to-year correlation", yc_label),
+    # 2026-11-02: the Tab 3 choices, as in the single-year report, plus the
+    # animal numbers between years, which only a trend uses
+    c("Links between inputs (Tab 3)", .corr_mode_label(corr_settings$corr_mode %||% "none")),
+    c("Animal numbers (N) between groups (Tab 3)", .n_corr_label(corr_settings$n_group_corr %||% "full", "group")),
+    c("Animal numbers (N) between years (Tab 3)", .n_corr_label(corr_settings$n_year_corr %||% "none", "year")),
     c("IPCC guidelines version",
       if (!is.null(ipcc_meta) && !is.null(ipcc_meta$ipcc_version))
         ipcc_meta$ipcc_version else "(not set)"),
@@ -786,7 +807,7 @@ build_trend_summary_docx <- function(path,
   tb <- tryCatch(placeholder_table(param_specs, manure), error = function(e) NULL)
   if (is.null(tb) || !nrow(tb)) return(doc)
   doc <- heading_fn(doc, heading)
-  doc <- .add_p(doc, "Your file gave no uncertainty range for the inputs below, and no published default exists for them. So that the run could go ahead, the tool used placeholder ranges: for parameters, the values the tool used before October 2026; for manure, MCF +/-25 %, EF3 a factor of 2, and the volatilisation and leaching fractions +/-50 %. These ranges have no published source. They are not IPCC defaults. The results that depend on them are indicative only. Replace each one with a range from your own data and run again.")
+  doc <- .add_p(doc, "Your file gave no uncertainty range for the inputs below, and no published default exists for them. So that the run could go ahead, the tool used placeholder ranges. They are not IPCC defaults. The results that depend on them are indicative only. Replace each one with a range from your own data and run again.")
   # 2026-11-02 (Lolita): one row per input instead of one per group and
   # input (59 rows on Zambia for three inputs). The group-by-group list is
   # in the range_source column of the Excel Input_Parameters sheet.
@@ -1243,21 +1264,31 @@ WORD_SENS_MAX <- 50L
   # Bar-end value label: number formatted to 2 dp, placed just outside the
   # bar tip (hjust depends on sign so labels always sit on the bar's outer
   # edge, never overlap the axis line).
+  # 2026-11-02: green for inputs a compiler can improve, blue for IPCC
+  # coefficients, as in the app; long labels break before their bracket.
+  top$kind <- factor(ifelse(param_reducible(as.character(top$parameter)),
+                            "Input you can improve with national data", "IPCC coefficient"),
+                     levels = c("Input you can improve with national data", "IPCC coefficient"))
+  lab <- as.character(top$parameter)
+  long <- nchar(lab) > 22 & grepl(" (", lab, fixed = TRUE)
+  lab[long] <- sub(" (", "\n(", lab[long], fixed = TRUE)
+  top$parameter <- factor(lab, levels = lab)
   top$lbl <- sprintf("%+.2f", top[[val_col]])
   top$lbl_hjust <- ifelse(top[[val_col]] >= 0, -0.15, 1.15)
   x_range <- range(top[[val_col]], na.rm = TRUE)
   x_pad   <- 0.18 * diff(x_range)
 
-  ggplot2::ggplot(top, ggplot2::aes(x = .data[[val_col]], y = parameter,
-                                     fill = .data[[val_col]] > 0)) +
+  ggplot2::ggplot(top, ggplot2::aes(x = .data[[val_col]], y = parameter, fill = kind)) +
     ggplot2::geom_col() +
     ggplot2::geom_text(ggplot2::aes(label = lbl, hjust = lbl_hjust),
                         size = 3.0, colour = "#1B4332") +
-    ggplot2::scale_fill_manual(values = c(`TRUE` = .GREEN_MID, `FALSE` = "#C1121F"),
-                                guide = "none") +
+    ggplot2::scale_fill_manual(values = c("Input you can improve with national data" = .GREEN_MID,
+                                          "IPCC coefficient" = "#1565C0"),
+                               name = NULL, drop = FALSE) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(add = c(x_pad, x_pad))) +
     ggplot2::labs(x = toupper(val_col), y = NULL, subtitle = subtitle) +
-    ggplot2::theme_minimal(base_size = 10)
+    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme(legend.position = "bottom")
 }
 
 .gg_source_grid <- function(mc_results) {
@@ -1269,12 +1300,15 @@ WORD_SENS_MAX <- 50L
     "Manure N2O (direct)"   = "direct_n2o_mm_total",
     "Manure N2O (indirect)" = "indirect_n2o_mm_total",
     "Pasture N2O (direct)"  = "direct_n2o_prp_total",
-    "Pasture N2O (indirect)"= "indirect_n2o_prp_total",
-    "Total CO2eq"           = "total_co2e"
+    "Pasture N2O (indirect)"= "indirect_n2o_prp_total"
   )
+  # 2026-11-02: the inventory names its columns total_enteric_ch4 and so
+  # on; only "total_co2e" matched before, so the grid showed one panel.
+  # The total has its own figure, so it is not repeated here.
   parts <- list()
   for (lab in names(picks)) {
     col <- picks[[lab]]
+    if (!col %in% names(inv)) col <- paste0("total_", sub("_total$", "", col))
     if (col %in% names(inv)) {
       v <- inv[[col]]
       if (length(v) > 0 && stats::sd(v, na.rm = TRUE) > 0) {
@@ -1397,6 +1431,40 @@ WORD_SENS_MAX <- 50L
                                  name = NULL) +
     ggplot2::labs(x = NULL, y = "95% MoE (%)",
                    title = "Effect of correlations on uncertainty (95% MoE)") +
+    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme(legend.position = "bottom")
+}
+
+# 2026-11-02: the correlation levels as in the app: one bar per level
+# (no correlations, + the links, + the N correlation), the change from
+# the previous level written on each bar.
+.gg_comparison_levels <- function(levels) {
+  if (is.null(levels) || length(levels) < 2L) return(NULL)
+  vars   <- c("total_co2e", "total_ch4", "total_n2o")
+  labels <- c("Total CO2eq", "Total CH4", "Total N2O")
+  pull <- function(df, v) { r <- df[df$variable == v, , drop = FALSE]; if (nrow(r)) r$moe_pct[1] else NA_real_ }
+  rows <- list(); prev <- NULL
+  for (k in seq_along(levels)) {
+    moe <- vapply(vars, pull, numeric(1), df = levels[[k]])
+    lbl <- if (is.null(prev)) sprintf("%.1f%%", moe) else sprintf("%.1f%%\n(%+.1f pts)", moe, moe - prev)
+    rows[[k]] <- data.frame(variable = labels, level = names(levels)[k], moe_pct = moe, lbl = lbl,
+                            stringsAsFactors = FALSE)
+    prev <- moe
+  }
+  df <- do.call(rbind, rows)
+  df <- df[!is.na(df$moe_pct), , drop = FALSE]
+  if (!nrow(df)) return(NULL)
+  df$variable <- factor(df$variable, levels = labels)
+  df$level <- factor(df$level, levels = names(levels))
+  cols <- c("#90A4AE", .GREEN_MID, "#1D4ED8")[seq_along(levels)]
+  if (length(levels) == 2L) cols <- c("#90A4AE", "#1D4ED8")
+  ggplot2::ggplot(df, ggplot2::aes(x = variable, y = moe_pct, fill = level)) +
+    ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8), width = 0.75) +
+    ggplot2::geom_text(ggplot2::aes(label = lbl), position = ggplot2::position_dodge(width = 0.8),
+                       vjust = -0.3, size = 2.6, colour = "#1B4332", lineheight = 0.9) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.22))) +
+    ggplot2::scale_fill_manual(values = stats::setNames(cols, names(levels)), name = NULL) +
+    ggplot2::labs(x = NULL, y = "95% MoE (%)") +
     ggplot2::theme_minimal(base_size = 10) +
     ggplot2::theme(legend.position = "bottom")
 }

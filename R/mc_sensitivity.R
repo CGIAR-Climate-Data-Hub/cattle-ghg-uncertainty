@@ -343,3 +343,24 @@ sens_groups_of_row <- function(df) {
       if (length(out[[i]]) && any(nzchar(out[[i]]))) out[[i]] else sens_group_of(df$parameter[i]))
   } else lapply(df$parameter, sens_group_of)
 }
+
+
+# 2026-11-02: which inputs a compiler can improve with national data (green
+# in the tornado) and which are IPCC coefficients (blue). Labels arrive as
+# "DE (heifers, emergent_beef)", "Ym = 5.24 (shared by 5 groups)",
+# "N (one count, 27 groups)", "MCF_liquid_slurry (...)" or "BW_y1"; the
+# bracket, the " = value" and the year suffix are removed before the
+# catalogue lookup. The manure system coefficients (MCF, EF3, Frac_GasMS,
+# Frac_LeachMS) are IPCC coefficients; the manure shares (fraction_...)
+# and anything not in the catalogue count as national data.
+param_reducible <- function(params) {
+  bare <- sub("[[:space:]]*[(][^()]*[)][[:space:]]*$", "", as.character(params))
+  bare <- sub("[[:space:]]*=.*$", "", bare)
+  bare <- sub("_(y1|yN)$", "", bare)
+  lut <- stats::setNames(PARAM_CATALOGUE$user_reducible, PARAM_CATALOGUE$parameter)
+  r <- as.logical(lut[bare])
+  coef <- grepl("^(MCF|EF3|Frac_GasMS|Frac_LeachMS|Frac_GASM|Frac_LEACH|EF4|EF5|B0|Bo)(_|$)", bare)
+  r[is.na(r) & coef] <- FALSE
+  r[is.na(r)] <- TRUE
+  r
+}

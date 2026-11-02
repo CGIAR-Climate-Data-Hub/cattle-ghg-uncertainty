@@ -2624,12 +2624,12 @@ app_server <- function(input, output, session) {
     short <- trimws(sub("^Advanced: ", "", sub(" \\(.*\\)$", "", lab)))
     paste0(toupper(substr(short, 1, 1)), substr(short, 2, nchar(short)))
   }
-  output$comparison_plot <- plotly::renderPlotly({
-    req(rv$mc_results, rv$comparison_result)
+  # The correlation levels as a named list of uncertainty frames (no
+  # correlations, + the links, + the N correlation), for the chart and the
+  # Word report. NULL without a comparison run.
+  .comparison_levels_list <- function() {
+    if (is.null(rv$mc_results) || is.null(rv$comparison_result)) return(NULL)
     cs <- rv$comparison_settings %||% list(corr_mode = "none", n_group = "full")
-    vars   <- c("total_co2e", "total_ch4", "total_n2o")
-    labels <- c(t("res_cmp_total_co2e"), t("res_cmp_total_ch4"), t("res_cmp_total_n2o"))
-    get_moe <- function(unc, v) { row <- unc[unc$variable == v, ]; if (nrow(row) > 0) round(row$moe_pct, 1) else NA_real_ }
     has_links <- !identical(as.character(cs$corr_mode), "none")
     # the N correlation exists only with two groups or more
     has_n     <- !identical(as.character(cs$n_group), "none") && (cs$n_groups %||% 2L) > 1L
@@ -2641,6 +2641,14 @@ app_server <- function(input, output, session) {
                 else if (has_links && !has_n) sprintf(t("res_cmp_level_links"), .cmp_mode_short(cs$corr_mode))
                 else sprintf(t("res_cmp_level_both"), .cmp_mode_short(cs$corr_mode))
     levels[[main_lab]] <- calc_all_uncertainty(rv$mc_results$inventory)
+    levels
+  }
+  output$comparison_plot <- plotly::renderPlotly({
+    req(rv$mc_results, rv$comparison_result)
+    vars   <- c("total_co2e", "total_ch4", "total_n2o")
+    labels <- c(t("res_cmp_total_co2e"), t("res_cmp_total_ch4"), t("res_cmp_total_n2o"))
+    get_moe <- function(unc, v) { row <- unc[unc$variable == v, ]; if (nrow(row) > 0) round(row$moe_pct, 1) else NA_real_ }
+    levels <- .comparison_levels_list()
     cols <- c("#90A4AE", "#2D6A4F", "#1D4ED8")
     if (length(levels) == 2L) cols <- cols[c(1, 3)]
     p <- plotly::plot_ly(); prev <- NULL; top <- 0
@@ -2808,13 +2816,10 @@ app_server <- function(input, output, session) {
       yaxis = list(title = "", categoryorder = "array", categoryarray = lev),
       legend = list(orientation = "h", x = 0, y = -0.18, font = list(size = 14)))
   }
-  .reducible_of <- function(params) {
-    bare <- sub(" \\([^()]+\\)\\s*$", "", params)
-    bare <- gsub("_(y1|yN)$", "", bare)
-    lut <- setNames(PARAM_CATALOGUE$user_reducible, PARAM_CATALOGUE$parameter)
-    r <- lut[bare]; r[is.na(r)] <- TRUE
-    as.logical(r)
-  }
+  # 2026-11-02: param_reducible() in R/mc_sensitivity.R, shared with the
+  # Word report; it also strips " = value" from shared labels, which left
+  # "Ym = 5.24 (shared by 5 groups)" green.
+  .reducible_of <- function(params) param_reducible(params)
 
   output$tornado_chart <- plotly::renderPlotly({
     req(isTRUE(rv$prerender_ok))
@@ -3022,162 +3027,6 @@ app_server <- function(input, output, session) {
     list(x = h$mids, y = y, width = diff(br)[1])
   }
 
-  # T8.4 / Round 6a #8: per-source histograms embedded in IPCC Report.
-  # Bug fix: previous version referenced `inv$enteric_ch4_total` etc., but the
-  # top-level inventory data.frame only carries cross-system aggregates
-  # (`total_enteric_ch4`, `total_manure_ch4`, `total_direct_n2o`,
-  # `total_indirect_n2o`). Indirect N2O is the sum of MM-indirect and PRP-
-  # indirect across systems, so we now rebuild per-source vectors by summing
-  # the per-system samples directly. Sources with zero variance (because the
-  # source was not ticked, or because all systems sum to zero for that source)
-  # are skipped with a placeholder annotation rather than rendered as a flat
-  # bar at zero.
-  output$report_source_histograms <- plotly::renderPlotly({
-    req(isTRUE(rv$prerender_ok))
-    req(rv$mc_results)
-    by_sys <- rv$mc_results$by_system
-    if (length(by_sys) == 0)
-      return(plotly::plot_ly() |>
-               plotly::layout(title = "No simulation data available."))
-
-    .sum_across <- function(field) {
-      vals <- lapply(by_sys, function(s) s$results[[field]])
-      vals <- Filter(function(v) !is.null(v) && length(v) > 0, vals)
-      if (length(vals) == 0) return(NULL)
-      Reduce(`+`, vals)
-    }
-    enteric_ch4 <- .sum_across("enteric_ch4_total")
-    manure_ch4  <- .sum_across("manure_ch4_total")
-    mm_n2o_dir  <- .sum_across("direct_n2o_mm_total")
-    mm_n2o_ind  <- .sum_across("indirect_n2o_mm_total")
-    prp_dir     <- .sum_across("direct_n2o_prp_total")
-    prp_ind     <- .sum_across("indirect_n2o_prp_total")
-    pasture_n2o <- if (!is.null(prp_dir) && !is.null(prp_ind)) prp_dir + prp_ind
-                   else if (!is.null(prp_dir)) prp_dir
-                   else prp_ind
-
-    sources <- list(
-      "Enteric CH4 (t)"         = enteric_ch4,
-      "Manure CH4 (t)"          = manure_ch4,
-      "Manure N2O direct (t)"   = mm_n2o_dir,
-      "Manure N2O indirect (t)" = mm_n2o_ind,
-      "Pasture N2O (t)"         = pasture_n2o
-    )
-
-    has_variance <- function(v) !is.null(v) && length(v) > 1 &&
-      sd(v, na.rm = TRUE) > .Machine$double.eps
-    keep <- vapply(sources, has_variance, logical(1))
-    if (!any(keep)) {
-      return(plotly::plot_ly() |>
-               plotly::layout(
-                 title = "No source has variance to display.",
-                 annotations = list(list(
-                   text = paste("None of the ticked emission sources produced",
-                                "variable output. Ensure at least one source",
-                                "is selected on Tab 5 and that the relevant",
-                                "parameters have non-zero uncertainty."),
-                   showarrow = FALSE, x = 0.5, y = 0.5,
-                   xref = "paper", yref = "paper"))))
-    }
-    sources <- sources[keep]
-
-    plots <- lapply(seq_along(sources), function(i) {
-      hb <- .hist_bars(sources[[i]], 40)
-      plotly::plot_ly() |>
-        plotly::add_trace(type = "bar", x = hb$x, y = hb$y, width = rep(hb$width, length(hb$x)),
-                          marker = list(color = "#2D6A4F"),
-                          name = names(sources)[i], showlegend = FALSE) |>
-        plotly::layout(bargap = 0, xaxis = list(title = names(sources)[i]),
-                       yaxis = list(title = ""))
-    })
-    plotly::subplot(plots,
-                    nrows  = max(1, ceiling(length(plots) / 3)),
-                    margin = 0.06,
-                    titleX = TRUE, titleY = FALSE)
-  })
-
-  # T8.4 / Round 6a #8: tornado chart embedded in IPCC Report (vs total_co2e).
-  # Bug fix: when sensitivity_analysis() returns an empty list (no input
-  # parameters had variance), or when SRC's lm() coefficients column is named
-  # `Estimate` rather than `src`, the previous code crashed on
-  # `top10[[val_col]]`. We now defend against an empty sensitivity object,
-  # missing column, or zero rows with friendly placeholder annotations.
-  output$report_tornado <- plotly::renderPlotly({
-    req(isTRUE(rv$prerender_ok))
-    placeholder <- function(msg) {
-      plotly::plot_ly() |>
-        plotly::layout(
-          xaxis = list(visible = FALSE),
-          yaxis = list(visible = FALSE),
-          annotations = list(list(
-            text = msg, showarrow = FALSE,
-            x = 0.5, y = 0.5, xref = "paper", yref = "paper",
-            font = list(size = 14, color = "#555"))))
-    }
-    if (is.null(rv$sensitivity) || length(rv$sensitivity) == 0)
-      return(placeholder("Sensitivity analysis not yet run. Run a simulation on Tab 5 first."))
-
-    # Hotfix: custom %||% is unsafe on data.frames (it does is.na(a[1])
-    # which on a frame returns a vector, breaking the `||` chain). Use
-    # explicit checks instead so the tornado renderer doesn't throw.
-    sens <- if (!is.null(rv$sensitivity$src) &&
-                is.data.frame(rv$sensitivity$src) && nrow(rv$sensitivity$src) > 0) {
-      rv$sensitivity$src
-    } else NULL
-    if (is.null(sens) || nrow(sens) == 0)
-      return(placeholder("No input parameters had variance: tornado chart cannot be built."))
-
-    val_col <- if ("src" %in% names(sens)) "src" else NULL
-    if (is.null(val_col) || !"parameter" %in% names(sens))
-      return(placeholder("Sensitivity result is missing the expected columns."))
-
-    top10 <- utils::head(sens, 10)
-    top10 <- top10[order(top10[[val_col]]), , drop = FALSE]
-    .tornado_bars(as.character(top10$parameter), top10[[val_col]], .reducible_of(top10$parameter),
-                  paste0(t("sens_tornado_title"), " (", toupper(val_col), ")"), toupper(val_col))
-  })
-
-  # Tx.1: input distribution density plots for QA review
-  output$report_input_densities <- plotly::renderPlotly({
-    req(isTRUE(rv$prerender_ok))
-    req(rv$mc_results)
-    if (length(rv$mc_results$by_system) == 0) return(plotly::plot_ly())
-    samples <- rv$mc_results$by_system[[1]]$samples
-    if (is.null(samples) || ncol(samples) == 0) return(plotly::plot_ly())
-
-    # Take up to 12 parameters to keep the panel readable
-    keep <- head(colnames(samples), 12)
-    plots <- lapply(keep, function(p) {
-      hb <- .hist_bars(samples[[p]], 30, density = TRUE)
-      if (is.null(hb)) return(plotly::plot_ly() |> plotly::layout(xaxis = list(title = p)))
-      plotly::plot_ly() |>
-        plotly::add_trace(type = "bar", x = hb$x, y = hb$y, width = rep(hb$width, length(hb$x)),
-                          marker = list(color = "#40916C"),
-                          name = p, showlegend = FALSE) |>
-        plotly::layout(bargap = 0, xaxis = list(title = p), yaxis = list(title = ""))
-    })
-    # Wider inter-panel margin so each panel's x-axis title (the parameter name)
-    # sits clearly in the gap below its histogram instead of overlapping the row
-    # beneath it. Pair with a taller plot height in the UI (report tab).
-    plotly::subplot(plots, nrows = 4, margin = 0.055,
-                    titleX = TRUE, titleY = FALSE)
-  })
-
-  # T8.3: input documentation table for IPCC inventory submission / QA
-  output$inputs_doc_table <- DT::renderDT({
-    req(isTRUE(rv$prerender_ok))
-    req(rv$param_specs)
-    ps <- rv$param_specs
-    keep <- intersect(c("cattle_type", "aggregation_level", "sub_category",
-                        "parameter", "param_type", "mean", "uncertainty_pct",
-                        "lower", "upper", "distribution", "data_source",
-                        "ipcc_ref"),
-                      names(ps))
-    DT::datatable(ps[, keep, drop = FALSE], rownames = FALSE,
-                  options = list(pageLength = 25, scrollX = TRUE),
-                  class = "compact stripe")
-  })
-
   output$download_xlsx <- downloadHandler(
     filename = function() paste0("uncertainty_report_", Sys.Date(), ".xlsx"),
     content = function(file) {
@@ -3253,6 +3102,7 @@ app_server <- function(input, output, session) {
         ipcc_meta             = rv$inv_metadata,
         decomposition         = rv$decomposition,
         comparison_uncertainty = comp_unc,
+        comparison_levels     = tryCatch(.comparison_levels_list(), error = function(e) NULL),
         diagnostics           = rv$diagnostics,
         samples_for_density   = density_samples,
         qa_caveats            = .qa_caveats_export(),
@@ -4053,7 +3903,10 @@ app_server <- function(input, output, session) {
         headline             = trend_head(),
         ipcc_table           = trend_ipcc(),
         compare              = trend_cmp(),
-        manure               = rv$manure_data
+        manure               = rv$manure_data,
+        corr_settings        = list(corr_mode = input$corr_mode %||% "none",
+                                    n_group_corr = input$n_group_corr %||% "full",
+                                    n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none")
       )
     }
   )
@@ -4094,10 +3947,6 @@ app_server <- function(input, output, session) {
                "trend_ipcc_table", "trend_compare_table",
                "trend_report_text", "trend_report_text_report"))
     tryCatch(outputOptions(output, id, suspendWhenHidden = FALSE), error = function(e) NULL)
-  outputOptions(output, "report_source_histograms", suspendWhenHidden = FALSE)
-  outputOptions(output, "report_tornado", suspendWhenHidden = FALSE)
-  outputOptions(output, "report_input_densities", suspendWhenHidden = FALSE)
-  outputOptions(output, "inputs_doc_table", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_tornado_per_year_sens", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_tornado_delta_sens", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_sens_per_year_table", suspendWhenHidden = FALSE)
