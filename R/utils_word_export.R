@@ -271,7 +271,8 @@ build_run_summary_docx <- function(path,
   # through, the sampled distributions, the full input table); 3. the
   # results (by source with their charts, IPCC Table 3.3 and its AD / EF
   # split, by group, the effect of correlations); 4. what drives the
-  # uncertainty (tornado and ranking); 5. IPCC reporting notes.
+  # uncertainty (tornado and ranking). The IPCC reporting notes part was
+  # removed on 2026-11-02 (Lolita: "remove ipcc reporting notes").
   # Wide tables sit on landscape pages: a portrait break closes the
   # portrait text before them, a landscape break closes the table.
   num <- local({ part <- 0L; sub <- 0L
@@ -286,8 +287,8 @@ build_run_summary_docx <- function(path,
   doc <- .add_h2(doc, "Summary")
   doc <- .add_p(doc, .build_single_exec_summary(uncertainty, sensitivity, settings))
   doc <- .add_p(doc, paste(
-    "The report has five parts: the simulation, the inputs, the results,",
-    "the sensitivity analysis, and notes for IPCC reporting."))
+    "The report has four parts: the simulation, the inputs, the results",
+    "and the sensitivity analysis."))
 
   # ---- 1. What was run ----------------------------------------------------
   doc <- num$part(doc, "Simulation")
@@ -440,15 +441,6 @@ build_run_summary_docx <- function(path,
     }
   }
 
-  # ---- 5. Notes for IPCC reporting -----------------------------------------
-  doc <- num$part(doc, "IPCC reporting notes")
-  # Andreas 2026-05 C12: the metric is described, not a column letter of the
-  # national template, which was not verified.
-  doc <- .add_p(doc,
-    "This run follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo). The 95% MoE values in section 3 are the combined-uncertainty figures for the IPCC Annex 7 / Table 3.3 national inventory uncertainty table (the % uncertainty column: half the width of the 95% confidence interval divided by the mean). Cross-check the exact column position against your national submission template. The activity-data vs emission-factor split follows the convention adopted in this tool: AD = animal population (N) only; EF = the IPCC equation parameters that combine into the per-head emission factor. The methodology document (Resources tab) has the full IPCC / UNFCCC reporting guidance, including the CRT category map.")
-  doc <- .add_p(doc,
-    "Default uncertainty ranges are used only where the literature gives one that applies to any country: Ym (IPCC 2019, Table 10.12), Bo (IPCC 2019, Table 10.16A), the pasture N2O factors and fractions (IPCC 2019, Tables 11.1 and 11.3), EF3 and the volatilisation and leaching fractions of each manure system when the IPCC default value is used (IPCC 2019, Tables 10.21 and 10.22), and Cfi, Ca, C and Cp (Monni et al. 2007, Table I, also used by the UK inventory). Every other range comes from the uploaded template; where the template gave none, a placeholder range without a published source was used, and each one is listed in section 2.")
-
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")
   doc <- .add_logo_footer(doc)
@@ -551,7 +543,8 @@ build_trend_summary_docx <- function(path,
   # reads in the order of the single-year report: summary; 1. simulation
   # (settings, Monte Carlo diagnostics); 2. inputs; 3. results (base year
   # and year t with IPCC Table 3.3, every year, the change between the
-  # first and last year); 4. sensitivity analysis; 5. IPCC reporting notes.
+  # first and last year); 4. sensitivity analysis (notes part removed
+  # 2026-11-02).
   num <- local({ part <- 0L; sub <- 0L
     list(part = function(doc, title) { part <<- part + 1L; sub <<- 0L
                                         .add_h2(doc, sprintf("%d. %s", part, title)) },
@@ -566,8 +559,8 @@ build_trend_summary_docx <- function(path,
                                                  sensitivity_delta, year_corr, n_iter))
   if (!is.null(headline)) for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
   doc <- .add_p(doc, paste(
-    "The report has five parts: the simulation, the inputs, the results,",
-    "the sensitivity analysis, and notes for IPCC reporting."))
+    "The report has four parts: the simulation, the inputs, the results",
+    "and the sensitivity analysis."))
 
   # ---- 1. Simulation --------------------------------------------------------
   doc <- num$part(doc, "Simulation")
@@ -679,20 +672,6 @@ build_trend_summary_docx <- function(path,
       "Top 10 drivers of the change between the first and last year (SRC)",
       "The ten inputs with the largest influence on the change in total CO2eq between the first and the last year; an input drawn in both years appears once per year. Green: inputs you can improve with better national data. Blue: IPCC coefficients.")
   }
-
-  # ---- 5. IPCC reporting notes -----------------------------------------------
-  doc <- num$part(doc, "IPCC reporting notes")
-  yc_text <- switch(
-    year_corr,
-    full    = "Coefficient draws (the 23 IPCC equation parameters) are sampled once and reused across every year, while activity data (animal population N) is re-drawn fresh for each year. This is the IPCC 2019 Refinement Vol 1 Ch 3 §3.2.2.4 default for emission-factor uncertainty: same EF every year, AD re-estimated annually. The trend uncertainty in this configuration reflects only the AD changes between years.",
-    partial = "Coefficient draws change slowly from year to year: each year keeps about 70% of the previous year's draw and takes 30% new. This fits emission factors that are revised every few years, where nearby years mostly rely on the same data (IPCC 2019 Refinement Vol 1 Ch 3 §3.2.2.4).",
-    none    = "Coefficient draws and activity-data draws are both independent for each year. This is the most conservative assumption and tends to inflate trend uncertainty; per IPCC §3.2.2.4 it is appropriate only when each year's emission factors come from genuinely independent measurement campaigns."
-  )
-  doc <- .add_p(doc, yc_text)
-  doc <- .add_p(doc,
-    "All uncertainty quantification follows IPCC 2006 Vol 1 Ch 3 Approach 2 (Monte Carlo). The average change per year is a least-squares line fitted draw by draw; its 95% CI is the 2.5th to 97.5th percentile of those slopes. The change between the first and last year is the per-draw difference, which keeps the year-to-year correlation set above.")
-  doc <- .add_p(doc,
-    "Per IPCC Vol 1 Ch 3 §3.7, trend uncertainty is reported alongside the level of emissions in any national inventory submission that covers more than one year. The trend columns of IPCC Table 3.3 in section 3 are the figures to report. If the trend is reported with a year-to-year correlation other than 'the same factors for every year', document that choice in the methods section of the national inventory report; the setting is recorded in section 1.")
 
   # ---- Footer -------------------------------------------------------------
   doc <- .add_p(doc, "")

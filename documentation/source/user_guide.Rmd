@@ -570,7 +570,7 @@ For a trend, the tab shows the sentences to report and the full trend version of
 Two downloads are available:
 
 - **Excel report (.xlsx)**. The first sheet, README, describes every other sheet. For a single year: the run settings, the QA/QC checks ignored or repaired, the results (one row per IPCC reporting line: mean, 95% confidence interval, margin of error, and the activity data and emission factor split when the decomposition ran), the sensitivity ranking and every input of the run. For a trend: the run settings, the headline figures to report, IPCC Table 3.3, every year in total, by source and by group, the two sensitivity rankings and every input.
-- **Word report**. A complete report you can adapt for the uncertainty section of your inventory report. It reads in the order of the work: a summary; 1. the simulation (settings and Monte Carlo diagnostics); 2. the inputs (parameters filled with defaults, placeholder ranges, checks ignored or repaired, the sampled distributions and the full input table); 3. the results (by source, IPCC Table 3.3, by group, and the effect of correlations); 4. the sensitivity analysis; 5. notes for IPCC reporting. Every figure is numbered and has a caption.
+- **Word report**. A complete report you can adapt for the uncertainty section of your inventory report. It reads in the order of the work: a summary; 1. the simulation (settings and Monte Carlo diagnostics); 2. the inputs (parameters filled with defaults, placeholder ranges, checks ignored or repaired, the sampled distributions and the full input table); 3. the results (by source, IPCC Table 3.3, by group, and the effect of correlations); 4. the sensitivity analysis. Every figure is numbered and has a caption.
 
 \newpage
 
