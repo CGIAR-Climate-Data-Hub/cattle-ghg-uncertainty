@@ -3665,7 +3665,7 @@ app_server <- function(input, output, session) {
                       vline(h$trend_hi_pct, "#C1121F", "dash"),
                       vline(0, "#555", "dot")),
         annotations = list(list(
-          x = 0.01, y = 0.99, xref = "paper", yref = "paper", xanchor = "left", yanchor = "top",
+          x = 0.03, y = 0.99, xref = "paper", yref = "paper", xanchor = "left", yanchor = "top",
           showarrow = FALSE, align = "left", bgcolor = "rgba(255,255,255,0.85)",
           font = list(size = 12, color = "#1B4332"),
           text = sprintf(t("res_trend_change_annot"), .fs(h$trend_pct), .fs(h$trend_lo_pct),

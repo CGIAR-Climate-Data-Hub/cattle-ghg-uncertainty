@@ -119,7 +119,7 @@ Before opening the tool, you need the right data to run it. Four kinds of input 
     - a percentage (for example ±20%, meaning the true value is very likely within 20% of the number you give), or
     - a lower and an upper value.
 
-    The tool has a default range for only a few IPCC coefficients: Ym, Bo, Cfi, Ca, C, Cp, the pasture N~2~O factors, and some manure factors. For every other input, the range should come from your own data. If one is missing, the tool uses a placeholder range so that it can run. A placeholder has no published source: the tool warns you about it, and lists it in the report and the exports. Replace it with your own range.
+    The tool has a default range for only a few IPCC coefficients: Ym, Bo, Cfi, Ca, C, Cp, the pasture N~2~O factors, and some manure factors. For the pasture factors (EF3~PRP~, EF4, EF5 and the volatilisation and leaching fractions), it recognises every IPCC default value, for wet and dry climates, aggregated across climates, and from the 2006 Guidelines, and gives each its own IPCC range. For every other input, the range should come from your own data. If one is missing, the tool uses a placeholder range so that it can run. A placeholder has no published source: the tool warns you about it, and lists it in the report and the exports. Replace it with your own range.
 
 3. **Manure management fractions.** The share of manure handled in each management system (for example pasture, solid storage, liquid storage).
 
@@ -365,9 +365,11 @@ Whichever you choose, each year uses its own values from the Parameter_TimeSerie
 
 Why does this matter so much for a trend? Suppose your country uses the same emission factors for the whole time series. Then a draw with a high Ym in the base year should also have a high Ym in the current year. When the two years are compared, this coefficient uncertainty cancels out, and the uncertainty of the trend comes only from the changes in activity data. The IPCC (Volume 1, Chapter 3, section 3.2.3) calls this a "Type A" sensitivity. Treating the factors as independent from year to year would make the trend look much more uncertain than it is.
 
-What changes: the question about groups changes the uncertainty of each year's total; the questions about years change the uncertainty of the trend; none of them changes the mean. On the same tested inventory, in trend mode, the 95% range of the trend was about ±70 points with a new survey every year and about ±3 points with one census interpolated, with the coefficients fully correlated between years.
+What changes: the question about groups changes the uncertainty of each year's total; the questions about years change the uncertainty of the trend; none of them changes the mean. Whatever you choose, each year uses its own values from the Parameter_TimeSeries sheet. On the same tested inventory, in trend mode, emissions rose by about 167% between the base year and year t; the uncertainty of that change was about ±150 percentage points with a new survey every year and about ±14 points with one census carried over the years, with the coefficients fully correlated between years.
 
 A practical check for a trend: run it once with "The same factors for every year" and once with "New factors every year". If the two trend uncertainties are similar, your result does not depend on this choice. If they are very different, the emission factors dominate your trend uncertainty, and your inventory report should say which assumption you used.
+
+**When your systems differ.** The choice applies to every group at once. Some inventories keep the same factors for some production systems and revise others every year, or revise only some factors. In that case, choose the option that fits the systems with the largest share of emissions (the "Results by group" table shows the shares). Then run the trend once more with the other option. Report the larger of the two trend uncertainties, or report both and say why in the methods section of your inventory report. "Factors revised every few years" sits between the two and is a reasonable single choice for a mix.
 
 In the tornado chart, a count split into groups appears as one bar, for example "N (one count, 27 groups)", because the groups move together.
 
@@ -394,7 +396,7 @@ Before you click Run, a few settings need your attention (Screenshot 8).
 
 **GWP version.** The global warming potentials used to convert methane and nitrous oxide into CO~2~ equivalent. Choose AR4 (CH~4~ = 25, N~2~O = 298), AR5 (CH~4~ = 28, N~2~O = 265) or AR6 (CH~4~ = 27, N~2~O = 273; the 27 is the value for biogenic methane, which is right for cattle). The default is AR5. Use the version your reporting guidelines require.
 
-**Emission sources.** Tick every source that applies to your inventory ("Select all sources" ticks the six at once). A source you do not tick counts as zero. You may leave out enteric fermentation, but the enteric inputs must still be in your file, because the manure calculations use them. If enteric fermentation is not ticked, its emissions and uncertainty do not appear in the results.
+**Emission sources.** Tick every source that applies to your inventory ("Select all sources" ticks the six at once). A source you do not tick is left out of every result: the totals, IPCC Table 3.3, the sensitivity analysis, the comparison with and without correlations, the trend results and both downloads cover only the sources you ticked, and a line above the results names them. You may leave out enteric fermentation, but the enteric inputs must still be in your file, because the manure calculations use them.
 
 **Run uncertainty decomposition (AD/EF/Combined).** Ticked by default. The tool runs two more simulations, one where only the activity data vary and one where only the emission factors and coefficients vary, to fill the AD and EF columns of Table 3.3. It roughly triples the run time on a large inventory; untick it for a quick look.
 
@@ -473,23 +475,30 @@ How to read Figure 4.3: if the AD bar is the larger one, better livestock survey
 
 ## Trend results
 
-A trend run gives a different set of results, built around the two years the IPCC asks for.
+A trend run gives a different set of results, built around what a national inventory reports for several years: the uncertainty of the emissions in the year you report (year t), and the uncertainty of the change since the base year.
 
-**What to report** (Screenshot 14). The first card lets you choose the base year and the year you report (year t); by default the first and the last year of your series. Under the two lists, a few sentences say exactly what to report: the total of each year with its uncertainty, the change between them with its 95% range, and whether that range includes zero. When it includes zero, the inventory cannot tell an increase from a decrease at 95%; that is an honest and useful result.
+**The two years and the four cards** (Screenshot 14). The first card lets you choose the base year and year t; by default the first and the last year of your series. Everything in this first part of the page follows your choice. The four cards then give, in the order of IPCC Table 3.3:
+
+- **Emissions in year t**, with their 95% uncertainty (plus or minus a percentage of the mean);
+- **the change** from the base year to year t, in percent;
+- **the uncertainty of the change**, in percentage points: half the width of the 95% range of the change. This is the trend uncertainty you report;
+- **emissions in the base year**, with their uncertainty.
+
+Under the cards, a short reading says the same in words, and whether the 95% range of the change includes zero. When it does, the inventory cannot tell an increase from a decrease at 95%; that is an honest and useful result.
 
 ![](img/guide/s14_trend_top.png){width=100%}
 
-*Screenshot 14. The top of the trend results: the units, the two years, the sentences to report, and the four cards.*
+*Screenshot 14. The top of the trend results: the two years, the four cards and the reading.*
 
-**The cards.** Four boxes give the change since the base year (with its 95% range), the average change per year over all the years, the total of the latest year with its margin of error, and the largest change from one year to the next. The units choice above works as in a single-year run.
+The cards, the reading, Figure 4.2 and the table next to it all come from one calculation: the base year and year t simulated again as a pair, with 10,000 draws each by default. If you choose two other years, a button appears above the cards to run that pair; until you press it, the figures come from the series at 2,000 draws per year, and the reading under the cards says so.
 
-**The charts** (Screenshot 15). Figure 4.2 shows the total of every year with its 95% interval as a shaded band. Figure 4.3 shows the change from one year to the next, in percent. Figure 4.4 shows the distribution of the change between the first and the last year over all the iterations; when its 95% range does not include zero, the trend is distinguishable from no change.
+**How certain is the change?** (Screenshot 15). Figure 4.2 shows the change between the two years, draw by draw. The solid line is the mean change, the dashed lines the 95% interval, and the box in the corner gives the half-width of the interval: the uncertainty of the change. Next to it, a short table gives the same figures for each emission source, or, with the switch above it, for dairy and non-dairy cattle.
 
 ![](img/guide/s15_trend_charts.png){width=100%}
 
-*Screenshot 15. The trend over the years (Figure 4.2) and the year-to-year changes (Figure 4.3).*
+*Screenshot 15. The change between the two years (Figure 4.2) and the table by emission source.*
 
-**The tables.** Three tables follow: the two years side by side by emission source (the mean and margin of error of each source in both years, the change between them and its range, and which sources drive the uncertainty of year t); the results by group for any year you pick; and every year, with its mean, 95% interval, margin of error and changes.
+**The whole series.** Below a heading of its own come the results of every year, at 2,000 draws per year: the average change per year over the series and the largest change from one year to the next; Figure 4.3, the total of every year with its 95% interval as a shaded band (the two chosen years are marked); Figure 4.4, the change from one year to the next; the table of every year; and the results by group for any year you pick.
 
 \newpage
 
@@ -538,7 +547,7 @@ The ranking is computed on 4,000 of the iterations, which is enough for stable v
 A trend run gives two rankings, each with its tornado chart and its table (Screenshot 17):
 
 - **The latest year**: what drives the uncertainty of that year's total. It reads like a single-year ranking.
-- **The change between the first and the last year**: what drives the uncertainty of the trend. An input drawn in both years appears once per year, for example "N (cows) 2018" and "N (cows) 2022". An input whose error is the same in both years cancels in the change, so it drops down this ranking; that is the correlation between years at work.
+- **The change between the first and the last year**: what drives the uncertainty of the trend. An input drawn in both years appears once per year, for example "N (cows) 2018" and "N (cows) 2022". Inputs that move together are shown as one: animal numbers counted once and split into groups appear as "N (one count, 27 groups)", and an input whose draws are linked between the two years carries both years in its name, for example "DE (6 groups) 2018 and 2022". Inputs that cannot change the result, such as the factors of a manure system a group does not use, are left out, and when many inputs remain, only those most related to the change enter the calculation.
 
 ![](img/guide/s17_trend_sensitivity.png){width=100%}
 
@@ -565,14 +574,25 @@ For a single year, the table has one row per emission category and the three tot
 
 For the IPCC Inventory Software, copy the AD and EF columns of the matching category rows. Both are filled when the decomposition was ticked on Tab 4.
 
-For a trend, the tab shows the sentences to report and the full trend version of Table 3.3 for the base year and year t, with the trend columns. The first and the last year are always computed with 10,000 paired draws during the run. If you choose two other years, a button appears to run them the same way.
+When your inventory has dairy and non-dairy cattle, a second table gives the same lines for each cattle type (reporting codes 3.A.1.a and 3.A.1.b for enteric fermentation, 3.B.1.a and 3.B.1.b for manure management). Each type's uncertainty is computed from the draws of its own groups.
+
+For a trend, the tab shows the two years, the reading, and the trend version of Table 3.3 for the base year and year t, with the same table by cattle type and the downloads. Its columns are:
+
+- **Base year and year t emissions**, in t CO~2~eq;
+- **Year t: activity data, emission factor and combined uncertainty**, each as the lower and upper halves of the 95% interval: the uncertainty of the emissions of year t;
+- **Contribution to variance**: how much of the uncertainty of year t each source carries;
+- **Trend**: the change from the base year, in percent;
+- **Trend uncertainty introduced by activity data, and by emission factors**: the half-width of the 95% range of the change when only one side varies, in percentage points. These are the two trend columns of the IPCC Approach 1 table (Volume 1, Chapter 3, Table 3.2), here from Monte Carlo runs;
+- **Trend uncertainty, combined**: the lower and upper limits of the 95% range of the change, in percentage points around the trend. This is the trend uncertainty you report.
+
+The first and the last year are always computed with 10,000 paired draws during the run. If you choose two other years, a button appears to run them the same way.
 
 ## The downloads
 
 Two downloads are available:
 
-- **Excel report (.xlsx)**. The first sheet, README, describes every other sheet. For a single year: the run settings, the QA/QC checks ignored or repaired, the results (one row per IPCC reporting line: mean, 95% confidence interval, margin of error, and the activity data and emission factor split when the decomposition ran), the sensitivity ranking and every input of the run. For a trend: the run settings, the headline figures to report, IPCC Table 3.3, every year in total, by source and by group, the two sensitivity rankings and every input.
-- **Word report**. A complete report you can adapt for the uncertainty section of your inventory report. It reads in the order of the work: a summary; 1. the simulation (settings and Monte Carlo diagnostics); 2. the inputs (parameters filled with defaults, placeholder ranges, checks ignored or repaired, the sampled distributions and the full input table); 3. the results (by source, IPCC Table 3.3, by group, and the effect of correlations); 4. the sensitivity analysis. Every figure is numbered and has a caption.
+- **Excel report (.xlsx)**. The first sheet, README, describes every other sheet. For a single year: the run settings, the QA/QC checks ignored or repaired, the results (one row per IPCC reporting line: mean, 95% confidence interval, margin of error, and the activity data and emission factor split when the decomposition ran), the sensitivity ranking and every input of the run. When the inventory has dairy and non-dairy cattle, a Results_by_cattle_type sheet follows the results. For a trend: the run settings, the headline figures to report (in the order of the cards), IPCC Table 3.3 and the same table by cattle type, every year in total, by source and by group, the two sensitivity rankings and every input.
+- **Word report**. A complete report you can adapt for the uncertainty section of your inventory report. It reads in the order of the work: a summary; 1. the simulation (settings and Monte Carlo diagnostics); 2. the inputs (parameters filled with defaults, placeholder ranges, checks ignored or repaired, the sampled distributions and the full input table); 3. the results (by source, IPCC Table 3.3 and the same table by cattle type, by group, and the effect of correlations; for a trend, the two chosen years first, then by cattle type, then the whole series); 4. the sensitivity analysis. Every figure is numbered and has a caption.
 
 \newpage
 

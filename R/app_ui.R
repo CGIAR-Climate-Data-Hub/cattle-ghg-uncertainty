@@ -2091,7 +2091,10 @@ app_ui <- function(request = NULL) {
                               tags$div(class = "small text-muted", t("coef_year_partial_help"))),
                       tagList(tags$strong(t("coef_year_none")),
                               tags$div(class = "small text-muted", t("coef_year_none_help")))),
-                    choiceValues = c("full", "partial", "none"), selected = "full")
+                    choiceValues = c("full", "partial", "none"), selected = "full"),
+                  # 2026-11-04 (review of the new version): systems that differ
+                  div(class = "small text-muted", style = "margin-top:-4px;",
+                      icon("circle-info"), " ", t("coef_year_mixed_help"))
                 )
               )
             )

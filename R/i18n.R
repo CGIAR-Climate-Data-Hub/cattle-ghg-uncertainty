@@ -1405,8 +1405,8 @@ lang_state_take <- function(token) {
   res_vb_tr_change_sub = list(en = "change in mean total emissions", fr = "variation des émissions totales moyennes"),
   res_vb_tr_unc_title = list(en = "Uncertainty of the change", fr = "Incertitude de la variation"),
   res_vb_tr_unc_value = list(en = "+/- %s pp", fr = "+/- %s pts"),
-  res_vb_tr_unc_sub = list(en = "half-width of the 95%% range, in percentage points; the change lies between %s%% and %s%%",
-                           fr = "demi-largeur de la plage à 95 %%, en points de pourcentage ; la variation se situe entre %s %% et %s %%"),
+  res_vb_tr_unc_sub = list(en = "percentage points (half the 95%% range: %s%% to %s%%)",
+                           fr = "points de pourcentage (moitié de la plage à 95 %% : %s %% à %s %%)"),
   trend_word_rose = list(en = "rose", fr = "ont augmenté"),
   trend_word_fell = list(en = "fell", fr = "ont diminué"),
   trend_reading_change = list(
@@ -1983,6 +1983,9 @@ lang_state_take <- function(token) {
     fr = "Vos facteurs sont révisés de temps en temps, et les années proches reposent surtout sur les mêmes données. L'erreur change lentement d'une année à l'autre et ne s'annule qu'en partie."),
   coef_year_none = list(en = "New factors every year",
                         fr = "De nouveaux facteurs chaque année"),
+  coef_year_mixed_help = list(
+    en = "The choice applies to every group. If some systems keep the same factors and others revise them, choose the option that fits the systems with most of the emissions, run the trend once more with the other option, and report the larger trend uncertainty (or both). The middle option fits a mix.",
+    fr = "Le choix s'applique à tous les groupes. Si certains systèmes gardent les mêmes facteurs et d'autres les révisent, choisissez l'option qui correspond aux systèmes qui émettent le plus, relancez la tendance avec l'autre option, et déclarez l'incertitude de tendance la plus forte (ou les deux). L'option du milieu convient à un mélange."),
   coef_year_none_help = list(
     en = "Each year's factors were measured anew with new field data. Each year's error is new, so nothing cancels, and the trend is at its most uncertain. Choose this only if that is really how your factors were made.",
     fr = "Les facteurs de chaque année ont été mesurés à nouveau avec de nouvelles données de terrain. Chaque erreur est nouvelle, rien ne s'annule, et la tendance est au plus incertain. Choisissez ceci seulement si c'est vraiment ainsi que vos facteurs ont été obtenus."),
