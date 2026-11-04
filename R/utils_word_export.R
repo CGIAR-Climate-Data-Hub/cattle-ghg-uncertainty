@@ -240,6 +240,7 @@ build_run_summary_docx <- function(path,
                                    uncertainty,
                                    sensitivity = NULL,
                                    ipcc_table  = NULL,
+                                   ipcc_by_type = NULL,
                                    ipcc_meta   = NULL,
                                    decomposition          = NULL,
                                    comparison_uncertainty = NULL,
@@ -380,6 +381,13 @@ build_run_summary_docx <- function(path,
     doc <- .add_p(doc,
       "For each reporting line: the uncertainty when only the activity data vary (AD), when only the emission factors and coefficients vary (EF), and when both vary (combined, the figure reported in Table 3.3), as 95% MoE.")
     doc <- .add_flextable_safe(doc, .styled_flextable(.ipcc_flextable(ipcc_table)))
+    # 2026-11-04: the same table by cattle type, when the run has both
+    if (is.data.frame(ipcc_by_type) && length(unique(ipcc_by_type[["Cattle type"]])) > 1L) {
+      doc <- num$sub(doc, "IPCC Table 3.3 by cattle type")
+      doc <- .add_p(doc,
+        "The same lines for dairy and non-dairy cattle separately, for countries that report the two types apart (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b). Each type's uncertainty is computed from the draws of its own groups, summed within the type.")
+      doc <- .add_flextable_safe(doc, .styled_flextable(.ipcc_flextable(ipcc_by_type)))
+    }
     doc <- .add_landscape_break(doc)
     decomp_plot <- .gg_decomposition(decomposition)
     doc <- fig(doc, decomp_plot, "Uncertainty from activity data and emission factors",

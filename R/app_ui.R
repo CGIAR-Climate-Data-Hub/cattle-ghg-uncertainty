@@ -2590,6 +2590,17 @@ app_ui <- function(request = NULL) {
             DT::DTOutput("ipcc_table")
           )
         ),
+        # 2026-11-04: the same table split between dairy and non-dairy cattle
+        conditionalPanel(
+          condition = "output.has_ipcc_by_type == true",
+          bslib::card(
+            bslib::card_header(t("card_ipcc_by_type_h")),
+            bslib::card_body(
+              p(tags$em(t("ipcc_by_type_note"))),
+              DT::DTOutput("ipcc_table_by_type")
+            )
+          )
+        ),
         bslib::card(
           style = "border-left: 4px solid #2D6A4F;",
           bslib::card_header(t("card_downloads_h")),

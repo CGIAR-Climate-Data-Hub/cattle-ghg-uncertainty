@@ -4807,6 +4807,35 @@ section_F <- function() {
              notes = if (f90_ok) "EF4 0.005 dry range; EF4 0.010 by edition; EF5 0.0075; placeholder upgraded, country value untouched"
                      else paste(f90_fail, collapse = "; "))
 
+  # F91 -- results by cattle type (2026-11-04, review of the new version):
+  # dairy plus non-dairy equals the inventory draw by draw, and Table 3.3 by
+  # cattle type has one row per line and type with the right codes.
+  f91_fail <- tryCatch({
+    f <- character(0)
+    sp <- do.call(rbind, lapply(c("dairy", "non_dairy"), function(ct) {
+      d <- make_golden_specs(constant_dist = FALSE); d$cattle_type <- ct
+      d$aggregation_level <- "lvl"; d$sub_category <- if (ct == "dairy") "cows" else "steers"; d }))
+    b <- build_systems_data(sp, manure = NULL, n_iter = 500, seed = 6)
+    sim <- run_inventory_simulation(b$systems, n_iter = 500, gwp = "AR5", seed = 6)
+    ct <- cattle_type_results(sim)
+    if (!identical(sort(names(ct)), c("dairy", "non_dairy"))) f <- c(f, "types not found")
+    else {
+      if (max(abs(ct$dairy$total_co2e + ct$non_dairy$total_co2e - sim$inventory$total_co2e)) > 1e-6)
+        f <- c(f, "dairy + non-dairy is not the inventory, draw by draw")
+      u <- lapply(ct, calc_all_uncertainty)
+      tb <- format_ipcc_table_by_type(list(combined = u, ad_only = u, ef_only = u))
+      if (!any(grepl("^3.A.1.a", tb[[1]]) & tb[["Cattle type"]] == "Dairy cattle") ||
+          !any(grepl("^3.A.1.b", tb[[1]]) & tb[["Cattle type"]] == "Non-dairy cattle"))
+        f <- c(f, "Table 3.3 by cattle type lacks the 3.A.1.a / 3.A.1.b rows")
+    }
+    f
+  }, error = function(e) conditionMessage(e))
+  f91_ok <- length(f91_fail) == 0L
+  check_bool("F91", "F",
+             "Results by cattle type: dairy plus non-dairy equals the inventory draw by draw; Table 3.3 by cattle type carries 3.A.1.a and 3.A.1.b",
+             f91_ok,
+             notes = if (f91_ok) "sum check exact; codes present" else paste(f91_fail, collapse = "; "))
+
   # F80 -- conversions declared by the AI and recomputed by the server
   # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
   # is verified, one off by 1 % fails, a missing lactation length warns, the

@@ -21,6 +21,7 @@ app_server <- function(input, output, session) {
     decomposition = NULL,
     sensitivity = NULL,
     ipcc_table = NULL,
+    ipcc_table_by_type = NULL,
     sim_log = "",
     sim_running = FALSE,
     sim_error = NULL,
@@ -184,7 +185,7 @@ app_server <- function(input, output, session) {
         rv$upload_status   <- NULL
         # results of the cleared example would export its inputs
         rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
-        rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
+        rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$ipcc_table_by_type <- NULL; rv$sim_error <- NULL
         rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_links <- NULL
         rv$diagnostics <- NULL
         rv$sim_view <- "settings"
@@ -1474,7 +1475,7 @@ app_server <- function(input, output, session) {
     # draws) peaked at about 835 MB of process memory locally against 570 MB
     # for a first run, and crashed the 1 GB server (oom, 2026-10-30 19:27 UTC).
     rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
-    rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
+    rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$ipcc_table_by_type <- NULL; rv$sim_error <- NULL
     rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_links <- NULL
     rv$diagnostics <- NULL
     # 2026-11-02: and the trend results, for the same reason (see the trend
@@ -1657,6 +1658,9 @@ app_server <- function(input, output, session) {
           # ---- Stage 3: uncertainty metrics ----
           setProgress(0.40, detail = "Computing uncertainty metrics...")
           rv$uncertainty <- drop_unselected_rows(calc_all_uncertainty(sim_result$inventory), srcs_run)
+          # 2026-11-04: the same summary per cattle type (dairy, non-dairy),
+          # from the group draws summed within each type; no extra run
+          bt_comb <- cattle_type_uncertainty(sim_result, srcs_run)
           rv$sim_log <- paste0(rv$sim_log, "Simulation complete.\n")
 
           # ---- Stage 4: decomposition (AD-only + EF-only, multi-group safe) ----
@@ -1689,6 +1693,7 @@ app_server <- function(input, output, session) {
             # holding all three risks an out-of-memory abort on a large run).
             ad_result <- filter_sim_sources(ad_result, srcs_run, input$gwp_version)
             ad_unc <- drop_unselected_rows(calc_all_uncertainty(ad_result$inventory), srcs_run)
+            bt_ad  <- cattle_type_uncertainty(ad_result, srcs_run)
             rm(systems_ad, ad_result); invisible(gc(FALSE))
 
             setProgress(0.70, detail = sprintf("Running EF-only simulation (%d group(s))...",
@@ -1705,6 +1710,7 @@ app_server <- function(input, output, session) {
             )
             ef_result <- filter_sim_sources(ef_result, srcs_run, input$gwp_version)
             ef_unc <- drop_unselected_rows(calc_all_uncertainty(ef_result$inventory), srcs_run)
+            bt_ef  <- cattle_type_uncertainty(ef_result, srcs_run)
             rm(systems_ef, ef_result); invisible(gc(FALSE))
 
             rv$decomposition <- list(
@@ -1713,6 +1719,9 @@ app_server <- function(input, output, session) {
               ef_only  = ef_unc
             )
             rv$ipcc_table <- format_ipcc_table(rv$decomposition, sources = srcs_run)
+            rv$ipcc_table_by_type <- tryCatch(
+              format_ipcc_table_by_type(list(combined = bt_comb, ad_only = bt_ad, ef_only = bt_ef)),
+              error = function(e) NULL)
             rv$sim_log <- paste0(rv$sim_log,
               sprintf("Uncertainty decomposition complete (%d group(s)).\n", length(systems_data)))
             setProgress(0.90, detail = "Decomposition complete.")
@@ -2926,6 +2935,19 @@ app_server <- function(input, output, session) {
     DT::datatable(rv$ipcc_table, rownames = FALSE,
                   options = list(pageLength = 10, dom = 't'))
   })
+  # 2026-11-04: Table 3.3 by cattle type, shown when the run has groups of
+  # both types (with one type it would repeat the table above)
+  output$has_ipcc_by_type <- reactive({
+    tb <- rv$ipcc_table_by_type
+    !is.null(tb) && length(unique(tb[["Cattle type"]])) > 1L
+  })
+  outputOptions(output, "has_ipcc_by_type", suspendWhenHidden = FALSE)
+  output$ipcc_table_by_type <- DT::renderDT({
+    req(isTRUE(rv$prerender_ok))
+    req(rv$ipcc_table_by_type)
+    DT::datatable(rv$ipcc_table_by_type, rownames = FALSE,
+                  options = list(pageLength = 20, dom = 't'))
+  })
 
   # T1.4 + R1.7: parameter glossary, variable names are now IPCC-aligned, so the
   # separate ipcc_software_name column is dropped (redundant). "Our column"
@@ -3059,6 +3081,7 @@ app_server <- function(input, output, session) {
       export_results_xlsx(
         rv$mc_results$inventory, rv$uncertainty,
         rv$sensitivity, rv$ipcc_table, file,
+        ipcc_by_type = rv$ipcc_table_by_type,
         param_specs = rv$param_specs,
         qa_caveats  = .qa_caveats_export(),
         manure      = rv$manure_data,
@@ -3125,6 +3148,7 @@ app_server <- function(input, output, session) {
         uncertainty           = rv$uncertainty,
         sensitivity           = rv$sensitivity,
         ipcc_table            = rv$ipcc_table,
+        ipcc_by_type          = rv$ipcc_table_by_type,
         ipcc_meta             = rv$inv_metadata,
         decomposition         = rv$decomposition,
         comparison_uncertainty = comp_unc,
@@ -3168,7 +3192,7 @@ app_server <- function(input, output, session) {
     # (2026-11-02 09:36 UTC). The note tells the user what went.
     if (!is.null(rv$mc_results)) {
       rv$mc_results <- NULL; rv$uncertainty <- NULL; rv$decomposition <- NULL
-      rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$sim_error <- NULL
+      rv$sensitivity <- NULL; rv$ipcc_table <- NULL; rv$ipcc_table_by_type <- NULL; rv$sim_error <- NULL
       rv$comparison_result <- NULL; rv$comparison_sensitivity <- NULL; rv$comparison_links <- NULL
       rv$diagnostics <- NULL
       invisible(gc(FALSE))

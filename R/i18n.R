@@ -2028,15 +2028,15 @@ lang_state_take <- function(token) {
   res_decomp_ef_label = list(en = "Coefficients (EF)", fr = "Coefficients (FE)"),
   res_decomp_combined_label = list(en = "Combined", fr = "Combinée"),
 
-  res_by_system_h = list(en = "Results by sub-category",
-                            fr = "Résultats par sous-catégorie"),
+  res_by_system_h = list(en = "Results by group (level chosen above)",
+                            fr = "Résultats par groupe (niveau choisi ci-dessus)"),
   res_by_system_intro = list(
     en = "Per-sub-category mean and 95% CI for each emission source.",
     fr = "Moyenne et IC 95 % par sous-catégorie pour chaque source d'émission."
   ),
 
-  res_by_category_h = list(en = "Results by cattle type",
-                              fr = "Résultats par type de bétail"),
+  res_by_category_h = list(en = "Results by group and emission source",
+                              fr = "Résultats par groupe et source d'émission"),
   res_by_category_intro = list(
     en = "Aggregated by cattle type (dairy, non-dairy, buffalo).",
     fr = "Agrégés par type de bétail (laitier, non laitier, buffle)."
@@ -2203,6 +2203,11 @@ lang_state_take <- function(token) {
   ),
   res_vb_direct_indirect = list(en = "Direct + indirect", fr = "Direct + indirect"),
 
+  # 2026-11-04: IPCC Table 3.3 by cattle type
+  card_ipcc_by_type_h = list(en = "IPCC Table 3.3 by cattle type", fr = "Tableau 3.3 du GIEC par type de bovin"),
+  ipcc_by_type_note = list(
+    en = "The same figures for dairy and non-dairy cattle separately, for countries that report the two types apart (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b). Each type's uncertainty is computed from the draws of its own groups, summed within the type.",
+    fr = "Les mêmes chiffres pour les bovins laitiers et non laitiers séparément, pour les pays qui déclarent les deux types à part (codes 3.A.1.a et 3.A.1.b, 3.B.1.a et 3.B.1.b). L'incertitude de chaque type est calculée à partir des tirages de ses propres groupes, additionnés au sein du type."),
   res_inline_total_co2e = list(en = "Total CO₂eq:", fr = "CO₂éq total :"),
   # 2026-11-04: the line shown above the results when not every Tab 4 source was ticked
   res_sources_included = list(en = "Sources included in every figure below:", fr = "Sources incluses dans tous les chiffres ci-dessous :"),
@@ -2269,10 +2274,6 @@ lang_state_take <- function(token) {
   res_agg_level_note = list(en = "Tables below aggregate per-iteration results at this level.",
                               fr = "Les tableaux ci-dessous agrègent les résultats par itération à ce niveau."),
 
-  res_by_system_h = list(en = "By-System Breakdown",
-                            fr = "Détail par système"),
-  res_by_category_h = list(en = "By Reporting Category (IPCC Table 3.3 layout)",
-                              fr = "Par catégorie de rapport (mise en page IPCC Tableau 3.3)"),
   res_by_category_note = list(
     en = "Each row is one IPCC inventory reporting line (group × source). Rows match the granularity used in IPCC Volume 1 Chapter 3 uncertainty reporting.",
     fr = "Chaque ligne est une ligne de rapport d'inventaire IPCC (groupe × source). La granularité correspond à celle des rapports d'incertitude IPCC Volume 1 Chapitre 3."

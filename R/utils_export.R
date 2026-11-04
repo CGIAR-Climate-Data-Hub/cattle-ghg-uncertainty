@@ -96,7 +96,8 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
 
 export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, filepath,
                                 settings = NULL, param_specs = NULL,
-                                qa_caveats = NULL, manure = NULL) {
+                                qa_caveats = NULL, manure = NULL,
+                                ipcc_by_type = NULL) {
   # Andreas 2026-05 #38: previously crashed when ipcc_table was NULL (which
   # happens whenever AD/EF decomposition didn't run, e.g. for custom uploads
   #: see app_server.R line 982). Replace NULL/empty inputs with placeholder
@@ -176,8 +177,11 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   # 2026-11-02 (Lolita): the Metadata sheet is gone (the iterations are in
   # Run_Settings); a README sheet first says what every sheet holds.
   has_decomp <- "AD uncertainty, MoE 95% (%)" %in% names(results_df)
+  # 2026-11-04: Table 3.3 by cattle type, when the run has both types
+  has_type <- is.data.frame(ipcc_by_type) && length(unique(ipcc_by_type[["Cattle type"]])) > 1L
   readme_df <- data.frame(
-    Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Results", "Sensitivity_SRC", "Input_Parameters"),
+    Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Results",
+              if (has_type) "Results_by_cattle_type", "Sensitivity_SRC", "Input_Parameters"),
     Contents = c(
       paste0(sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Single-year Monte Carlo results, %s iterations.",
                      .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), format(n_iter, big.mark = ",")),
@@ -189,6 +193,7 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
              "the 95% margin of error (MoE, half the width of the CI as a percentage of the mean) and its lower and upper halves",
              if (has_decomp) ", then the uncertainty from the activity data (AD) alone and from the emission factors and coefficients (EF) alone."
              else ". The AD and EF split appears when 'Run uncertainty decomposition' is ticked on Tab 4."),
+      if (has_type) "The same lines for dairy and non-dairy cattle separately (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b): mean emissions in tonnes of the gas, the AD, EF and combined 95% MoE, and the lower and upper halves of the combined interval. Each type's uncertainty is computed from the draws of its own groups, summed within the type.",
       "The sensitivity analysis of total CO2eq: one row per input, its standardised regression coefficient (src, from -1 to +1; the further from zero, the more the input matters), its absolute value, p_value, rank, and the animal groups that use it.",
       "Every input of the run: group, parameter, mean, distribution, bounds, and range_source, which says where each uncertainty range comes from and marks the placeholder ranges (no published source)."),
     stringsAsFactors = FALSE)
@@ -198,10 +203,11 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     Run_Settings     = run_settings_df,
     QA_Caveats       = caveats_df,
     Results          = results_df,
+    Results_by_cattle_type = if (has_type) ipcc_by_type else NULL,
     Sensitivity_SRC  = src_df,
     Input_Parameters = inputs_df
   )
-  writexl::write_xlsx(sheets, path = filepath)
+  writexl::write_xlsx(Filter(Negate(is.null), sheets), path = filepath)
 }
 
 # 2026-11-04: " Sources included in every figure: ..." when not every Tab 4
