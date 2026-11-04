@@ -2652,6 +2652,22 @@ app_ui <- function(request = NULL) {
             DT::DTOutput("trend_ipcc_table")
           )
         ),
+        # 2026-11-04: the same table split between dairy and non-dairy cattle
+        conditionalPanel(
+          condition = "output.has_trend_by_type == true",
+          bslib::card(
+            bslib::card_header(t("card_ipcc_by_type_h")),
+            bslib::card_body(
+              p(tags$em(t("trend_by_type_note"))),
+              DT::DTOutput("trend_ipcc_table_by_type")
+            )
+          )
+        ),
+        bslib::card(
+          bslib::card_header(fig_title("6.1", t("card_trend_chart_h"))),
+          bslib::card_body(plotly::plotlyOutput("trend_plot_report", height = "400px"),
+                           fig_caption("fig_cap_trend"))
+        ),
         bslib::card(
           bslib::card_header(t("card_trend_downloads")),
           bslib::card_body(
@@ -2663,11 +2679,6 @@ app_ui <- function(request = NULL) {
                                         class = "btn-primary"))
             )
           )
-        ),
-        bslib::card(
-          bslib::card_header(fig_title("6.1", t("card_trend_chart_h"))),
-          bslib::card_body(plotly::plotlyOutput("trend_plot_report", height = "400px"),
-                           fig_caption("fig_cap_trend"))
         ),
         bslib::card(
           bslib::card_header(t("card_trend_table_h")),

@@ -3316,7 +3316,9 @@ app_server <- function(input, output, session) {
                                            n_iter_pair = n_iter_pair,
                                            n_group_rho = .n_group_rho(),
                                            n_year_corr = input$n_year_corr %||% "none",
-                                           emission_sources = srcs_run)
+                                           emission_sources = srcs_run,
+                                           corr_mode = input$corr_mode %||% "none",
+                                           n_group_corr = input$n_group_corr %||% "full")
           rv_trend$pairs           <- setNames(list(pair),
                                                .trend_pair_key(pair$base_year, pair$year_t))
           # year selectors: base year = first, year t = last, on both tabs
@@ -3610,6 +3612,19 @@ app_server <- function(input, output, session) {
                            trend_compare_years(trend_res_rep(), ys$base, ys$t, trend_gwp()) })
   trend_head <- reactive({ ys <- trend_sel_years()
                            trend_headline(trend_res_rep(), ys$base, ys$t, trend_gwp()) })
+  # 2026-11-04: Table 3.3 by cattle type for the chosen pair
+  trend_ipcc_by_type <- reactive({
+    p <- trend_pair()
+    if (is.null(p)) NULL else tryCatch(trend_ipcc_table_by_type(p, trend_gwp()), error = function(e) NULL)
+  })
+  output$has_trend_by_type <- reactive({
+    tb <- trend_ipcc_by_type(); !is.null(tb) && length(unique(tb[["Cattle type"]])) > 1L
+  })
+  outputOptions(output, "has_trend_by_type", suspendWhenHidden = FALSE)
+  output$trend_ipcc_table_by_type <- DT::renderDT({
+    tb <- trend_ipcc_by_type(); req(tb)
+    DT::datatable(tb, rownames = FALSE, options = list(pageLength = 20, dom = 't', scrollX = TRUE))
+  })
   trend_ipcc <- reactive({
     ys <- trend_sel_years()
     trend_ipcc_table(trend_res_rep(), ys$base, ys$t, trend_gwp(),
@@ -3911,14 +3926,15 @@ app_server <- function(input, output, session) {
         filepath             = file,
         headline             = trend_head(),
         ipcc_table           = trend_ipcc(),
+        ipcc_by_type         = trend_ipcc_by_type(),
         compare              = trend_cmp(),
         sources_long         = trend_sources_long(rv_trend$res, trend_gwp()),
         by_group             = rv_trend$res$system_summary,
         settings             = list(gwp_version = rv_trend$run_args$gwp %||% input$gwp_version,
                                     seed = rv_trend$run_args$seed %||% input$seed,
                                     emission_sources = rv_trend$run_args$emission_sources %||% input$emission_sources,
-                                    corr_mode = input$corr_mode %||% "none",
-                                    n_group_corr = input$n_group_corr %||% "full",
+                                    corr_mode = rv_trend$run_args$corr_mode %||% input$corr_mode %||% "none",
+                                    n_group_corr = rv_trend$run_args$n_group_corr %||% input$n_group_corr %||% "full",
                                     n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none"),
         qa_caveats           = .qa_caveats_export(),
         param_specs          = rv$param_specs,
@@ -3947,10 +3963,11 @@ app_server <- function(input, output, session) {
         param_specs          = rv$param_specs,
         headline             = trend_head(),
         ipcc_table           = trend_ipcc(),
+        ipcc_by_type         = trend_ipcc_by_type(),
         compare              = trend_cmp(),
         manure               = rv$manure_data,
-        corr_settings        = list(corr_mode = input$corr_mode %||% "none",
-                                    n_group_corr = input$n_group_corr %||% "full",
+        corr_settings        = list(corr_mode = rv_trend$run_args$corr_mode %||% input$corr_mode %||% "none",
+                                    n_group_corr = rv_trend$run_args$n_group_corr %||% input$n_group_corr %||% "full",
                                     n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none",
                                     gwp_version = rv_trend$run_args$gwp %||% input$gwp_version,
                                     seed = rv_trend$run_args$seed %||% input$seed,

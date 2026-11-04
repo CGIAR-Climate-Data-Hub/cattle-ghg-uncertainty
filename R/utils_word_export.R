@@ -529,6 +529,7 @@ build_trend_summary_docx <- function(path,
                                       compare     = NULL,
                                       manure      = NULL,
                                      corr_settings = NULL,
+                                     ipcc_by_type = NULL,
                                      diagnostics = NULL) {
 
   doc <- officer::read_docx()
@@ -630,11 +631,19 @@ build_trend_summary_docx <- function(path,
       doc <- .add_p(doc, paste(
         "IPCC Table 3.3, the general reporting table for uncertainty. Approach 2 (Monte Carlo); values in t CO2eq, divide by 1,000 for Gg.",
         if (isTRUE(attr(ipcc_table, "has_ad_ef")))
-          "The activity data and emission factor columns come from two extra simulations for year t with the other side held at its mean."
+          "The activity data (AD) and emission factor (EF) columns come from extra simulations of both years with the other side held at its mean: the year t columns are the uncertainty of year t emissions, the trend columns the uncertainty the AD and the EF introduce into the trend (95% half-width, percentage points)."
         else "The activity data and emission factor columns were not computed for this report; IPCC allows them to be left blank.",
         "Contribution to variance is each source's covariance with the total divided by the variance of the total; the six sources sum to 1.",
         "Trend uncertainty is in percentage points around the trend, the IPCC convention."))
       doc <- .add_flextable_safe(doc, .styled_flextable(.trend_ipcc_flextable(ipcc_table)))
+      # 2026-11-04: the same table by cattle type, when the run has both
+      if (is.data.frame(ipcc_by_type) && length(unique(ipcc_by_type[["Cattle type"]])) > 1L) {
+        doc <- .add_p(doc, paste(
+          "The same table for dairy and non-dairy cattle separately (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b).",
+          "Year t uncertainties are +/- half-widths of the 95% interval; each type's figures come from the draws of its own groups."))
+        ft <- flextable::fontsize(flextable::flextable(ipcc_by_type), size = 6.5, part = "all")
+        doc <- .add_flextable_safe(doc, .styled_flextable(flextable::autofit(ft)))
+      }
       doc <- .add_landscape_break(doc)
     }
   }
@@ -1615,11 +1624,14 @@ WORD_SENS_MAX <- 50L
   for (j in 3:4) df[[j]] <- format(round(df[[j]], 0), big.mark = ",")
   for (j in 5:10) df[[j]] <- ifelse(is.na(df[[j]]), "", formatC(df[[j]], digits = 1, format = "f"))
   df[[11]] <- ifelse(is.na(df[[11]]), "", formatC(df[[11]], digits = 3, format = "f"))
-  for (j in 12:14) df[[j]] <- ifelse(is.na(df[[j]]), "", formatC(df[[j]], digits = 1, format = "f"))
+  for (j in 12:16) df[[j]] <- ifelse(is.na(df[[j]]), "", formatC(df[[j]], digits = 1, format = "f"))
+  # 2026-11-04: the trend's AD and EF columns, and headers that say which
+  # figures are the year t level and which the trend
   names(df) <- c("IPCC category", "Gas", "Base year (t CO2eq)", "Year t (t CO2eq)",
-                 "AD (-) %", "AD (+) %", "EF (-) %", "EF (+) %",
-                 "Combined (-) %", "Combined (+) %", "Share of variance, year t",
-                 "Trend (% of base)", "Trend unc. (-) pp", "Trend unc. (+) pp",
+                 "Year t AD (-) %", "Year t AD (+) %", "Year t EF (-) %", "Year t EF (+) %",
+                 "Year t combined (-) %", "Year t combined (+) %", "Share of variance, year t",
+                 "Trend (% of base)", "Trend unc. from AD (+/- pp)", "Trend unc. from EF (+/- pp)",
+                 "Trend unc. combined (-) pp", "Trend unc. combined (+) pp",
                  "Approach and comments")
   ft <- flextable::flextable(df)
   ft <- flextable::fontsize(ft, size = 6.5, part = "all")

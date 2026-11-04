@@ -6,25 +6,32 @@
 # AD/EF split (trend_decompose_year), which the single-year path also does
 # as two extra runs.
 #
-# Table 3.3 columns and where each comes from:
-#   C  base year emissions          mean of the base year's draws
-#   D  year t emissions             mean of year t's draws
-#   E  activity data uncertainty    AD-only run for year t (optional)
-#   F  emission factor uncertainty  EF-only run for year t (optional)
-#   G  combined uncertainty         2.5 / 97.5 percentiles of year t, as
-#                                   (-) and (+) % of the mean
-#   H  contribution to variance     cov(row, total) / var(total) in year t;
-#      in year t                    sums to 1 over the six sources, which is
-#                                   what the foot of the table requires when
-#                                   sources are correlated (Approach 2)
-#   I  trend                        (mean_t - mean_base) / mean_base * 100
-#   J  uncertainty in the trend     2.5 / 97.5 percentiles of the per-
-#                                   iteration trend, as percentage points
-#                                   from column I (the IPCC convention: a
-#                                   trend of -5% with a range of -8% to -3%
-#                                   is reported as -3 to +2)
-#   K  approach and comments        Approach 2 (Monte Carlo) and the
-#                                   year-to-year correlation setting
+# Table 3.3 columns (2026-11-04) and where each comes from. Everything is
+# computed on the paired reporting run of the two chosen years
+# (trend_reporting_pair), whose combined, AD-only and EF-only runs share
+# their draws and their year-to-year links:
+#   base year / year t emissions       means of the combined run
+#   year t: activity data (-)/(+) %    AD-only run of year t (coefficients
+#                                      held at their means), 2.5 / 97.5
+#                                      percentiles as % of the mean
+#   year t: emission factor (-)/(+) %  EF-only run of year t (N held)
+#   year t: combined (-)/(+) %         combined run of year t
+#   contribution to variance           cov(row, total) / var(total) in year
+#                                      t; sums to 1 over the sources
+#   trend                              (mean_t - mean_base) / mean_base * 100
+#   trend uncertainty introduced by    95% half-width of the per-draw trend
+#   activity data / emission factors   of the AD-only / EF-only pair, in
+#                                      percentage points (IPCC Approach 1
+#                                      Table 3.2 columns K and L; from
+#                                      separate runs, so they need not
+#                                      combine in quadrature to the next)
+#   trend uncertainty, combined        2.5 / 97.5 percentiles of the per-
+#                                      draw trend minus the trend, in
+#                                      percentage points (a trend of -5%
+#                                      with a range of -8% to -3% is
+#                                      reported as -3 to +2)
+#   approach and comments              Approach 2 (Monte Carlo) and the
+#                                      year-to-year correlation setting
 # The table is in t CO2eq, the unit used everywhere else in the tool; IPCC
 # prints Gg CO2eq. Divide by 1,000 to convert.
 
@@ -194,21 +201,32 @@ trend_ipcc_table <- function(res, base_year, year_t, gwp = "AR5",
   comments <- ifelse(cmp$is_source, "Approach 2 (Monte Carlo)",
                 ifelse(cmp$var == "total_co2e", paste0("Approach 2 (Monte Carlo); ", yc),
                        "Approach 2 (Monte Carlo); gas total"))
+  # 2026-11-04: the trend's uncertainty introduced by the activity data and
+  # by the emission factors, each the 95% half-width of the per-draw trend
+  # of the AD-only and EF-only pairs (both years run since this date).
+  by_ad <- if (!is.null(decomp)) decomp$ad_by_year else NULL
+  by_ef <- if (!is.null(decomp)) decomp$ef_by_year else NULL
+  hw_of <- function(byy) vapply(cmp$var, function(v) {
+    if (is.null(byy)) return(NA_real_)
+    .trend_hw(byy[[as.character(base_year)]][[v]], byy[[as.character(year_t)]][[v]])
+  }, numeric(1))
   out <- data.frame(
     `IPCC category` = cmp$category,
     Gas = cmp$gas,
     `Base year emissions (t CO₂eq)` = round(cmp$base_mean, 1),
     `Year t emissions (t CO₂eq)`    = round(cmp$t_mean, 1),
-    `AD uncertainty (-) %` = round(pick(ad, cmp$var, "lower_pct"), 1),
-    `AD uncertainty (+) %` = round(pick(ad, cmp$var, "upper_pct"), 1),
-    `EF uncertainty (-) %` = round(pick(ef, cmp$var, "lower_pct"), 1),
-    `EF uncertainty (+) %` = round(pick(ef, cmp$var, "upper_pct"), 1),
-    `Combined uncertainty (-) %` = round(cmp$t_lower_pct, 1),
-    `Combined uncertainty (+) %` = round(cmp$t_upper_pct, 1),
+    `Year t: activity data uncertainty (-) %` = round(pick(ad, cmp$var, "lower_pct"), 1),
+    `Year t: activity data uncertainty (+) %` = round(pick(ad, cmp$var, "upper_pct"), 1),
+    `Year t: emission factor uncertainty (-) %` = round(pick(ef, cmp$var, "lower_pct"), 1),
+    `Year t: emission factor uncertainty (+) %` = round(pick(ef, cmp$var, "upper_pct"), 1),
+    `Year t: combined uncertainty (-) %` = round(cmp$t_lower_pct, 1),
+    `Year t: combined uncertainty (+) %` = round(cmp$t_upper_pct, 1),
     `Contribution to variance in year t` = round(cmp$contribution, 4),
     `Trend (% of base year)` = round(cmp$trend_pct, 1),
-    `Trend uncertainty (-) pp` = round(cmp$trend_lo_pp, 1),
-    `Trend uncertainty (+) pp` = round(cmp$trend_hi_pp, 1),
+    `Trend uncertainty introduced by activity data (+/- pp)` = round(hw_of(by_ad), 1),
+    `Trend uncertainty introduced by emission factors (+/- pp)` = round(hw_of(by_ef), 1),
+    `Trend uncertainty, combined (-) pp` = round(cmp$trend_lo_pp, 1),
+    `Trend uncertainty, combined (+) pp` = round(cmp$trend_hi_pp, 1),
     `Approach and comments` = comments,
     check.names = FALSE, stringsAsFactors = FALSE, row.names = NULL)
   attr(out, "base_year") <- as.integer(base_year)
@@ -340,10 +358,13 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
   # make_year_block_generator()); "full" asks for the two years directly,
   # "partial" steps through the chain up to the later one.
   yspecs <- function(k) .trend_year_specs(trend_df[trend_df$year == years[k], , drop = FALSE], base_specs)
+  # "full": each year's blocks are built inside the loop below and released
+  # after that year (about 40 MB per year at 10,000 draws on the test
+  # inventory); building both up front raised the peak of the pair.
+  gen_full <- NULL
   if (identical(year_corr, "full")) {
-    gen <- make_year_block_generator(base_specs, n_iter, seed = seed, rho = 1,
-                                     crossgroup = crossgroup, corr_matrix = corr_matrix)
-    for (k in yi) blocks[[as.character(years[k])]] <- gen(yspecs(k), k)
+    gen_full <- make_year_block_generator(base_specs, n_iter, seed = seed, rho = 1,
+                                          crossgroup = crossgroup, corr_matrix = corr_matrix)
   } else if (identical(year_corr, "partial")) {
     gen <- make_year_block_generator(base_specs, n_iter, seed = seed, rho = ar1_rho,
                                      crossgroup = crossgroup, corr_matrix = corr_matrix)
@@ -353,18 +374,28 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
     }
   }
 
-  inventory_by_year <- list(); decomp <- NULL
-  n_steps <- length(pair) + 2L; step <- 0L
+  # 2026-11-04 (review of the new version): the AD-only and EF-only runs
+  # are made for BOTH years, on the same draws and year links as the
+  # combined pair, so the trend's uncertainty introduced by the activity
+  # data and by the emission factors (IPCC Approach 1 Table 3.2 columns K
+  # and L, here from Monte Carlo) can be reported. Their per-draw totals
+  # are kept (about 0.9 MB per run at 10,000 draws), and so are the per-draw
+  # sums by cattle type of the three runs (Table 3.3 by cattle type).
+  inventory_by_year <- list(); ad_by_year <- list(); ef_by_year <- list()
+  ct_by_year <- list(); decomp <- NULL
+  n_steps <- 3L * length(pair); step <- 0L
   fmt <- function(n) format(n, big.mark = ",")
   for (j in seq_along(pair)) {
     y  <- pair[j]
     ps <- .trend_year_specs(trend_df[trend_df$year == y, , drop = FALSE], base_specs)
     year_seed <- .trend_year_seed(seed, yi[j])
+    yb <- if (!is.null(gen_full)) gen_full(ps, yi[j]) else blocks[[as.character(y)]]
     built <- build_systems_data(ps, manure = manure, n_iter = n_iter, seed = year_seed,
                                 crossgroup = crossgroup, corr_matrix = corr_matrix,
                                 sg_to_mm = sg_to_mm,
-                                pre_sampled_blocks = blocks[[as.character(y)]],
+                                pre_sampled_blocks = yb,
                                 pre_sampled_activity = act_blocks[[as.character(y)]])
+    rm(yb); blocks[[as.character(y)]] <- NULL
     run <- function(systems, label) {
       lo <- step / n_steps; hi <- (step + 1L) / n_steps
       tick(lo, label)
@@ -377,24 +408,97 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
       # 2026-11-04: the Tab 4 source ticks, as in the series
       filter_sim_sources(sim, emission_sources, gwp)
     }
+    yl <- as.character(y)
     sim <- run(built$systems, sprintf("Year %d at %s draws", y, fmt(n_iter)))
-    inventory_by_year[[as.character(y)]] <- sim$inventory
+    inventory_by_year[[yl]] <- sim$inventory
+    ct_comb <- cattle_type_results(sim)
     rm(sim); gc(FALSE)
-    if (y == as.integer(year_t)) {
-      ad <- run(lapply(built$systems, fix_params_for_decomposition, fix_type = "coefficient"),
-                sprintf("AD-only run, year %d", y))
-      u_ad <- calc_all_uncertainty(ad$inventory); rm(ad)
-      ef <- run(lapply(built$systems, fix_params_for_decomposition, fix_type = "activity_data"),
-                sprintf("EF-only run, year %d", y))
-      u_ef <- calc_all_uncertainty(ef$inventory); rm(ef)
-      decomp <- list(year = y, ad_only = u_ad, ef_only = u_ef)
-    }
+    ad <- run(lapply(built$systems, fix_params_for_decomposition, fix_type = "coefficient"),
+              sprintf("AD-only run, year %d", y))
+    ad_by_year[[yl]] <- ad$inventory
+    ct_ad <- cattle_type_results(ad)
+    u_ad <- calc_all_uncertainty(ad$inventory); rm(ad); gc(FALSE)
+    ef <- run(lapply(built$systems, fix_params_for_decomposition, fix_type = "activity_data"),
+              sprintf("EF-only run, year %d", y))
+    ef_by_year[[yl]] <- ef$inventory
+    ct_ef <- cattle_type_results(ef)
+    u_ef <- calc_all_uncertainty(ef$inventory); rm(ef); gc(FALSE)
+    ct_by_year[[yl]] <- list(combined = ct_comb, ad_only = ct_ad, ef_only = ct_ef)
+    if (y == as.integer(year_t)) decomp <- list(year = y, ad_only = u_ad, ef_only = u_ef)
     rm(built); gc(FALSE)
   }
+  if (!is.null(decomp)) { decomp$ad_by_year <- ad_by_year; decomp$ef_by_year <- ef_by_year }
   tick(1, "Done")
   list(base_year = as.integer(base_year), year_t = as.integer(year_t),
        n_iter = n_iter, seed = seed, year_corr = year_corr,
-       inventory_by_year = inventory_by_year, decomp = decomp)
+       emission_sources = normalize_sources(emission_sources),
+       inventory_by_year = inventory_by_year, decomp = decomp, ct_by_year = ct_by_year)
+}
+
+# 95% half-width of x as % of its mean, and of the per-draw change between
+# two years in percentage points of the base year.
+.hw_pct <- function(x) {
+  if (is.null(x)) return(NA_real_)
+  m <- mean(x, na.rm = TRUE)
+  if (!is.finite(m) || m <= 0) return(NA_real_)
+  (.q(x, 0.975) - .q(x, 0.025)) / 2 / m * 100
+}
+.trend_draws <- function(xb, xt) {
+  if (is.null(xb) || is.null(xt)) return(NULL)
+  ok <- is.finite(xb) & is.finite(xt) & xb > 0
+  if (sum(ok) <= 10) return(NULL)
+  (xt[ok] - xb[ok]) / xb[ok] * 100
+}
+.trend_hw <- function(xb, xt) {
+  d <- .trend_draws(xb, xt)
+  if (is.null(d)) NA_real_ else (.q(d, 0.975) - .q(d, 0.025)) / 2
+}
+
+# IPCC Table 3.3 by cattle type for the trend: per reporting line and
+# cattle type, from the pair's per-draw sums by type. Emissions in t CO2eq.
+trend_ipcc_table_by_type <- function(pair, gwp = "AR5") {
+  ct <- pair$ct_by_year
+  if (is.null(ct)) return(NULL)
+  b <- ct[[as.character(pair$base_year)]]; tt <- ct[[as.character(pair$year_t)]]
+  if (is.null(b) || is.null(tt) || is.null(tt$combined)) return(NULL)
+  g <- GWP_VALUES[[gwp]] %||% GWP_VALUES[["AR5"]]
+  gas_f <- c(enteric_ch4_total = g$CH4, manure_ch4_total = g$CH4, direct_n2o_mm_total = g$N2O,
+             indirect_n2o_mm_total = g$N2O, direct_n2o_prp_total = g$N2O,
+             indirect_n2o_prp_total = g$N2O, total_co2e = 1)
+  rows <- list()
+  for (i in seq_len(nrow(.CT_LINES))) {
+    l <- .CT_LINES[i, ]
+    for (ty in names(tt$combined)) {
+      vb <- b$combined[[ty]][[l$var]]; vt <- tt$combined[[ty]][[l$var]]
+      if (is.null(vb) || is.null(vt)) next
+      mb <- mean(vb, na.rm = TRUE); mt <- mean(vt, na.rm = TRUE)
+      if (!isTRUE(mb > 0) && !isTRUE(mt > 0)) next      # an unticked source
+      d <- .trend_draws(vb, vt)
+      tr <- if (mb > 0) (mt - mb) / mb * 100 else NA_real_
+      code <- if (ty == "dairy") l$code_dairy else l$code_non_dairy
+      rows[[length(rows) + 1L]] <- data.frame(
+        `IPCC category` = trimws(paste(code, l$line)),
+        `Cattle type` = .CT_LABEL[[ty]],
+        Gas = l$gas,
+        `Base year emissions (t CO₂eq)` = round(mb * gas_f[[l$var]], 1),
+        `Year t emissions (t CO₂eq)` = round(mt * gas_f[[l$var]], 1),
+        `Year t: activity data uncertainty (+/- %)` = round(.hw_pct(tt$ad_only[[ty]][[l$var]]), 1),
+        `Year t: emission factor uncertainty (+/- %)` = round(.hw_pct(tt$ef_only[[ty]][[l$var]]), 1),
+        `Year t: combined uncertainty (+/- %)` = round(.hw_pct(vt), 1),
+        `Trend (% of base year)` = round(tr, 1),
+        `Trend uncertainty introduced by activity data (+/- pp)` =
+          round(.trend_hw(b$ad_only[[ty]][[l$var]], tt$ad_only[[ty]][[l$var]]), 1),
+        `Trend uncertainty introduced by emission factors (+/- pp)` =
+          round(.trend_hw(b$ef_only[[ty]][[l$var]], tt$ef_only[[ty]][[l$var]]), 1),
+        `Trend uncertainty, combined (-) pp` = if (is.null(d)) NA_real_ else round(.q(d, 0.025) - tr, 1),
+        `Trend uncertainty, combined (+) pp` = if (is.null(d)) NA_real_ else round(.q(d, 0.975) - tr, 1),
+        check.names = FALSE, stringsAsFactors = FALSE)
+    }
+  }
+  if (!length(rows)) return(NULL)
+  out <- do.call(rbind, rows); rownames(out) <- NULL
+  attr(out, "base_year") <- pair$base_year; attr(out, "year_t") <- pair$year_t
+  out
 }
 
 # The series result with the two reported years replaced by the pair's draws,

@@ -2204,6 +2204,9 @@ lang_state_take <- function(token) {
   res_vb_direct_indirect = list(en = "Direct + indirect", fr = "Direct + indirect"),
 
   # 2026-11-04: IPCC Table 3.3 by cattle type
+  trend_by_type_note = list(
+    en = "The same table for dairy and non-dairy cattle separately (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b). Year t uncertainties are +/- half-widths of the 95% interval; each type's figures come from the draws of its own groups.",
+    fr = "Le même tableau pour les bovins laitiers et non laitiers séparément (codes 3.A.1.a et 3.A.1.b, 3.B.1.a et 3.B.1.b). Les incertitudes de l'année t sont des demi-largeurs +/- de l'intervalle à 95 % ; les chiffres de chaque type viennent des tirages de ses propres groupes."),
   card_ipcc_by_type_h = list(en = "IPCC Table 3.3 by cattle type", fr = "Tableau 3.3 du GIEC par type de bovin"),
   ipcc_by_type_note = list(
     en = "The same figures for dairy and non-dairy cattle separately, for countries that report the two types apart (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b). Each type's uncertainty is computed from the draws of its own groups, summed within the type.",

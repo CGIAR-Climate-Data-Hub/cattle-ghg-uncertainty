@@ -935,8 +935,8 @@ section_D <- function() {
                    notes = sprintf("I=%.1f table=%.1f", tab[[12]][9], mg_res$table$Delta_vs_base_pct[3]))
       check_bool("D6c", "D",
                  "Trend Table 3.3: trend uncertainty (-) <= 0 <= (+) for the total",
-                 isTRUE(tab[[13]][9] <= 0 && tab[[14]][9] >= 0),
-                 notes = sprintf("J=(%.1f, %.1f) pp", tab[[13]][9], tab[[14]][9]))
+                 isTRUE(tab[["Trend uncertainty, combined (-) pp"]][9] <= 0 && tab[["Trend uncertainty, combined (+) pp"]][9] >= 0),
+                 notes = sprintf("J=(%.1f, %.1f) pp", tab[["Trend uncertainty, combined (-) pp"]][9], tab[["Trend uncertainty, combined (+) pp"]][9]))
     } else {
       record("D6a", "D", "Trend Table 3.3", "9 rows", NA, "FAIL",
              "trend_ipcc_table() failed or returned the wrong shape")
@@ -4827,12 +4827,28 @@ section_F <- function() {
       if (!any(grepl("^3.A.1.a", tb[[1]]) & tb[["Cattle type"]] == "Dairy cattle") ||
           !any(grepl("^3.A.1.b", tb[[1]]) & tb[["Cattle type"]] == "Non-dairy cattle"))
         f <- c(f, "Table 3.3 by cattle type lacks the 3.A.1.a / 3.A.1.b rows")
+      # trend: the pair keeps the sums by type; dairy + non-dairy year t
+      # total equals the pair's total; the AD and EF trend columns exist
+      ts <- do.call(rbind, lapply(2020:2021, function(yr) {
+        d <- sp[sp$parameter == "N", c("cattle_type", "aggregation_level", "sub_category", "parameter", "mean")]
+        d$year <- yr; d$uncertainty_pct <- NA; d$mean <- d$mean * (1 + 0.1 * (yr - 2020)); d }))
+      pr <- trend_reporting_pair(ts, sp, 2020, 2021, n_iter = 400, gwp = "AR5", seed = 7, year_corr = "full")
+      tt <- trend_ipcc_table_by_type(pr, "AR5")
+      tot <- tt[tt[[1]] == "Total", ]
+      if (nrow(tot) != 2L || abs(sum(tot[["Year t emissions (t CO\u2082eq)"]]) - mean(pr$inventory_by_year[["2021"]]$total_co2e)) > 1)
+        f <- c(f, "trend: dairy + non-dairy year t total is not the pair's total")
+      tr <- tr0 <- NULL
+      tr0 <- run_trend_analysis(ts, sp, n_iter = 400, gwp = "AR5", seed = 7, year_corr = "full")
+      ti <- trend_ipcc_table(trend_reporting_res(tr0, pr, 2020, 2021), 2020, 2021, decomp = pr$decomp)
+      k <- grep("Trend uncertainty introduced by", names(ti))
+      if (length(k) != 2L || !all(is.finite(unlist(ti[ti[[1]] == "Total CO\u2082eq", k]))))
+        f <- c(f, "trend Table 3.3 lacks finite AD / EF trend columns")
     }
     f
   }, error = function(e) conditionMessage(e))
   f91_ok <- length(f91_fail) == 0L
   check_bool("F91", "F",
-             "Results by cattle type: dairy plus non-dairy equals the inventory draw by draw; Table 3.3 by cattle type carries 3.A.1.a and 3.A.1.b",
+             "Results by cattle type: dairy plus non-dairy equals the inventory draw by draw (single year and trend pair); Table 3.3 by cattle type carries 3.A.1.a and 3.A.1.b; the trend table has finite AD and EF trend columns",
              f91_ok,
              notes = if (f91_ok) "sum check exact; codes present" else paste(f91_fail, collapse = "; "))
 

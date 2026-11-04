@@ -288,6 +288,7 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
                                # caveats and the inputs, as in the
                                # single-year workbook
                                settings = NULL, qa_caveats = NULL,
+                               ipcc_by_type = NULL,
                                param_specs = NULL, manure = NULL) {
   # 2026-11-02 (Lolita: "the excel for trend is really messy ... like the
   # single year one"). README first, then the run, the headline figures,
@@ -390,8 +391,10 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     x
   } else placeholder("Input parameters unavailable.")
 
+  has_type <- is.data.frame(ipcc_by_type) && length(unique(ipcc_by_type[["Cattle type"]])) > 1L
   readme_df <- data.frame(
-    Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Headline", "IPCC_Table_3_3", "All_years",
+    Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Headline", "IPCC_Table_3_3",
+              if (has_type) "IPCC_Table_3_3_by_type", "All_years",
               "All_years_by_source", "All_years_by_group", "Sensitivity_latest_year", "Sensitivity_change", "Input_Parameters"),
     Contents = c(
       paste0(sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Trend %s to %s.",
@@ -401,7 +404,14 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
       "The settings of the run: years, draws, the year-to-year correlation of the coefficients, the correlation choices of Tab 3, GWP basis, seed, emission sources, and how many QA/QC checks were ignored or repaired.",
       "The QA/QC checks that were ignored or repaired so the run could go ahead.",
       "The figures to report: total emissions of the base year and year t with their 95% confidence interval (CI) and 95% margin of error (MoE, half the width of the CI as a percentage of the mean); the change between the two years with its 95% CI and the trend uncertainty in percentage points; the average change per year over all years.",
-      "IPCC 2006 Vol. 1 Ch. 3 Table 3.3, the general reporting table for uncertainty, for the base year and year t.",
+      paste("IPCC 2006 Vol. 1 Ch. 3 Table 3.3, the general reporting table for uncertainty, for the base year and year t, one row per reporting line.",
+            "Columns: emissions of the base year and year t (t CO2eq);",
+            "the uncertainty of year t emissions from the activity data alone, the emission factors alone, and both (lower and upper halves of the 95% interval, % of the mean);",
+            "each line's contribution to the variance of the year t total;",
+            "the trend (change from the base year, %);",
+            "the trend uncertainty introduced by the activity data and by the emission factors (95% half-width, percentage points; IPCC Approach 1 Table 3.2 columns K and L, here from Monte Carlo runs with the other side held at its mean in both years);",
+            "and the combined trend uncertainty (lower and upper, percentage points around the trend)."),
+      if (has_type) "The same table for dairy and non-dairy cattle separately (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b), year t uncertainties as +/- half-widths. Each type's figures come from the draws of its own groups, summed within the type.",
       "One row per year: mean total emissions, 95% CI, MoE, change since the base year and from the previous year.",
       "One row per year and emission source: mean emissions in t CO2eq, 95% CI, MoE and its lower and upper halves.",
       "One row per year, animal group and emission source: mean and 95% CI.",
@@ -414,11 +424,12 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     README = readme_df, Run_Settings = run_settings_df, QA_Caveats = caveats_df,
     Headline = headline_df,
     IPCC_Table_3_3 = if (is.data.frame(ipcc_table) && nrow(ipcc_table)) ipcc_table else placeholder("IPCC table unavailable."),
+    IPCC_Table_3_3_by_type = if (has_type) ipcc_by_type else NULL,
     All_years = all_years_df, All_years_by_source = by_source_df, All_years_by_group = by_group_df,
     Sensitivity_latest_year = pull_sens(sensitivity_per_year),
     Sensitivity_change = pull_sens(sensitivity_delta),
     Input_Parameters = inputs_df)
-  writexl::write_xlsx(sheets, path = filepath)
+  writexl::write_xlsx(Filter(Negate(is.null), sheets), path = filepath)
 }
 
 # 2026-11-02: the year-to-year correlation of the coefficients as the
