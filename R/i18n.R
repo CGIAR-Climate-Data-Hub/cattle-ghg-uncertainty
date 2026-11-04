@@ -1388,14 +1388,64 @@ lang_state_take <- function(token) {
   btn_download_docx = list(en = "Download Word summary",
                               fr = "Télécharger le résumé Word"),
   info_trend_report_what = list(
-    en = "What you report for several years: the base year and year t in plain sentences, the IPCC table for those two years, every year's total with its uncertainty, and what drives it. Pick the two years below. Downloads: Excel or Word.",
-    fr = "Ce que vous déclarez pour plusieurs années : l'année de base et l'année t en phrases simples, le tableau GIEC pour ces deux années, le total de chaque année avec son incertitude, et ce qui la pilote. Choisissez les deux années ci-dessous. Téléchargements : Excel ou Word."
+    en = "What you report for several years: the IPCC table for the base year and year t, by emission source and by cattle type, and the downloads. Pick the two years below. The charts and the table of every year are on the Results tab and in the Word report.",
+    fr = "Ce que vous déclarez pour plusieurs années : le tableau GIEC pour l'année de base et l'année t, par source d'émission et par type de bovin, et les téléchargements. Choisissez les deux années ci-dessous. Les graphiques et le tableau de toutes les années se trouvent dans l'onglet Résultats et dans le rapport Word."
   ),
   # ---- Trend: what to report (2026-10-22) ----------------------------------
   trend_report_h = list(en = "What to report", fr = "Ce qu'il faut déclarer"),
   trend_report_intro = list(
-    en = "IPCC asks for two years: the base year and the year you are reporting (year t). Pick them here. The sentences, the comparison table and the IPCC reporting table follow your choice.",
-    fr = "Le GIEC demande deux années : l'année de base et l'année déclarée (année t). Choisissez-les ici. Les phrases, le tableau de comparaison et le tableau de déclaration GIEC suivent votre choix."),
+    en = "A national inventory reports the uncertainty of the emissions in the year it covers (year t) and the uncertainty of the trend since the base year. Pick the two years: every figure in this section follows them.",
+    fr = "Un inventaire national déclare l'incertitude des émissions de l'année couverte (année t) et l'incertitude de la tendance depuis l'année de base. Choisissez les deux années : tous les chiffres de cette partie les suivent."),
+  # 2026-11-04 (review of the new version): the headline cards, the reading,
+  # the change figure and the by-source table, all from the paired run
+  res_vb_tr_t_title = list(en = "Emissions in %d (year t)", fr = "Émissions en %d (année t)"),
+  res_vb_tr_b_title = list(en = "Emissions in %d (base year)", fr = "Émissions en %d (année de base)"),
+  res_vb_tr_level_sub = list(en = "95%% uncertainty +/- %s%% (%s to %s)", fr = "Incertitude à 95 %% +/- %s %% (%s à %s)"),
+  res_vb_tr_change_title = list(en = "Change %d to %d", fr = "Variation %d à %d"),
+  res_vb_tr_change_sub = list(en = "change in mean total emissions", fr = "variation des émissions totales moyennes"),
+  res_vb_tr_unc_title = list(en = "Uncertainty of the change", fr = "Incertitude de la variation"),
+  res_vb_tr_unc_value = list(en = "+/- %s pp", fr = "+/- %s pts"),
+  res_vb_tr_unc_sub = list(en = "half-width of the 95%% range, in percentage points; the change lies between %s%% and %s%%",
+                           fr = "demi-largeur de la plage à 95 %%, en points de pourcentage ; la variation se situe entre %s %% et %s %%"),
+  trend_word_rose = list(en = "rose", fr = "ont augmenté"),
+  trend_word_fell = list(en = "fell", fr = "ont diminué"),
+  trend_reading_change = list(
+    en = "Emissions %s by %s%% between %d and %d. With 95%% confidence the change lies between %s%% and %s%%, plus or minus %s percentage points;",
+    fr = "Les émissions %s de %s %% entre %d et %d. Avec une confiance de 95 %%, la variation se situe entre %s %% et %s %%, soit plus ou moins %s points de pourcentage ;"),
+  trend_reading_zero_in = list(en = "this range includes zero, so this analysis cannot say whether emissions fell or rose.",
+                               fr = "cette plage inclut zéro : l'analyse ne permet pas de dire si les émissions ont baissé ou augmenté."),
+  trend_reading_zero_out = list(en = "this range does not include zero, so the direction of the change is clear.",
+                                fr = "cette plage n'inclut pas zéro : le sens de la variation est clair."),
+  trend_reading_level = list(
+    en = "The emissions of %d are known to plus or minus %s%% (95%%), those of %d to plus or minus %s%%.",
+    fr = "Les émissions de %d sont connues à plus ou moins %s %% (95 %%), celles de %d à plus ou moins %s %%."),
+  res_trend_change_h = list(en = "How certain is the change from %d to %d?", fr = "Quelle est la certitude de la variation de %d à %d ?"),
+  res_trend_change_xaxis = list(en = "Change in total emissions (% of the base year)", fr = "Variation des émissions totales (% de l'année de base)"),
+  res_trend_change_annot = list(
+    en = "Change %s%%<br>95%% interval %s%% to %s%%<br>Half-width: %s percentage points",
+    fr = "Variation %s %%<br>Intervalle à 95 %% : %s %% à %s %%<br>Demi-largeur : %s points de pourcentage"),
+  fig_cap_change = list(
+    en = "Each bar counts the paired draws whose change in total emissions fell in that range, in percent of the base year. The solid line is the mean change, the dashed red lines the 95% interval, the dotted line no change. Half the width of the interval is the uncertainty of the change reported in IPCC Table 3.3.",
+    fr = "Chaque barre compte les tirages appariés dont la variation des émissions totales tombe dans cet intervalle, en pourcentage de l'année de base. La ligne pleine est la variation moyenne, les lignes rouges en tirets l'intervalle à 95 %, la ligne pointillée l'absence de variation. La moitié de la largeur de l'intervalle est l'incertitude de la variation déclarée dans le tableau 3.3 du GIEC."),
+  trend_bysrc_h = list(en = "By emission source", fr = "Par source d'émission"),
+  trend_bysrc_note = list(
+    en = "The figures above for each emission source, or for dairy and non-dairy cattle. The full IPCC Table 3.3, with the activity data and emission factor columns, is on the IPCC Report tab.",
+    fr = "Les chiffres ci-dessus pour chaque source d'émission, ou pour les bovins laitiers et non laitiers. Le tableau 3.3 complet du GIEC, avec les colonnes données d'activité et facteurs d'émission, se trouve dans l'onglet Rapport GIEC."),
+  trend_bysrc_by_source = list(en = "By emission source", fr = "Par source d'émission"),
+  trend_bysrc_by_type = list(en = "By cattle type", fr = "Par type de bovin"),
+  trend_bysrc_type_missing = list(
+    en = "Run the two chosen years at the reporting draw count (button above) to see them by cattle type.",
+    fr = "Lancez les deux années choisies avec le nombre de tirages de déclaration (bouton ci-dessus) pour les voir par type de bovin."),
+  trend_col_bysrc_t = list(en = "Emissions in %d (t CO₂eq)", fr = "Émissions en %d (t CO₂éq)"),
+  trend_col_bysrc_level = list(en = "Year t uncertainty (+/- %)", fr = "Incertitude de l'année t (+/- %)"),
+  trend_col_bysrc_change = list(en = "Change %d to %d (%%)", fr = "Variation %d à %d (%%)"),
+  trend_col_bysrc_unc = list(en = "Uncertainty of the change (+/- pp)", fr = "Incertitude de la variation (+/- pts)"),
+  trend_series_h = list(en = "The whole series", fr = "La série complète"),
+  trend_series_note = list(
+    en = "Every year from %2$d to %3$d (%4$d years) at %1$s draws per year: the series chart, the average change per year, the largest one-year change and the table of every year. The figures above come from the paired run of the two chosen years.",
+    fr = "Chaque année de %2$d à %3$d (%4$d années) avec %1$s tirages par année : la courbe de la série, la variation moyenne par an, la plus forte variation d'une année et le tableau de toutes les années. Les chiffres ci-dessus proviennent de l'exécution en paire des deux années choisies."),
+  res_trend_plot_sub = list(en = "Average change per year: %s CO₂eq (95%% range %s to %s). The dotted lines mark the base year and year t.",
+                            fr = "Variation moyenne par an : %s CO₂éq (plage à 95 %% de %s à %s). Les lignes pointillées marquent l'année de base et l'année t."),
   trend_base_year_label = list(en = "Base year", fr = "Année de base"),
   trend_year_t_label = list(en = "Year to report (year t)", fr = "Année à déclarer (année t)"),
   trend_word_base_year = list(en = "Base year", fr = "Année de base"),

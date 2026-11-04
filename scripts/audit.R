@@ -4852,6 +4852,54 @@ section_F <- function() {
              f91_ok,
              notes = if (f91_ok) "sum check exact; codes present" else paste(f91_fail, collapse = "; "))
 
+  # F92 -- trend results: one source for the headline (2026-11-04, review
+  # of the new version: "the narrative numbers did not match the numbers in
+  # the headline cards"). The headline (cards, reading, Word summary), the
+  # total row of IPCC Table 3.3 and the per-draw change of the figure all
+  # come from the same paired run and agree; the trend-change sensitivity
+  # stays within -1 and +1 with animal numbers linked between groups.
+  f92_fail <- tryCatch({
+    f <- character(0)
+    sp <- do.call(rbind, lapply(c("A", "B", "C"), function(g) {
+      d <- make_golden_specs(constant_dist = FALSE); d$cattle_type <- "dairy"
+      d$aggregation_level <- "lvl"; d$sub_category <- g
+      k <- d$parameter == "DE"; d$distribution[k] <- "normal"; d$lower[k] <- 54; d$upper[k] <- 66
+      k <- d$parameter == "N"; d$distribution[k] <- "normal"
+      d$lower[k] <- d$mean[k] * 0.95; d$upper[k] <- d$mean[k] * 1.05; d }))
+    ts <- do.call(rbind, lapply(2020:2022, function(yr) {
+      d <- sp[sp$parameter %in% c("N", "DE"), c("cattle_type", "aggregation_level", "sub_category", "parameter", "mean")]
+      d$year <- yr; d$uncertainty_pct <- NA
+      d$mean[d$parameter == "N"] <- d$mean[d$parameter == "N"] * (1 + 0.05 * (yr - 2020)); d }))
+    tr <- run_trend_analysis(ts, sp, n_iter = 600, gwp = "AR5", seed = 9, year_corr = "full",
+                             keep_samples = "ends", keep_sample_rows = 600L, n_group_rho = 1, n_year_corr = "none")
+    pr <- trend_reporting_pair(ts, sp, 2020, 2022, n_iter = 800, gwp = "AR5", seed = 9, year_corr = "full",
+                               n_group_rho = 1, n_year_corr = "none")
+    rr <- trend_reporting_res(tr, pr, 2020, 2022)
+    h  <- trend_headline(rr, 2020, 2022)
+    ti <- trend_ipcc_table(rr, 2020, 2022, decomp = pr$decomp)
+    tot <- ti[ti[[1]] == "Total CO\u2082eq", ]
+    if (abs(tot[["Trend (% of base year)"]] - round(h$trend_pct, 1)) > 0.051 ||
+        abs(tot[["Trend uncertainty, combined (-) pp"]] - round(h$trend_lo_pp, 1)) > 0.051)
+      f <- c(f, "Table 3.3 total row and the headline disagree")
+    xb <- rr$inventory_by_year[["2020"]]$total_co2e; xt <- rr$inventory_by_year[["2022"]]$total_co2e
+    d <- (xt - xb) / xb * 100
+    if (abs(stats::quantile(d, 0.025, names = FALSE) - h$trend_lo_pct) > 1e-6)
+      f <- c(f, "the change figure's draws and the headline range disagree")
+    if (!identical(h$n_iter_pair, 800L) && !identical(as.integer(h$n_iter_pair), 800L))
+      f <- c(f, "the headline does not come from the pair")
+    sdl <- trend_sensitivity_delta(tr)
+    if (is.null(sdl) || max(abs(sdl$src$src), na.rm = TRUE) > 1.1)
+      f <- c(f, sprintf("trend-change SRC outside -1..1 (max %.2f)", if (is.null(sdl)) NA else max(abs(sdl$src$src))))
+    if (!is.null(sdl) && !any(startsWith(sdl$src$parameter, "N (one count")))
+      f <- c(f, "animal numbers linked between groups were not merged into one input")
+    f
+  }, error = function(e) conditionMessage(e))
+  f92_ok <- length(f92_fail) == 0L
+  check_bool("F92", "F",
+             "Trend: headline, IPCC Table 3.3 total row and the change figure come from the same paired run and agree; trend-change SRC within -1..1 with linked animal numbers merged",
+             f92_ok,
+             notes = if (f92_ok) "change, its range and Table 3.3 agree; SRC bounded; N merged" else paste(f92_fail, collapse = "; "))
+
   # F80 -- conversions declared by the AI and recomputed by the server
   # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
   # is verified, one off by 1 % fails, a missing lactation length warns, the

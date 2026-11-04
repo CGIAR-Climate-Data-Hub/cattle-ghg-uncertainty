@@ -2353,9 +2353,13 @@ app_ui <- function(request = NULL) {
           conditionalPanel(
             condition = "output.trend_results_visible == true",
           units_switch_ui("res_units_trend"),
-          # 2026-10-22: what a compiler reports, first. IPCC Table 3.3 wants
-          # a base year and a year t; the selectors drive the sentences,
-          # the comparison table and the IPCC table on the report tab.
+          # 2026-11-04 (review of the new version: "the narrative numbers did
+          # not match the numbers in the headline cards"). What a country
+          # reports comes first, and every figure of this first part reads
+          # the paired run of the two chosen years (trend_head()): the
+          # emissions of year t and their uncertainty, the change from the
+          # base year and its uncertainty, the base year. The 2,000-draw
+          # series follows under its own heading.
           bslib::card(
             bslib::card_header(t("trend_report_h")),
             bslib::card_body(
@@ -2365,59 +2369,82 @@ app_ui <- function(request = NULL) {
                               choices = NULL, width = "180px"),
                   selectInput("trend_year_t", t("trend_year_t_label"),
                               choices = NULL, width = "220px")),
-              uiOutput("trend_report_text")
+              uiOutput("trend_adef_ui_res")
             )
           ),
           uiOutput("trend_sources_included_ui"),
           bslib::layout_columns(
             col_widths = c(3, 3, 3, 3),
-            bslib::value_box(title = t("res_vb_trend_delta"),
-                              value = textOutput("vb_trend_delta"),
-                              p(textOutput("vb_trend_delta_sub", inline = TRUE)),
-                              showcase = icon("arrow-trend-up"), theme = "primary"),
+            bslib::value_box(title = textOutput("vb_tr_t_title", inline = TRUE),
+                              value = textOutput("vb_tr_t"),
+                              p(textOutput("vb_tr_t_sub", inline = TRUE)),
+                              showcase = icon("calendar-days"), theme = "primary"),
+            bslib::value_box(title = textOutput("vb_tr_change_title", inline = TRUE),
+                              value = textOutput("vb_tr_change"),
+                              p(t("res_vb_tr_change_sub")),
+                              showcase = icon("arrow-trend-up"), theme = "success"),
+            bslib::value_box(title = t("res_vb_tr_unc_title"),
+                              value = textOutput("vb_tr_unc"),
+                              p(textOutput("vb_tr_unc_sub", inline = TRUE)),
+                              showcase = icon("arrows-left-right"), theme = "warning"),
+            bslib::value_box(title = textOutput("vb_tr_b_title", inline = TRUE),
+                              value = textOutput("vb_tr_b"),
+                              p(textOutput("vb_tr_b_sub", inline = TRUE)),
+                              showcase = icon("flag"), theme = "info")
+          ),
+          uiOutput("trend_reading"),
+          bslib::layout_columns(
+            col_widths = c(6, 6),
+            bslib::card(
+              bslib::card_header(fig_title("4.2", textOutput("trend_change_title", inline = TRUE))),
+              bslib::card_body(
+                plotly::plotlyOutput("trend_change_hist", height = "320px"),
+                fig_caption("fig_cap_change")
+              )
+            ),
+            bslib::card(
+              bslib::card_header(t("trend_bysrc_h")),
+              bslib::card_body(
+                p(tags$em(t("trend_bysrc_note"))),
+                radioButtons("trend_bysrc_view", NULL, inline = TRUE,
+                             choices = setNames(c("source", "type"),
+                                                c(t("trend_bysrc_by_source"), t("trend_bysrc_by_type")))),
+                DT::DTOutput("trend_bysrc_table")
+              )
+            )
+          ),
+          # the whole series, 2,000 draws per year
+          h4(t("trend_series_h"), style = "margin: 18px 16px 4px; color:#1B4332;"),
+          div(style = "margin: 0 16px 10px; color:#555;", tags$em(textOutput("trend_series_note", inline = TRUE))),
+          bslib::layout_columns(
+            col_widths = c(6, 6),
             bslib::value_box(title = t("res_vb_trend_slope_short"),
                               value = textOutput("vb_trend_slope"),
                               p(textOutput("vb_trend_slope_sub", inline = TRUE)),
-                              showcase = icon("chart-line"), theme = "success"),
-            bslib::value_box(title = t("res_vb_trend_latest_short"),
-                              value = textOutput("vb_trend_latest"),
-                              p(textOutput("vb_trend_latest_sub", inline = TRUE)),
-                              showcase = icon("calendar-days"), theme = "info"),
+                              showcase = icon("chart-line"), theme = "light"),
             bslib::value_box(title = t("res_vb_trend_yoy_largest"),
                               value = textOutput("vb_trend_yoy"),
                               p(textOutput("vb_trend_yoy_sub", inline = TRUE)),
-                              showcase = icon("bolt"), theme = "warning")
+                              showcase = icon("bolt"), theme = "light")
           ),
-          div(style = "padding: 0 12px 8px; color: #555; font-size: 0.85rem;",
-              tags$em(textOutput("vb_trend_inline", inline = TRUE))),
-          # charts (4.1 is the convergence figure in the diagnostics panel)
           bslib::layout_columns(
             col_widths = c(7, 5),
             bslib::card(
-              bslib::card_header(fig_title("4.2", t("card_trend_chart_h"))),
+              bslib::card_header(fig_title("4.3", t("card_trend_chart_h"))),
               bslib::card_body(plotly::plotlyOutput("trend_plot", height = "360px"),
                                fig_caption("fig_cap_trend"))
             ),
             bslib::card(
-              bslib::card_header(fig_title("4.3", t("res_trend_yoy_h"))),
+              bslib::card_header(fig_title("4.4", t("res_trend_yoy_h"))),
               bslib::card_body(plotly::plotlyOutput("trend_yoy_chart", height = "360px"),
                                fig_caption("fig_cap_yoy"))
             )
           ),
           bslib::card(
-            bslib::card_header(fig_title("4.4", t("res_trend_delta_hist_h"))),
+            bslib::card_header(t("card_trend_table_h")),
             bslib::card_body(
-              p(tags$em(t("res_trend_delta_hist_note"))),
-              plotly::plotlyOutput("trend_delta_histogram", height = "300px"),
-              fig_caption("fig_cap_delta")
-            )
-          ),
-          # tables
-          bslib::card(
-            bslib::card_header(t("trend_compare_h")),
-            bslib::card_body(
-              p(tags$em(t("trend_compare_note"))),
-              DT::DTOutput("trend_compare_table")
+              p(tags$em(t("trend_table_note"))),
+              DT::DTOutput("trend_table")
             )
           ),
           bslib::card(
@@ -2427,13 +2454,6 @@ app_ui <- function(request = NULL) {
               selectInput("trend_detail_year", t("trend_year_detail_label"),
                           choices = NULL, width = "160px"),
               DT::DTOutput("trend_year_groups")
-            )
-          ),
-          bslib::card(
-            bslib::card_header(t("card_trend_table_h")),
-            bslib::card_body(
-              p(tags$em(t("trend_table_note"))),
-              DT::DTOutput("trend_table")
             )
           ),
           div(style = "margin: 8px 16px; font-size:0.85rem; color:#555;",
@@ -2664,11 +2684,6 @@ app_ui <- function(request = NULL) {
           )
         ),
         bslib::card(
-          bslib::card_header(fig_title("6.1", t("card_trend_chart_h"))),
-          bslib::card_body(plotly::plotlyOutput("trend_plot_report", height = "400px"),
-                           fig_caption("fig_cap_trend"))
-        ),
-        bslib::card(
           bslib::card_header(t("card_trend_downloads")),
           bslib::card_body(
             p(tags$em(t("trend_downloads_note"))),
@@ -2680,32 +2695,6 @@ app_ui <- function(request = NULL) {
             )
           )
         ),
-        bslib::card(
-          bslib::card_header(t("card_trend_table_h")),
-          bslib::card_body(
-            p(tags$em(t("trend_table_note"))),
-            DT::DTOutput("trend_table_report")
-          )
-        ),
-        bslib::card(
-          bslib::card_header(t("card_trend_sens_h")),
-          bslib::card_body(
-            p(tags$em(t("trend_sens_note"))),
-            bslib::layout_columns(
-              col_widths = c(6, 6),
-              div(
-                h6(fig_title("6.2", t("fig_tornado_year_title")), style = "color:#1B4332;"),
-                plotly::plotlyOutput("trend_tornado_per_year_report", height = "320px"),
-                fig_caption("fig_cap_tornado_year")
-              ),
-              div(
-                h6(fig_title("6.3", t("fig_tornado_delta_title")), style = "color:#1B4332;"),
-                plotly::plotlyOutput("trend_tornado_delta_report", height = "320px"),
-                fig_caption("fig_cap_tornado_delta")
-              )
-            )
-          )
-        )
       )
       )
     ),

@@ -3331,12 +3331,15 @@ app_server <- function(input, output, session) {
           rv_trend$delta_total     <- res$delta_total
           rv_trend$year_corr       <- res$year_corr
           rv_trend$years           <- res$years
+          # 2026-11-04: the same numbers as the headline cards (the pair)
+          hp <- tryCatch(trend_headline(trend_reporting_res(res, pair, y_first, y_last), y_first, y_last, gv),
+                         error = function(e) NULL)
           rv_trend$message <- list(type = "success",
-            text = sprintf("Trend computed for %d years (%d to %d). Change since base year: %+.1f%% (95%% range %+.1f%% to %+.1f%%); average change per year: %+.0f t CO₂eq.",
-                           nrow(res$table), min(res$table$Year), max(res$table$Year),
-                           res$table$Delta_vs_base_pct[nrow(res$table)],
-                           res$delta_total$pct_ci[1], res$delta_total$pct_ci[2],
-                           res$slope$mean))
+            text = if (!is.null(hp))
+              sprintf("Trend computed for %d years (%d to %d). Change %d to %d: %+.1f%%, 95%% range %+.1f%% to %+.1f%% (plus or minus %.1f percentage points).",
+                      nrow(res$table), min(res$table$Year), max(res$table$Year), y_first, y_last,
+                      hp$trend_pct, hp$trend_lo_pct, hp$trend_hi_pct, (hp$trend_hi_pp - hp$trend_lo_pp) / 2)
+            else sprintf("Trend computed for %d years (%d to %d).", nrow(res$table), min(res$table$Year), max(res$table$Year)))
           nnf <- res$n_nonfinite_by_year
           if (length(nnf) && sum(nnf) > 0) {
             bad <- nnf[nnf > 0]
@@ -3402,16 +3405,6 @@ app_server <- function(input, output, session) {
   # (the trend table's Delta_vs_base_pct), so the value box, the message,
   # the What to report sentences and Table 3.3 all show one number. The
   # range is the per-iteration 95% range, as before.
-  output$vb_trend_delta <- renderText({
-    req(rv_trend$results)
-    .fmt_signed_pct(rv_trend$results$Delta_vs_base_pct[nrow(rv_trend$results)], 1)
-  })
-  output$vb_trend_delta_sub <- renderText({
-    req(rv_trend$delta_total)
-    sprintf("95%% range %s to %s",
-            .fmt_signed_pct(rv_trend$delta_total$pct_ci[1], 1),
-            .fmt_signed_pct(rv_trend$delta_total$pct_ci[2], 1))
-  })
 
   output$vb_trend_slope <- renderText({
     req(rv_trend$slope)
@@ -3427,21 +3420,6 @@ app_server <- function(input, output, session) {
             .fmt_mass_tr(rv_trend$slope$ci[2], signed = TRUE))
   })
 
-  output$vb_trend_latest <- renderText({
-    req(rv_trend$results)
-    df <- rv_trend$results
-    last <- df[nrow(df), ]
-    .fmt_mass_tr(last$Mean_t_CO2eq)
-  })
-  output$vb_trend_latest_sub <- renderText({
-    req(rv_trend$results)
-    df <- rv_trend$results
-    last <- df[nrow(df), ]
-    # 2026-06: switched from CV% to 95% MoE to match the IPCC Vol.1 Ch.3
-    # Table 3.3 reporting convention used by every other uncertainty display
-    # in the app. CV_pct still in the trend results frame for re-derivation.
-    sprintf("Year %d  ·  ±%.1f%% (95%% MoE)", last$Year, last$MoE_95_pct)
-  })
 
   output$vb_trend_yoy <- renderText({
     req(rv_trend$results)
@@ -3462,44 +3440,10 @@ app_server <- function(input, output, session) {
 
   # Inline summary line below the value boxes: mirrors the single-year
   # output$vb_co2e_inline pattern.
-  output$vb_trend_inline <- renderText({
-    req(rv_trend$results, rv_trend$year_corr)
-    df <- rv_trend$results
-    yc_label <- switch(rv_trend$year_corr,
-                        full    = "coefficients held the same across years (IPCC default)",
-                        partial = "coefficients drifting slowly between years",
-                        none    = "coefficients redrawn every year")
-    sprintf("Year range: %d – %d  ·  %d years analysed  ·  %s",
-            min(df$Year), max(df$Year), nrow(df), yc_label)
-  })
 
   # Δ Y_N − Y_1 distribution histogram: visualises the uncertainty on the
   # trend itself (the per-iteration distribution of the absolute change).
   # Mirrors the single-year output$results_histogram.
-  output$trend_delta_histogram <- plotly::renderPlotly({
-    req(rv_trend$delta_total)
-    x <- rv_trend$delta_total$per_iter
-    if (is.null(x) || length(x) == 0) return(plotly::plot_ly())
-    ci <- stats::quantile(x, c(0.025, 0.975), names = FALSE, na.rm = TRUE)
-    fill_above <- if (mean(x, na.rm = TRUE) > 0) "#2D6A4F" else "#C1121F"
-    plotly::plot_ly(x = x, type = "histogram", nbinsx = 50,
-                    marker = list(color = fill_above,
-                                   line = list(color = "#1B4332", width = 1))) %>%
-      plotly::layout(
-        title = list(text = "Distribution of Δ Y_N − Y_1 (t CO₂eq): uncertainty on the trend itself",
-                     font = list(size = 12)),
-        xaxis = list(title = "ΔCO₂eq (t)"),
-        yaxis = list(title = "Frequency"),
-        shapes = list(
-          list(type = "line", x0 = ci[1], x1 = ci[1], y0 = 0, y1 = 1,
-               yref = "paper", line = list(color = "#C1121F", dash = "dash", width = 1.5)),
-          list(type = "line", x0 = ci[2], x1 = ci[2], y0 = 0, y1 = 1,
-               yref = "paper", line = list(color = "#C1121F", dash = "dash", width = 1.5)),
-          list(type = "line", x0 = 0, x1 = 0, y0 = 0, y1 = 1,
-               yref = "paper", line = list(color = "#555", dash = "dot", width = 1))
-        )
-      )
-  })
 
   # Year-over-year % change bar chart: quick visual of the per-year
   # bumpiness; complements the trend chart which shows levels.
@@ -3546,13 +3490,17 @@ app_server <- function(input, output, session) {
   output$trend_plot <- plotly::renderPlotly({
     req(rv_trend$results)
     df <- rv_trend$results
-    sub <- if (!is.null(rv_trend$slope) && !is.null(rv_trend$delta_total)) {
-      sprintf("Change since base year: %.1f%% (95%% range %.1f%%, %.1f%%)  •  Average change per year: %.0f t CO₂eq (95%% range %.0f, %.0f)",
-              rv_trend$delta_total$pct_mean,
-              rv_trend$delta_total$pct_ci[1], rv_trend$delta_total$pct_ci[2],
-              rv_trend$slope$mean,
-              rv_trend$slope$ci[1], rv_trend$slope$ci[2])
-    } else NULL
+    # 2026-11-04: the change between the two chosen years is in the cards
+    # and Figure 4.2 (the paired run); this chart is the series. The chosen
+    # years are marked.
+    sub <- if (!is.null(rv_trend$slope))
+      sprintf(t("res_trend_plot_sub"), .fmt_mass_tr(rv_trend$slope$mean, signed = TRUE),
+              .fmt_mass_tr(rv_trend$slope$ci[1], signed = TRUE), .fmt_mass_tr(rv_trend$slope$ci[2], signed = TRUE))
+    else NULL
+    ys <- tryCatch(trend_sel_years(), error = function(e) NULL)
+    marks <- if (is.null(ys)) list() else lapply(c(ys$base, ys$t), function(y)
+      list(type = "line", x0 = y, x1 = y, y0 = 0, y1 = 1, yref = "paper",
+           line = list(color = "#C1121F", dash = "dot", width = 1.2)))
     plotly::plot_ly() |>
       plotly::add_ribbons(x = df$Year, ymin = df$CI_Lower_t, ymax = df$CI_Upper_t,
                           name = t("res_vb_ci_label"),
@@ -3568,7 +3516,8 @@ app_server <- function(input, output, session) {
                                     if (!is.null(sub)) paste0("<br><sub>", sub, "</sub>") else "")),
         xaxis = list(title = t("res_trend_xaxis_year")),
         yaxis = list(title = t("res_hist_xaxis")),
-        hovermode = "x unified"
+        hovermode = "x unified",
+        shapes = marks
       )
   })
 
@@ -3640,48 +3589,123 @@ app_server <- function(input, output, session) {
   .f0 <- function(x) if (is.null(x) || is.na(x)) "-" else format(round(x, 0), big.mark = ",")
   .f1 <- function(x) if (is.null(x) || is.na(x)) "-" else formatC(x, digits = 1, format = "f")
 
-  .trend_report_ui <- function() {
+  # 2026-11-04: one reading of the paired run for the chosen years, under
+  # the headline cards and on the IPCC Report tab; the same numbers as the
+  # cards, the change figure and the tables.
+  .trend_reading_ui <- function() {
     h <- trend_head(); req(h)
-    # 2026-11-02: the masses in the units chosen above the cards
-    s1 <- sprintf(t("trend_line_year"), t("trend_word_base_year"), h$base_year,
-                  .fmt_mass_tr(h$base_mean), .f1(h$base_moe), .fmt_mass_tr(h$base_lo), .fmt_mass_tr(h$base_hi))
-    s2 <- sprintf(t("trend_line_year"), t("trend_word_year_t"), h$year_t,
-                  .fmt_mass_tr(h$t_mean), .f1(h$t_moe), .fmt_mass_tr(h$t_lo), .fmt_mass_tr(h$t_hi))
-    s3 <- sprintf(t("trend_line_change"), h$base_year, h$year_t, .fs(h$trend_pct),
-                  .fs(h$trend_lo_pct), .fs(h$trend_hi_pct),
-                  .fs(h$trend_lo_pp), .fs(h$trend_hi_pp))
-    s4 <- if (isTRUE(h$zero_inside)) t("trend_line_zero_in") else t("trend_line_zero_out")
+    hw <- (h$trend_hi_pp - h$trend_lo_pp) / 2
+    verb <- if (isTRUE(h$trend_pct >= 0)) t("trend_word_rose") else t("trend_word_fell")
+    s1 <- sprintf(t("trend_reading_change"), verb, .f1(abs(h$trend_pct)), h$base_year, h$year_t,
+                  .fs(h$trend_lo_pct), .fs(h$trend_hi_pct), .f1(hw))
+    s2 <- if (isTRUE(h$zero_inside)) t("trend_reading_zero_in") else t("trend_reading_zero_out")
+    s3 <- sprintf(t("trend_reading_level"), h$year_t, .f1(h$t_moe), h$base_year, .f1(h$base_moe))
     n_series <- format(rv_trend$run_args$n_iter %||% 2000, big.mark = ",")
-    s5 <- if (!is.null(h$n_iter_pair))
+    s4 <- if (!is.null(h$n_iter_pair))
       sprintf(t("trend_line_draws_pair"), format(h$n_iter_pair, big.mark = ","), n_series)
     else sprintf(t("trend_line_draws_series"), n_series)
-    tags$ul(style = "font-size:1rem; line-height:1.7; margin-bottom:0;",
-            tags$li(tags$strong(s1)), tags$li(tags$strong(s2)),
-            tags$li(s3), tags$li(s4), tags$li(s5),
-            tags$li(tags$em(style = "color:#555;", t("trend_line_where"))))
+    div(class = "info-panel", style = "margin: 4px 12px 12px; font-size:1rem; line-height:1.6;",
+        p(style = "margin-bottom:4px;", tags$strong(s1), " ", s2),
+        p(style = "margin-bottom:4px;", s3),
+        p(style = "margin-bottom:0; color:#555; font-size:0.85rem;", tags$em(s4)))
   }
-  output$trend_report_text        <- renderUI(.trend_report_ui())
-  output$trend_report_text_report <- renderUI(.trend_report_ui())
+  output$trend_reading            <- renderUI(.trend_reading_ui())
+  output$trend_report_text_report <- renderUI(.trend_reading_ui())
 
-  output$trend_compare_table <- DT::renderDT({
-    cmp <- trend_cmp(); req(cmp)
-    rng <- function(lo, hi) ifelse(is.na(lo), "", paste0(.fs_vec(lo), " to ", .fs_vec(hi)))
-    df <- data.frame(
-      cmp$category,
-      round(cmp$base_mean, 0), round(cmp$base_moe_pct, 1),
-      round(cmp$t_mean, 0),    round(cmp$t_moe_pct, 1),
-      round(cmp$trend_pct, 1),
-      rng(cmp$trend_pct + cmp$trend_lo_pp, cmp$trend_pct + cmp$trend_hi_pp),
-      ifelse(cmp$is_source | cmp$var == "total_co2e", round(cmp$contribution, 3), NA),
-      check.names = FALSE, stringsAsFactors = FALSE)
-    names(df) <- c(t("trend_col_source"), t("trend_col_base_mean"), t("trend_col_base_moe"),
-                   t("trend_col_t_mean"), t("trend_col_t_moe"), t("trend_col_change"),
-                   t("trend_col_change_range"), t("trend_col_contrib"))
-    DT::datatable(df, rownames = FALSE,
-                  options = list(pageLength = 12, dom = "t", ordering = FALSE)) |>
-      DT::formatCurrency(c(2, 4), currency = "", digits = 0)
+  # The four headline cards, all from trend_head() (the pair when it was
+  # run for the chosen years, the series otherwise, never a mix).
+  output$vb_tr_t_title <- renderText({ h <- trend_head(); req(h); sprintf(t("res_vb_tr_t_title"), h$year_t) })
+  output$vb_tr_t       <- renderText({ h <- trend_head(); req(h); .fmt_mass_tr(h$t_mean) })
+  output$vb_tr_t_sub   <- renderText({ h <- trend_head(); req(h)
+    sprintf(t("res_vb_tr_level_sub"), .f1(h$t_moe), .fmt_mass_tr(h$t_lo), .fmt_mass_tr(h$t_hi)) })
+  output$vb_tr_change_title <- renderText({ h <- trend_head(); req(h)
+    sprintf(t("res_vb_tr_change_title"), h$base_year, h$year_t) })
+  output$vb_tr_change  <- renderText({ h <- trend_head(); req(h); paste0(.fs(h$trend_pct), "%") })
+  output$vb_tr_unc     <- renderText({ h <- trend_head(); req(h)
+    sprintf(t("res_vb_tr_unc_value"), .f1((h$trend_hi_pp - h$trend_lo_pp) / 2)) })
+  output$vb_tr_unc_sub <- renderText({ h <- trend_head(); req(h)
+    sprintf(t("res_vb_tr_unc_sub"), .fs(h$trend_lo_pct), .fs(h$trend_hi_pct)) })
+  output$vb_tr_b_title <- renderText({ h <- trend_head(); req(h); sprintf(t("res_vb_tr_b_title"), h$base_year) })
+  output$vb_tr_b       <- renderText({ h <- trend_head(); req(h); .fmt_mass_tr(h$base_mean) })
+  output$vb_tr_b_sub   <- renderText({ h <- trend_head(); req(h)
+    sprintf(t("res_vb_tr_level_sub"), .f1(h$base_moe), .fmt_mass_tr(h$base_lo), .fmt_mass_tr(h$base_hi)) })
+
+  # Figure 4.2: the change between the two chosen years, draw by draw, in
+  # percent of the base year, with the mean, the 95% interval and its
+  # half-width written on the chart (review of the new version: "the answer
+  # is not shown in that chart in terms of half-widths").
+  output$trend_change_title <- renderText({ ys <- trend_sel_years()
+    sprintf(t("res_trend_change_h"), ys$base, ys$t) })
+  # the per-draw change (% of the base year) of the chosen pair
+  .trend_change_draws <- function() {
+    rr <- trend_res_rep(); ys <- trend_sel_years()
+    xb <- rr$inventory_by_year[[as.character(ys$base)]]$total_co2e
+    xt <- rr$inventory_by_year[[as.character(ys$t)]]$total_co2e
+    if (is.null(xb) || is.null(xt)) return(NULL)
+    ok <- is.finite(xb) & is.finite(xt) & xb > 0
+    (xt[ok] - xb[ok]) / xb[ok] * 100
+  }
+  output$trend_change_hist <- plotly::renderPlotly({
+    h <- trend_head(); req(h)
+    d <- .trend_change_draws(); req(d)
+    hb <- .hist_bars(d, nbins = 40); req(hb)
+    hw <- (h$trend_hi_pp - h$trend_lo_pp) / 2
+    vline <- function(x, col, dash) list(type = "line", x0 = x, x1 = x, y0 = 0, y1 = 1, yref = "paper",
+                                         line = list(color = col, dash = dash, width = 1.5))
+    plotly::plot_ly() |>
+      plotly::add_trace(x = hb$x, y = hb$y, type = "bar", width = rep(hb$width, length(hb$x)),
+                        marker = list(color = "#52B788", line = list(color = "#1B4332", width = 0.5)),
+                        hoverinfo = "x+y", showlegend = FALSE) |>
+      plotly::layout(
+        xaxis = list(title = t("res_trend_change_xaxis"), zeroline = FALSE),
+        yaxis = list(title = t("res_hist_yaxis")),
+        bargap = 0,
+        shapes = list(vline(h$trend_pct, "#1B4332", "solid"),
+                      vline(h$trend_lo_pct, "#C1121F", "dash"),
+                      vline(h$trend_hi_pct, "#C1121F", "dash"),
+                      vline(0, "#555", "dot")),
+        annotations = list(list(
+          x = 0.01, y = 0.99, xref = "paper", yref = "paper", xanchor = "left", yanchor = "top",
+          showarrow = FALSE, align = "left", bgcolor = "rgba(255,255,255,0.85)",
+          font = list(size = 12, color = "#1B4332"),
+          text = sprintf(t("res_trend_change_annot"), .fs(h$trend_pct), .fs(h$trend_lo_pct),
+                         .fs(h$trend_hi_pct), .f1(hw)))))
   })
-  .fs_vec <- function(x, d = 1) vapply(x, function(v) .fs(v, d), character(1))
+
+  # The short form of Table 3.3 next to the figure: by emission source, or
+  # by cattle type when the pair was run for the chosen years.
+  output$trend_bysrc_table <- DT::renderDT({
+    view <- input$trend_bysrc_view %||% "source"
+    if (identical(view, "type")) {
+      tb <- trend_ipcc_by_type()
+      validate(need(!is.null(tb) && nrow(tb) > 0, t("trend_bysrc_type_missing")))
+      df <- data.frame(paste(tb[[1]], "|", tb[["Cattle type"]]),
+                       round(tb[["Year t emissions (t CO\u2082eq)"]], 0),
+                       tb[["Year t: combined uncertainty (+/- %)"]],
+                       tb[["Trend (% of base year)"]],
+                       round((tb[["Trend uncertainty, combined (+) pp"]] - tb[["Trend uncertainty, combined (-) pp"]]) / 2, 1),
+                       check.names = FALSE, stringsAsFactors = FALSE)
+    } else {
+      cmp <- trend_cmp(); req(cmp)
+      df <- data.frame(cmp$category, round(cmp$t_mean, 0), round(cmp$t_moe_pct, 1),
+                       round(cmp$trend_pct, 1), round((cmp$trend_hi_pp - cmp$trend_lo_pp) / 2, 1),
+                       check.names = FALSE, stringsAsFactors = FALSE)
+    }
+    ys <- trend_sel_years()
+    names(df) <- c(t("trend_col_source"), sprintf(t("trend_col_bysrc_t"), ys$t),
+                   t("trend_col_bysrc_level"), sprintf(t("trend_col_bysrc_change"), ys$base, ys$t),
+                   t("trend_col_bysrc_unc"))
+    DT::datatable(df, rownames = FALSE,
+                  options = list(pageLength = 20, dom = "t", ordering = FALSE, scrollX = TRUE)) |>
+      DT::formatCurrency(2, currency = "", digits = 0)
+  })
+
+  output$trend_series_note <- renderText({
+    req(rv_trend$res)
+    sprintf(t("trend_series_note"), format(rv_trend$run_args$n_iter %||% 2000, big.mark = ","),
+            min(rv_trend$res$years), max(rv_trend$res$years), length(rv_trend$res$years))
+  })
+
 
   output$trend_year_groups <- DT::renderDT({
     req(rv_trend$res, rv_trend$res$system_summary)
@@ -3708,14 +3732,16 @@ app_server <- function(input, output, session) {
                   options = list(pageLength = 12, dom = "t", ordering = FALSE, scrollX = TRUE)) |>
       DT::formatCurrency(c(3, 4), currency = "", digits = 0)
   })
-  output$trend_adef_ui <- renderUI({
+  .trend_adef_ui <- function() {
     req(rv_trend$res)
     status <- tags$em(style = "color:#555; font-size:0.85rem;", textOutput("trend_adef_status", inline = TRUE))
     if (!is.null(trend_pair())) return(div(style = "margin-bottom:8px;", status))
     div(style = "display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px;",
         actionButton("trend_adef_btn", t("trend_adef_btn"), class = "btn-outline-success", icon = icon("calculator")),
         status)
-  })
+  }
+  output$trend_adef_ui     <- renderUI(.trend_adef_ui())
+  output$trend_adef_ui_res <- renderUI(.trend_adef_ui())
   output$trend_adef_status <- renderText({
     p <- trend_pair()
     if (is.null(p))
@@ -3818,64 +3844,11 @@ app_server <- function(input, output, session) {
     .sens_rank_dt(base)
   }
 
-  output$trend_tornado_per_year <- plotly::renderPlotly({
-    .trend_tornado_plot(trend_sens_per_year(),
-                         "Top 10 drivers: latest year")
-  })
 
-  output$trend_tornado_delta <- plotly::renderPlotly({
-    .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers of the change between first and last year")
-  })
 
   # Round 9: mirror outputs for the IPCC Report tab. Shiny requires unique
   # output IDs per UI element, so the same chart shown in two places needs two
   # render calls. Both delegate to the same reactive sources.
-  output$trend_table_report <- DT::renderDT({
-    req(isTRUE(rv$prerender_ok))
-    req(rv_trend$results)
-    DT::datatable(.trend_table_labelled(rv_trend$results), rownames = FALSE,
-                  options = list(pageLength = 25, dom = "t"))
-  })
-  output$trend_plot_report <- plotly::renderPlotly({
-    req(isTRUE(rv$prerender_ok))
-    req(rv_trend$results)
-    df <- rv_trend$results
-    sub <- if (!is.null(rv_trend$slope) && !is.null(rv_trend$delta_total)) {
-      sprintf("Change since base year: %.1f%% (95%% range %.1f%%, %.1f%%)  •  Average change per year: %.0f t CO₂eq (95%% range %.0f, %.0f)",
-              rv_trend$delta_total$pct_mean,
-              rv_trend$delta_total$pct_ci[1], rv_trend$delta_total$pct_ci[2],
-              rv_trend$slope$mean,
-              rv_trend$slope$ci[1], rv_trend$slope$ci[2])
-    } else NULL
-    plotly::plot_ly() |>
-      plotly::add_ribbons(x = df$Year, ymin = df$CI_Lower_t, ymax = df$CI_Upper_t,
-                          name = t("res_vb_ci_label"),
-                          line = list(color = "transparent"),
-                          fillcolor = "rgba(45,106,79,0.25)") |>
-      plotly::add_trace(x = df$Year, y = df$Mean_t_CO2eq,
-                        type = "scatter", mode = "lines+markers",
-                        name = t("res_vb_mean_label"),
-                        line = list(color = "#1B4332", width = 3),
-                        marker = list(size = 8, color = "#1B4332")) |>
-      plotly::layout(
-        title = list(text = paste0(t("res_trend_plot_title"),
-                                    if (!is.null(sub)) paste0("<br><sub>", sub, "</sub>") else "")),
-        xaxis = list(title = t("res_trend_xaxis_year")),
-        yaxis = list(title = t("res_hist_xaxis")),
-        hovermode = "x unified"
-      )
-  })
-  output$trend_tornado_per_year_report <- plotly::renderPlotly({
-    req(isTRUE(rv$prerender_ok))
-    .trend_tornado_plot(trend_sens_per_year(),
-                         "Top 10 drivers: latest year")
-  })
-  output$trend_tornado_delta_report <- plotly::renderPlotly({
-    req(isTRUE(rv$prerender_ok))
-    .trend_tornado_plot(trend_sens_delta(),
-                         "Top 10 drivers of the change between first and last year")
-  })
   # Round 9 follow-up: third copy of the trend tornadoes for Tab 6 (Sensitivity)
   # since each Shiny output ID can render in only one UI element. All three
   # copies (Tab 5 results, Tab 6, Tab 7 report) read from the same reactives.
@@ -3965,6 +3938,7 @@ app_server <- function(input, output, session) {
         ipcc_table           = trend_ipcc(),
         ipcc_by_type         = trend_ipcc_by_type(),
         compare              = trend_cmp(),
+        change_draws         = .trend_change_draws(),
         manure               = rv$manure_data,
         corr_settings        = list(corr_mode = rv_trend$run_args$corr_mode %||% input$corr_mode %||% "none",
                                     n_group_corr = rv_trend$run_args$n_group_corr %||% input$n_group_corr %||% "full",
@@ -4006,21 +3980,14 @@ app_server <- function(input, output, session) {
   outputOptions(output, "ipcc_table_notice", suspendWhenHidden = FALSE)
   # 2026-10-29: the trend views too, so leaving the tab and coming back
   # does not redraw them.
-  for (id in c("trend_table_report", "trend_plot_report",
-               "trend_tornado_per_year_report", "trend_tornado_delta_report",
-               "trend_tornado_per_year_sens", "trend_tornado_delta_sens",
+  for (id in c("trend_tornado_per_year_sens", "trend_tornado_delta_sens",
                "trend_sens_per_year_table", "trend_sens_delta_table",
-               "trend_ipcc_table", "trend_compare_table",
-               "trend_report_text", "trend_report_text_report"))
+               "trend_ipcc_table", "trend_report_text_report", "trend_ipcc_table_by_type"))
     tryCatch(outputOptions(output, id, suspendWhenHidden = FALSE), error = function(e) NULL)
   outputOptions(output, "trend_tornado_per_year_sens", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_tornado_delta_sens", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_sens_per_year_table", suspendWhenHidden = FALSE)
   outputOptions(output, "trend_sens_delta_table", suspendWhenHidden = FALSE)
-  outputOptions(output, "trend_plot_report", suspendWhenHidden = FALSE)
-  outputOptions(output, "trend_table_report", suspendWhenHidden = FALSE)
-  outputOptions(output, "trend_tornado_per_year_report", suspendWhenHidden = FALSE)
-  outputOptions(output, "trend_tornado_delta_report", suspendWhenHidden = FALSE)
   # 2026-11-02: the single-year results block is hidden until a run is
   # complete (output$results_visible). Hidden outputs are suspended, so
   # they used to compute only after the block appeared and the cards stood
@@ -4029,9 +3996,11 @@ app_server <- function(input, output, session) {
                "vb_co2e_inline", "vb_moe", "vb_ch4", "vb_n2o",
                "results_histogram", "decomposition_plot", "results_by_system", "results_by_category", "comparison_card",
                # the trend block, under the same gate (output$trend_results_visible)
-               "vb_trend_delta", "vb_trend_delta_sub", "vb_trend_slope", "vb_trend_slope_sub",
-               "vb_trend_latest", "vb_trend_latest_sub", "vb_trend_yoy", "vb_trend_yoy_sub", "vb_trend_inline",
-               "trend_report_text", "trend_compare_table", "trend_plot", "trend_yoy_chart",
-               "trend_delta_histogram", "trend_year_groups", "trend_table"))
+               "vb_tr_t_title", "vb_tr_t", "vb_tr_t_sub", "vb_tr_change_title", "vb_tr_change",
+               "vb_tr_unc", "vb_tr_unc_sub", "vb_tr_b_title", "vb_tr_b", "vb_tr_b_sub",
+               "trend_reading", "trend_change_title", "trend_change_hist", "trend_bysrc_table",
+               "trend_series_note", "trend_adef_ui_res",
+               "vb_trend_slope", "vb_trend_slope_sub", "vb_trend_yoy", "vb_trend_yoy_sub",
+               "trend_plot", "trend_yoy_chart", "trend_year_groups", "trend_table"))
     tryCatch(outputOptions(output, nm, suspendWhenHidden = FALSE), error = function(e) NULL)
 }

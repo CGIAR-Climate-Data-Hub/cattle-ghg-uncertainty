@@ -452,10 +452,34 @@ trend_sensitivity_year <- function(res, year = NULL, method = "both") {
 # Sensitivity of the first-to-last change to the inputs of both years. The
 # two years' draws are placed side by side, labelled by group and year, and
 # regressed on the per-iteration delta.
+# 2026-11-04: columns that cannot move a group's emissions are left out of
+# the trend-change regression: the draws of a manure system the group does
+# not use (its allocation fraction is 0 in every draw: MCF, EF3, Frac_GasMS,
+# Frac_LeachMS and the fraction itself) and any constant column. Each group
+# carries six manure systems; over two years and 27 groups the regression
+# had more inputs (over 3,000) than draws (2,000), and its coefficients ran
+# into the thousands.
+.drop_inert_columns <- function(samp) {
+  cn <- colnames(samp)
+  fr <- grep("^fraction_", cn, value = TRUE)
+  unused <- sub("^fraction_", "", fr[vapply(fr, function(f) all(samp[, f] == 0, na.rm = TRUE), logical(1))])
+  drop <- cn %in% as.vector(outer(c("MCF_", "EF3_", "Frac_GasMS_", "Frac_LeachMS_", "fraction_"), unused, paste0))
+  rng <- apply(samp, 2, function(v) diff(range(v, na.rm = TRUE)))
+  drop <- drop | !is.finite(rng) | rng == 0
+  samp[, !drop, drop = FALSE]
+}
+
 trend_sensitivity_delta <- function(res, method = "both", max_rows = 4000L) {
   sb <- res$samples_by_year
   if (is.null(sb) || length(sb) < 2) return(NULL)
   y1 <- names(sb)[1]; yN <- names(sb)[length(sb)]
+  # 2026-11-04: the production system joins the sub-category in the label
+  # when the inventory has several ("N (dairy_cows, commercial) 1990"); the
+  # sub-category alone gave repeated names that data.frame() numbered
+  # ("N (dairy_cows) 1990.1").
+  lv_all <- unique(unlist(lapply(sb, function(bs) vapply(names(bs), function(sn) {
+    parts <- strsplit(sn, "||", fixed = TRUE)[[1]]; if (length(parts) >= 2) parts[2] else "" }, character(1)))))
+  multi_level <- length(setdiff(lv_all, "")) > 1L
   label <- function(bs, tag) {
     blocks <- lapply(names(bs), function(sn) {
       samp <- bs[[sn]]$samples
@@ -464,8 +488,11 @@ trend_sensitivity_delta <- function(res, method = "both", max_rows = 4000L) {
         samp <- samp[, sample_columns_for_sources(colnames(samp), res$emission_sources), drop = FALSE]
         if (ncol(samp) == 0) return(NULL)
       }
+      samp <- .drop_inert_columns(samp)
+      if (ncol(samp) == 0) return(NULL)
       parts <- strsplit(sn, "||", fixed = TRUE)[[1]]
       sc <- if (length(parts) >= 3 && nzchar(parts[3])) parts[3] else sn
+      if (multi_level && length(parts) >= 2 && nzchar(parts[2])) sc <- paste0(sc, ", ", parts[2])
       colnames(samp) <- paste0(colnames(samp), " (", sc, ") ", tag)
       samp
     })
@@ -476,17 +503,58 @@ trend_sensitivity_delta <- function(res, method = "both", max_rows = 4000L) {
   a <- label(sb[[y1]], y1); b <- label(sb[[yN]], yN)
   if (is.null(a) || is.null(b)) return(NULL)
   m <- min(nrow(a), nrow(b), length(res$delta_total$per_iter), max_rows)
-  combined <- cbind(a[seq_len(m), , drop = FALSE], b[seq_len(m), , drop = FALSE])
-  # identical columns (a coefficient shared across groups, or held across
-  # both years) are regressed once. 2026-10-29: found from a numeric
-  # fingerprint confirmed with identical(), as aggregate_sensitivity() does;
-  # pasting every column into a string took 37 s on the test inventory (2 x 1,250
-  # columns), which was most of the wait before the trend results showed.
-  cm <- as.matrix(combined)
-  fp <- paste(colSums(cm), colSums(cm * cm), cm[1L, ], cm[nrow(cm), ], sep = "|")
-  grp <- match(fp, fp)
-  for (j in which(grp != seq_along(grp)))
-    if (!identical(unname(cm[, j]), unname(cm[, grp[j]]))) grp[j] <- j
-  combined <- combined[, !duplicated(grp), drop = FALSE]
-  sensitivity_analysis(combined, res$delta_total$per_iter[seq_len(m)], method = method)
+  cm <- as.matrix(cbind(a[seq_len(m), , drop = FALSE], b[seq_len(m), , drop = FALSE]))
+  rm(a, b)
+  # 2026-11-04: inputs that move together are one input for the regression.
+  # Animal numbers drawn as one count split into groups, and a count or a
+  # coefficient linked between the two years, have (almost) the same ranks
+  # in every column; regressed side by side they are collinear, and the
+  # standardised coefficients ran to +/-30 (an SRC lies between -1 and +1).
+  # Columns of one parameter whose rank correlation is above 0.999 are
+  # merged, as aggregate_sensitivity() does for the single-year run: the
+  # animal numbers into their sum, any other input into its first column,
+  # labelled with the groups and the years it covers.
+  base_of <- sub(" \\(.*$", "", colnames(cm))
+  year_of <- sub("^.* ", "", colnames(cm))
+  tag_of  <- sub("^.*\\((.*)\\) [^ ]+$", "\\1", colnames(cm))
+  cols <- list(); nms <- character(0)
+  for (bp in unique(base_of)) {
+    idx <- which(base_of == bp)
+    if (length(idx) == 1L) { cols[[length(cols) + 1L]] <- cm[, idx]; nms <- c(nms, colnames(cm)[idx]); next }
+    R <- apply(cm[, idx, drop = FALSE], 2, rank, ties.method = "average")
+    C <- suppressWarnings(stats::cor(R)); C[!is.finite(C)] <- 0
+    left <- seq_along(idx)
+    while (length(left)) {
+      ref <- left[1]
+      pick <- unique(c(ref, left[C[left, ref] > 0.999]))
+      left <- setdiff(left, pick)
+      mem <- idx[pick]
+      if (length(mem) == 1L) { cols[[length(cols) + 1L]] <- cm[, mem]; nms <- c(nms, colnames(cm)[mem]); next }
+      yrs <- unique(year_of[mem]); tg <- unique(tag_of[mem])
+      grp_txt <- if (length(tg) > 1L) sprintf("%s%d groups", if (bp == "N") "one count, " else "", length(tg)) else tg
+      cols[[length(cols) + 1L]] <- if (bp == "N") rowSums(cm[, mem, drop = FALSE]) else cm[, mem[1]]
+      nms <- c(nms, sprintf("%s (%s) %s", bp, grp_txt, paste(yrs, collapse = " and ")))
+    }
+  }
+  combined <- do.call(cbind, cols); colnames(combined) <- make.unique(nms, sep = " #")
+  rm(cm, cols); gc(FALSE)
+  y <- res$delta_total$per_iter[seq_len(m)]
+  # 2026-11-04: screening before the regression. With two years of inputs
+  # the regression can still hold several hundred columns for 2,000 draws,
+  # and minor inputs then take large coefficients by chance. The inputs are
+  # ranked by their rank correlation with the change and at most one per ten
+  # draws (and at least 50) enter the regression, the usual screening step
+  # of a Monte Carlo sensitivity analysis. The ones left out have the
+  # weakest correlation with the change.
+  k_max <- max(50L, floor(m / 10))
+  n_in <- ncol(combined)
+  if (n_in > k_max) {
+    rc <- suppressWarnings(abs(stats::cor(combined, y, method = "spearman")))[, 1]
+    rc[!is.finite(rc)] <- 0
+    keep <- order(-rc)[seq_len(k_max)]
+    combined <- combined[, sort(keep), drop = FALSE]
+  }
+  out <- sensitivity_analysis(as.data.frame(combined), y, method = method)
+  if (!is.null(out)) attr(out, "screened") <- c(inputs = n_in, regressed = ncol(combined))
+  out
 }

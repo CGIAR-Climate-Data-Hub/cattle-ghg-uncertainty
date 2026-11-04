@@ -323,22 +323,29 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
   caveats_df <- if (is.data.frame(qa_caveats) && nrow(qa_caveats) > 0) qa_caveats
                 else placeholder("No QA/QC checks were ignored or repaired for this run.")
 
+  # 2026-11-04: in the order of the app's headline cards (year t, the change
+  # and its uncertainty, the base year), all from the paired run; the
+  # series' average change per year last, marked as such.
   headline_df <- if (!is.null(h)) data.frame(
-    Item = c("Base year", "Base year: mean total emissions (t CO2eq)",
-             "Base year: 95% CI lower (t CO2eq)", "Base year: 95% CI upper (t CO2eq)", "Base year: MoE 95% (%)",
-             "Year t", "Year t: mean total emissions (t CO2eq)",
+    Item = c("Year t", "Year t: mean total emissions (t CO2eq)",
              "Year t: 95% CI lower (t CO2eq)", "Year t: 95% CI upper (t CO2eq)", "Year t: MoE 95% (%)",
              "Change in mean emissions, base year to year t (%)",
+             "Uncertainty of the change: +/- percentage points (half-width of the 95% range)",
              "Change: 95% CI lower (%)", "Change: 95% CI upper (%)",
              "Trend uncertainty, lower (percentage points)", "Trend uncertainty, upper (percentage points)",
              "The 95% CI of the change includes zero",
-             "Average change per year over all years (t CO2eq per year)",
-             "Average change per year: 95% CI lower", "Average change per year: 95% CI upper"),
-    Value = c(h$base_year, r1(h$base_mean, 0), r1(h$base_lo, 0), r1(h$base_hi, 0), r1(h$base_moe),
-              h$year_t, r1(h$t_mean, 0), r1(h$t_lo, 0), r1(h$t_hi, 0), r1(h$t_moe),
-              r1(h$trend_pct), r1(h$trend_lo_pct), r1(h$trend_hi_pct),
+             "Base year", "Base year: mean total emissions (t CO2eq)",
+             "Base year: 95% CI lower (t CO2eq)", "Base year: 95% CI upper (t CO2eq)", "Base year: MoE 95% (%)",
+             "Draws of the paired run (each year)",
+             "Series: average change per year over all years (t CO2eq per year)",
+             "Series: average change per year, 95% CI lower", "Series: average change per year, 95% CI upper"),
+    Value = c(h$year_t, r1(h$t_mean, 0), r1(h$t_lo, 0), r1(h$t_hi, 0), r1(h$t_moe),
+              r1(h$trend_pct), r1((h$trend_hi_pp - h$trend_lo_pp) / 2),
+              r1(h$trend_lo_pct), r1(h$trend_hi_pct),
               r1(h$trend_lo_pp), r1(h$trend_hi_pp),
               if (isTRUE(h$zero_inside)) "yes" else "no",
+              h$base_year, r1(h$base_mean, 0), r1(h$base_lo, 0), r1(h$base_hi, 0), r1(h$base_moe),
+              if (!is.null(h$n_iter_pair)) h$n_iter_pair else NA,
               r1(slope$mean, 0), r1(slope$ci[1], 0), r1(slope$ci[2], 0)),
     stringsAsFactors = FALSE) else placeholder("Headline figures unavailable.")
 
@@ -403,7 +410,7 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
       "This sheet: what each sheet of the workbook contains.",
       "The settings of the run: years, draws, the year-to-year correlation of the coefficients, the correlation choices of Tab 3, GWP basis, seed, emission sources, and how many QA/QC checks were ignored or repaired.",
       "The QA/QC checks that were ignored or repaired so the run could go ahead.",
-      "The figures to report: total emissions of the base year and year t with their 95% confidence interval (CI) and 95% margin of error (MoE, half the width of the CI as a percentage of the mean); the change between the two years with its 95% CI and the trend uncertainty in percentage points; the average change per year over all years.",
+      "The figures to report, in the order of the app's headline cards, all from the paired run of the two chosen years: total emissions of year t with their 95% confidence interval (CI) and 95% margin of error (MoE, half the width of the CI as a percentage of the mean); the change from the base year with its uncertainty (plus or minus percentage points, half the width of its 95% range) and its 95% CI; total emissions of the base year. Last, the series' average change per year.",
       paste("IPCC 2006 Vol. 1 Ch. 3 Table 3.3, the general reporting table for uncertainty, for the base year and year t, one row per reporting line.",
             "Columns: emissions of the base year and year t (t CO2eq);",
             "the uncertainty of year t emissions from the activity data alone, the emission factors alone, and both (lower and upper halves of the 95% interval, % of the mean);",

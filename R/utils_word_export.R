@@ -530,6 +530,7 @@ build_trend_summary_docx <- function(path,
                                       manure      = NULL,
                                      corr_settings = NULL,
                                      ipcc_by_type = NULL,
+                                     change_draws = NULL,
                                      diagnostics = NULL) {
 
   doc <- officer::read_docx()
@@ -564,9 +565,11 @@ build_trend_summary_docx <- function(path,
 
   # ---- Summary ------------------------------------------------------------
   doc <- .add_h2(doc, "Summary")
-  doc <- .add_p(doc, .build_trend_exec_summary(trend_results, slope, delta_total,
-                                                 sensitivity_delta, year_corr, n_iter))
+  # 2026-11-04 (review of the new version): the figures a country reports
+  # first, from the paired run of the two chosen years, the same numbers as
+  # the app's headline cards; then the driver and the basis of the run.
   if (!is.null(headline)) for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
+  doc <- .add_p(doc, .build_trend_exec_summary(headline, sensitivity_delta, year_corr, n_iter))
   doc <- .add_p(doc, paste(
     "The report has four parts: the simulation, the inputs, the results",
     "and the sensitivity analysis.", trimws(.sources_sentence(corr_settings$emission_sources))))
@@ -619,12 +622,25 @@ build_trend_summary_docx <- function(path,
   }
 
   # ---- 3. Results -----------------------------------------------------------
+  # 2026-11-04: what a country reports first (the two chosen years, the
+  # change and its uncertainty, IPCC Table 3.3, by cattle type), then the
+  # whole series.
   doc <- num$part(doc, "Results")
   if (!is.null(headline)) {
     doc <- num$sub(doc, sprintf("Base year %d and year t %d", headline$base_year, headline$year_t))
     if (!is.null(compare)) {
       doc <- .add_p(doc, "The two years side by side, by emission source:")
       doc <- .add_flextable_safe(doc, .styled_flextable(.trend_compare_flextable(compare)))
+    }
+    if (length(change_draws) > 10) {
+      hw <- (headline$trend_hi_pp - headline$trend_lo_pp) / 2
+      doc <- fig(doc, .gg_change_hist(change_draws, headline),
+        sprintf("How certain is the change from %d to %d?", headline$base_year, headline$year_t),
+        sprintf(paste("Change in total emissions between the two years, draw by draw, in percent of the base year. The solid line is the mean change (%s%%),",
+                      "the dashed lines the 95%% interval (%s%% to %s%%); half its width, %s percentage points, is the uncertainty of the change reported in IPCC Table 3.3."),
+                .fmt_signed(headline$trend_pct, 1), .fmt_signed(headline$trend_lo_pct, 1),
+                .fmt_signed(headline$trend_hi_pct, 1), formatC(hw, digits = 1, format = "f")),
+        height = 3.0)
     }
     if (!is.null(ipcc_table)) {
       doc <- .add_portrait_break(doc)
@@ -633,38 +649,39 @@ build_trend_summary_docx <- function(path,
         if (isTRUE(attr(ipcc_table, "has_ad_ef")))
           "The activity data (AD) and emission factor (EF) columns come from extra simulations of both years with the other side held at its mean: the year t columns are the uncertainty of year t emissions, the trend columns the uncertainty the AD and the EF introduce into the trend (95% half-width, percentage points)."
         else "The activity data and emission factor columns were not computed for this report; IPCC allows them to be left blank.",
-        "Contribution to variance is each source's covariance with the total divided by the variance of the total; the six sources sum to 1.",
+        "Contribution to variance is each source's covariance with the total divided by the variance of the total; the sources sum to 1.",
         "Trend uncertainty is in percentage points around the trend, the IPCC convention."))
       doc <- .add_flextable_safe(doc, .styled_flextable(.trend_ipcc_flextable(ipcc_table)))
-      # 2026-11-04: the same table by cattle type, when the run has both
-      if (is.data.frame(ipcc_by_type) && length(unique(ipcc_by_type[["Cattle type"]])) > 1L) {
-        doc <- .add_p(doc, paste(
-          "The same table for dairy and non-dairy cattle separately (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b).",
-          "Year t uncertainties are +/- half-widths of the 95% interval; each type's figures come from the draws of its own groups."))
-        ft <- flextable::fontsize(flextable::flextable(ipcc_by_type), size = 6.5, part = "all")
-        doc <- .add_flextable_safe(doc, .styled_flextable(flextable::autofit(ft)))
-      }
+      doc <- .add_landscape_break(doc)
+    }
+    if (is.data.frame(ipcc_by_type) && length(unique(ipcc_by_type[["Cattle type"]])) > 1L) {
+      doc <- .add_portrait_break(doc)
+      doc <- num$sub(doc, "By cattle type")
+      doc <- .add_p(doc, paste(
+        "IPCC Table 3.3 for dairy and non-dairy cattle separately (reporting codes 3.A.1.a and 3.A.1.b, 3.B.1.a and 3.B.1.b).",
+        "Year t uncertainties are +/- half-widths of the 95% interval; each type's figures come from the draws of its own groups."))
+      ft <- flextable::fontsize(flextable::flextable(ipcc_by_type), size = 6.5, part = "all")
+      doc <- .add_flextable_safe(doc, .styled_flextable(flextable::autofit(ft)))
       doc <- .add_landscape_break(doc)
     }
   }
 
-  doc <- num$sub(doc, "Every year")
-  doc <- .add_p(doc,
-    "Mean total emissions of each year with the 95% confidence interval, the 95% margin of error, and the change since the base year and from the previous year.")
+  doc <- num$sub(doc, "The whole series")
+  doc <- .add_p(doc, sprintf(paste(
+    "Every year of the series at %s draws per year: mean total emissions with the 95%% confidence interval,",
+    "the 95%% margin of error, and the change since the base year and from the previous year.",
+    "The figures above come from the paired run of the two chosen years."), .fmt_int(n_iter)))
   doc <- .add_flextable_safe(doc, .styled_flextable(.trend_table_flextable(trend_results)))
   doc <- fig(doc, .gg_trend_chart(trend_results), "Trend in total CO2eq emissions",
     "Mean total CO2eq for each year (line) with its 95% confidence interval (shaded band).")
   doc <- fig(doc, .gg_yoy_chart(trend_results), "Year-over-year change",
     "Change in mean total CO2eq from one year to the next, in percent. Bars above zero are increases.",
     height = 2.8)
-
-  doc <- num$sub(doc, "Change between the first and last year")
-  doc <- .add_p(doc,
-    "The change between the last and the first year, and the average change per year (a straight line fitted to every year), each computed draw by draw so that their 95% confidence intervals keep the correlation between years.")
-  doc <- .add_flextable_safe(doc, .styled_flextable(.slope_delta_flextable(slope, delta_total)))
-  doc <- fig(doc, .gg_delta_distribution(delta_total), "Distribution of the change between the first and last year",
-    "Distribution, across draws, of the difference between the last and the first year. The dashed lines bound the 95% confidence interval; when it does not include zero, the trend is distinguishable from no change.",
-    height = 3.0)
+  if (!is.null(slope) && !is.null(slope$mean))
+    doc <- .add_p(doc, sprintf(paste(
+      "Average change per year over the series (a straight line fitted to every year, draw by draw): %s t CO2eq per year,",
+      "95%% confidence interval %s to %s."),
+      .fmt_signed(slope$mean, 0), .fmt_signed(slope$ci[1], 0), .fmt_signed(slope$ci[2], 0)))
 
   # ---- 4. Sensitivity analysis -----------------------------------------------
   has_py <- !is.null(.sensitivity_flextable(sensitivity_per_year, top_n = 1L))
@@ -709,43 +726,23 @@ build_trend_summary_docx <- function(path,
   invisible(path)
 }
 
-.build_trend_exec_summary <- function(trend_results, slope, delta_total,
-                                        sensitivity_delta, year_corr, n_iter) {
-  yrs <- range(trend_results$Year)
-  delta_pct_str <- sprintf("%s%% (95%% range %s%% to %s%%)",
-                            .fmt_signed(trend_results$Delta_vs_base_pct[nrow(trend_results)], 1),
-                            .fmt_signed(delta_total$pct_ci[1], 1),
-                            .fmt_signed(delta_total$pct_ci[2], 1))
-  slope_str <- sprintf("%s t CO2eq/yr (95%% CI %s, %s)",
-                        .fmt_signed(slope$mean, 0),
-                        .fmt_signed(slope$ci[1], 0),
-                        .fmt_signed(slope$ci[2], 0))
-
+.build_trend_exec_summary <- function(headline, sensitivity_delta, year_corr, n_iter) {
   driver_text <- ""
-  base <- if (!is.null(sensitivity_delta$src) && nrow(sensitivity_delta$src) > 0)
-    sensitivity_delta$src
-  else NULL
-  if (!is.null(base) && nrow(base) > 0) {
-    val_col <- "src"
-    top <- base[order(-abs(base[[val_col]])), , drop = FALSE][1, ]
-    driver_text <- sprintf(
-      " The dominant trend driver is %s (%s = %s).",
-      top$parameter, toupper(val_col),
-      formatC(top[[val_col]], digits = 2, format = "f"))
+  base <- if (!is.null(sensitivity_delta$src) && nrow(sensitivity_delta$src) > 0) sensitivity_delta$src else NULL
+  if (!is.null(base)) {
+    top <- base[order(-abs(base$src)), , drop = FALSE][1, ]
+    driver_text <- sprintf("The input that drives the uncertainty of the change most is %s (SRC %s). ",
+                           top$parameter, formatC(top$src, digits = 2, format = "f"))
   }
-
-  yc_short <- switch(
-    year_corr,
-    full    = "coefficients fully correlated between years (the same factors for every year)",
-    partial = "coefficients partly correlated between years (factors revised every few years)",
-    none    = "independent years"
-  )
-
-  sprintf(
-    "Between %d and %d, total cattle emissions changed by %s. The annualised trend slope is %s.%s These figures are based on %s Monte Carlo iterations per year, with %s.",
-    yrs[1], yrs[2], delta_pct_str, slope_str, driver_text,
-    .fmt_int(n_iter), yc_short
-  )
+  yc_short <- switch(year_corr %||% "full",
+    full    = "the same factors for every year (coefficients fully correlated between years)",
+    partial = "factors revised every few years (coefficients partly correlated between years)",
+    none    = "independent years")
+  pair_txt <- if (!is.null(headline$n_iter_pair))
+    sprintf("The two years come from a paired run of %s draws each; the series from %s draws per year.",
+            .fmt_int(headline$n_iter_pair), .fmt_int(n_iter))
+  else sprintf("The two years come from the series at %s draws per year.", .fmt_int(n_iter))
+  paste0(driver_text, pair_txt, " Year-to-year setting: ", yc_short, ".")
 }
 
 # ============================================================================
@@ -1562,6 +1559,27 @@ WORD_SENS_MAX <- 50L
 
 # Round 9b §3b: Distribution of Δ Y_N − Y_1 from the per-iteration delta
 # samples. Mirrors output$trend_delta_histogram.
+# 2026-11-04: the change between the two chosen years, draw by draw, in
+# percent of the base year, with the mean, the 95% interval and its
+# half-width written on the chart.
+.gg_change_hist <- function(d, h) {
+  d <- d[is.finite(d)]
+  if (length(d) < 10) return(NULL)
+  hw <- (h$trend_hi_pp - h$trend_lo_pp) / 2
+  lab <- sprintf("Change %s%%\n95%% interval %s%% to %s%%\nHalf-width %s percentage points",
+                 .fmt_signed(h$trend_pct, 1), .fmt_signed(h$trend_lo_pct, 1),
+                 .fmt_signed(h$trend_hi_pct, 1), formatC(hw, digits = 1, format = "f"))
+  ggplot2::ggplot(data.frame(d = d), ggplot2::aes(x = d)) +
+    ggplot2::geom_histogram(bins = 40, fill = "#52B788", colour = "#1B4332", linewidth = 0.2) +
+    ggplot2::geom_vline(xintercept = h$trend_pct, colour = "#1B4332", linewidth = 0.8) +
+    ggplot2::geom_vline(xintercept = c(h$trend_lo_pct, h$trend_hi_pct), colour = "#C1121F",
+                        linetype = "dashed", linewidth = 0.6) +
+    ggplot2::annotate("label", x = -Inf, y = Inf, hjust = -0.05, vjust = 1.1, label = lab,
+                      size = 3, colour = "#1B4332", fill = "white", label.size = 0) +
+    ggplot2::labs(x = "Change in total emissions (% of the base year)", y = "Draws") +
+    ggplot2::theme_minimal(base_size = 10)
+}
+
 .gg_delta_distribution <- function(delta_total) {
   if (is.null(delta_total) || is.null(delta_total$per_iter)) return(NULL)
   x <- delta_total$per_iter
@@ -1583,19 +1601,20 @@ WORD_SENS_MAX <- 50L
 # English sentences from trend_headline(); the app phrases the same numbers
 # through i18n.
 .trend_headline_sentences <- function(h) {
+  if (is.null(h)) return(character(0))
   f0 <- function(x) format(round(x, 0), big.mark = ",")
   f1 <- function(x) formatC(x, digits = 1, format = "f")
   fs <- function(x) { v <- formatC(x, digits = 1, format = "f"); if (x > 0) paste0("+", v) else v }
-  c(sprintf("Base year %d: %s t CO2eq, plus or minus %s%% (95%% range %s to %s t).",
-            h$base_year, f0(h$base_mean), f1(h$base_moe), f0(h$base_lo), f0(h$base_hi)),
-    sprintf("Year t %d: %s t CO2eq, plus or minus %s%% (95%% range %s to %s t).",
+  hw <- (h$trend_hi_pp - h$trend_lo_pp) / 2
+  # 2026-11-04: in the order of the app's headline cards
+  c(sprintf("Emissions in %d (year t): %s t CO2eq, plus or minus %s%% (95%% range %s to %s t).",
             h$year_t, f0(h$t_mean), f1(h$t_moe), f0(h$t_lo), f0(h$t_hi)),
-    sprintf("Change from %d to %d: %s%%. The 95%% range of this change is %s%% to %s%%, that is %s to %s percentage points around the trend.",
-            h$base_year, h$year_t, fs(h$trend_pct), fs(h$trend_lo_pct), fs(h$trend_hi_pct),
-            fs(h$trend_lo_pp), fs(h$trend_hi_pp)),
-    if (isTRUE(h$zero_inside))
-      "This range includes zero: at 95%, the inventory cannot tell an increase from a decrease."
-    else "This range does not include zero: the direction of the change is clear at 95%.")
+    sprintf("Change from %d to %d: %s%%. With 95%% confidence the change lies between %s%% and %s%%, plus or minus %s percentage points; %s",
+            h$base_year, h$year_t, fs(h$trend_pct), fs(h$trend_lo_pct), fs(h$trend_hi_pct), f1(hw),
+            if (isTRUE(h$zero_inside)) "this range includes zero, so this analysis cannot say whether emissions fell or rose."
+            else "this range does not include zero, so the direction of the change is clear."),
+    sprintf("Emissions in %d (base year): %s t CO2eq, plus or minus %s%% (95%% range %s to %s t).",
+            h$base_year, f0(h$base_mean), f1(h$base_moe), f0(h$base_lo), f0(h$base_hi)))
 }
 
 .trend_compare_flextable <- function(cmp) {
