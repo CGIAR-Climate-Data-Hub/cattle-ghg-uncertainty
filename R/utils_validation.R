@@ -252,7 +252,7 @@ normalise_param_names <- function(param_specs) {
 }
 
 ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
-                                 region = NULL) {
+                                 region = NULL, ipcc_version = NULL) {
   if (is.null(param_specs) || nrow(param_specs) == 0)
     return(list(valid = FALSE, param_specs = param_specs,
                 auto_filled = NULL, message = "No parameters loaded."))
@@ -290,7 +290,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   group_cols <- intersect(c("cattle_type", "aggregation_level", "sub_category"),
                           names(param_specs))
   if (length(group_cols) == 0) {
-    ps1 <- apply_default_ranges(param_specs, catalogue)
+    ps1 <- apply_default_ranges(param_specs, catalogue, ipcc_version)
     return(list(valid = TRUE, param_specs = ps1, auto_filled = NULL,
                 ranges_filled = .n_ranges_filled(param_specs, ps1),
                 message = "Single-group input: no per-group completeness check."))
@@ -400,7 +400,7 @@ ensure_completeness <- function(param_specs, catalogue = PARAM_CATALOGUE,
   # 2026-10-30: blank ranges take a default only where one is defensible
   # (see apply_default_ranges). Everything else stays blank for the QA/QC.
   ps0 <- param_specs
-  param_specs <- apply_default_ranges(param_specs, catalogue)
+  param_specs <- apply_default_ranges(param_specs, catalogue, ipcc_version)
   ranges_filled <- .n_ranges_filled(ps0, param_specs)
 
   if (length(msg_parts) == 0) msg_parts <- "All sub-categories complete."
@@ -461,8 +461,43 @@ DEFAULT_RANGE_SOURCE <- c(
     abs(a - b) <= 1e-9 * max(1, abs(b))
 }
 
-# The default range for one parameter around one value, or NULL.
-default_range_for <- function(parameter, mean, catalogue = PARAM_CATALOGUE) {
+# The other IPCC default values of the pasture N2O factors and fractions,
+# with their ranges (2026-11-04, review of the new version: a dry-climate
+# EF4 from IPCC 2019 Table 11.3 was not recognised as a default and took a
+# placeholder range). The catalogue holds one value per parameter (the 2019
+# wet-climate value for EF3_PRP, EF4 and Frac_LEACH_PRP); these are the
+# aggregated and dry-climate 2019 values and the 2006 values, read from
+# ipcc_reference/text (19R_V4_Ch11 Tables 11.1 and 11.3, V4_11_Ch11 Tables
+# 11.1 and 11.3). A lower bound of 0.000 takes the same positive floor as
+# the catalogue (5e-04 for the factors), because a zero lower bound is
+# degenerate for the bounded distributions.
+IPCC_ALT_DEFAULTS <- data.frame(
+  parameter = c("EF3_PRP", "EF3_PRP", "EF3_PRP", "EF4", "EF4", "EF4", "EF5",
+                "Frac_GASM_PRP", "Frac_LEACH_PRP"),
+  edition   = c("2019", "2019", "2006", "2019", "2019", "2006", "2006", "2006", "2006"),
+  case      = c("aggregated across climates", "dry climate", "cattle", "aggregated across climates",
+                "dry climate", "", "", "", ""),
+  value     = c(0.004, 0.002, 0.02, 0.010, 0.005, 0.010, 0.0075, 0.20, 0.30),
+  lower     = c(5e-04, 5e-04, 0.007, 0.002, 5e-04, 0.002, 5e-04, 0.05, 0.1),
+  upper     = c(0.014, 0.007, 0.06, 0.018, 0.011, 0.05, 0.025, 0.5, 0.8),
+  table     = c("Table 11.1", "Table 11.1", "Table 11.1", "Table 11.3", "Table 11.3", "Table 11.3",
+                "Table 11.3", "Table 11.3", "Table 11.3"),
+  stringsAsFactors = FALSE)
+
+# "2006" or "2019" from the template's ipcc_version ("2006",
+# "2019_refinement"), NULL when unknown.
+.ipcc_edition <- function(ipcc_version) {
+  v <- as.character(ipcc_version %||% "")[1]
+  if (is.na(v) || !nzchar(v)) return(NULL)
+  if (grepl("2006", v)) "2006" else if (grepl("2019", v)) "2019" else NULL
+}
+
+# The default range for one parameter around one value, or NULL. A
+# bounds-type parameter matches the catalogue value first, then the other
+# IPCC values (IPCC_ALT_DEFAULTS); when two editions share a value (EF4
+# 0.010), the template's edition wins, and 2019 when none is given.
+default_range_for <- function(parameter, mean, catalogue = PARAM_CATALOGUE,
+                              ipcc_version = NULL) {
   if (is.null(parameter) || is.na(parameter) || is.na(mean)) return(NULL)
   if (!parameter %in% names(DEFAULT_RANGE_SOURCE)) return(NULL)
   i <- match(parameter, catalogue$parameter)
@@ -478,7 +513,15 @@ default_range_for <- function(parameter, mean, catalogue = PARAM_CATALOGUE) {
   def <- suppressWarnings(as.numeric(catalogue$ipcc_default[i]))
   if (!is.na(lo) && !is.na(hi) && .same_value(mean, def))
     return(list(pct = NA_real_, lower = lo, upper = hi, source = src))
-  NULL
+  alt <- IPCC_ALT_DEFAULTS[IPCC_ALT_DEFAULTS$parameter == parameter, , drop = FALSE]
+  alt <- alt[vapply(alt$value, function(v) .same_value(mean, v), logical(1)), , drop = FALSE]
+  if (nrow(alt) == 0L) return(NULL)
+  ed <- .ipcc_edition(ipcc_version) %||% "2019"
+  k <- if (any(alt$edition == ed)) which(alt$edition == ed)[1] else 1L
+  a <- alt[k, ]
+  list(pct = NA_real_, lower = a$lower, upper = a$upper,
+       source = sprintf("IPCC %s, Vol. 4, %s%s", a$edition, a$table,
+                        if (nzchar(a$case)) paste0(", ", a$case) else ""))
 }
 
 # TRUE when a row needs a range and has none: not a constant, a non-zero
@@ -533,7 +576,8 @@ placeholder_range_for <- function(parameter, mean, catalogue = PARAM_CATALOGUE) 
 # Fill blank ranges: a defensible default where one exists (range_default),
 # else a placeholder (range_placeholder). A row the translator tagged
 # "placeholder range" in data_source keeps its range and is flagged too.
-apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
+apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE,
+                                 ipcc_version = NULL) {
   ps <- param_specs
   if (is.null(ps) || !nrow(ps) || !all(c("parameter", "mean") %in% names(ps)))
     return(ps)
@@ -547,6 +591,21 @@ apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
   if ("data_source" %in% names(ps))
     ps$range_placeholder[grepl(.PLACEHOLDER_TAG, as.character(ps$data_source), fixed = TRUE)] <- TRUE
   mu <- suppressWarnings(as.numeric(ps$mean))
+  # 2026-11-04: a placeholder the translator wrote on a value that is an IPCC
+  # default (a dry-climate EF4, a 2006 EF5) takes the IPCC range instead, so
+  # a template translated before this date is corrected on upload. The
+  # range_upgraded flag feeds an Info row on the QA/QC tab. A range the user
+  # typed (no placeholder tag) is never replaced.
+  if (!"range_upgraded" %in% names(ps)) ps$range_upgraded <- FALSE
+  ps$range_upgraded[is.na(ps$range_upgraded)] <- FALSE
+  for (i in which(ps$range_placeholder)) {
+    r <- default_range_for(ps$parameter[i], mu[i], catalogue, ipcc_version)
+    if (is.null(r) || !is.na(r$pct)) next
+    ps$lower[i] <- r$lower; ps$upper[i] <- r$upper
+    ps$range_placeholder[i] <- FALSE; ps$range_default[i] <- TRUE; ps$range_upgraded[i] <- TRUE
+    if ("data_source" %in% names(ps))
+      ps$data_source[i] <- trimws(sub("[;,]?[[:space:]]*placeholder range", "", as.character(ps$data_source[i])))
+  }
   blank <- range_is_blank(mu, suppressWarnings(as.numeric(ps$lower)),
                           suppressWarnings(as.numeric(ps$upper)),
                           as.character(ps$distribution))
@@ -555,7 +614,7 @@ apply_default_ranges <- function(param_specs, catalogue = PARAM_CATALOGUE) {
       ps$distribution[i] <- "constant"; ps$lower[i] <- mu[i]; ps$upper[i] <- mu[i]
       next
     }
-    r <- default_range_for(ps$parameter[i], mu[i], catalogue)
+    r <- default_range_for(ps$parameter[i], mu[i], catalogue, ipcc_version)
     is_def <- !is.null(r)
     if (!is_def) r <- placeholder_range_for(ps$parameter[i], mu[i], catalogue)
     if (is.null(r)) next

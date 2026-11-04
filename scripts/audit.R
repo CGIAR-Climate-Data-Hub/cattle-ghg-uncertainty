@@ -4771,6 +4771,42 @@ section_F <- function() {
              notes = if (f89_ok) "enteric only: totals, AD-only, Table 3.3 (3 rows, both modes), trend series and pair, sensitivity inputs"
                      else paste(f89_fail, collapse = "; "))
 
+  # F90 -- the other IPCC default values of the pasture N2O factors are
+  # recognised (2026-11-04, review of the new version: a dry-climate EF4
+  # got a placeholder range). EF4 0.005 takes 0.0005 to 0.011 as a default;
+  # EF4 0.010 takes the 2019 aggregated range, or the 2006 range for a 2006
+  # template; a translator placeholder on such a value is replaced on upload
+  # and reported as Info on the QA/QC tab.
+  f90_fail <- tryCatch({
+    f <- character(0)
+    r <- default_range_for("EF4", 0.005)
+    if (is.null(r) || abs(r$lower - 5e-04) > 1e-12 || abs(r$upper - 0.011) > 1e-12 || !grepl("dry", r$source))
+      f <- c(f, "EF4 0.005 is not the dry-climate default")
+    r19 <- default_range_for("EF4", 0.010); r06 <- default_range_for("EF4", 0.010, ipcc_version = "2006")
+    if (is.null(r19) || r19$upper != 0.018) f <- c(f, "EF4 0.010 without an edition is not the 2019 aggregated range")
+    if (is.null(r06) || r06$upper != 0.05) f <- c(f, "EF4 0.010 in a 2006 template is not the 2006 range")
+    if (is.null(default_range_for("EF5", 0.0075))) f <- c(f, "EF5 2006 0.0075 not recognised")
+    if (!is.null(default_range_for("EF4", 0.0077))) f <- c(f, "a country value 0.0077 was taken for a default")
+    ps <- data.frame(cattle_type = "dairy", aggregation_level = "s", sub_category = "cows",
+                     parameter = c("EF4", "EF4"), mean = c(0.005, 0.007), lower = c(0.0039, 0.0055),
+                     upper = c(0.0061, 0.0085), uncertainty_pct = NA, distribution = "lognormal",
+                     data_source = c("user_file; placeholder range", "user_file; placeholder range"),
+                     stringsAsFactors = FALSE)
+    out <- apply_default_ranges(ps)
+    if (!isTRUE(out$range_upgraded[1]) || !isTRUE(out$range_default[1]) || isTRUE(out$range_placeholder[1]) ||
+        abs(out$upper[1] - 0.011) > 1e-12 || grepl("placeholder", out$data_source[1]))
+      f <- c(f, "a translator placeholder on EF4 0.005 was not replaced by the IPCC range")
+    if (!isTRUE(out$range_placeholder[2]) || out$upper[2] != 0.0085)
+      f <- c(f, "a placeholder on a country value 0.007 was changed")
+    f
+  }, error = function(e) conditionMessage(e))
+  f90_ok <- length(f90_fail) == 0L
+  check_bool("F90", "F",
+             "Other IPCC defaults of EF3_PRP, EF4, EF5 and the pasture fractions (dry climate, aggregated, 2006) take their own IPCC range; a translator placeholder on such a value is replaced on upload",
+             f90_ok,
+             notes = if (f90_ok) "EF4 0.005 dry range; EF4 0.010 by edition; EF5 0.0075; placeholder upgraded, country value untouched"
+                     else paste(f90_fail, collapse = "; "))
+
   # F80 -- conversions declared by the AI and recomputed by the server
   # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
   # is verified, one off by 1 % fails, a missing lactation length warns, the

@@ -4050,7 +4050,7 @@ translator_cancel_clear <- function(tok) {
           ph_tag <- FALSE
           if (!is_const && is.finite(num0(v_mean)) && num0(v_mean) != 0 &&
               is.na(v_lo) && is.na(v_hi) && is.na(num0(v_unc)) &&
-              is.null(default_range_for(p_name, num0(v_mean)))) {
+              is.null(default_range_for(p_name, num0(v_mean), ipcc_version = ipcc_version))) {
             ph <- placeholder_range_for(p_name, num0(v_mean))
             if (!is.null(ph)) {
               if (!is.na(ph$pct)) v_unc <- ph$pct else { v_lo <- ph$lower; v_hi <- ph$upper }

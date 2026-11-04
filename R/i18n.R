@@ -1680,6 +1680,11 @@ lang_state_take <- function(token) {
     en = "No uncertainty range for %s of %s in your file, and IPCC gives none for this value. A placeholder range is used so the run can go ahead (MCF +/-25%%, EF3 a factor of 2, fractions +/-50%%). It has no source: replace it with your own.",
     fr = "Pas de plage d'incertitude pour %s de %s dans votre fichier, et le GIEC n'en donne pas pour cette valeur. Une plage provisoire est utilisée pour que le calcul puisse tourner (MCF +/-25 %%, EF3 facteur 2, fractions +/-50 %%). Elle n'a pas de source : remplacez-la par la vôtre."
   ),
+  # 2026-11-04: a translator placeholder replaced on upload by the IPCC range
+  qa_msg_range_upgraded = list(
+    en = "%s = %s is an IPCC default value (%s). The placeholder range written by the translator was replaced by the IPCC range, %s to %s.",
+    fr = "%s = %s est une valeur par défaut du GIEC (%s). La plage provisoire écrite par le traducteur a été remplacée par la plage du GIEC, %s à %s."
+  ),
   qa_msg_range_default = list(
     en = "No range was given for %s, so the default range was used (%s). If the value is your own and not the default, enter your own range.",
     fr = "Aucune plage n'a été donnée pour %s, la plage par défaut a donc été utilisée (%s). Si la valeur est la vôtre et non la valeur par défaut, saisissez votre propre plage."

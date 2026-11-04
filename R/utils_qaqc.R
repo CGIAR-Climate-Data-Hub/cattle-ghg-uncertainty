@@ -367,8 +367,16 @@ run_qaqc <- function(param_specs, catalogue = PARAM_CATALOGUE, region = "global"
       }
     }
     if ("range_default" %in% names(ps) && isTRUE(ps$range_default[i])) {
-      src <- if (p %in% names(DEFAULT_RANGE_SOURCE)) DEFAULT_RANGE_SOURCE[[p]] else ""
-      add(grp, p, "range_default", "info", qa_msg("range_default", p, src))
+      # 2026-11-04: the source of the value actually matched (a dry-climate
+      # or 2006 value names its own table and case)
+      dr <- tryCatch(default_range_for(p, mu), error = function(e) NULL)
+      src <- if (!is.null(dr$source)) dr$source
+             else if (p %in% names(DEFAULT_RANGE_SOURCE)) DEFAULT_RANGE_SOURCE[[p]] else ""
+      if ("range_upgraded" %in% names(ps) && isTRUE(ps$range_upgraded[i]))
+        add(grp, p, "range_default", "info",
+            qa_msg("range_upgraded", p, formatC(mu, format = "fg", digits = 4), src,
+                   formatC(lo, format = "fg", digits = 4), formatC(hi, format = "fg", digits = 4)))
+      else add(grp, p, "range_default", "info", qa_msg("range_default", p, src))
     }
     # 2026-10-30 (later): a placeholder range lets the run go ahead; it is a
     # warning, and it is listed in the report and the exports.

@@ -23,9 +23,9 @@ Maximum CH₄ producing capacity of manure (IPCC Vol.4 Ch.10 Table 10.16a, 2019R
 
 ## EF3_PRP
 
-N₂O emission factor for dung/urine on pasture, EF3PRP,CPP (IPCC Vol.4 Ch.11 Table 11.1, 2019R, **wet climate**: 0.006, range **0.000–0.027**). For dry climate use 0.002 (range 0.000–0.007). For aggregated-across-climates use 0.004 (range 0.000–0.014). 2006 = 0.02. The wide wet-climate range is genuine, EF3PRP is one of the most uncertain N₂O parameters and a dominant driver of pasture-N₂O uncertainty.
+N₂O emission factor for dung/urine on pasture, EF3PRP,CPP (IPCC Vol.4 Ch.11 Table 11.1, 2019R, **wet climate**: 0.006, range **0.000–0.027**). For dry climate use 0.002 (range 0.000–0.007). For aggregated-across-climates use 0.004 (range 0.000–0.014). 2006 = 0.02 (range 0.007–0.06). The app recognises each of these values and fills its own IPCC range when the range is blank. The wide wet-climate range is genuine, EF3PRP is one of the most uncertain N₂O parameters and a dominant driver of pasture-N₂O uncertainty.
 
 ## EF4
 
-N₂O EF for atmospheric N deposition (IPCC Vol.4 Ch.11 Table 11.3, 2019R, **wet climate**: 0.014, range 0.011-0.017). For dry climate use 0.005. For aggregated use 0.010 (range 0.002-0.018). 2006 = 0.010.
+N₂O EF for atmospheric N deposition (IPCC Vol.4 Ch.11 Table 11.3, 2019R, **wet climate**: 0.014, range 0.011-0.017). For dry climate use 0.005 (range 0.000-0.011). For aggregated use 0.010 (range 0.002-0.018). 2006 = 0.010 (range 0.002-0.05). The app recognises each of these values and fills its own IPCC range when the range is blank.
 

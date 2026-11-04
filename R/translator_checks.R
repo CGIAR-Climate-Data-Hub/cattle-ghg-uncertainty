@@ -1996,16 +1996,22 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
     mean_v <- num(get("mean") %||% get("value")); unc <- num(get("uncertainty_pct"))
     lo <- num(get("lower")); hi <- num(get("upper")); dist <- tolower(as.character(get("distribution")))
     src <- tolower(as.character(get("data_source")))
+    # 2026-11-04: the edition decides between two IPCC values that are equal
+    # (EF4 0.010 in 2006 and 2019); rows the AI tagged ipcc_default are
+    # checked too, so a default that still gets a placeholder is reported.
+    ed <- tryCatch(.translator_metadata_list(piece$inventory_metadata)$ipcc_version,
+                   error = function(e) NULL)
     for (i in seq_len(nrow(ps))) {
       if (!is.finite(mean_v[i]) || identical(dist[i], "constant")) next
-      if (!grepl("^user", src[i] %||% "")) next
+      if (!grepl("^(user|ipcc)", src[i] %||% "")) next
       no_spread <- !is.finite(unc[i]) && !is.finite(lo[i]) && !is.finite(hi[i])
       no_dist   <- is.na(dist[i]) || !nzchar(dist[i]) || dist[i] == "na"
       if (!no_spread && !no_dist) next
       # 2026-10-30: a range is applied only where a defensible default
       # exists; otherwise the user must add one (the app will not run).
       pn <- as.character(ps$parameter[i])
-      has_def <- no_spread && !is.null(default_range_for(pn, mean_v[i]))
+      dr <- if (no_spread) default_range_for(pn, mean_v[i], ipcc_version = ed) else NULL
+      has_def <- !is.null(dr)
       what <- paste(c(if (no_spread && has_def) "range", if (no_dist) "distribution"), collapse = " and ")
       grp_i <- paste(ps$cattle_type[i] %||% "", ps$aggregation_level[i] %||% "", ps$sub_category[i] %||% "", sep = "||")
       where_i <- sprintf("%s / %s / %s", ps$aggregation_level[i] %||% "", ps$sub_category[i], pn)
@@ -2014,7 +2020,7 @@ translator_consistency_checks <- function(param_specs, manure = NULL,
           where = where_i,
           issue = sprintf("The file gave a value for %s (%s) but no %s; the default %s was applied%s. Replace it if your inventory has its own.",
                           pn, format(signif(mean_v[i], 6)), what, what,
-                          if (no_spread && has_def) sprintf(" (%s)", DEFAULT_RANGE_SOURCE[[pn]]) else ""),
+                          if (no_spread && has_def) sprintf(" (%s)", dr$source) else ""),
           sheet = "Parameters", group = grp_i, parameter = pn, severity = "info",
           stringsAsFactors = FALSE)
       if (no_spread && !has_def)

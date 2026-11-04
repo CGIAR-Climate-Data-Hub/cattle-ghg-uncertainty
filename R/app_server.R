@@ -213,7 +213,8 @@ app_server <- function(input, output, session) {
   # Helper: run ensure_completeness() immediately after loading any dataset so
   # the imputed-parameter flags are set before the user reaches Tab 2 or Tab 5.
   .apply_completeness <- function(region = NULL) {
-    comp <- ensure_completeness(rv$param_specs, region = region)
+    comp <- ensure_completeness(rv$param_specs, region = region,
+                                ipcc_version = rv$metadata$ipcc_version)
     if (isTRUE(comp$valid) && (length(comp$auto_filled) > 0 ||
                                isTRUE(comp$ranges_filled > 0))) {
       rv$param_specs <- comp$param_specs
@@ -1327,7 +1328,8 @@ app_server <- function(input, output, session) {
                                     nzchar(rv$inv_metadata$region %||% "")) {
       rv$inv_metadata$region
     } else NULL
-    comp <- ensure_completeness(rv$param_specs, region = region_for_completeness)
+    comp <- ensure_completeness(rv$param_specs, region = region_for_completeness,
+                                ipcc_version = rv$metadata$ipcc_version)
     if (!isTRUE(comp$valid)) {
       showNotification(paste0("Cannot run simulation. ", comp$message),
                        type = "error", duration = 12)

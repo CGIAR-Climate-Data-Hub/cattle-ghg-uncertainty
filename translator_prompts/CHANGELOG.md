@@ -2,6 +2,10 @@
 
 What the AI translator is told, and why it changed. Hand-kept, newest first. The prompt the app sends is assembled from `system_instructions.md`, the generated `param_catalogue.md`, `template_schema.md` and `worked_example.md`, the hand-written `mapping_examples.md`, and the in-app presentation rules in `R/openai_client.R`. `Rscript scripts/translator_prompt_view.R` writes the assembled prompt to `reports/` with its hash; the same hash is stamped into every workbook's Inventory_Metadata notes.
 
+## 2026-11-04
+
+- The other IPCC default values of the pasture N2O factors are recognised: EF3_PRP dry climate 0.002, aggregated 0.004 and 2006 0.02; EF4 dry climate 0.005, aggregated 0.010 and 2006 0.010; EF5 2006 0.0075; Frac_GASM_PRP 2006 0.20; Frac_LEACH_PRP 2006 0.30. Each takes its own IPCC range when the range is blank (a reviewer's dry-climate EF4 got a placeholder range). The instructions list the values and their ranges and tell the AI to tag such a row `ipcc_default` and leave the range blank. A template written before this date is corrected on upload: a placeholder range on one of these values is replaced by the IPCC range, with an Info row on the QA/QC tab.
+
 ## 2026-11-02
 
 - No country is named in the instructions: the three examples taken from a real inventory say "On one real inventory file". Wording only; the rules are unchanged.
