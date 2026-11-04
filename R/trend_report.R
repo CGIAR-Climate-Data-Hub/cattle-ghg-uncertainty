@@ -70,6 +70,7 @@ trend_year_sources <- function(res, year, gwp = "AR5") {
     x <- .trend_row_co2e(inv, r$var, r$gas, gwp)
     if (is.null(x)) return(NULL)
     m <- mean(x, na.rm = TRUE); lo <- .q(x, 0.025); hi <- .q(x, 0.975)
+    if (r$var %in% unselected_vars(res$emission_sources)) return(NULL)
     data.frame(var = r$var, category = r$category, gas = .gas_label(r$gas),
                year = as.integer(year), mean_t_co2e = m, lo = lo, hi = hi,
                moe_pct   = if (m > 0) (hi - lo) / 2 / m * 100 else NA_real_,
@@ -97,6 +98,9 @@ trend_compare_years <- function(res, base_year, year_t, gwp = "AR5") {
   var_tot <- stats::var(total_t, na.rm = TRUE)
   rows <- lapply(seq_len(nrow(.TREND_IPCC_ROWS)), function(i) {
     r  <- .TREND_IPCC_ROWS[i, ]
+    # 2026-11-04: rows of unticked sources (and a gas total left without a
+    # source) are not reported
+    if (r$var %in% unselected_vars(res$emission_sources)) return(NULL)
     xb <- .trend_row_co2e(b, r$var, r$gas, gwp)
     xt <- .trend_row_co2e(t, r$var, r$gas, gwp)
     if (is.null(xb) || is.null(xt)) return(NULL)
@@ -187,7 +191,9 @@ trend_ipcc_table <- function(res, base_year, year_t, gwp = "AR5",
                partial = "coefficients partly correlated between years (factors revised every few years)",
                none    = "coefficients independent between years",
                year_corr)
-  n_src <- sum(cmp$is_source)
+  comments <- ifelse(cmp$is_source, "Approach 2 (Monte Carlo)",
+                ifelse(cmp$var == "total_co2e", paste0("Approach 2 (Monte Carlo); ", yc),
+                       "Approach 2 (Monte Carlo); gas total"))
   out <- data.frame(
     `IPCC category` = cmp$category,
     Gas = cmp$gas,
@@ -203,9 +209,7 @@ trend_ipcc_table <- function(res, base_year, year_t, gwp = "AR5",
     `Trend (% of base year)` = round(cmp$trend_pct, 1),
     `Trend uncertainty (-) pp` = round(cmp$trend_lo_pp, 1),
     `Trend uncertainty (+) pp` = round(cmp$trend_hi_pp, 1),
-    `Approach and comments` = c(rep("Approach 2 (Monte Carlo)", n_src),
-                                rep("Approach 2 (Monte Carlo); gas total", 2L),
-                                paste0("Approach 2 (Monte Carlo); ", yc)),
+    `Approach and comments` = comments,
     check.names = FALSE, stringsAsFactors = FALSE, row.names = NULL)
   attr(out, "base_year") <- as.integer(base_year)
   attr(out, "year_t")    <- as.integer(year_t)
@@ -224,7 +228,8 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
                                  crossgroup = "shared", corr_matrix = NULL,
                                  sg_to_mm = list(), year_corr = "full",
                                  keep_sample_rows = 4000L, progress_fn = NULL,
-                                 n_group_rho = 0, n_year_corr = "none", ar1_rho = 0.7) {
+                                 n_group_rho = 0, n_year_corr = "none", ar1_rho = 0.7,
+                                 emission_sources = NULL) {
   year <- as.integer(year)
   year_df <- trend_df[trend_df$year == year, , drop = FALSE]
   specs <- .trend_year_specs(year_df, base_specs)
@@ -261,6 +266,7 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
     sys <- lapply(built$systems, fix_params_for_decomposition, fix_type = fix_type)
     sim <- run_inventory_simulation(sys, n_iter = n_iter, gwp = gwp, seed = year_seed,
                                     keep_sample_rows = keep_sample_rows)
+    sim <- filter_sim_sources(sim, emission_sources, gwp)
     u <- calc_all_uncertainty(sim$inventory)
     rm(sys, sim); gc(FALSE)
     u
@@ -306,7 +312,8 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
                                  # row is kept: about 60 MB less at the peak
                                  # on the test inventory at 10,000
                                  keep_sample_rows = 1L, progress_fn = NULL,
-                                 n_group_rho = 0, n_year_corr = "none") {
+                                 n_group_rho = 0, n_year_corr = "none",
+                                 emission_sources = NULL) {
   n_iter <- as.integer(n_iter)
   trend_df$year <- suppressWarnings(as.integer(trend_df$year))
   years <- sort(unique(trend_df$year[!is.na(trend_df$year)]))
@@ -367,7 +374,8 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
         progress_cb = function(done, total)
           tick(lo + (hi - lo) * done / max(total, 1L), label))
       step <<- step + 1L
-      sim
+      # 2026-11-04: the Tab 4 source ticks, as in the series
+      filter_sim_sources(sim, emission_sources, gwp)
     }
     sim <- run(built$systems, sprintf("Year %d at %s draws", y, fmt(n_iter)))
     inventory_by_year[[as.character(y)]] <- sim$inventory

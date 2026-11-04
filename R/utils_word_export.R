@@ -288,7 +288,7 @@ build_run_summary_docx <- function(path,
   doc <- .add_p(doc, .build_single_exec_summary(uncertainty, sensitivity, settings))
   doc <- .add_p(doc, paste(
     "The report has four parts: the simulation, the inputs, the results",
-    "and the sensitivity analysis."))
+    "and the sensitivity analysis.", trimws(.sources_sentence(settings$emission_sources))))
 
   # ---- 1. What was run ----------------------------------------------------
   doc <- num$part(doc, "Simulation")
@@ -560,7 +560,7 @@ build_trend_summary_docx <- function(path,
   if (!is.null(headline)) for (line in .trend_headline_sentences(headline)) doc <- .add_p(doc, line)
   doc <- .add_p(doc, paste(
     "The report has four parts: the simulation, the inputs, the results",
-    "and the sensitivity analysis."))
+    "and the sensitivity analysis.", trimws(.sources_sentence(corr_settings$emission_sources))))
 
   # ---- 1. Simulation --------------------------------------------------------
   doc <- num$part(doc, "Simulation")

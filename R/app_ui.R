@@ -2273,27 +2273,10 @@ app_ui <- function(request = NULL) {
           # 2026-10-28 (review): results in gigagrams with 3 decimals by
           # default; tonnes, or both, on request.
           units_switch_ui("res_units"),
-          bslib::layout_columns(
-            col_widths = NULL,
-            bslib::value_box(title = t("res_vb_enteric_ch4_t"),
-                              value = textOutput("vb_enteric_ch4"),
-                              showcase = icon("fire"), theme = "success"),
-            bslib::value_box(title = t("res_vb_manure_ch4_t"),
-                              value = textOutput("vb_manure_ch4"),
-                              showcase = icon("recycle"), theme = "success"),
-            bslib::value_box(title = t("res_vb_manure_n2o_t"),
-                              value = textOutput("vb_manure_n2o"),
-                              p(t("res_vb_direct_indirect")),
-                              showcase = icon("cloud"), theme = "primary"),
-            bslib::value_box(title = t("res_vb_pasture_n2o_t"),
-                              value = textOutput("vb_pasture_n2o"),
-                              p(t("res_vb_direct_indirect")),
-                              showcase = icon("seedling"), theme = "primary"),
-            bslib::value_box(title = t("res_vb_total_moe_pct"),
-                              value = textOutput("vb_moe_total"),
-                              p(t("res_vb_total_moe_sub")),
-                              showcase = icon("percent"), theme = "warning")
-          ),
+          # 2026-11-04: the sources included (when not all six), then the
+          # cards of the ticked sources only (built on the server)
+          uiOutput("sources_included_ui"),
+          uiOutput("vb_cards_ui"),
           div(style = "padding: 0 12px 8px; color: #555; font-size: 0.85rem;",
               tags$em(paste0(t("res_inline_total_co2e"), " ")),
               textOutput("vb_co2e_inline", inline = TRUE),
@@ -2385,6 +2368,7 @@ app_ui <- function(request = NULL) {
               uiOutput("trend_report_text")
             )
           ),
+          uiOutput("trend_sources_included_ui"),
           bslib::layout_columns(
             col_widths = c(3, 3, 3, 3),
             bslib::value_box(title = t("res_vb_trend_delta"),
@@ -2602,6 +2586,7 @@ app_ui <- function(request = NULL) {
           bslib::card_header(t("card_ipcc_table_h")),
           bslib::card_body(
             uiOutput("ipcc_table_notice"),
+            uiOutput("sources_included_ui_rep"),
             DT::DTOutput("ipcc_table")
           )
         ),
@@ -2647,6 +2632,7 @@ app_ui <- function(request = NULL) {
         bslib::card(
           bslib::card_header(t("trend_ipcc_h")),
           bslib::card_body(
+            uiOutput("trend_sources_included_ui_rep"),
             p(tags$em(t("trend_ipcc_note"))),
             # 2026-11-02 (Lolita): the button shows only when the chosen
             # years have not been run as a pair (the run already does the

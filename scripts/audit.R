@@ -4719,6 +4719,58 @@ section_F <- function() {
              notes = if (f88_ok) "DE 60/65/70: totals follow under none, full and partial; full rank link 1; partial 0.68"
                      else paste(f88_fail, collapse = "; "))
 
+  # F89 -- the Tab 4 source ticks filter everything (2026-11-04, review of
+  # the new version). Enteric only: the inventory total equals enteric CH4
+  # x GWP in every run (main, AD-only, EF-only, trend series, trend pair);
+  # IPCC Table 3.3 (single year and trend) lists only the enteric line and
+  # the CH4 and CO2eq totals; inputs feeding only other sources are left out
+  # of the sensitivity regression.
+  f89_fail <- tryCatch({
+    f <- character(0)
+    src <- "enteric_ch4"
+    sp <- make_golden_specs(constant_dist = FALSE)
+    sp$cattle_type <- "dairy"; sp$aggregation_level <- "lvl"; sp$sub_category <- "A"
+    b <- build_systems_data(sp, manure = NULL, n_iter = 600, seed = 4)
+    sim <- filter_sim_sources(run_inventory_simulation(b$systems, n_iter = 600, gwp = "AR5", seed = 4), src, "AR5")
+    if (max(abs(sim$inventory$total_co2e - sim$inventory$total_enteric_ch4 * GWP_VALUES$AR5$CH4)) > 1e-6)
+      f <- c(f, "single year: total CO2eq is not enteric CH4 x GWP")
+    if (any(sim$inventory$total_manure_ch4 != 0) || any(sim$inventory$total_n2o != 0))
+      f <- c(f, "single year: an unticked source is not zero")
+    ad <- filter_sim_sources(run_inventory_simulation(lapply(b$systems, fix_params_for_decomposition, fix_type = "coefficient"),
+                                                      n_iter = 600, gwp = "AR5", seed = 4), src, "AR5")
+    if (max(abs(ad$inventory$total_co2e - ad$inventory$total_enteric_ch4 * GWP_VALUES$AR5$CH4)) > 1e-6)
+      f <- c(f, "AD-only run not filtered")
+    u <- function(x) drop_unselected_rows(calc_all_uncertainty(x$inventory), src)
+    tab <- format_ipcc_table(list(combined = u(sim), ad_only = u(ad), ef_only = u(sim)), sources = src)
+    if (nrow(tab) != 3L || !grepl("^3.A.1", tab[[1]][1]))
+      f <- c(f, sprintf("single-year Table 3.3 has %d rows: %s", nrow(tab), paste(tab[[1]], collapse = " | ")))
+    keep <- sample_columns_for_sources(c("N", "DE", "Ym", "Bo", "MCF_pasture", "EF3_PRP", "fraction_pasture"), src)
+    if (!identical(keep, c(TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)))
+      f <- c(f, "sensitivity keeps inputs of unticked sources")
+    ts <- do.call(rbind, lapply(2020:2021, function(yr) {
+      d <- sp[sp$parameter == "N", c("cattle_type", "aggregation_level", "sub_category", "parameter", "mean")]
+      d$year <- yr; d$uncertainty_pct <- NA; d$mean <- d$mean * (1 + 0.1 * (yr - 2020)); d }))
+    tr <- run_trend_analysis(ts, sp, n_iter = 400, gwp = "AR5", seed = 5, year_corr = "full", emission_sources = src)
+    inv1 <- tr$inventory_by_year[["2020"]]
+    if (abs(tr$table$Mean_t_CO2eq[1] - mean(inv1$total_enteric_ch4) * GWP_VALUES$AR5$CH4) > 1)
+      f <- c(f, "trend series total is not enteric only")
+    pr <- trend_reporting_pair(ts, sp, 2020, 2021, n_iter = 400, gwp = "AR5", seed = 5, year_corr = "full",
+                               emission_sources = src)
+    rr <- trend_reporting_res(tr, pr, 2020, 2021)
+    ti <- trend_ipcc_table(rr, 2020, 2021, decomp = pr$decomp)
+    if (nrow(ti) != 3L) f <- c(f, sprintf("trend Table 3.3 has %d rows", nrow(ti)))
+    p21 <- pr$inventory_by_year[["2021"]]
+    if (max(abs(p21$total_co2e - p21$total_enteric_ch4 * GWP_VALUES$AR5$CH4)) > 1e-6)
+      f <- c(f, "trend pair not filtered")
+    f
+  }, error = function(e) conditionMessage(e))
+  f89_ok <- length(f89_fail) == 0L
+  check_bool("F89", "F",
+             "Tab 4 source ticks filter every run and table: enteric only gives enteric totals in the main, AD-only, trend series and trend pair runs, a three-row Table 3.3 in both modes, and no other source's inputs in the sensitivity",
+             f89_ok,
+             notes = if (f89_ok) "enteric only: totals, AD-only, Table 3.3 (3 rows, both modes), trend series and pair, sensitivity inputs"
+                     else paste(f89_fail, collapse = "; "))
+
   # F80 -- conversions declared by the AI and recomputed by the server
   # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
   # is verified, one off by 1 % fails, a missing lactation length warns, the

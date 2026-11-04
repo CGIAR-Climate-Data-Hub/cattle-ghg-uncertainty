@@ -1,6 +1,7 @@
 # Export Functions - IPCC Table 3.3 and Excel Reports
 
-format_ipcc_table <- function(uncertainty_decomposition, country = "", year = "") {
+format_ipcc_table <- function(uncertainty_decomposition, country = "", year = "",
+                              sources = NULL) {
   combined <- uncertainty_decomposition$combined
   ad_only <- uncertainty_decomposition$ad_only
   ef_only <- uncertainty_decomposition$ef_only
@@ -57,7 +58,7 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
             "direct_n2o_prp_total", "indirect_n2o_prp_total",
             "total_ch4", "total_n2o", "total_co2e")
 
-  data.frame(
+  out <- data.frame(
     `Emission category` = c(
       "3.A.1 Enteric Fermentation: Cattle",
       "3.B.1 Manure Management: Cattle (CH₄)",
@@ -83,6 +84,14 @@ format_ipcc_table <- function(uncertainty_decomposition, country = "", year = ""
     stringsAsFactors = FALSE,
     row.names = NULL
   )
+  # 2026-11-04: only the Tab 4 sources that were ticked, and the gas totals
+  # that still have a source (R/utils_sources.R)
+  if (!is.null(sources) && !all_sources_selected(sources)) {
+    out <- out[!vars %in% unselected_vars(sources), , drop = FALSE]
+    rownames(out) <- NULL
+  }
+  attr(out, "vars") <- if (!is.null(sources)) setdiff(vars, unselected_vars(sources)) else vars
+  out
 }
 
 export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, filepath,
@@ -170,8 +179,9 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
   readme_df <- data.frame(
     Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Results", "Sensitivity_SRC", "Input_Parameters"),
     Contents = c(
-      sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Single-year Monte Carlo results, %s iterations.",
-              .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), format(n_iter, big.mark = ",")),
+      paste0(sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Single-year Monte Carlo results, %s iterations.",
+                     .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), format(n_iter, big.mark = ",")),
+             .sources_sentence(settings$emission_sources)),
       "This sheet: what each sheet of the workbook contains.",
       "The settings of the run: iterations, correlation choices (Tab 3), GWP basis, seed, emission sources, and how many QA/QC checks were ignored or repaired.",
       "The QA/QC checks that were ignored or repaired so the run could go ahead. Empty when there were none.",
@@ -192,6 +202,13 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     Input_Parameters = inputs_df
   )
   writexl::write_xlsx(sheets, path = filepath)
+}
+
+# 2026-11-04: " Sources included in every figure: ..." when not every Tab 4
+# source was ticked, "" otherwise (README sheets and Word summaries).
+.sources_sentence <- function(sources) {
+  if (is.null(sources) || all_sources_selected(sources)) return("")
+  paste0(" Sources included in every figure: ", sources_label(sources), ".")
 }
 
 # 2026-11-02: the app version for the README sheet (VERSION file at the app root).
@@ -237,10 +254,15 @@ export_results_xlsx <- function(results, uncertainty, sensitivity, ipcc_table, f
     `Lower half of the CI (-%)` = get("lower_pct", 1),
     `Upper half of the CI (+%)` = get("upper_pct", 1),
     check.names = FALSE, stringsAsFactors = FALSE)
-  if (is.data.frame(ipcc_table) && nrow(ipcc_table) == nrow(out) &&
+  # 2026-11-04: a line absent from the uncertainty frame (a source not
+  # ticked on Tab 4) is not reported; AD and EF are matched by category
+  out <- out[!is.na(out[["Mean emissions (t of the gas)"]]), , drop = FALSE]
+  rownames(out) <- NULL
+  if (is.data.frame(ipcc_table) && "Emission category" %in% names(ipcc_table) &&
       all(c("AD uncertainty (95% MoE %)", "EF uncertainty (95% MoE %)") %in% names(ipcc_table))) {
-    out[["AD uncertainty, MoE 95% (%)"]] <- ipcc_table[["AD uncertainty (95% MoE %)"]]
-    out[["EF uncertainty, MoE 95% (%)"]] <- ipcc_table[["EF uncertainty (95% MoE %)"]]
+    k <- match(out[["Emission category"]], ipcc_table[["Emission category"]])
+    out[["AD uncertainty, MoE 95% (%)"]] <- ipcc_table[["AD uncertainty (95% MoE %)"]][k]
+    out[["EF uncertainty, MoE 95% (%)"]] <- ipcc_table[["EF uncertainty (95% MoE %)"]][k]
   }
   out
 }
@@ -366,8 +388,9 @@ export_trend_xlsx <- function(results_table, slope, delta_total,
     Sheet = c("", "README", "Run_Settings", "QA_Caveats", "Headline", "IPCC_Table_3_3", "All_years",
               "All_years_by_source", "All_years_by_group", "Sensitivity_latest_year", "Sensitivity_change", "Input_Parameters"),
     Contents = c(
-      sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Trend %s to %s.",
-              .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), yrs[1], yrs[2]),
+      paste0(sprintf("Cattle GHG uncertainty calculator, version %s. Generated %s. Trend %s to %s.",
+                     .app_version(), format(Sys.time(), "%Y-%m-%d %H:%M"), yrs[1], yrs[2]),
+             .sources_sentence(settings$emission_sources)),
       "This sheet: what each sheet of the workbook contains.",
       "The settings of the run: years, draws, the year-to-year correlation of the coefficients, the correlation choices of Tab 3, GWP basis, seed, emission sources, and how many QA/QC checks were ignored or repaired.",
       "The QA/QC checks that were ignored or repaired so the run could go ahead.",

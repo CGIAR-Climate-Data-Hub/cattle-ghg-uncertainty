@@ -306,28 +306,11 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
   n_nonfinite     <- list()
   shared_summary  <- NULL
 
-  # Round 9: emission-source filter, applied per year on the inventory
-  # frame's per-source totals. NULL or all keys = include all.
-  all_src_keys <- c("enteric_ch4", "manure_ch4", "manure_n2o_direct",
-                     "manure_n2o_indirect",
-                     "pasture_n2o_direct", "pasture_n2o_indirect")
-  srcs <- if (is.null(emission_sources) || length(emission_sources) == 0L)
-            all_src_keys else emission_sources
-  apply_source_filter <- length(srcs) > 0L && length(srcs) < length(all_src_keys)
-  gwp_vals <- if (!is.null(GWP_VALUES[[gwp]])) GWP_VALUES[[gwp]]
-              else GWP_VALUES[["AR5"]]
-
-  filter_co2e <- function(inv) {
-    if (!apply_source_filter) return(inv$total_co2e)
-    legacy_pasture <- "pasture_n2o" %in% srcs
-    ch4 <- (if ("enteric_ch4" %in% srcs) inv$total_enteric_ch4 else 0) +
-           (if ("manure_ch4"  %in% srcs) inv$total_manure_ch4  else 0)
-    n2o <- (if ("manure_n2o_direct"   %in% srcs) inv$total_direct_n2o_mm   else 0) +
-           (if ("manure_n2o_indirect" %in% srcs) inv$total_indirect_n2o_mm else 0) +
-           (if (legacy_pasture || "pasture_n2o_direct"   %in% srcs) inv$total_direct_n2o_prp   else 0) +
-           (if (legacy_pasture || "pasture_n2o_indirect" %in% srcs) inv$total_indirect_n2o_prp else 0)
-    ch4 * gwp_vals$CH4 + n2o * gwp_vals$N2O
-  }
+  # 2026-11-04: the Tab 4 source ticks filter each year's whole result
+  # (inventory and groups) through filter_sim_sources() (R/utils_sources.R),
+  # so the per-source frames, the group summaries and the totals agree. The
+  # old filter rewrote the yearly total only.
+  srcs <- normalize_sources(emission_sources)
 
   for (yi in seq_along(years)) {
     y <- years[yi]
@@ -350,9 +333,10 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
       seed = year_seed,
       keep_sample_rows = keep_sample_rows
     )
+    sim <- filter_sim_sources(sim, srcs, gwp)
 
     inv  <- sim$inventory
-    co2e <- filter_co2e(inv)
+    co2e <- inv$total_co2e
     # The sampler's physical floors (mc_sampling.R) keep the energy chain
     # finite; this is the second line of defence, and the count is reported
     # rather than hidden.
@@ -442,6 +426,7 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
       pct_ci     = c(q025(delta_pct_per_iter), q975(delta_pct_per_iter))
     ),
     year_corr = year_corr,
+    emission_sources = srcs,
     n_group_rho = n_group_rho,
     n_year_corr = n_year_corr,
     years     = years,
@@ -461,7 +446,7 @@ trend_sensitivity_year <- function(res, year = NULL, method = "both") {
   bs <- res$samples_by_year[[yl]]
   out <- res$co2e_by_year[[yl]]
   if (is.null(bs) || is.null(out)) return(NULL)
-  aggregate_sensitivity(bs, out, method = method)
+  aggregate_sensitivity(bs, out, method = method, sources = res$emission_sources)
 }
 
 # Sensitivity of the first-to-last change to the inputs of both years. The
@@ -475,6 +460,10 @@ trend_sensitivity_delta <- function(res, method = "both", max_rows = 4000L) {
     blocks <- lapply(names(bs), function(sn) {
       samp <- bs[[sn]]$samples
       if (is.null(samp) || ncol(samp) == 0) return(NULL)
+      if (!is.null(res$emission_sources) && !all_sources_selected(res$emission_sources)) {
+        samp <- samp[, sample_columns_for_sources(colnames(samp), res$emission_sources), drop = FALSE]
+        if (ncol(samp) == 0) return(NULL)
+      }
       parts <- strsplit(sn, "||", fixed = TRUE)[[1]]
       sc <- if (length(parts) >= 3 && nzchar(parts[3])) parts[3] else sn
       colnames(samp) <- paste0(colnames(samp), " (", sc, ") ", tag)

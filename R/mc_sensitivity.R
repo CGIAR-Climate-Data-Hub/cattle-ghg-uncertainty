@@ -119,7 +119,7 @@ sensitivity_analysis <- function(inputs, output, method = "src") {
 # `output` must have length = n_iter (the row count of each system's samples
 # frame).
 aggregate_sensitivity <- function(by_system, output, method = "both",
-                                  max_rows = 4000L) {
+                                  max_rows = 4000L, sources = NULL) {
   if (is.null(by_system) || length(by_system) == 0) return(NULL)
   if (is.null(output) || length(output) == 0) return(NULL)
 
@@ -160,6 +160,12 @@ aggregate_sensitivity <- function(by_system, output, method = "both",
     # The full-length row count and column means are kept for the
     # subsample note and the "= value (shared by N groups)" labels, so both
     # read exactly as they did when the whole matrix was joined.
+    # 2026-11-04: inputs that feed only unticked sources are left out
+    # (R/utils_sources.R); they would show as near-zero bars.
+    if (!is.null(sources) && !all_sources_selected(sources)) {
+      samp <- samp[, sample_columns_for_sources(colnames(samp), sources), drop = FALSE]
+      if (ncol(samp) == 0) return(NULL)
+    }
     full_rows[[sn]] <<- nrow(samp)
     full_means[[sn]] <<- colMeans(samp)
     if (nrow(samp) > n_keep) samp <- samp[seq_len(n_keep), , drop = FALSE]

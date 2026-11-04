@@ -1441,6 +1441,18 @@ app_server <- function(input, output, session) {
     # code receives an integer without needing individual as.integer() calls.
     n_iter_val <- as.integer(input$n_iter)
     n_iter_fmt <- format(n_iter_val, big.mark = ",")
+    # 2026-11-04: the settings of this run, read by every result and by the
+    # downloads (they used to read the live inputs, so changing a tick after
+    # the run misreported it). srcs_run are the Tab 4 ticks, applied to
+    # every simulation of the run through filter_sim_sources().
+    srcs_run <- normalize_sources(input$emission_sources)
+    rv$run_settings <- list(emission_sources = srcs_run, gwp_version = input$gwp_version,
+                            seed = input$seed, n_iter = n_iter_val,
+                            corr_mode = input$corr_mode,
+                            run_comparison = isTRUE(input$run_comparison),
+                            analysis_mode = input$analysis_mode,
+                            n_group_corr = input$n_group_corr %||% "full",
+                            n_year_corr = input$n_year_corr %||% "none")
 
     rv$sim_log <- paste0(rv$sim_log, "\n--- Starting simulation ---\n")
     rv$sim_log <- paste0(rv$sim_log, "Iterations: ", n_iter_val, "\n")
@@ -1624,74 +1636,15 @@ app_server <- function(input, output, session) {
             keep_sample_rows = 4000L
           )
 
-          # T1.12: zero out per-source contributions the user has unchecked.
-          # The per-source columns are kept (for sensitivity / per-system tables);
-          # only the headline totals (total_ch4, total_n2o, total_co2e) are
-          # recomputed to reflect the selection.
-          srcs <- input$emission_sources %||% character()
-          gwp_vals <- GWP_VALUES[[input$gwp_version]]
-          # Andreas 2026-05-21 bug: the per-system results frame names the
-          # per-source columns `enteric_ch4_total`, `manure_ch4_total`,
-          # `direct_n2o_mm_total`, ..., while the aggregated `inventory` frame
-          # built in run_inventory_simulation() uses `total_enteric_ch4`,
-          # `total_manure_ch4`, `total_direct_n2o_mm`, ..., a different
-          # convention. The single-year run filters BOTH frames through
-          # .apply_source_selection() below: so the function has to accept
-          # either naming. Previously it knew only the per-system names, so
-          # when applied to the inventory frame every column lookup returned
-          # NULL, the arithmetic collapsed to length 0, and downstream code
-          # surfaced the cryptic "replacement has 0 rows" / "missing value
-          # where TRUE/FALSE required" error. The helper below resolves a
-          # column by either name, with a numeric-0 fallback when the column
-          # genuinely does not exist (so per-system frames that legitimately
-          # lack PRP columns still work).
-          .col_or_zero <- function(df, suffix_name, prefix_name) {
-            if (!is.null(df[[suffix_name]])) df[[suffix_name]]
-            else if (!is.null(df[[prefix_name]])) df[[prefix_name]]
-            else 0
-          }
-          .apply_source_selection <- function(df) {
-            ch4 <- (if ("enteric_ch4" %in% srcs)
-                      .col_or_zero(df, "enteric_ch4_total", "total_enteric_ch4")
-                    else 0) +
-                   (if ("manure_ch4"  %in% srcs)
-                      .col_or_zero(df, "manure_ch4_total",  "total_manure_ch4")
-                    else 0)
-            # Andreas 2026-05 #27: pasture direct and indirect are separate IPCC
-            # reporting categories: splitting the single legacy `pasture_n2o`
-            # checkbox into two. Old `pasture_n2o` kept as a back-compat alias
-            # for any saved bookmarks / URLs.
-            legacy_pasture <- "pasture_n2o" %in% srcs
-            n2o <- (if ("manure_n2o_direct"   %in% srcs)
-                      .col_or_zero(df, "direct_n2o_mm_total",   "total_direct_n2o_mm")
-                    else 0) +
-                   (if ("manure_n2o_indirect" %in% srcs)
-                      .col_or_zero(df, "indirect_n2o_mm_total", "total_indirect_n2o_mm")
-                    else 0) +
-                   (if (legacy_pasture || "pasture_n2o_direct"   %in% srcs)
-                      .col_or_zero(df, "direct_n2o_prp_total",   "total_direct_n2o_prp")
-                    else 0) +
-                   (if (legacy_pasture || "pasture_n2o_indirect" %in% srcs)
-                      .col_or_zero(df, "indirect_n2o_prp_total", "total_indirect_n2o_prp")
-                    else 0)
-            df$total_ch4  <- ch4
-            df$total_n2o  <- n2o
-            df$co2e_ch4   <- ch4 * gwp_vals$CH4
-            df$co2e_n2o   <- n2o * gwp_vals$N2O
-            df$total_co2e <- df$co2e_ch4 + df$co2e_n2o
-            df
-          }
-          # 6 sources now (pasture direct & indirect split). Skip
-          # re-aggregation when the user has all 6 ticked.
-          if (length(srcs) > 0 && length(srcs) < 6) {
-            sim_result$inventory <- .apply_source_selection(sim_result$inventory)
-            for (sn in names(sim_result$by_system)) {
-              sim_result$by_system[[sn]]$results <- .apply_source_selection(
-                sim_result$by_system[[sn]]$results)
-            }
+          # 2026-11-04: the Tab 4 ticks filter the whole result (inventory,
+          # every group, every source column); the AD-only, EF-only and
+          # comparison runs below go through the same filter
+          # (R/utils_sources.R).
+          sim_result <- filter_sim_sources(sim_result, srcs_run, input$gwp_version)
+          if (!all_sources_selected(srcs_run))
             rv$sim_log <- paste0(rv$sim_log, "Source selection: ",
-                                 paste(srcs, collapse = ", "), "\n")
-          }
+                                 paste(srcs_run, collapse = ", "), "
+")
           rv$mc_results        <- sim_result
           rv$show_diagnostics  <- FALSE
 
@@ -1701,7 +1654,7 @@ app_server <- function(input, output, session) {
 
           # ---- Stage 3: uncertainty metrics ----
           setProgress(0.40, detail = "Computing uncertainty metrics...")
-          rv$uncertainty <- calc_all_uncertainty(sim_result$inventory)
+          rv$uncertainty <- drop_unselected_rows(calc_all_uncertainty(sim_result$inventory), srcs_run)
           rv$sim_log <- paste0(rv$sim_log, "Simulation complete.\n")
 
           # ---- Stage 4: decomposition (AD-only + EF-only, multi-group safe) ----
@@ -1732,7 +1685,8 @@ app_server <- function(input, output, session) {
             # matrices before the EF-only pass so the three full simulations
             # don't sit in memory simultaneously (free tier is ~1 GB RAM -
             # holding all three risks an out-of-memory abort on a large run).
-            ad_unc <- calc_all_uncertainty(ad_result$inventory)
+            ad_result <- filter_sim_sources(ad_result, srcs_run, input$gwp_version)
+            ad_unc <- drop_unselected_rows(calc_all_uncertainty(ad_result$inventory), srcs_run)
             rm(systems_ad, ad_result); invisible(gc(FALSE))
 
             setProgress(0.70, detail = sprintf("Running EF-only simulation (%d group(s))...",
@@ -1747,7 +1701,8 @@ app_server <- function(input, output, session) {
               # samples are never read (decomposition uses only its inventory).
               keep_sample_rows = 4000L
             )
-            ef_unc <- calc_all_uncertainty(ef_result$inventory)
+            ef_result <- filter_sim_sources(ef_result, srcs_run, input$gwp_version)
+            ef_unc <- drop_unselected_rows(calc_all_uncertainty(ef_result$inventory), srcs_run)
             rm(systems_ef, ef_result); invisible(gc(FALSE))
 
             rv$decomposition <- list(
@@ -1755,7 +1710,7 @@ app_server <- function(input, output, session) {
               ad_only  = ad_unc,
               ef_only  = ef_unc
             )
-            rv$ipcc_table <- format_ipcc_table(rv$decomposition)
+            rv$ipcc_table <- format_ipcc_table(rv$decomposition, sources = srcs_run)
             rv$sim_log <- paste0(rv$sim_log,
               sprintf("Uncertainty decomposition complete (%d group(s)).\n", length(systems_data)))
             setProgress(0.90, detail = "Decomposition complete.")
@@ -1798,7 +1753,8 @@ app_server <- function(input, output, session) {
           if (length(sim_result$by_system) > 0) {
             rv$sensitivity <- tryCatch(
               aggregate_sensitivity(
-                sim_result$by_system, sim_result$inventory$total_co2e),
+                sim_result$by_system, sim_result$inventory$total_co2e,
+                sources = srcs_run),
               error = function(e) {
                 rv$sim_log <- paste0(rv$sim_log,
                   "WARNING: sensitivity analysis could not be computed: ",
@@ -1854,6 +1810,7 @@ app_server <- function(input, output, session) {
               keep_sample_rows = 4000L
             )
             rm(b0); invisible(gc(FALSE))
+            nocorr_result <- filter_sim_sources(nocorr_result, srcs_run, input$gwp_version)
             rv$comparison_result <- nocorr_result
             # what the two runs differ in, named on the card
             n_groups_cmp <- tryCatch(length(unique(make_group_key(specs))), error = function(e) 2L)
@@ -1863,7 +1820,8 @@ app_server <- function(input, output, session) {
             if (length(nocorr_result$by_system) > 0) {
               rv$comparison_sensitivity <- tryCatch(
                 aggregate_sensitivity(
-                  nocorr_result$by_system, nocorr_result$inventory$total_co2e),
+                  nocorr_result$by_system, nocorr_result$inventory$total_co2e,
+                  sources = srcs_run),
                 error = function(e) {
                   rv$sim_log <- paste0(rv$sim_log,
                     "WARNING: comparison sensitivity could not be computed: ",
@@ -1888,7 +1846,8 @@ app_server <- function(input, output, session) {
                                                pct_pregnant = if (!is.null(input$pct_pregnant)) input$pct_pregnant else 1,
                                                sampler = "iman_conover", progress_cb = keepalive_cb(0.975, 0.99, "Comparison (links only)"),
                                                keep_sample_rows = 1L)
-                u <- calc_all_uncertainty(r1$inventory); rm(b1, r1); invisible(gc(FALSE)); u
+                r1 <- filter_sim_sources(r1, srcs_run, input$gwp_version)
+                u <- drop_unselected_rows(calc_all_uncertainty(r1$inventory), srcs_run); rm(b1, r1); invisible(gc(FALSE)); u
               }, error = function(e) { rv$sim_log <- paste0(rv$sim_log, "WARNING: links-only comparison run failed: ", conditionMessage(e), "\n"); NULL })
             }
             setProgress(0.99, detail = "Comparison complete.")
@@ -2082,6 +2041,38 @@ app_server <- function(input, output, session) {
     }
     paste0(.fmt_mass(s), moe_str)
   }
+  # 2026-11-04: only the boxes of ticked sources (a box shows when any of
+  # its sources was ticked), then the total MoE box; and one line naming
+  # the sources when not all six were ticked.
+  output$vb_cards_ui <- renderUI({
+    req(rv$uncertainty)
+    s <- rv$run_settings$emission_sources %||% ALL_SOURCE_KEYS
+    boxes <- list(
+      if ("enteric_ch4" %in% s) bslib::value_box(title = t("res_vb_enteric_ch4_t"),
+        value = textOutput("vb_enteric_ch4"), showcase = icon("fire"), theme = "success"),
+      if ("manure_ch4" %in% s) bslib::value_box(title = t("res_vb_manure_ch4_t"),
+        value = textOutput("vb_manure_ch4"), showcase = icon("recycle"), theme = "success"),
+      if (any(c("manure_n2o_direct", "manure_n2o_indirect") %in% s)) bslib::value_box(
+        title = t("res_vb_manure_n2o_t"), value = textOutput("vb_manure_n2o"),
+        p(t("res_vb_direct_indirect")), showcase = icon("cloud"), theme = "primary"),
+      if (any(c("pasture_n2o_direct", "pasture_n2o_indirect") %in% s)) bslib::value_box(
+        title = t("res_vb_pasture_n2o_t"), value = textOutput("vb_pasture_n2o"),
+        p(t("res_vb_direct_indirect")), showcase = icon("seedling"), theme = "primary"),
+      bslib::value_box(title = t("res_vb_total_moe_pct"), value = textOutput("vb_moe_total"),
+        p(t("res_vb_total_moe_sub")), showcase = icon("percent"), theme = "warning"))
+    do.call(bslib::layout_columns, c(list(col_widths = NULL), Filter(Negate(is.null), boxes)))
+  })
+  .sources_line <- function(s) {
+    if (is.null(s) || all_sources_selected(s)) return(NULL)
+    div(class = "info-panel", style = "margin: 4px 12px 10px;", icon("filter"), " ",
+        tags$strong(t("res_sources_included")), " ", sources_label(s, get0(".LANG_CURRENT", envir = .GlobalEnv, ifnotfound = "en")))
+  }
+  output$sources_included_ui <- renderUI(.sources_line(rv$run_settings$emission_sources))
+  output$sources_included_ui_rep <- renderUI(.sources_line(rv$run_settings$emission_sources))
+  output$trend_sources_included_ui <- renderUI(.sources_line(rv_trend$run_args$emission_sources))
+  output$trend_sources_included_ui_rep <- renderUI(.sources_line(rv_trend$run_args$emission_sources))
+  outputOptions(output, "vb_cards_ui", suspendWhenHidden = FALSE)
+
   output$vb_enteric_ch4 <- renderText({ req(rv$uncertainty); .vb_mean("total_enteric_ch4") })
   output$vb_manure_ch4  <- renderText({ req(rv$uncertainty); .vb_mean("total_manure_ch4") })
   output$vb_manure_n2o  <- renderText({
@@ -2538,7 +2529,7 @@ app_server <- function(input, output, session) {
       uniq_ct_per_group[names(agg)]
     }
 
-    gwp_vals <- GWP_VALUES[[input$gwp_version]]
+    gwp_vals <- GWP_VALUES[[rv$run_settings$gwp_version %||% input$gwp_version]]
     g_ch4 <- gwp_vals$CH4
     g_n2o <- gwp_vals$N2O
 
@@ -2749,6 +2740,20 @@ app_server <- function(input, output, session) {
     updateSelectizeInput(session, "sens_groups", selected = character(0))
   })
 
+  # 2026-11-04: the output dropdown offers the ticked sources only, and its
+  # total reads "selected sources" when not all six were ticked.
+  observeEvent(rv$run_settings, {
+    s <- rv$run_settings$emission_sources %||% ALL_SOURCE_KEYS
+    keys <- c(enteric_ch4 = "src_enteric_ch4", manure_ch4 = "src_manure_ch4",
+              manure_n2o_direct = "src_manure_n2o_d", manure_n2o_indirect = "src_manure_n2o_i",
+              pasture_n2o_direct = "src_pasture_n2o_d", pasture_n2o_indirect = "src_pasture_n2o_i")
+    on <- SOURCE_COLUMNS$key %in% s
+    ch <- c("total_co2e", SOURCE_COLUMNS$suffix[on])
+    names(ch) <- c(if (all_sources_selected(s)) t("sens_total_co2e") else t("sens_total_co2e_sel"),
+                   vapply(keys[SOURCE_COLUMNS$key[on]], t, character(1)))
+    updateSelectInput(session, "sens_source", choices = ch, selected = "total_co2e")
+  }, ignoreNULL = TRUE)
+
   # T7.2: now also recomputes per-source sensitivity on demand (against the
   # selected output column) using the cached samples.
   active_sensitivity <- reactive({
@@ -2779,8 +2784,11 @@ app_server <- function(input, output, session) {
       } else {
         rowSums(sapply(base$by_system, function(s) s$results[[src]]))
       }
+      # 2026-11-04: only the inputs that feed this source
+      src_key <- SOURCE_COLUMNS$key[match(src, SOURCE_COLUMNS$suffix)]
       raw <- aggregate_sensitivity(base$by_system, per_source_total,
-                                    method = "both")
+                                    method = "both",
+                                    sources = if (!is.na(src_key)) src_key else NULL)
     }
 
     # Group filter: only apply when the dropdown is rendered (multi-group runs).
@@ -3053,15 +3061,15 @@ app_server <- function(input, output, session) {
         qa_caveats  = .qa_caveats_export(),
         manure      = rv$manure_data,
         settings = list(
-          n_iter           = as.integer(input$n_iter),
-          corr_mode        = input$corr_mode,
-          run_comparison   = input$run_comparison,
-          gwp_version      = input$gwp_version,
-          seed             = input$seed,
-          analysis_mode    = input$analysis_mode,
-          emission_sources = input$emission_sources,
-          n_group_corr     = input$n_group_corr %||% "full",
-          n_year_corr      = input$n_year_corr %||% "none",
+          n_iter           = rv$run_settings$n_iter %||% as.integer(input$n_iter),
+          corr_mode        = rv$run_settings$corr_mode %||% input$corr_mode,
+          run_comparison   = rv$run_settings$run_comparison %||% input$run_comparison,
+          gwp_version      = rv$run_settings$gwp_version %||% input$gwp_version,
+          seed             = rv$run_settings$seed %||% input$seed,
+          analysis_mode    = rv$run_settings$analysis_mode %||% input$analysis_mode,
+          emission_sources = rv$run_settings$emission_sources %||% input$emission_sources,
+          n_group_corr     = rv$run_settings$n_group_corr %||% input$n_group_corr %||% "full",
+          n_year_corr      = rv$run_settings$n_year_corr %||% input$n_year_corr %||% "none",
           # How each group reached gross energy. An inventory report that
           # does not say which groups bypassed the energy balance is not
           # reproducible, so this travels with every export.
@@ -3088,14 +3096,15 @@ app_server <- function(input, output, session) {
         shiny::need(!is.null(rv$mc_results),  "Run a Monte Carlo simulation on Tab 5 before downloading the Word summary."),
         shiny::need(!is.null(rv$uncertainty), "Uncertainty metrics not yet computed.")
       )
+      rs <- rv$run_settings
       settings <- list(
-        n_iter            = as.integer(input$n_iter),
-        corr_mode         = input$corr_mode,
-        run_comparison    = isTRUE(input$run_comparison),
-        gwp_version       = input$gwp_version,
-        seed              = input$seed,
-        analysis_mode     = input$analysis_mode,
-        emission_sources  = input$emission_sources
+        n_iter            = rs$n_iter %||% as.integer(input$n_iter),
+        corr_mode         = rs$corr_mode %||% input$corr_mode,
+        run_comparison    = rs$run_comparison %||% isTRUE(input$run_comparison),
+        gwp_version       = rs$gwp_version %||% input$gwp_version,
+        seed              = rs$seed %||% input$seed,
+        analysis_mode     = rs$analysis_mode %||% input$analysis_mode,
+        emission_sources  = rs$emission_sources %||% input$emission_sources
       )
       # Round 9b: pass through the decomposition, comparison run (uncertainty
       # frame), diagnostics, and a samples frame for the density plot so the
@@ -3194,6 +3203,9 @@ app_server <- function(input, output, session) {
           yc <- if (!is.null(input$year_corr) && nzchar(input$year_corr)) input$year_corr else "full"
           gv <- if (!is.null(input$gwp_version) && nzchar(input$gwp_version)) input$gwp_version else "AR5"
           sd_ <- if (!is.null(input$seed)) input$seed else 42
+          # 2026-11-04: the Tab 4 ticks of this run, kept with it (the
+          # series, both paired runs and the downloads read this copy)
+          srcs_run <- normalize_sources(input$emission_sources)
 
           # Per-year progress callback: fan out the [0.05, 0.95] band across
           # the years so the bar advances as each per-year sim completes.
@@ -3214,7 +3226,7 @@ app_server <- function(input, output, session) {
           res <- run_trend_analysis(
             df, base_specs = rv$param_specs, n_iter = n_iter,
             gwp = gv, seed = sd_, year_corr = yc,
-            emission_sources = input$emission_sources,
+            emission_sources = srcs_run,
             progress_fn = prog_fn,
             manure      = rv$manure_data,
             crossgroup  = cg,
@@ -3238,6 +3250,7 @@ app_server <- function(input, output, session) {
             n_iter = n_iter_pair, gwp = gv, seed = sd_, year_corr = yc,
             manure = rv$manure_data, crossgroup = cg, corr_matrix = cm, sg_to_mm = sgm,
             n_group_rho = .n_group_rho(), n_year_corr = input$n_year_corr %||% "none",
+            emission_sources = srcs_run,
             progress_fn = function(frac, lbl) setProgress(0.60 + 0.36 * frac, detail = lbl))
 
           # 2026-10-29: the two sensitivity regressions (latest year, and the
@@ -3276,7 +3289,8 @@ app_server <- function(input, output, session) {
                                            corr_matrix = cm, sg_to_mm = sgm, year_corr = yc,
                                            n_iter_pair = n_iter_pair,
                                            n_group_rho = .n_group_rho(),
-                                           n_year_corr = input$n_year_corr %||% "none")
+                                           n_year_corr = input$n_year_corr %||% "none",
+                                           emission_sources = srcs_run)
           rv_trend$pairs           <- setNames(list(pair),
                                                .trend_pair_key(pair$base_year, pair$year_t))
           # year selectors: base year = first, year t = last, on both tabs
@@ -3683,6 +3697,7 @@ app_server <- function(input, output, session) {
                              crossgroup = a$crossgroup, corr_matrix = a$corr_matrix,
                              sg_to_mm = a$sg_to_mm,
                              n_group_rho = a$n_group_rho %||% 0, n_year_corr = a$n_year_corr %||% "none",
+                             emission_sources = a$emission_sources,
                              progress_fn = function(frac, lbl) setProgress(frac, detail = lbl)),
         error = function(e) { showNotification(conditionMessage(e), type = "error"); NULL })
     })
@@ -3875,7 +3890,7 @@ app_server <- function(input, output, session) {
         by_group             = rv_trend$res$system_summary,
         settings             = list(gwp_version = rv_trend$run_args$gwp %||% input$gwp_version,
                                     seed = rv_trend$run_args$seed %||% input$seed,
-                                    emission_sources = input$emission_sources,
+                                    emission_sources = rv_trend$run_args$emission_sources %||% input$emission_sources,
                                     corr_mode = input$corr_mode %||% "none",
                                     n_group_corr = input$n_group_corr %||% "full",
                                     n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none"),
@@ -3913,7 +3928,7 @@ app_server <- function(input, output, session) {
                                     n_year_corr = rv_trend$run_args$n_year_corr %||% input$n_year_corr %||% "none",
                                     gwp_version = rv_trend$run_args$gwp %||% input$gwp_version,
                                     seed = rv_trend$run_args$seed %||% input$seed,
-                                    emission_sources = input$emission_sources),
+                                    emission_sources = rv_trend$run_args$emission_sources %||% input$emission_sources),
         diagnostics          = rv_trend$diagnostics
       )
     }

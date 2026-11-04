@@ -1307,6 +1307,8 @@ lang_state_take <- function(token) {
     fr = "Le graphique tornade classe les entrées selon leur effet sur l'incertitude. Les barres vertes sont des entrées améliorables avec des données nationales ; les barres bleues sont des coefficients GIEC. Concentrez votre travail de données sur les premières barres vertes."
   ),
   sens_output_var = list(en = "Output variable", fr = "Variable de sortie"),
+  # 2026-11-04: the total when not every Tab 4 source was ticked
+  sens_total_co2e_sel = list(en = "Total CO₂eq (selected sources)", fr = "CO₂éq total (sources sélectionnées)"),
   sens_total_co2e = list(en = "Total CO₂eq (all sources)",
                            fr = "CO₂éq total (toutes sources)"),
   card_tornado_h = list(en = "Tornado Chart - Top Parameters",
@@ -2197,6 +2199,8 @@ lang_state_take <- function(token) {
   res_vb_direct_indirect = list(en = "Direct + indirect", fr = "Direct + indirect"),
 
   res_inline_total_co2e = list(en = "Total CO₂eq:", fr = "CO₂éq total :"),
+  # 2026-11-04: the line shown above the results when not every Tab 4 source was ticked
+  res_sources_included = list(en = "Sources included in every figure below:", fr = "Sources incluses dans tous les chiffres ci-dessous :"),
   res_inline_moe = list(en = "95% MoE:", fr = "MoE 95 % :"),
   res_inline_total_ch4 = list(en = "Total CH₄:", fr = "CH₄ total :"),
   res_inline_total_n2o = list(en = "Total N₂O:", fr = "N₂O total :"),
