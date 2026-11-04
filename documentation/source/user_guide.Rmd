@@ -361,6 +361,8 @@ In a trend run, the same card asks two more questions (Screenshot 7).
 - **Factors revised every few years.** Your factors are revised from time to time, and nearby years mostly rely on the same data. The error changes slowly from year to year and cancels only in part.
 - **New factors every year.** Each year's factors were measured anew with new field data. Each year's error is new, so nothing cancels, and the trend is at its most uncertain. Choose this only if that is really how your factors were made.
 
+Whichever you choose, each year uses its own values from the Parameter_TimeSeries sheet: if body weight, milk yield or digestibility change over the years, every year is simulated with its own value and range. The choice only decides how the errors of two years are linked.
+
 Why does this matter so much for a trend? Suppose your country uses the same emission factors for the whole time series. Then a draw with a high Ym in the base year should also have a high Ym in the current year. When the two years are compared, this coefficient uncertainty cancels out, and the uncertainty of the trend comes only from the changes in activity data. The IPCC (Volume 1, Chapter 3, section 3.2.3) calls this a "Type A" sensitivity. Treating the factors as independent from year to year would make the trend look much more uncertain than it is.
 
 What changes: the question about groups changes the uncertainty of each year's total; the questions about years change the uncertainty of the trend; none of them changes the mean. On the same tested inventory, in trend mode, the 95% range of the trend was about ±70 points with a new survey every year and about ±3 points with one census interpolated, with the coefficients fully correlated between years.

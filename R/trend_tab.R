@@ -53,13 +53,20 @@
       for (k in seq_along(sel)) {
         r <- sel[k]
         pc <- suppressWarnings(as.numeric(ps$uncertainty_pct[r]))
-        if (!is.na(pc)) {
+        lo <- suppressWarnings(as.numeric(ps$lower[r]))
+        hi <- suppressWarnings(as.numeric(ps$upper[r]))
+        # 2026-11-04: a row whose range is given by bounds may carry a 0 in
+        # uncertainty_pct; the bounds win then. Now that every year's draws
+        # come from its own specs (make_year_block_generator), taking the 0
+        # would have collapsed the range of every later year.
+        has_bounds <- !is.na(lo) && !is.na(hi) && hi > lo
+        if (!is.na(pc) && (pc > 0 || !has_bounds)) {
           ps$lower[r] <- new_mean * (1 - pc / 100)
           ps$upper[r] <- new_mean * (1 + pc / 100)
         } else if (!is.na(old_mean[k]) && old_mean[k] != 0) {
           ratio <- new_mean / old_mean[k]
-          ps$lower[r] <- suppressWarnings(as.numeric(ps$lower[r])) * ratio
-          ps$upper[r] <- suppressWarnings(as.numeric(ps$upper[r])) * ratio
+          ps$lower[r] <- lo * ratio
+          ps$upper[r] <- hi * ratio
         }
       }
     }
@@ -283,13 +290,13 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
   # "full": one set of per-group blocks, reused every year.
   # "partial": a generator yielding the next year's blocks, AR(1)-linked.
   # "none": no blocks; each year builds its own shared draws with its own seed.
-  full_blocks <- if (year_corr == "full")
-    build_full_coefficient_blocks(base_specs, n_iter, seed = seed,
-                                  crossgroup = crossgroup, corr_matrix = corr_matrix) else NULL
-  next_partial <- if (year_corr == "partial")
-    make_partial_block_generator(base_specs, n_iter, seed = seed,
-                                 rho = ar1_rho, crossgroup = crossgroup,
-                                 corr_matrix = corr_matrix) else NULL
+  # 2026-11-04: one generator for both links, fed each year's own specs, so
+  # a coefficient's time series reaches the draws (see
+  # make_year_block_generator() in R/systems_builder.R).
+  year_blocks <- if (year_corr %in% c("full", "partial"))
+    make_year_block_generator(base_specs, n_iter, seed = seed,
+                              rho = if (year_corr == "full") 1 else ar1_rho,
+                              crossgroup = crossgroup, corr_matrix = corr_matrix) else NULL
 
   rows            <- list()
   co2e_by_year    <- list()
@@ -327,9 +334,7 @@ run_trend_analysis <- function(trend_df, base_specs, n_iter = 2000,
     year_slice <- trend_df[trend_df$year == y, , drop = FALSE]
     ps <- .trend_year_specs(year_slice, base_specs)
 
-    blocks <- if (year_corr == "full") full_blocks
-              else if (year_corr == "partial") next_partial()
-              else NULL
+    blocks <- if (!is.null(year_blocks)) year_blocks(ps, yi) else NULL
 
     year_seed <- .trend_year_seed(seed, yi)
     built <- build_systems_data(ps, manure = manure, n_iter = n_iter,

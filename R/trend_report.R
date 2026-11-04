@@ -249,8 +249,8 @@ trend_decompose_year <- function(trend_df, base_specs, year, n_iter = 2000,
   # the same coefficient draws the trend run used for this year when the
   # blocks are shared across years
   blocks <- if (identical(year_corr, "full"))
-    build_full_coefficient_blocks(base_specs, n_iter, seed = seed, crossgroup = crossgroup,
-                                  corr_matrix = corr_matrix)
+    make_year_block_generator(base_specs, n_iter, seed = seed, rho = 1, crossgroup = crossgroup,
+                              corr_matrix = corr_matrix)(specs, yi)
   else NULL
   built <- build_systems_data(specs, manure = manure, n_iter = n_iter, seed = year_seed,
                               crossgroup = crossgroup, corr_matrix = corr_matrix,
@@ -329,16 +329,19 @@ trend_reporting_pair <- function(trend_df, base_specs, base_year, year_t,
 
   # coefficient draws between the two years, linked as the series links them
   blocks <- list()
+  # 2026-11-04: each year's blocks from that year's own specs (see
+  # make_year_block_generator()); "full" asks for the two years directly,
+  # "partial" steps through the chain up to the later one.
+  yspecs <- function(k) .trend_year_specs(trend_df[trend_df$year == years[k], , drop = FALSE], base_specs)
   if (identical(year_corr, "full")) {
-    b <- build_full_coefficient_blocks(base_specs, n_iter, seed = seed, crossgroup = crossgroup,
-                                       corr_matrix = corr_matrix)
-    for (y in pair) blocks[[as.character(y)]] <- b
+    gen <- make_year_block_generator(base_specs, n_iter, seed = seed, rho = 1,
+                                     crossgroup = crossgroup, corr_matrix = corr_matrix)
+    for (k in yi) blocks[[as.character(years[k])]] <- gen(yspecs(k), k)
   } else if (identical(year_corr, "partial")) {
-    next_partial <- make_partial_block_generator(base_specs, n_iter, seed = seed,
-                                                 rho = ar1_rho, crossgroup = crossgroup,
-                                                 corr_matrix = corr_matrix)
+    gen <- make_year_block_generator(base_specs, n_iter, seed = seed, rho = ar1_rho,
+                                     crossgroup = crossgroup, corr_matrix = corr_matrix)
     for (k in seq_len(max(yi))) {
-      bk <- next_partial()
+      bk <- gen(yspecs(k), k)
       if (k %in% yi) blocks[[as.character(years[k])]] <- bk
     }
   }

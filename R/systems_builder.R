@@ -355,106 +355,50 @@ build_systems_data <- function(specs, manure = NULL, n_iter, seed = NULL,
        group_key = group_key, sys_groups = sys_groups)
 }
 
-# Every coefficient of every group drawn once, as per-group blocks.
+# Coefficient draws across the years of a trend run.
 #
-# Used by trend mode for year_corr = "full": the same blocks are handed to
-# build_systems_data() for every year, so a coefficient's error is identical
-# in 2010 and 2022 and cancels in the difference, which is the IPCC default
-# (Vol. 1 Ch. 3 §3.2.2.4). Coefficients that several groups hold as the same
-# estimate share one draw across those groups when crossgroup = "shared",
-# exactly as build_shared_coefficient_draws() does within a year; the rest
-# are drawn independently per group. Activity data is never pre-sampled.
+# 2026-11-04 (review of the new version). Until this date the coefficient
+# draws were made once from the inventory-year specs and handed unchanged to
+# every year, under "full" (build_full_coefficient_blocks) and "partial"
+# (make_partial_block_generator). Only N is activity data, so BW, MW, WG,
+# Milk, Fat, pct_pregnant, DE, CP and MilkPR are coefficients: their values
+# in Parameter_TimeSeries were ignored under the default setting, and the
+# yearly means followed N only (DE 60/65/70 over three years gave the same
+# total every year). The year-to-year link now lives in the ranks, not in
+# the values: each draw id keeps a latent normal vector, and each year the
+# coefficient's marginal is drawn from THAT year's spec row, sorted, and
+# reordered by the rank of the latent.
+#   rho = 1    ("full"):    the latent is fixed, so the rank correlation
+#                           between any two years is 1 and the error cancels
+#                           in a difference, as before; each year keeps its
+#                           own mean and range.
+#   rho < 1    ("partial"): the latent follows a Gaussian AR(1),
+#                           z_t = rho z_{t-1} + sqrt(1 - rho^2) e_t; lag-k
+#                           Spearman is (6/pi) asin(rho^k / 2), about 0.68 at
+#                           lag 1 for rho = 0.7.
+# The shared-estimate partition (groups holding the same estimate share one
+# draw) is detected on the inventory-year specs. In a later year a group of
+# that partition whose value differs gets its own marginal, still ordered by
+# the shared latent; groups whose values still agree get the identical draw.
+# The Tab 3 matrix is imposed on the latent innovations between draws that
+# cover the same groups (.draw_set_chol), so it holds every year.
+# Memory: one n_iter latent per draw id, plus the year's draws.
 #
-# Memory is one n_iter vector per distinct draw. Groups whose coefficient
-# rows all resolve to the same draws share one matrix object.
-build_full_coefficient_blocks <- function(specs, n_iter, seed = NULL,
-                                          crossgroup = c("shared", "independent"),
-                                          corr_matrix = NULL) {
+# The generator returns function(year_specs = specs, year_index = NULL).
+# year_specs must be the inventory-year specs with the year's values
+# written in (.trend_year_specs keeps the rows in the same order). Under
+# rho = 1 any year can be asked for directly with its index; under rho < 1
+# the years must be asked for in order.
+make_year_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
+                                      crossgroup = c("shared", "independent"),
+                                      corr_matrix = NULL) {
   crossgroup <- match.arg(crossgroup)
   n_iter <- as.integer(n_iter)
   group_key <- make_group_key(specs)
   pt <- if ("param_type" %in% names(specs)) specs$param_type else NA
   pt[is.na(pt)] <- "coefficient"
   is_coef <- pt == "coefficient"
-  if (!any(is_coef)) return(list())
-
-  shared <- if (identical(crossgroup, "shared"))
-    detect_shared_parameters(specs, group_key) else list()
-
-  # Draw id per coefficient row: the partition id if the row is shared,
-  # otherwise its own (group, parameter).
-  draw_id <- rep(NA_character_, nrow(specs))
-  for (i in which(is_coef)) {
-    p <- specs$parameter[i]; g <- group_key[i]
-    id <- NULL
-    if (!is.null(shared[[p]])) {
-      for (pi in seq_along(shared[[p]])) {
-        if (g %in% shared[[p]][[pi]]) { id <- paste0(p, "#", pi); break }
-      }
-    }
-    if (is.null(id)) id <- paste0(p, "@", g)
-    draw_id[i] <- id
-  }
-
-  if (!is.null(seed)) set.seed(seed)
-  draws <- list(); id_groups <- list()
-  # Deterministic order: first appearance in the sheet.
-  for (i in which(is_coef)) {
-    id <- draw_id[i]
-    if (!is.null(draws[[id]])) next
-    draws[[id]] <- sample_distribution(n_iter, specs$distribution[i],
-                                       specs$mean[i], specs$lower[i], specs$upper[i])
-    id_groups[[id]] <- if (grepl("#", id, fixed = TRUE))
-      shared[[specs$parameter[i]]][[as.integer(sub("^.*#", "", id))]] else group_key[i]
-  }
-  # 2026-10-30: the Tab 3 matrix between draws that cover the same groups
-  # (a group's own coefficients among themselves, or shared estimates
-  # with the same group set), as in the single-year run.
-  draws <- .correlate_draw_sets(draws, id_groups, corr_matrix)
-
-  per_group <- split(seq_len(nrow(specs))[is_coef], group_key[is_coef])
-  per_group <- lapply(per_group, function(rows) {
-    ids <- draw_id[rows]; ps <- specs$parameter[rows]
-    # one column per parameter; a repeated row keeps its last occurrence,
-    # matching how the per-group sampler treats a repeated row
-    keep <- !duplicated(ps, fromLast = TRUE)
-    list(ids = ids[keep], params = ps[keep])
-  })
-  sig  <- vapply(per_group, function(x) paste(x$ids, collapse = "\r"), character(1))
-  mats <- list()
-  for (i in which(!duplicated(sig))) {
-    x <- per_group[[i]]
-    m <- do.call(cbind, draws[x$ids])
-    colnames(m) <- x$params
-    mats[[sig[i]]] <- m
-  }
-  blocks <- unname(lapply(sig, function(s) mats[[s]]))
-  names(blocks) <- names(per_group)
-  blocks
-}
-
-# Year-to-year correlated coefficient blocks for year_corr = "partial".
-#
-# Returns a closure; each call yields the per-group blocks for the next year.
-# The year-to-year link is a Gaussian AR(1) on a latent z per draw, with the
-# marginal imposed by rank: z_t = rho z_{t-1} + sqrt(1 - rho^2) e_t, and the
-# year's marginal draw is reordered by rank(z_t). Lag-k Spearman is then
-# (6/pi) asin(rho^k / 2), about 0.68 at lag 1 for rho = 0.7.
-#
-# 2026-10-16: this replaces the earlier .ar1_samples_one_coef(), which
-# reordered all years jointly with mc2d::cornode and therefore had to hold
-# n_iter x n_years per coefficient ROW. On 32 groups and 35 years that is
-# over 2 GB. The sequential form keeps one n_iter vector of state per
-# distinct draw, whichever the number of years.
-make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
-                                         crossgroup = c("shared", "independent"),
-                                         corr_matrix = NULL) {
-  crossgroup <- match.arg(crossgroup)
-  n_iter <- as.integer(n_iter)
-  group_key <- make_group_key(specs)
-  pt <- if ("param_type" %in% names(specs)) specs$param_type else NA
-  pt[is.na(pt)] <- "coefficient"
-  is_coef <- pt == "coefficient"
+  if (!any(is_coef)) return(function(year_specs = specs, year_index = NULL) list())
   shared <- if (identical(crossgroup, "shared"))
     detect_shared_parameters(specs, group_key) else list()
 
@@ -469,10 +413,8 @@ make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
     if (is.null(id)) id <- paste0(p, "@", g)
     draw_id[i] <- id
   }
-  ids   <- unique(draw_id[is_coef])
+  ids      <- unique(draw_id[is_coef])
   spec_row <- vapply(ids, function(id) which(draw_id == id)[1], integer(1))
-  # 2026-10-30: the Tab 3 matrix between draws that cover the same groups,
-  # imposed on the normal innovations so the AR(1) chain keeps it every year.
   id_groups <- lapply(ids, function(id) if (grepl("#", id, fixed = TRUE))
     shared[[sub("[#@].*$", "", id)]][[as.integer(sub("^.*#", "", id))]]
     else sub("^.*@", "", id))
@@ -480,40 +422,84 @@ make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
   chol_sets <- .draw_set_chol(ids, id_groups, corr_matrix)
   per_group <- split(seq_len(nrow(specs))[is_coef], group_key[is_coef])
   per_group <- lapply(per_group, function(rows) {
-    pids <- draw_id[rows]; ps <- specs$parameter[rows]
+    ps <- specs$parameter[rows]
+    # one column per parameter; a repeated row keeps its last occurrence,
+    # matching how the per-group sampler treats a repeated row
     keep <- !duplicated(ps, fromLast = TRUE)
-    list(ids = pids[keep], params = ps[keep])
+    list(rows = rows[keep], params = ps[keep])
   })
+  k_of <- stats::setNames(seq_along(ids), ids)
 
   st <- new.env(parent = emptyenv())
-  st$z <- NULL
-  st$year <- 0L
-  st$rng <- seed
+  st$z <- NULL; st$year <- 0L
 
-  function() {
-    st$year <- st$year + 1L
-    if (!is.null(st$rng)) set.seed(st$rng + st$year)
+  latent <- function() {
     z_new <- matrix(stats::rnorm(n_iter * length(ids)), nrow = n_iter)
     for (cs in chol_sets) z_new[, cs$k] <- z_new[, cs$k, drop = FALSE] %*% cs$U
-    st$z <- if (is.null(st$z)) z_new else rho * st$z + sqrt(1 - rho^2) * z_new
-    draws <- list()
-    for (k in seq_along(ids)) {
-      i <- spec_row[k]
-      m <- sort(sample_distribution(n_iter, specs$distribution[i],
-                                    specs$mean[i], specs$lower[i], specs$upper[i]))
-      draws[[ids[k]]] <- m[rank(st$z[, k], ties.method = "first")]
+    z_new
+  }
+  spec_sig <- function(ys, r) paste(ys$distribution[r], ys$mean[r], ys$lower[r], ys$upper[r], sep = "|")
+
+  function(year_specs = specs, year_index = NULL) {
+    if (nrow(year_specs) != nrow(specs))
+      stop("make_year_block_generator: the year's specs must keep the inventory-year rows.")
+    st$year <- if (!is.null(year_index)) as.integer(year_index) else st$year + 1L
+    if (rho >= 1) {
+      # one latent for every year, from the run seed
+      if (is.null(st$z)) { if (!is.null(seed)) set.seed(seed); st$z <- latent() }
+      if (!is.null(seed)) set.seed(seed + st$year)
+    } else {
+      if (!is.null(seed)) set.seed(seed + st$year)
+      z_new <- latent()
+      st$z <- if (is.null(st$z)) z_new else rho * st$z + sqrt(1 - rho^2) * z_new
     }
-    sig  <- vapply(per_group, function(x) paste(x$ids, collapse = "\r"), character(1))
+    # the year's marginal for each draw id (its first row), then any group
+    # whose value has moved away from it in this year
+    cache <- list()
+    draw_for <- function(id, r) {
+      key <- paste(id, spec_sig(year_specs, r), sep = "|")
+      if (is.null(cache[[key]])) {
+        m <- sort(sample_distribution(n_iter, year_specs$distribution[r],
+                                      year_specs$mean[r], year_specs$lower[r],
+                                      year_specs$upper[r]))
+        cache[[key]] <<- m[rank(st$z[, k_of[[id]]], ties.method = "first")]
+      }
+      key
+    }
+    for (k in seq_along(ids)) draw_for(ids[k], spec_row[k])
+    keys <- lapply(per_group, function(x)
+      vapply(x$rows, function(r) draw_for(draw_id[r], r), character(1)))
+    sig  <- vapply(keys, function(x) paste(x, collapse = "\r"), character(1))
     mats <- list()
     for (i in which(!duplicated(sig))) {
-      x <- per_group[[i]]
-      mm <- do.call(cbind, draws[x$ids]); colnames(mm) <- x$params
+      mm <- do.call(cbind, cache[keys[[i]]]); colnames(mm) <- per_group[[i]]$params
       mats[[sig[i]]] <- mm
     }
     blocks <- unname(lapply(sig, function(s) mats[[s]]))
     names(blocks) <- names(per_group)
     blocks
   }
+}
+
+# Every coefficient of every group drawn for one year with the "full" link
+# (kept for the audit and the seed test; trend code calls the generator).
+build_full_coefficient_blocks <- function(specs, n_iter, seed = NULL,
+                                          crossgroup = c("shared", "independent"),
+                                          corr_matrix = NULL, year_specs = specs,
+                                          year_index = 1L) {
+  make_year_block_generator(specs, n_iter, seed = seed, rho = 1,
+                            crossgroup = match.arg(crossgroup),
+                            corr_matrix = corr_matrix)(year_specs, year_index)
+}
+
+# Year-to-year correlated blocks for year_corr = "partial": each call yields
+# the next year's blocks (pass the year's specs so its values are used).
+make_partial_block_generator <- function(specs, n_iter, seed = NULL, rho = 0.7,
+                                         crossgroup = c("shared", "independent"),
+                                         corr_matrix = NULL) {
+  make_year_block_generator(specs, n_iter, seed = seed, rho = rho,
+                            crossgroup = match.arg(crossgroup),
+                            corr_matrix = corr_matrix)
 }
 
 # ---------------------------------------------------------------------------

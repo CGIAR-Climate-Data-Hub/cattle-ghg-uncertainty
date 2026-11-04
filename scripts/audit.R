@@ -822,7 +822,9 @@ section_D <- function() {
     s$mean[n_idx]  <- 100000 + (yr - 2018) * 5000
     s$lower[n_idx] <- s$mean[n_idx] * 0.95
     s$upper[n_idx] <- s$mean[n_idx] * 1.05
-    s$uncertainty_pct <- 0
+    # blank, as a real Parameter_TimeSeries is: each year keeps the row's own
+    # range (a 0 would mean "no uncertainty", now honoured per year)
+    s$uncertainty_pct <- NA
     trend_df <- rbind(trend_df, s)
   }
 
@@ -4672,6 +4674,50 @@ section_F <- function() {
              "Round trip: a group's series is copied from its file row (converted where the row is), the blocking failures reach run_qaqc through the hidden Translator_Checks sheet",
              f81_ok,
              notes = if (f81_ok) "scripts/test_translator_roundtrip.R passed" else paste(utils::tail(f81_out, 4), collapse = " | "))
+
+  # F88 -- trend coefficients follow their time series (2026-11-04). Until
+  # this date "full" and "partial" drew the coefficients once from the
+  # inventory-year specs, so a DE series 60/65/70 gave the same total every
+  # year. Now each year draws from its own specs and the link is in the
+  # ranks: means follow the series under every setting, the rank
+  # correlation between years is 1 under "full" and about 0.68 under
+  # "partial".
+  f88_fail <- tryCatch({
+    f <- character(0)
+    bs <- make_golden_specs(constant_dist = FALSE)
+    bs$cattle_type <- "dairy"; bs$aggregation_level <- "lvl"; bs$sub_category <- "A"
+    k <- bs$parameter == "DE"
+    bs$distribution[k] <- "normal"; bs$lower[k] <- 54; bs$upper[k] <- 66; bs$uncertainty_pct[k] <- 10
+    ts <- do.call(rbind, lapply(2020:2022, function(yr) {
+      d <- bs[bs$parameter %in% c("N", "DE"), c("cattle_type", "aggregation_level", "sub_category", "parameter", "mean")]
+      d$year <- yr; d$uncertainty_pct <- c(5, 10)[match(d$parameter, c("N", "DE"))]
+      d$mean[d$parameter == "DE"] <- 60 + 5 * (yr - 2020); d }))
+    m <- list()
+    for (yc in c("none", "full", "partial")) {
+      r <- run_trend_analysis(ts, bs, n_iter = 1500, gwp = "AR5", seed = 3, year_corr = yc)
+      m[[yc]] <- r$table$Mean_t_CO2eq
+      if (!(m[[yc]][3] < 0.9 * m[[yc]][1]))
+        f <- c(f, sprintf("%s: the total does not follow DE 60 to 70 (%.0f to %.0f)", yc, m[[yc]][1], m[[yc]][3]))
+    }
+    if (abs(m$full[3] / m$none[3] - 1) > 0.02)
+      f <- c(f, sprintf("full and none disagree on the year-3 mean (%.0f vs %.0f)", m$full[3], m$none[3]))
+    y3 <- .trend_year_specs(ts[ts$year == 2022, ], bs)
+    g <- make_year_block_generator(bs, 3000L, seed = 5, rho = 1)
+    a <- g(bs, 1L)[[1]][, "DE"]; b <- g(y3, 3L)[[1]][, "DE"]
+    if (abs(mean(b) - 70) > 0.5) f <- c(f, sprintf("full: year-3 DE draws centre on %.1f, not 70", mean(b)))
+    if (stats::cor(a, b, method = "spearman") < 0.999) f <- c(f, "full: the rank link between years is not 1")
+    gp <- make_year_block_generator(bs, 3000L, seed = 5, rho = 0.7)
+    a <- gp(bs, 1L)[[1]][, "DE"]; b <- gp(bs, 2L)[[1]][, "DE"]
+    rp <- stats::cor(a, b, method = "spearman")
+    if (abs(rp - 0.68) > 0.08) f <- c(f, sprintf("partial: lag-1 rank link %.2f, target 0.68", rp))
+    f
+  }, error = function(e) conditionMessage(e))
+  f88_ok <- length(f88_fail) == 0L
+  check_bool("F88", "F",
+             "Trend: coefficient time series reach the draws under every year-to-year setting; full keeps a rank link of 1 between years, partial about 0.68",
+             f88_ok,
+             notes = if (f88_ok) "DE 60/65/70: totals follow under none, full and partial; full rank link 1; partial 0.68"
+                     else paste(f88_fail, collapse = "; "))
 
   # F80 -- conversions declared by the AI and recomputed by the server
   # (2026-11-01, Stage 6): a milk mean within 0.2 % of source x days / 365
